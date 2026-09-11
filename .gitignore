@@ -1,0 +1,7 @@
+.gemini_chat_history.json
+.venv/
+.aicontext.txt
+.gemini.yaml
+*.old
+*.bak
+__pycache__/
