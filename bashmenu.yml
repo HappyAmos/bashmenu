@@ -1,5 +1,6 @@
 git_pat: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
 google_gemini_api_key: YOUR_GOOGLE_GEMINI_API_KEY
+scripts: scripts
 settings:
   dns:
     ipv4:
@@ -9,11 +10,12 @@ settings:
       primary: fdbd:6905:d4e0:1:7605:d849:9be:4689
       secondary: 2606:4700:4700::1111
   ping_target: 192.168.4.47
+  scripts_dir: '{bashmenu_dir}/scripts'
   show_menu_shortcuts: true
   tab_to_spaces: true
   tabstop: 4
-  templates_dir: "{bashmenu_dir}/templates"
-  scripts_dir: "{bashmenu_dir}/scripts"
+  templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
-theme: qbasic
+templates: templates
+theme: monochrome
 version: 0.0.1
