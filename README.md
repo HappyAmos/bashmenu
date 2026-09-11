@@ -7,7 +7,7 @@ through other python scripts to make bash as glamerous as the desktop!
 Configurable options via menu directives make creating settings a 
 breeze!
 
-Have an idea for a plug-in? Just set the script to run in a separate
+Have an idea for a plug-in? Just set the script to run in the same  
 process through the visual menu editor, and it will seamlessly switch
 to the new task.
 
