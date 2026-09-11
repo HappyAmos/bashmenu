@@ -1,6 +1,7 @@
-git_pat: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
-google_gemini_api_key: YOUR_GOOGLE_GEMINI_API_KEY
-scripts: scripts
+version: 0.0.1
+#templates: templates
+#scripts: scripts
+theme: monochrome
 settings:
   dns:
     ipv4:
@@ -16,6 +17,7 @@ settings:
   tabstop: 4
   templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
-templates: templates
-theme: monochrome
-version: 0.0.1
+custom_settings:
+  option_boolean: true
+  option_string: "A string of text"
+  option_filepath: '{bashmenu_dir}'

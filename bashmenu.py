@@ -10,13 +10,12 @@ tabstop/spaces support, whitespace visibility toggle, themed interactive file/
 directory chooser modal, Yes/No/Cancel confirmation dialogs, dynamic YAML dot-
 notation variable interpolation, item hotkey shortcuts, and ymlcheck validator.
 """
+__version__ = "0.0.1"
+__author__ = "HappyAmos"
 
 import contextlib
 import copy
 import curses
-
-__version__ = "0.0.1"
-__author__ = "HA Bash Menu Development Team"
 import getpass
 import io
 import os
@@ -34,15 +33,15 @@ import yaml
 os.environ.setdefault("ESCDELAY", "25")
 
 # Absolute path resolution
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASHMENU_DIR = SCRIPT_DIR
-CONFIG_FILE = os.path.join(SCRIPT_DIR, "bashmenu.yml")
-MENU_FILE = os.path.join(SCRIPT_DIR, "bashmenu.mnu")
-THEME_FILE = os.path.join(SCRIPT_DIR, "bashmenu.themes")
+# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASHMENU_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASHMENU_DIR, "bashmenu.yml")
+MENU_FILE = os.path.join(BASHMENU_DIR, "bashmenu.mnu")
+THEME_FILE = os.path.join(BASHMENU_DIR, "bashmenu.themes")
 
 # Import ymlcheck validator module if available in application directory
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+if BASHMENU_DIR not in sys.path:
+    sys.path.insert(0, BASHMENU_DIR)
 
 try:
     import ymlcheck
@@ -80,7 +79,7 @@ PRIMARY_IP = get_primary_ip()
 # Auto-created in 'bashmenu.yml' if the file does not exist on startup.
 # ==============================================================================
 DEFAULT_CONFIG = {
-    "version": "0.0.1",
+    "version": __version__,
     "theme": "dracula",
     "git_pat": "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN",
     "google_gemini_api_key": "YOUR_GOOGLE_GEMINI_API_KEY",
@@ -1368,7 +1367,7 @@ def run_curses_editor(
         abs_path = (
             os.path.abspath(expanded_path)
             if os.path.isabs(expanded_path)
-            else os.path.abspath(os.path.join(SCRIPT_DIR, expanded_path))
+            else os.path.abspath(os.path.join(BASHMENU_DIR, expanded_path))
         )
         rel_name = os.path.basename(abs_path)
     else:
@@ -1533,7 +1532,7 @@ def run_curses_editor(
             abs_path = (
                 os.path.abspath(expanded)
                 if os.path.isabs(expanded)
-                else os.path.abspath(os.path.join(SCRIPT_DIR, expanded))
+                else os.path.abspath(os.path.join(BASHMENU_DIR, expanded))
             )
             rel_name = os.path.basename(abs_path)
             save_file()
@@ -2688,7 +2687,7 @@ def process_item_action(
         else:
             target_path = Path(os.path.abspath(os.path.expanduser(target_path_str)))
             if not os.path.isabs(template_path_str):
-                template_path = Path(SCRIPT_DIR) / template_path_str
+                template_path = Path(BASHMENU_DIR) / template_path_str
             else:
                 template_path = Path(template_path_str)
 
@@ -2814,8 +2813,8 @@ def process_item_action(
                 script_file = action_str.split(" ", 1)[0]
                 if script_file.endswith(".py"):
                     module_name = script_file[:-3]
-                    if SCRIPT_DIR not in sys.path:
-                        sys.path.insert(0, SCRIPT_DIR)
+                    if BASHMENU_DIR not in sys.path:
+                        sys.path.insert(0, BASHMENU_DIR)
                     try:
                         import importlib
                         if module_name in sys.modules:
@@ -2838,7 +2837,7 @@ def process_item_action(
             else:
                 if item_type == "script":
                     script_parts = action_str.split(" ", 1)
-                    script_path = os.path.join(SCRIPT_DIR, script_parts[0])
+                    script_path = os.path.join(BASHMENU_DIR, script_parts[0])
                     args = f" {script_parts[1]}" if len(script_parts) > 1 else ""
                     action_str = f'"{script_path}"{args}'
 

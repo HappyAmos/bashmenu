@@ -54,32 +54,35 @@ options:
       interactive: true
       user_mode: root
       quiet: true
+    - label: Install autoexec.sh Launcher
+      type: inject_block
+      template: '{templates_dir}/launch-autoexec.sh.tmpl'
+      target: ~/.bashrc
+      block_id: launch_autoexec
+      refresh: false
+    - label: Install bash_aliases From Template
+      type: inject_block
+      template: '{templates_dir}/bash_aliases.tmpl'
+      target: ~/.bash_aliases
+      block_id: bash_aliases
+      refresh: false
     - label: Install Basics (apt install vim mc htop glow gum curl wget git shellcheck
         shfmt)
       type: command
       user_mode: root
       action: apt install -y vim mc htop glow gum curl wget git shellcheck shfmt
       stream: true
-    - label: Install autoexec.sh Launcher
-      type: inject_block
-      template: templates/launch-autoexec.sh.tmpl
-      target: ~/.bashrc
-      block_id: launch_autoexec
-      refresh: false
-    - label: Install kmscon [scripts/install_kmscon.sh]
+    - label: Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]
       type: script
-      action: scripts/install_kmscon.sh
+      action: '{scripts_dir}/install_cheat.sh'
       stream: true
-    - label: Add bash_aliases From Template
-      type: inject_block
-      template: templates/bash_aliases.tmpl
-      target: ~/.bash_aliases
-      block_id: bash_aliases
-      refresh: false
-    - label: Install cheat markdown files from personal Github (requires configured
-        GitHub PAT)
+    - label: Install kmscon [{scripts_dir}/install_kmscon.sh]
       type: script
-      action: /home/andrew/scripts/bashmenu/scripts/install_cheat.sh
+      action: '{scripts_dir}/install_kmscon.sh'
+      stream: true
+    - label: Install Scripts From Private Repo [https://github.com/HappyAmos/scripts.git]
+      type: script
+      action: '{scripts_dir}/install_scripts.sh'
       stream: true
     - label: Back to Main Menu
       type: back
@@ -93,7 +96,7 @@ options:
       action: hostname
     - label: Show Configured DNS (getdns.py)
       type: script
-      action: /home/andrew/scripts/bashmenu/scripts/getdns.py
+      action: '{scripts_dir}/getdns.py'
       stream: true
     - label: Show Network Interfaces (ip a)
       type: command
@@ -117,8 +120,8 @@ options:
       prompt: 'Enter Hostname or IP Address:'
     - label: Configure DNS servers (dnsconfig.sh)
       type: script
-      action: /home/andrew/scripts/bashmenu/scripts/dnsconfig.sh {settings.dns.ipv4.primary}
-        {settings.dns.ipv4.secondary} {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}
+      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
+        {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
       stream: true
     - label: Back to Main Menu
       type: back
@@ -184,18 +187,6 @@ options:
     - label: Edit autoexec.sh [{home}/autoexec.sh]
       type: editor
       action: '{home}/autoexec.sh'
-    - label: Configure Gemini API Key [{google_gemini_api_key}]
-      type: config
-      key: google_gemini_api_key
-      title: Google Gemini API Key
-      prompt: 'Enter Gemini API Key:'
-      masked: true
-    - label: Configure GitHub Personal Access Token [{git_pat}]
-      type: config
-      key: git_pat
-      title: GitHub Personal Access Token
-      prompt: 'Enter GitHub PAT:'
-      masked: true
     - label: Back to Main Menu
       type: back
 - label: System Information
