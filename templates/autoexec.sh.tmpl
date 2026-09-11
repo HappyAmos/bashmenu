@@ -4,6 +4,10 @@ else
   touch "$HOME/autoexec.sh"
 cat << 'EOF' > "$HOME/autoexec.sh"
 #!/bin/bash
+# autoexec.sh is run from .bashrc when loggin in to
+# the terminal. This is just an alternate location
+# to keep .bashrc as clean (oem) as possible.
+
 bash --version
 echo
 echo "Type cheat -l to list personal tagged cheatsheets."

@@ -1,3 +1,4 @@
+#!/bin/bash
 # Get the directory that the script is located in:
 # SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 SCRIPT_DIR="$(cd -P "$(dirname "$BASH_SOURCE")" && pwd)"
@@ -12,11 +13,11 @@ cd "$INSTALL_DIR" &>/dev/null || exit 1
 # Check if the directory is empty or not. If it's not, it might already have scripts installed:
 if [ -z "$(find "$INSTALL_DIR" -maxdepth 0 -empty)" ]; then
     echo "Directory is NOT empty, aborting git clone."
-	exit 1
+    exit 1
 else
-	# Clone the private git repository into ~/$INSTALL_DIR
-	echo "Directory is empty, cloning git repository."
-	# The '.' at the end tells git to install in the current directory, instead of creating a new folder in the 
-	# current directory
-	git clone https://HappyAmos:$("$SCRIPT_DIR/get_api_key.sh" "gitpat.txt")@github.com/HappyAmos/scripts.git .
+    # Clone the private git repository into ~/$INSTALL_DIR
+    echo "Directory is empty, cloning git repository."
+    # The '.' at the end tells git to install in the current directory, instead of creating a new folder in the 
+    # current directory
+    git clone https://HappyAmos:$("$SCRIPT_DIR/get_api_key.sh" "gitpat.txt")@github.com/HappyAmos/scripts.git .
 fi

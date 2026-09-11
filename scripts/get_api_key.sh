@@ -15,7 +15,7 @@ REMOTE_FILE_DIR="/mnt/wd320/private/andrew/Linux/"
 function print_help_text {
     echo "Download the text from a file via SSH from [$SERVER@$REMOTE_FILE_DIR]"
     echo "Usage: [options] <filename>"
-	echo "Options:"
+    echo "Options:"
     echo -e "  -h\t--help\t\t This information."
 }
 

@@ -7,10 +7,12 @@ options:
     title: Applications
     options:
     - label: Antigravity
+      icon: "{nf::#EE9FB0}"
       type: script
       action: /home/andrew/.local/bin/agy
       interactive: true
       quiet: true
+      icon: U+e7f0
     - label: Copilot
       type: command
       action: copilot
@@ -56,7 +58,7 @@ options:
       quiet: true
     - label: Install autoexec.sh Launcher
       type: inject_block
-      template: '{templates_dir}/launch-autoexec.sh.tmpl'
+      template: '{templates_dir}/autoexec.sh.tmpl'
       target: ~/.bashrc
       block_id: launch_autoexec
       refresh: false

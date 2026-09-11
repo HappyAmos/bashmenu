@@ -2367,17 +2367,55 @@ def get_display_width(s):
 
 def resolve_glyph(glyph_str):
     """
-    Resolve hex strings starting with '#' (e.g. #f07c) to their unicode characters.
+    Resolve hex strings starting with '#' or standard hex prefixes to their unicode characters.
     """
-    if glyph_str.startswith("#"):
+    if not isinstance(glyph_str, str) or not glyph_str:
+        return glyph_str
+
+    # Attempt to peel off leading '#' if present
+    temp_str = glyph_str
+    has_hash = False
+    if temp_str.startswith("#"):
+        has_hash = True
+        temp_str = temp_str[1:]
+
+    # List of recognized hex prefixes
+    prefixes = ["U+", "u+", "0x", "0X", "\\u", "\\U", "\\"]
+
+    # Try with a prefix (either directly or after stripping '#')
+    for prefix in prefixes:
+        if temp_str.startswith(prefix):
+            try:
+                hex_val = temp_str[len(prefix):]
+                val = int(hex_val, 16)
+                if val <= 0x10FFFF:
+                    return chr(val)
+                return bytes.fromhex(hex_val).decode("utf-8")
+            except Exception:
+                pass
+
+    # If it was just prefixed by '#' but has no other prefix (e.g., '#e7f0' or '#EE9FB0')
+    if has_hash:
         try:
-            hex_val = glyph_str[1:]
-            for prefix in ["U+", "u+", "0x", "\\u", "\\"]:
-                if hex_val.startswith(prefix):
-                    hex_val = hex_val[len(prefix):]
-            return chr(int(hex_val, 16))
+            val = int(temp_str, 16)
+            if val <= 0x10FFFF:
+                return chr(val)
+            return bytes.fromhex(temp_str).decode("utf-8")
         except Exception:
-            return glyph_str
+            pass
+
+    # Direct check if the original string starts directly with any of the prefixes
+    for prefix in prefixes:
+        if glyph_str.startswith(prefix):
+            try:
+                hex_val = glyph_str[len(prefix):]
+                val = int(hex_val, 16)
+                if val <= 0x10FFFF:
+                    return chr(val)
+                return bytes.fromhex(hex_val).decode("utf-8")
+            except Exception:
+                pass
+
     return glyph_str
 
 
@@ -2993,6 +3031,7 @@ def main(stdscr):
             for opt in options:
                 if "icon" in opt:
                     resolved = interpolate_placeholders(opt.get("icon", ""), config)
+                    resolved = resolve_glyph(resolved)
                     if resolved:
                         icon_lens.append(get_display_width(resolved))
             if icon_lens:
@@ -3102,6 +3141,7 @@ def main(stdscr):
             if has_icons:
                 icon_str = option.get("icon", "")
                 icon_resolved = interpolate_placeholders(icon_str, config) if icon_str else ""
+                icon_resolved = resolve_glyph(icon_resolved)
                 if icon_resolved:
                     safe_addstr(stdscr, y, curr_x, icon_resolved, attr)
                     curr_x += get_display_width(icon_resolved)
