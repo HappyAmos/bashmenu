@@ -22,4 +22,6 @@ settings:
   use_nerd_fonts: true
 templates: templates
 theme: pacman
+user:
+  nerdsearch: hat
 version: 0.0.1

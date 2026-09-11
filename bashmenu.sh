@@ -1,6 +1,9 @@
 #!/bin/bash
 # Version: 0.0.1
-# Author:  HA Bash Menu Development Team
+# Author:  HA Bash Menu
+
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASHMENU_SCRIPT="${SCRIPT_DIR}/bashmenu.py"
@@ -44,4 +47,4 @@ else
     PYTHON_BIN="${PYTHON_BIN:-python3}"
 fi
 
-"$PYTHON_BIN" "$BASHMENU_SCRIPT" "$@"
+"$PYTHON_BIN"  "$BASHMENU_SCRIPT" "$@"

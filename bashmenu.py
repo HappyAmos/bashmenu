@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env LANG=en_US.UTF-8 /usr/local/bin/python3
 """
 bashmenu.py - A lightweight TUI menu engine loaded from menu and theme files.
 
@@ -34,7 +34,6 @@ import yaml
 os.environ.setdefault("ESCDELAY", "25")
 
 # Absolute path resolution
-# SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASHMENU_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASHMENU_DIR, "bashmenu.yml")
 MENU_FILE = os.path.join(BASHMENU_DIR, "bashmenu.mnu")
@@ -56,6 +55,25 @@ VIMRC_PATH = str(Path.home() / ".vimrc")
 BASH_ALIASES_PATH = str(Path.home() / ".bash_aliases")
 HOSTNAME = socket.gethostname()
 
+def safe_isprintable(s: str) -> bool:
+    """
+    Returns True if the string contains only valid printable characters,
+    specifically preserving Nerd Font / PUA glyphs.
+    """
+    for char in s:
+        # Get the 2-letter Unicode category (e.g., 'Cc', 'Lo', 'Co')
+        category = unicodedata.category(char)
+        
+        # 'Co' is the category for Private Use Areas (where Nerd Fonts live)
+        if category == 'Co':
+            continue
+            
+        # 'C' covers Control (Cc), Format (Cf), Surrogate (Cs), and Unassigned (Cn)
+        # 'Z' covers separators (except regular space, handled by 'Zs' checks natively)
+        if category.startswith('C') or category == 'Zl' or category == 'Zp':
+            return False
+            
+    return True
 
 def get_primary_ip():
     """
@@ -2297,7 +2315,7 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
     def sanitize_line(line):
         """Expand tabs and filter printable characters."""
         line = line.expandtabs(4)
-        return "".join(c for c in line if c.isprintable())
+        return "".join(c for c in line if safe_isprintable(c)) # c.isprintable())
 
     output_lines = []
 
