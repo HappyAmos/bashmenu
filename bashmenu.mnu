@@ -1,0 +1,228 @@
+version: 0.0.1
+title: Bash Menu
+options:
+- label: Applications
+  icon: "{nf::\U0001F3AE}"
+  submenu:
+    title: Applications
+    options:
+    - label: Antigravity
+      type: script
+      action: /home/andrew/.local/bin/agy
+      interactive: true
+      quiet: true
+    - label: Copilot
+      type: command
+      action: copilot
+      interactive: true
+      quiet: true
+    - label: Gemini [New Session]
+      type: command
+      action: gemini
+      interactive: true
+      quiet: true
+    - label: Gemini [Resume Last Session]
+      type: command
+      action: gemini --resume latest
+      interactive: true
+      quiet: true
+    - label: Midnight Commander
+      type: script
+      action: /usr/bin/mc
+      interactive: true
+      quiet: true
+    - label: Built-In Text Editor
+      type: editor
+      show_whitespace: true
+      tabstop: 4
+    - label: Vim
+      type: command
+      action: vim
+      interactive: true
+      quiet: true
+    - label: Back to Main Menu
+      type: back
+- label: Install
+  icon: "{nf::\U0001F4E5}"
+  submenu:
+    title: Install Tools Menu
+    options:
+    - label: Apt update && upgrade
+      type: command
+      action: sudo apt update && sudo apt upgrade -y
+      stream: false
+      interactive: true
+      user_mode: root
+      quiet: true
+    - label: Install Basics (apt install vim mc htop glow gum curl wget git shellcheck
+        shfmt)
+      type: command
+      user_mode: root
+      action: apt install -y vim mc htop glow gum curl wget git shellcheck shfmt
+      stream: true
+    - label: Install autoexec.sh Launcher
+      type: inject_block
+      template: templates/launch-autoexec.sh.tmpl
+      target: ~/.bashrc
+      block_id: launch_autoexec
+      refresh: false
+    - label: Install kmscon [scripts/install_kmscon.sh]
+      type: script
+      action: scripts/install_kmscon.sh
+      stream: true
+    - label: Add bash_aliases From Template
+      type: inject_block
+      template: templates/bash_aliases.tmpl
+      target: ~/.bash_aliases
+      block_id: bash_aliases
+      refresh: false
+    - label: Install cheat markdown files from personal Github (requires configured
+        GitHub PAT)
+      type: script
+      action: /home/andrew/scripts/bashmenu/scripts/install_cheat.sh
+      stream: true
+    - label: Back to Main Menu
+      type: back
+- label: Network Utilities
+  icon: "{nf::\U0001F310}"
+  submenu:
+    title: Network Utilities Options
+    options:
+    - label: Show Hostname Information (hostname)
+      type: command
+      action: hostname
+    - label: Show Configured DNS (getdns.py)
+      type: script
+      action: /home/andrew/scripts/bashmenu/scripts/getdns.py
+      stream: true
+    - label: Show Network Interfaces (ip a)
+      type: command
+      action: ip a
+    - label: Ping Target [{settings.ping_target}]
+      type: confirm
+      title: Confirm Ping Task
+      message: Start pinging target host {settings.ping_target}?
+      on_yes:
+        type: command
+        action: ping -c 4 {settings.ping_target}
+        stream: true
+      on_no:
+        type: message
+        title: Task Cancelled
+        message: Ping request was cancelled by user.
+    - label: Configure Ping Target [{settings.ping_target}]
+      type: config
+      key: settings.ping_target
+      title: Edit Ping Target
+      prompt: 'Enter Hostname or IP Address:'
+    - label: Configure DNS servers (dnsconfig.sh)
+      type: script
+      action: /home/andrew/scripts/bashmenu/scripts/dnsconfig.sh {settings.dns.ipv4.primary}
+        {settings.dns.ipv4.secondary} {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}
+      stream: true
+    - label: Back to Main Menu
+      type: back
+- label: Options & Settings
+  icon: "{nf::\u2699\uFE0F}"
+  submenu:
+    title: Options & Settings
+    options:
+    - label: Bashmenu Settings
+      submenu:
+        title: Bashmenu Settings
+        options:
+        - label: Visual Menu Editor (menuedit.py)
+          type: script
+          action: menuedit.py
+          interactive: true
+          quiet: true
+          refresh: true
+          external: false
+        - label: Edit Menu Layout (bashmenu.mnu)
+          type: editor
+          action: bashmenu.mnu
+          show_whitespace: true
+        - label: Change Color Theme
+          type: theme_selector
+        - label: Edit Themes File (bashmenu.themes)
+          type: editor
+          action: bashmenu.themes
+        - label: Editor Tabstop Distance [{settings.tabstop}]
+          type: config
+          key: settings.tabstop
+          title: Configure Tabstop Distance
+          prompt: 'Enter tabstop distance (spaces per TAB press):'
+        - label: Editor Tab to Spaces Mode [{settings.tab_to_spaces}]
+          type: toggle
+          key: settings.tab_to_spaces
+          title: Configure Tab Mode
+          prompt: 'Convert TAB key to spaces? (true/false):'
+        - label: Enable Nerd Fonts [{settings.use_nerd_fonts}]
+          type: toggle
+          key: settings.use_nerd_fonts
+          title: Toggle Nerd Fonts
+          message: Enable colorful menu emojis and Nerd Fonts?
+        - label: Edit Configuration File (bashmenu.yml)
+          type: editor
+          action: bashmenu.yml
+          show_whitespace: true
+        - label: Back to Options & Settings
+          type: back
+    - label: Edit .bashrc [{bashrc}]
+      type: editor
+      action: '{bashrc}'
+      show_whitespace: true
+    - label: Edit .vimrc [{vimrc}]
+      type: editor
+      action: '{vimrc}'
+      show_whitespace: false
+      tabstop: 4
+    - label: Edit .bash_aliases [{bash_aliases}]
+      type: editor
+      action: '{bash_aliases}'
+      show_whitespace: true
+    - label: Edit autoexec.sh [{home}/autoexec.sh]
+      type: editor
+      action: '{home}/autoexec.sh'
+    - label: Configure Gemini API Key [{google_gemini_api_key}]
+      type: config
+      key: google_gemini_api_key
+      title: Google Gemini API Key
+      prompt: 'Enter Gemini API Key:'
+      masked: true
+    - label: Configure GitHub Personal Access Token [{git_pat}]
+      type: config
+      key: git_pat
+      title: GitHub Personal Access Token
+      prompt: 'Enter GitHub PAT:'
+      masked: true
+    - label: Back to Main Menu
+      type: back
+- label: System Information
+  icon: "{nf::\u2139\uFE0F}"
+  submenu:
+    title: System Information Options
+    options:
+    - label: Check Disk Usage (df -h)
+      type: command
+      action: df -h
+    - label: Check RAM Usage (free -h)
+      type: command
+      action: free -h
+    - label: Check USB Controller (lsusb -vt)
+      type: command
+      action: lsusb -vt
+    - label: Check CPU Information (lscpu)
+      type: command
+      action: lscpu
+    - label: Back to Main Menu
+      type: back
+- label: Help [glow -p README.md]
+  icon: "{nf::\u2753}"
+  type: command
+  action: glow -p {bashmenu_dir}/README.md
+  interactive: true
+  quiet: true
+- label: Exit Menu
+  icon: "{nf::\U0001F6AA}"
+  type: exit

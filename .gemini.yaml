@@ -1,0 +1,35 @@
+# Model choice for this directory (default: gemini-3.6-flash)
+model: "gemini-3.6-flash"
+
+# System instruction sent ONLY on initial conversation setup
+system_instruction: >
+  You are an expert Python engineer. Keep responses concise
+  and focused on clean code and performance. The environment
+  for this user is a text only interface using a custom tool
+  that does not accept binary files, or execute function
+  calls. Therefore all source code should be sent only as 
+  text in your replies. If you are asked to create documentation
+  or comments or README.md, please keep the lines less than
+  80 characters for legibility in a terminal interface.
+  Code may exceed 80 characters in length of course, and the
+  length restriction does not apply to inline comments that
+  appear adjacent to a code statement. It would be helpful
+  if you could suggest a commit statement suggestion after
+  full code dumps that summarizes the changes.
+
+# Maximum number of turns to keep in chat history
+max_history_turns: 25
+
+# Default project source files to load with -p / --project
+files:
+  - "bashmenu.py"         # Main script
+  - "bashmenu.yml"        # Menu configuration
+  - "bashmenu.mnu"        # Menu definitions
+  - "bashmenu.themes"     # Themes definitions
+  - "bashmenu.md"         # Cheatsheet for using bashconfig, and it's schemas
+  - "ymlcheck.py"         # Simple python tool for validating yaml files
+  - "README.md"           # Github forward facing page
+  - "bashmenu.1"          # Man page for bashconfig.py
+  - "ymlcheck.1"          # Man page for ymlcheck.1
+  - "menuedit.py"         # Built in visual menu editor
+  - "getdns.py"           # CLI script to retrieve configured DNS settings

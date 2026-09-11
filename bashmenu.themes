@@ -1,0 +1,539 @@
+dracula:
+  indicator: "{nf:@:\uee90}"
+  256:
+    background: "COLOR_BLACK"
+    title: [201, -1]
+    border: [61, -1]
+    text: [255, -1]
+    highlight: [255, 201]
+    accent: [117, -1]
+    footer: [61, -1]
+    shadow: [236, "COLOR_BLACK"]
+    gutter: [239, -1]
+    selection: [255, 61]
+    status_bar: ["COLOR_BLACK", 117]
+    shortcut_key: [201, -1]
+    shortcut_label: [255, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_MAGENTA", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_WHITE", "COLOR_MAGENTA"]
+    accent: ["COLOR_CYAN", -1]
+    footer: ["COLOR_BLUE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
+    shortcut_key: ["COLOR_MAGENTA", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_MAGENTA", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_WHITE", "COLOR_MAGENTA"]
+    accent: ["COLOR_CYAN", -1]
+    footer: ["COLOR_BLUE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_BLUE", -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
+    shortcut_key: ["COLOR_MAGENTA", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+
+nord:
+  indicator: "{nf:#:\uef66}"
+  256:
+    background: "COLOR_BLACK"
+    title: [111, -1]
+    border: [60, -1]
+    text: [255, -1]
+    highlight: ["COLOR_BLACK", 111]
+    accent: [60, -1]
+    footer: [255, -1]
+    shadow: [236, "COLOR_BLACK"]
+    gutter: [239, -1]
+    selection: [255, 60]
+    status_bar: [255, 60]
+    shortcut_key: [111, -1]
+    shortcut_label: [255, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_CYAN", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_CYAN"]
+    accent: ["COLOR_BLUE", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_WHITE", "COLOR_BLUE"]
+    shortcut_key: ["COLOR_CYAN", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_CYAN", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_CYAN"]
+    accent: ["COLOR_BLUE", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_BLUE", -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_WHITE", "COLOR_BLUE"]
+    shortcut_key: ["COLOR_CYAN", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+
+cyberpunk:
+  indicator: "{nf:>:#f07c0}"
+  256:
+    background: "COLOR_BLACK"
+    title: [226, -1]
+    border: [201, -1]
+    text: [51, -1]
+    highlight: ["COLOR_BLACK", 226]
+    accent: [201, -1]
+    footer: [255, -1]
+    shadow: [236, "COLOR_BLACK"]
+    gutter: [201, -1]
+    selection: ["COLOR_BLACK", 51]
+    status_bar: ["COLOR_BLACK", 226]
+    shortcut_key: [226, -1]
+    shortcut_label: [51, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_MAGENTA", -1]
+    text: ["COLOR_CYAN", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_MAGENTA", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: ["COLOR_MAGENTA", -1]
+    selection: ["COLOR_BLACK", "COLOR_CYAN"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_CYAN", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_MAGENTA", -1]
+    text: ["COLOR_CYAN", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_MAGENTA", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_MAGENTA", -1]
+    selection: ["COLOR_BLACK", "COLOR_CYAN"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_CYAN", -1]
+
+gruvbox:
+  indicator: "{nf:&:#f0c6b}"
+  256:
+    background: -1
+    title: [214, -1]
+    border: [142, -1]
+    text: [223, -1]
+    highlight: [235, 214]
+    accent: [142, -1]
+    footer: [223, -1]
+    shadow: [236, "COLOR_BLACK"]
+    gutter: [243, -1]
+    selection: [235, 214]
+    status_bar: [235, 142]
+    shortcut_key: [214, -1]
+    shortcut_label: [223, -1]
+  16:
+    background: -1
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_GREEN", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_GREEN", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_WHITE", "COLOR_YELLOW"]
+    status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+  8:
+    background: -1
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_GREEN", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_GREEN", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_GREEN", -1]
+    selection: ["COLOR_WHITE", "COLOR_YELLOW"]
+    status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+
+qbasic:
+  indicator: "{nf:>:#e629}"
+  256:
+    background: 19
+    title: [226, 19]
+    border: [51, 19]
+    text: [255, 19]
+    highlight: [16, 51]
+    accent: [51, 19]
+    footer: [255, 19]
+    shadow: [16, 16]
+    gutter: [51, 19]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: [16, 51]
+    shortcut_key: [226, 19]
+    shortcut_label: [255, 19]
+  16:
+    background: "COLOR_BLUE"
+    title: ["COLOR_YELLOW", "COLOR_BLUE"]
+    border: ["COLOR_CYAN", "COLOR_BLUE"]
+    text: ["COLOR_WHITE", "COLOR_BLUE"]
+    highlight: ["COLOR_BLACK", "COLOR_CYAN"]
+    accent: ["COLOR_CYAN", "COLOR_BLUE"]
+    footer: ["COLOR_WHITE", "COLOR_BLUE"]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_CYAN", "COLOR_BLUE"]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
+    shortcut_key: ["COLOR_YELLOW", "COLOR_BLUE"]
+    shortcut_label: ["COLOR_WHITE", "COLOR_BLUE"]
+  8:
+    background: "COLOR_BLUE"
+    title: ["COLOR_YELLOW", "COLOR_BLUE"]
+    border: ["COLOR_CYAN", "COLOR_BLUE"]
+    text: ["COLOR_WHITE", "COLOR_BLUE"]
+    highlight: ["COLOR_BLACK", "COLOR_CYAN"]
+    accent: ["COLOR_CYAN", "COLOR_BLUE"]
+    footer: ["COLOR_WHITE", "COLOR_BLUE"]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_CYAN", "COLOR_BLUE"]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
+    shortcut_key: ["COLOR_YELLOW", "COLOR_BLUE"]
+    shortcut_label: ["COLOR_WHITE", "COLOR_BLUE"]
+
+pacman:
+  indicator: "{nf:):#f0baf}"
+  256:
+    background: "COLOR_BLACK"
+    title: [226, -1]
+    border: [21, -1]
+    text: [255, -1]
+    highlight: ["COLOR_BLACK", 226]
+    accent: [51, -1]
+    footer: [21, -1]
+    shadow: [236, "COLOR_BLACK"]
+    gutter: [196, -1]
+    selection: [255, 21]
+    status_bar: ["COLOR_BLACK", 226]
+    shortcut_key: [205, -1]
+    shortcut_label: [255, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_CYAN", -1]
+    footer: ["COLOR_BLUE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: ["COLOR_RED", -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_MAGENTA", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_CYAN", -1]
+    footer: ["COLOR_BLUE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_RED", -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_MAGENTA", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+
+industry:
+  indicator: "{nf:#:#f0b46}"
+  256:
+    background: 234
+    title: [214, 234]
+    border: [242, 234]
+    text: [250, 234]
+    highlight: [232, 214]
+    accent: [220, 234]
+    footer: [242, 234]
+    shadow: [233, "COLOR_BLACK"]
+    gutter: [240, 234]
+    selection: [255, 238]
+    status_bar: [232, 214]
+    shortcut_key: [214, 234]
+    shortcut_label: [250, 234]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_WHITE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_YELLOW", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_BLACK", "COLOR_YELLOW"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_WHITE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_YELLOW", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_WHITE", -1]
+    selection: ["COLOR_BLACK", "COLOR_YELLOW"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+
+matrix:
+  indicator: "{nf:->:#f0628}"
+  256:
+    background: "COLOR_BLACK"
+    title: [46, -1]
+    border: [34, -1]
+    text: [46, -1]
+    highlight: ["COLOR_BLACK", 46]
+    accent: [82, -1]
+    footer: [34, -1]
+    shadow: [236, "COLOR_BLACK"]
+    gutter: [22, -1]
+    selection: [255, 22]
+    status_bar: ["COLOR_BLACK", 46]
+    shortcut_key: [82, -1]
+    shortcut_label: [46, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_GREEN", -1]
+    border: ["COLOR_GREEN", -1]
+    text: ["COLOR_GREEN", -1]
+    highlight: ["COLOR_BLACK", "COLOR_GREEN"]
+    accent: ["COLOR_GREEN", -1]
+    footer: ["COLOR_GREEN", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_WHITE", "COLOR_GREEN"]
+    status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
+    shortcut_key: ["COLOR_GREEN", -1]
+    shortcut_label: ["COLOR_GREEN", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_GREEN", -1]
+    border: ["COLOR_GREEN", -1]
+    text: ["COLOR_GREEN", -1]
+    highlight: ["COLOR_BLACK", "COLOR_GREEN"]
+    accent: ["COLOR_GREEN", -1]
+    footer: ["COLOR_GREEN", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_GREEN", -1]
+    selection: ["COLOR_WHITE", "COLOR_GREEN"]
+    status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
+    shortcut_key: ["COLOR_GREEN", -1]
+    shortcut_label: ["COLOR_GREEN", -1]
+
+monochrome:
+  indicator: "{nf:>:#eee9}"
+  256:
+    background: "COLOR_BLACK"
+    title: [255, -1]
+    border: [245, -1]
+    text: [252, -1]
+    highlight: ["COLOR_BLACK", 255]
+    accent: [248, -1]
+    footer: [245, -1]
+    shadow: [235, "COLOR_BLACK"]
+    gutter: [239, -1]
+    selection: [232, 250]
+    status_bar: ["COLOR_BLACK", 255]
+    shortcut_key: [255, -1]
+    shortcut_label: [250, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_WHITE", -1]
+    border: ["COLOR_WHITE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_WHITE"]
+    accent: ["COLOR_WHITE", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: ["COLOR_BLACK", "COLOR_WHITE"]
+    shortcut_key: ["COLOR_WHITE", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_WHITE", -1]
+    border: ["COLOR_WHITE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_WHITE"]
+    accent: ["COLOR_WHITE", -1]
+    footer: ["COLOR_WHITE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_WHITE", -1]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: ["COLOR_BLACK", "COLOR_WHITE"]
+    shortcut_key: ["COLOR_WHITE", -1]
+    shortcut_label: ["COLOR_WHITE", -1]
+
+synthwave:
+  indicator: "{nf:>:#f147d}"
+  256:
+    background: "COLOR_BLACK"
+    title: [207, -1]
+    border: [129, -1]
+    text: [255, -1]
+    highlight: ["COLOR_BLACK", 201]
+    accent: [51, -1]
+    footer: [129, -1]
+    shadow: [234, "COLOR_BLACK"]
+    gutter: [238, -1]
+    selection: [255, 129]
+    status_bar: ["COLOR_BLACK", 51]
+    shortcut_key: [214, -1]
+    shortcut_label: [207, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_MAGENTA", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_MAGENTA"]
+    accent: ["COLOR_CYAN", -1]
+    footer: ["COLOR_BLUE", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_MAGENTA", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_MAGENTA", -1]
+    border: ["COLOR_BLUE", -1]
+    text: ["COLOR_WHITE", -1]
+    highlight: ["COLOR_BLACK", "COLOR_MAGENTA"]
+    accent: ["COLOR_CYAN", -1]
+    footer: ["COLOR_BLUE", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_BLUE", -1]
+    selection: ["COLOR_WHITE", "COLOR_BLUE"]
+    status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
+    shortcut_key: ["COLOR_YELLOW", -1]
+    shortcut_label: ["COLOR_MAGENTA", -1]
+
+amber_crt:
+  indicator: "{nf:>:#f0379}"
+  256:
+    background: "COLOR_BLACK"
+    title: [214, -1]
+    border: [172, -1]
+    text: [214, -1]
+    highlight: ["COLOR_BLACK", 214]
+    accent: [220, -1]
+    footer: [172, -1]
+    shadow: [234, "COLOR_BLACK"]
+    gutter: [130, -1]
+    selection: [0, 214]
+    status_bar: ["COLOR_BLACK", 214]
+    shortcut_key: [220, -1]
+    shortcut_label: [172, -1]
+  16:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_YELLOW", -1]
+    text: ["COLOR_YELLOW", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_WHITE", -1]
+    footer: ["COLOR_YELLOW", -1]
+    shadow: [8, "COLOR_BLACK"]
+    gutter: [8, -1]
+    selection: ["COLOR_BLACK", "COLOR_YELLOW"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_WHITE", -1]
+    shortcut_label: ["COLOR_YELLOW", -1]
+  8:
+    background: "COLOR_BLACK"
+    title: ["COLOR_YELLOW", -1]
+    border: ["COLOR_YELLOW", -1]
+    text: ["COLOR_YELLOW", -1]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_WHITE", -1]
+    footer: ["COLOR_YELLOW", -1]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_YELLOW", -1]
+    selection: ["COLOR_BLACK", "COLOR_YELLOW"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_WHITE", -1]
+    shortcut_label: ["COLOR_YELLOW", -1]
+
+hotdog_stand:
+  indicator: "{nf:o.O:#e251}"
+  256:
+    background: 196
+    title: [226, 196]
+    border: [226, 196]
+    text: [226, 196]
+    highlight: [16, 226]
+    accent: [255, 196]
+    footer: [226, 196]
+    shadow: [16, 16]
+    gutter: [220, 196]
+    selection: [16, 255]
+    status_bar: [16, 226]
+    shortcut_key: [255, 196]
+    shortcut_label: [226, 196]
+  16:
+    background: "COLOR_RED"
+    title: ["COLOR_YELLOW", "COLOR_RED"]
+    border: ["COLOR_YELLOW", "COLOR_RED"]
+    text: ["COLOR_YELLOW", "COLOR_RED"]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_WHITE", "COLOR_RED"]
+    footer: ["COLOR_YELLOW", "COLOR_RED"]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_YELLOW", "COLOR_RED"]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_WHITE", "COLOR_RED"]
+    shortcut_label: ["COLOR_YELLOW", "COLOR_RED"]
+  8:
+    background: "COLOR_RED"
+    title: ["COLOR_YELLOW", "COLOR_RED"]
+    border: ["COLOR_YELLOW", "COLOR_RED"]
+    text: ["COLOR_YELLOW", "COLOR_RED"]
+    highlight: ["COLOR_BLACK", "COLOR_YELLOW"]
+    accent: ["COLOR_WHITE", "COLOR_RED"]
+    footer: ["COLOR_YELLOW", "COLOR_RED"]
+    shadow: ["COLOR_BLACK", "COLOR_BLACK"]
+    gutter: ["COLOR_YELLOW", "COLOR_RED"]
+    selection: ["COLOR_BLACK", "COLOR_WHITE"]
+    status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
+    shortcut_key: ["COLOR_WHITE", "COLOR_RED"]
+    shortcut_label: ["COLOR_YELLOW", "COLOR_RED"]

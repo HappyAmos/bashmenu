@@ -1,0 +1,33 @@
+.TH YMLCHECK 1 "2026-03-31" "v0.0.1" "HA Bash Menu"
+.SH NAME
+ymlcheck \- validate YAML theme files and configurations for HA Bash Menu
+.SH SYNOPSIS
+.B python3 ymlcheck.py
+.I <path_to_theme.yaml>
+.SH DESCRIPTION
+.B ymlcheck.py
+is a command-line utility for validating YAML theme and configuration files.
+It verifies YAML syntax, schema structure, color depth mode mappings
+(256, 16, 8, truecolor), color index bounds, and curses color constants.
+.SH OPTIONS
+.TP
+.I <path_to_theme.yaml>
+Path to the YAML file to validate (e.g., bashmenu.themes).
+.SH DIAGNOSTICS
+.B ymlcheck.py
+prints detailed error messages including line numbers, column numbers,
+and context snippets if syntax or structural errors are found.
+.SH EXIT STATUS
+.TP
+.B 0
+File is valid.
+.TP
+.B 1
+Validation failed due to syntax errors or invalid theme values.
+.SH EXAMPLES
+Validate the default themes file:
+.RS
+.B python3 ymlcheck.py bashmenu.themes
+.RE
+.SH SEE ALSO
+.BR bashmenu (1)

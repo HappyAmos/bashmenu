@@ -1,0 +1,18 @@
+if [ -f "$HOME/autoexec.sh" ]; then
+  . "$HOME/autoexec.sh"
+else
+  touch "$HOME/autoexec.sh"
+cat << 'EOF' > "$HOME/autoexec.sh"
+#!/bin/bash
+bash --version
+echo
+echo "Type cheat -l to list personal tagged cheatsheets."
+echo "Type glow <somefile.md> to view markup"
+echo "Use <shellcheck script.sh> to run lint on bash scripts"
+echo "Type bm to launch an interactive launcher menu"
+echo "If apt is broken, try sudo apt --fix-broken install"
+echo
+export PATH=$PATH:~/scripts
+EOF
+
+fi

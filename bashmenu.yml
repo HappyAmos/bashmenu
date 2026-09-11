@@ -1,0 +1,19 @@
+git_pat: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
+google_gemini_api_key: YOUR_GOOGLE_GEMINI_API_KEY
+settings:
+  dns:
+    ipv4:
+      primary: 192.168.4.47
+      secondary: 1.1.1.1
+    ipv6:
+      primary: fdbd:6905:d4e0:1:7605:d849:9be:4689
+      secondary: 2606:4700:4700::1111
+  ping_target: 192.168.4.47
+  show_menu_shortcuts: true
+  tab_to_spaces: true
+  tabstop: 4
+  templates_dir: "{bashmenu_dir}/templates"
+  scripts_dir: "{bashmenu_dir}/scripts"
+  use_nerd_fonts: true
+theme: qbasic
+version: 0.0.1
