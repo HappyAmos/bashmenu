@@ -2,7 +2,34 @@
 
 A lightweight, data-driven Curses TUI (Text User Interface) menu engine
 for Linux systems, written in Python. It provides a modular framework
-configured entirely through YAML files.
+configured entirely through YAML, python and bash script files. Extendable
+through other python scripts to make bash as glamerous as the desktop! 
+Configurable options via menu directives make creating settings a 
+breeze!
+
+Have an idea for a plug-in? Just set the script to run in a separate
+process through the visual menu editor, and it will seamlessly switch
+to the new task.
+
+Create templates for injection into .bashrc or other run commands such 
+as .vimrc, to make setting up default settings on your machines a
+breeze.
+
+Everything is designed to select, click and go on about your day.
+
+This project is absolutely in beta, and is my current pet project.
+Expect some minor hic-ups, and contribute if you have an idea.
+Current version at initial release is 0.0.1.
+
+---
+
+Note:
+
+A default menu and settings is preconfigured, but almost everything is
+configurable. If you don't like the default menu options, or themes,
+change them! Join the project and help create the best shortcut manager,
+launcher, setup menu that has ever hit the terminal! Distributed under the
+generous MIT license, so do what you will with it!
 
 ---
 
@@ -27,19 +54,18 @@ configured entirely through YAML files.
   managing `bashmenu.mnu`. Reorder items (`m`/`M`), indent (`>`), outdent (`<`),
   add (`a`), edit (`e`/`ENTER`), edit raw YAML (`E`), delete (`d`), and test
   items (`t`). Press `F4` in `bashmenu.py` to launch.
-* **Built-in Nano-style Editor**: Multi-level undo/redo (`Alt+U`/`Alt+E`),
-  Save As (`Ctrl+S`/`F6`), Open (`Ctrl+R`/`F5`), New document (`Ctrl+N`/`F4`),
-  cut/copy/paste (`Ctrl+K`/`Alt+6`/`Ctrl+U`), text selection mark (`Ctrl+^`),
-  line numbers toggle (`Alt+N`), whitespace display (`Alt+P`), tabstop width
-  settings, and `$EDITOR` fallback (`F2`).
+* **Built-in Nano-style Editor**: Multi-level undo/redo,
 * **Variable Interpolation**: Dynamic string interpolation supporting `{user}`,
   `{home}`, `{bashrc}`, `{vimrc}`, `{bashmenu_dir}`, and configuration settings
   like `{settings.ping_target}` or `{git_pat}`.
 * **Nerd Fonts & Fallback Symbols**: Seamless support for terminal icons
   via the `nf:FALLBACK:GLYPH` syntax (and `{nf:FALLBACK:GLYPH}` bracketed syntax).
-  If `settings.use_nerd_fonts` is `true` in `bashmenu.yml`, the Nerd Font glyph is resolved.
-  If disabled, the fallback representation is used (or `""`, which automatically collapses the icon column for perfect, compact alignment).
-* **Settings Toggle Dialog (`type: toggle`)**: Interactive themed popups with True, False, and Cancel buttons, dynamically persisting selections in `bashmenu.yml`.
+  If `settings.use_nerd_fonts` is `true` in `bashmenu.yml`, the Nerd Font glyph is 
+  resolved.
+  If disabled, the fallback representation is used (or `""`, which automatically 
+  collapses the icon column for perfect, compact alignment).
+* **Settings Toggle Dialog (`type: toggle`)**: Interactive themed popups with True, 
+  False, and Cancel buttons, dynamically persisting selections in `bashmenu.yml`.
 * **Dynamic Block Injection**: Custom `inject_block` action type that allows
   injecting modular configuration blocks from templates into target files (e.g.
   injecting alias sourcing into `~/.bashrc`), with automatic, interactive
@@ -57,7 +83,7 @@ configured entirely through YAML files.
 
 ## Setup & Execution
 
-Run the launcher script to start the application. The launcher will
+Run the wrapper (launcher) script to start the application. The launcher will
 automatically handle Python virtual environment creation and download the
 necessary `PyYAML` dependency if missing or corrupted:
 
@@ -175,7 +201,9 @@ alias edit-menu="bashmenu.sh"
 
 ## Nerd Fonts Configuration & Syntax
 
-The system natively supports custom Nerd Font glyphs with automatic simpler emoji or text fallbacks. In your `bashmenu.mnu`, menu option labels are separated from their icons:
+The system natively supports custom Nerd Font glyphs with automatic simpler 
+emoji or text fallbacks. In your `bashmenu.mnu`, menu option labels are 
+separated from their icons:
 
 ```yaml
 - label: "Applications"
@@ -183,17 +211,30 @@ The system natively supports custom Nerd Font glyphs with automatic simpler emoj
 ```
 
 ### How it Works:
-1. **With Nerd Fonts Enabled:** If `settings.use_nerd_fonts` is `true` in `bashmenu.yml`, the engine translates the tag into the colorful glyph (e.g. `\U0001F3AE` / 🎮).
-2. **With Nerd Fonts Disabled:** If disabled, the tag resolves to an empty string `""`. The layout engine automatically collapses the icon padding column, so that option labels slide left and align compactly and perfectly next to shortcut numbers without any visual gaps.
-3. **Themes Integration**: Theme indicators can use the raw `nf:FALLBACK:GLYPH` syntax (e.g., `indicator: "nf:>:\uf0a4"` or `indicator: "nf:>:#f0a4"`), which dynamically renders the glyph character if Nerd Fonts are enabled, and `>` otherwise. The glyph can be specified as a raw character, or as a hexadecimal code point prefixed with `#` (e.g., `#f0a4` or `#f07c0`).
-4. **Width Precision**: The layout engine tracks true visual column widths (including 0-width variation selectors like `\uFE0F` and 2-width terminal emojis), ensuring everything stays pixel-perfectly aligned.
+1. **With Nerd Fonts Enabled:** If `settings.use_nerd_fonts` is `true` 
+   in `bashmenu.yml`, the engine translates the tag into the colorful glyph 
+   (e.g. `\U0001F3AE` / 🎮).
+2. **With Nerd Fonts Disabled:** If disabled, the tag resolves to an empty 
+   string `""`. The layout engine automatically collapses the icon padding column, 
+   so that option labels slide left and align compactly and perfectly next to 
+   shortcut numbers without any visual gaps.
+3. **Themes Integration**: Theme indicators can use the raw `nf:FALLBACK:GLYPH` 
+   syntax (e.g., `indicator: "nf:>:\uf0a4"` or `indicator: "nf:>:#f0a4"`), which 
+   dynamically renders the glyph character if Nerd Fonts are enabled, and `>` 
+   otherwise. The glyph can be specified as a raw character, or as a hexadecimal 
+   code point prefixed with `#` (e.g., `#f0a4` or `#f07c0`).
+4. **Width Precision**: The layout engine tracks true visual column widths 
+   (including 0-width variation selectors like `\uFE0F` and 2-width terminal 
+   emojis), ensuring everything stays pixel-perfectly aligned.
 
 ---
 
 ## Settings Toggle Dialog (`type: toggle`)
 
-The `toggle` or `config_toggle` directive displays a themed interactive pop-up with **True**, **False**, and **Cancel** buttons.
-* **True** (or `T`): Sets the designated dot-notation key (e.g., `settings.use_nerd_fonts`) in `bashmenu.yml` to `True`.
+The `toggle` or `config_toggle` directive displays a themed interactive pop-up 
+with **True**, **False**, and **Cancel** buttons.
+* **True** (or `T`): Sets the designated dot-notation key (e.g., 
+`settings.use_nerd_fonts`) in `bashmenu.yml` to `True`.
 * **False** (or `F`): Sets the key to `False`.
 * **Cancel** (or `C`/`ESC`): Exits without saving changes.
 
@@ -210,14 +251,19 @@ The `toggle` or `config_toggle` directive displays a themed interactive pop-up w
 
 ## Modularity & In-Process Plugins (`external: false`)
 
-To enable a plug-and-play plugin architecture, Python scripts (of `type: script`) can configure the `external` boolean directive in `bashmenu.mnu`:
-* **`external: true` (Default)**: Launches the script in a separate shell/subprocess. It temporarily suspends the current curses window.
-* **`external: false`**: Executes the Python script in-process using dynamic module loading. It avoids spinning up another shell/Python VM, eliminating terminal flashes entirely.
+To enable a plug-and-play plugin architecture, Python scripts (of `type: script`) 
+can configure the `external` boolean directive in `bashmenu.mnu`:
+* **`external: true` (Default)**: Launches the script in a separate shell/subprocess. 
+It temporarily suspends the current curses window.
+* **`external: false`**: Executes the Python script in-process using dynamic module 
+loading. It avoids spinning up another shell/Python VM, eliminating terminal flashes 
+entirely.
 
 #### Plugin Requirements:
 For an in-process script to run inside `bashmenu`'s parent process, it must:
 1. Be a Python script (`.py`).
-2. Implement a `def main(stdscr)` entry point function which takes the curses window as an argument.
+2. Implement a `def main(stdscr)` entry point function which takes the curses window 
+   as an argument.
 
 #### Example:
 ```yaml
