@@ -7,48 +7,48 @@ options:
     title: Applications
     options:
     - label: Antigravity
-      icon: "{nf::#EE9FB0}"
+      icon: '{nf::#EE9FB0}'
       type: script
       action: /home/andrew/.local/bin/agy
       interactive: true
       quiet: true
     - label: Copilot
-      icon: "{nf::#F0372}"
+      icon: '{nf::#F0372}'
       type: command
       action: copilot
       interactive: true
       quiet: true
     - label: Gemini [New Session]
-      icon: "{nf::#F1A0}"
+      icon: '{nf::#F1A0}'
       type: command
       action: gemini
       interactive: true
       quiet: true
     - label: Gemini [Resume Last Session]
-      icon: "{nf::#F1A0}"
+      icon: '{nf::#F1A0}'
       type: command
       action: gemini --resume latest
       interactive: true
       quiet: true
     - label: Midnight Commander
-      icon: "{nf::#f0ab6}"
+      icon: '{nf::#f0ab6}'
       type: script
       action: /usr/bin/mc
       interactive: true
       quiet: true
     - label: Built-In Text Editor
-      icon: "{nf::#f11e7}"
+      icon: '{nf::#f11e7}'
       type: editor
       show_whitespace: true
       tabstop: 4
     - label: Vim
-      icon: "{nf::#e62b}"
+      icon: '{nf::#e62b}'
       type: command
       action: vim
       interactive: true
       quiet: true
     - label: Back to Main Menu
-      icon: "{nf::#f048}"
+      icon: '{nf::#f048}'
       type: back
 - label: Install
   icon: "{nf::\U0001F4E5}"
@@ -62,38 +62,46 @@ options:
       interactive: true
       user_mode: root
       quiet: true
+      icon: '{nf::#f487}'
     - label: Install autoexec.sh Launcher
       type: inject_block
       template: '{templates_dir}/autoexec.sh.tmpl'
       target: ~/.bashrc
       block_id: launch_autoexec
       refresh: false
+      icon: '{nf::#ead3}'
     - label: Install bash_aliases From Template
       type: inject_block
       template: '{templates_dir}/bash_aliases.tmpl'
       target: ~/.bash_aliases
       block_id: bash_aliases
       refresh: false
+      icon: '{nf::#eeb6}'
     - label: Install Basics (apt install vim mc htop glow gum curl wget git shellcheck
         shfmt)
       type: command
       user_mode: root
       action: apt install -y vim mc htop glow gum curl wget git shellcheck shfmt
       stream: true
+      icon: '{nf::#ed5b}'
     - label: Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]
       type: script
       action: '{scripts_dir}/install_cheat.sh'
       stream: true
+      icon: '{nf::#f02aa}'
     - label: Install kmscon [{scripts_dir}/install_kmscon.sh]
       type: script
       action: '{scripts_dir}/install_kmscon.sh'
       stream: true
+      icon: '{nf::#ec84}'
     - label: Install Scripts From Private Repo [https://github.com/HappyAmos/scripts.git]
       type: script
       action: '{scripts_dir}/install_scripts.sh'
       stream: true
+      icon: '{nf::#ee79}'
     - label: Back to Main Menu
       type: back
+      icon: '{nf::#f048}'
 - label: Network Utilities
   icon: "{nf::\U0001F310}"
   submenu:
