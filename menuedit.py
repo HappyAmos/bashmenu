@@ -741,7 +741,9 @@ def main(stdscr):
         curr_node = nodes[selected_idx]
 
         tree_w = max(32, int(width * 0.48))
-        prop_w = width - tree_w - 3
+        if tree_w >= width - 4:
+            tree_w = max(10, width - 15)
+        prop_w = max(1, width - tree_w - 3)
 
         max_visible = height - 5
         scroll_top = max(0, selected_idx - (max_visible // 2))
@@ -767,7 +769,7 @@ def main(stdscr):
             pfx = nd.get("prefix", "")
 
             pfx_len = len(indent) + len(fold) + 1 + len(badge) + 1 + len(pfx)
-            label_avail_w = tree_w - 4 - pfx_len
+            label_avail_w = max(1, tree_w - 4 - pfx_len)
 
             if node_idx == selected_idx and len(label) > label_avail_w:
                 padded_text = label + (" " * label_avail_w) + label[:label_avail_w]
@@ -871,7 +873,7 @@ def main(stdscr):
                 badge = TYPE_BADGES.get(item.get("type", "submenu" if "submenu" in item else "option"), "[OPT]")
                 pfx = nd.get("prefix", "")
                 pfx_len = len(indent) + len(fold) + 1 + len(badge) + 1 + len(pfx)
-                law = tree_w - 4 - pfx_len
+                law = max(1, tree_w - 4 - pfx_len)
                 if len(label) > law:
                     if marquee_pause_ticks > 0:
                         marquee_pause_ticks -= 1

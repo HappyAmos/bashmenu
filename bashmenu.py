@@ -26,6 +26,7 @@ import subprocess
 import sys
 import termios
 import time
+import unicodedata
 from pathlib import Path
 import yaml
 
@@ -1895,9 +1896,11 @@ def run_curses_editor(
                 ("^G", "Get Help"),
                 ("^O", "WriteOut"),
                 ("^R", "Read File"),
+                ("^N", "New Doc"),
                 ("^K", "Cut"),
                 ("^U", "Paste"),
                 ("^C", "Location"),
+                ("M-6", "Copy"),
             ]
             shortcuts_r2 = [
                 ("^X", "Exit"),
@@ -1906,32 +1909,82 @@ def run_curses_editor(
                 ("M-E", "Redo"),
                 ("M-A", "Mark"),
                 ("M-N", "LineNo"),
+                ("M-P", "ShowWS"),
+                ("F2", "ExtEdit"),
             ]
 
-            def draw_help_row(row_y, shortcuts):
-                """Render shortcut keys and labels on editor status line."""
-                safe_addstr(stdscr, row_y, 1, " " * (width - 2), theme["text"])
-                col_w = max(10, (width - 2) // len(shortcuts))
-                for c_idx, (badge, label) in enumerate(shortcuts):
-                    x = 2 + (c_idx * col_w)
-                    if x + len(badge) + len(label) + 1 < width - 1:
+            # Clear both lines first with theme's standard background
+            safe_addstr(stdscr, status_y + 1, 1, " " * (width - 2), theme["text"])
+            safe_addstr(stdscr, status_y + 2, 1, " " * (width - 2), theme["text"])
+
+            num_cols_total = max(len(shortcuts_r1), len(shortcuts_r2))
+            col_widths = []
+            for col in range(num_cols_total):
+                w1 = len(shortcuts_r1[col][0]) + 1 + len(shortcuts_r1[col][1]) if col < len(shortcuts_r1) else 0
+                w2 = len(shortcuts_r2[col][0]) + 1 + len(shortcuts_r2[col][1]) if col < len(shortcuts_r2) else 0
+                col_widths.append(max(w1, w2))
+
+            # Find the maximum number of columns we can fit in the usable width with at least 1-space gaps
+            # Usable area is between x=2 and x=width-2. Max usable width is width - 4.
+            usable_w = max(1, width - 4)
+            C = num_cols_total
+            while C > 1:
+                required_w = sum(col_widths[:C])
+                if required_w + (C - 1) <= usable_w:
+                    break
+                C -= 1
+
+            # Compute horizontal positions to space the columns evenly.
+            col_x = []
+            if C > 1:
+                required_w = sum(col_widths[:C])
+                gap = (usable_w - required_w) / (C - 1)
+                current_x = 2.0
+                for col in range(C):
+                    col_x.append(int(current_x))
+                    current_x += col_widths[col] + gap
+            else:
+                col_x = [2]
+
+            # Render the columns
+            for col in range(C):
+                x = col_x[col]
+                # Render Row 1
+                if col < len(shortcuts_r1):
+                    badge, label = shortcuts_r1[col]
+                    if x + len(badge) + 1 + len(label) <= width - 2:
                         safe_addstr(
                             stdscr,
-                            row_y,
+                            status_y + 1,
                             x,
                             badge,
                             theme["shortcut_key"] | curses.A_BOLD,
                         )
                         safe_addstr(
                             stdscr,
-                            row_y,
+                            status_y + 1,
                             x + len(badge) + 1,
                             label,
                             theme["shortcut_label"],
                         )
-
-            draw_help_row(status_y + 1, shortcuts_r1)
-            draw_help_row(status_y + 2, shortcuts_r2)
+                # Render Row 2
+                if col < len(shortcuts_r2):
+                    badge, label = shortcuts_r2[col]
+                    if x + len(badge) + 1 + len(label) <= width - 2:
+                        safe_addstr(
+                            stdscr,
+                            status_y + 2,
+                            x,
+                            badge,
+                            theme["shortcut_key"] | curses.A_BOLD,
+                        )
+                        safe_addstr(
+                            stdscr,
+                            status_y + 2,
+                            x + len(badge) + 1,
+                            label,
+                            theme["shortcut_label"],
+                        )
 
         screen_y = (cursor_y - scroll_y) + 1
         screen_x = (cursor_x - scroll_x) + 1 + gutter_w
@@ -2349,8 +2402,12 @@ def get_char_width(c):
     # Variation selectors have width 0
     if 0xFE00 <= ord(c) <= 0xFE0F:
         return 0
-    # Non-ASCII characters (emojis, nerd fonts) usually have width 2 in terminals
-    if ord(c) > 127:
+    
+    # Use standard unicode classification:
+    # 'W' (Wide) and 'F' (Fullwidth) are 2 columns wide on standard terminals.
+    # 'A' (Ambiguous), 'Na' (Narrow), 'N' (Neutral), 'H' (Halfwidth) are 1 column.
+    w = unicodedata.east_asian_width(c)
+    if w in ("W", "F"):
         return 2
     return 1
 

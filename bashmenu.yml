@@ -21,5 +21,5 @@ settings:
   templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
 templates: templates
-theme: dracula
+theme: pacman
 version: 0.0.1

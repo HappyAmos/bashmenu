@@ -12,37 +12,43 @@ options:
       action: /home/andrew/.local/bin/agy
       interactive: true
       quiet: true
-      icon: U+e7f0
     - label: Copilot
+      icon: "{nf::#F0372}"
       type: command
       action: copilot
       interactive: true
       quiet: true
     - label: Gemini [New Session]
+      icon: "{nf::#F1A0}"
       type: command
       action: gemini
       interactive: true
       quiet: true
     - label: Gemini [Resume Last Session]
+      icon: "{nf::#F1A0}"
       type: command
       action: gemini --resume latest
       interactive: true
       quiet: true
     - label: Midnight Commander
+      icon: "{nf::#f0ab6}"
       type: script
       action: /usr/bin/mc
       interactive: true
       quiet: true
     - label: Built-In Text Editor
+      icon: "{nf::#f11e7}"
       type: editor
       show_whitespace: true
       tabstop: 4
     - label: Vim
+      icon: "{nf::#e62b}"
       type: command
       action: vim
       interactive: true
       quiet: true
     - label: Back to Main Menu
+      icon: "{nf::#f048}"
       type: back
 - label: Install
   icon: "{nf::\U0001F4E5}"
