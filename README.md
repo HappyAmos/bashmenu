@@ -75,7 +75,7 @@ generous MIT license, so do what you will with it!
   cross-platform stability.
 * **Modal Dialogs**: File/directory chooser modal (`picker: file|dir`),
   confirmation dialogs (`type: confirm`), text input prompts, and scrolling
-  message boxes.
+  message boxes, input/param prompts.
 * **Theme Support**: Adaptive color themes supporting 256-color, 16-color, and
   8-color terminfo fallbacks with auto-validation via `ymlcheck.py`.
 
@@ -129,7 +129,7 @@ necessary `PyYAML` dependency if missing or corrupted:
 
 * `type`: Option type (`command`, `script`, `config`, `editor`, `confirm`,
   `message`, `python`, `inject_block`, `theme_selector`, `back`, `exit`,
-  `submenu`).
+  `submenu`, `param`).
 * `label`: Display text label shown in menu row.
 * `action`: Command line string, script path, or editor file path.
 * `template`: Source template path for dynamic block injection (e.g.,

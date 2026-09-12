@@ -6,12 +6,11 @@ Provides a keyboard-navigable tree interface to add, modify, reorder, delete,
 preview, test, and validate menu items in bashmenu.mnu. Imports shared UI
 dialogs, themes, and configuration utilities directly from bashmenu.py.
 """
+__version__ = "0.0.1"
+__author__ = "HappyAmos"
 
 import copy
 import curses
-
-__version__ = "0.0.1"
-__author__ = "HA Bash Menu Development Team"
 import os
 import shutil
 import subprocess
@@ -70,6 +69,7 @@ TYPE_BADGES = {
     "submenu": "[DIR]",
     "command": "[CMD]",
     "script": "[SCR]",
+    "param": "[PAR]",
     "config": "[CFG]",
     "toggle": "[TGL]",
     "editor": "[EDT]",
@@ -88,6 +88,7 @@ ITEM_TYPES = [
     ("submenu", "Submenu Folder (nested options list)"),
     ("command", "Shell Command (executes shell command)"),
     ("script", "Script File (runs script from app folder)"),
+    ("param", "Parameter Pass (pass parameter to script)"),
     ("config", "Config Setting (edits bashmenu.yml value)"),
     ("toggle", "Settings Toggle (True/False/Cancel toggle modal)"),
     ("editor", "File Editor (opens file in built-in editor)"),
@@ -396,9 +397,9 @@ def edit_item_properties(stdscr, item_dict, config, theme):
         if item_type == "submenu":
             sub_title = item_dict.get("submenu", {}).get("title", "")
             fields.append(("submenu.title", "Submenu Header Title", str(sub_title)))
-        elif item_type in ["command", "script", "python"]:
+        elif item_type in ["command", "script", "python", "param"]:
             fields.append(("action", "Command / Script Action", str(item_dict.get("action", ""))))
-            if item_type == "script":
+            if item_type in ["script", "param"]:
                 fields.append(("external", "Run in separate process (true/false)", str(item_dict.get("external", True))))
             fields.append(("stream", "Stream Output (true/false)", str(item_dict.get("stream", False))))
             fields.append(("interactive", "Interactive Console Mode", str(item_dict.get("interactive", False))))
@@ -561,7 +562,7 @@ def edit_item_properties(stdscr, item_dict, config, theme):
                     next_idx = (opts.index(curr_val) + 1) % len(opts) if curr_val in opts else 0
                     item_dict[selected_key] = opts[next_idx]
                     break
-                elif selected_key == "action" and item_type == "script":
+                elif selected_key == "action" and (item_type == "script" or item_type == "param" ):
                     win.timeout(-1)
                     chosen = select_script_action(stdscr, curr_val, config, theme)
                     if chosen is not None:
@@ -597,7 +598,7 @@ def create_default_item(item_type):
         }
     elif item_type == "command":
         return {"label": "New Command", "type": "command", "action": "echo Hello"}
-    elif item_type == "script":
+    elif item_type in ["script", "param"]:
         return {"label": "New Script", "type": "script", "action": "script.sh"}
     elif item_type == "config":
         return {

@@ -47,16 +47,11 @@ options:
       action: vim
       interactive: true
       quiet: true
-    - label: Search For Matching Nerd Font & Emoji [{user.nerdsearch}]
-      type: script
-      action: '{scripts_dir}/glyphs.sh {user.nerdsearch}'
+    - label: Search Nerd Font & Emoji
+      type: param
+      action: '{scripts_dir}/glyphs.sh'
       stream: true
-    - label: Nerd Font/Emoji Search Term
-      type: config
-      action: echo Hello
-      key: user.nerdsearch
-      title: Search
-      prompt: 'Enter the term of the font and emoji you''d like to search for:'
+      icon: '{nf::#f422}'
     - label: Back to Main Menu
       icon: '{nf::#f048}'
       type: back

@@ -23,5 +23,4 @@ settings:
 templates: templates
 theme: pacman
 user:
-  nerdsearch: hat
 version: 0.0.1

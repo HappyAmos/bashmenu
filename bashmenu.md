@@ -77,7 +77,7 @@ Visual tree-editor tool for managing `bashmenu.mnu` items and directives.
 
 ### Directives & Attributes
 
-- `type`: `command` | `script` | `config` | `toggle` | `editor` | `confirm` | `message` |
+- `type`: `command` | `script` | `param` | `config` | `toggle` | `editor` | `confirm` | `message` |
   `python` | `inject_block` | `theme_selector` | `back` | `exit` | `submenu`
 - `label`: Display string shown in menu row.
 - `icon`: Separate icon string utilizing `nf:FALLBACK:GLYPH` syntax to display icons on supporting systems.

@@ -100,8 +100,6 @@ PRIMARY_IP = get_primary_ip()
 DEFAULT_CONFIG = {
     "version": __version__,
     "theme": "dracula",
-    "git_pat": "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN",
-    "google_gemini_api_key": "YOUR_GOOGLE_GEMINI_API_KEY",
     "templates": "templates",
     "scripts": "scripts",
     "settings": {
@@ -1086,6 +1084,7 @@ def show_input_box(
         win.refresh()
 
         key = win.getch()
+        #key = stdscr.get_wch()
         if key == 27:
             curses.curs_set(0)
             return None
@@ -2682,6 +2681,85 @@ def process_item_action(
                 bool_val = res == "true"
                 set_config_value(config, key_path, bool_val)
                 save_config(config)
+    
+    elif item_type == "param":
+        mode = selected_item.get("user_mode")
+        if mode == "root" and not is_root():
+            show_popup_message(
+                stdscr,
+                "Permission Denied",
+                "This operation requires root permissions (run with sudo).",
+                theme,
+            )
+        else:
+            action_str = interpolate_placeholders(
+                selected_item.get("action", ""), config
+            )
+
+            # Check if script should launch in-process (external: false)
+            external_val = selected_item.get("external", True)
+            is_external = True
+            if isinstance(external_val, bool):
+                is_external = external_val
+            elif isinstance(external_val, str):
+                is_external = external_val.lower() not in ("false", "0", "no")
+
+            if item_type == "param" and not is_external:
+                script_file = action_str.split(" ", 1)[0]
+                if script_file.endswith(".py"):
+                    module_name = script_file[:-3]
+                    if BASHMENU_DIR not in sys.path:
+                        sys.path.insert(0, BASHMENU_DIR)
+                    try:
+                        import importlib
+                        if module_name in sys.modules:
+                            module = importlib.reload(sys.modules[module_name])
+                        else:
+                            module = importlib.import_module(module_name)
+                        if hasattr(module, "main"):
+                            module.main(stdscr)
+                        else:
+                            raise AttributeError(f"Module '{module_name}' does not implement 'main(stdscr)'.")
+                    except Exception as e:
+                        show_popup_message(stdscr, "In-Process Execution Error", str(e), theme)
+                else:
+                    show_popup_message(
+                        stdscr,
+                        "In-Process Execution Error",
+                        f"Non-python script '{script_file}' cannot be run in-process.",
+                        theme
+                    )
+            else:
+
+                title = selected_item.get("title", "")
+                prompt = selected_item.get("prompt", "Enter a parameter:")
+                masked = selected_item.get("masked", False)
+                current_val = "" 
+                param = show_input_box(
+                        stdscr, title, prompt, current_val, theme, masked
+                )
+
+                # TODO: Validate param here
+
+                if item_type == "param":
+                    script_parts = action_str.split(" ", 1)
+                    script_path = os.path.join(BASHMENU_DIR, script_parts[0])
+                    args = f" {script_parts[1]} " if len(script_parts) > 1 else ""
+                    action_str = f'"{script_path}"{args} {param}'
+
+                if selected_item.get("interactive", False):
+                    is_quiet = selected_item.get("quiet", False)
+                    run_interactive_action(stdscr, action_str, quiet=is_quiet)
+                else:
+                    run_action_in_window(
+                        stdscr,
+                        action_str,
+                        interpolate_placeholders(
+                            selected_item.get("label", ""), config
+                        ),
+                        theme,
+                        stream=selected_item.get("stream", False),
+                    )
 
     elif item_type == "config":
         key_path = selected_item.get("key", "")
