@@ -24,8 +24,13 @@ CHANGES_AHEAD=$(git rev-list --count HEAD..@{u})
 
 if [ "$CHANGES_AHEAD" -gt 0 ]; then
     echo "There has been an update! ($CHANGES_AHEAD new commit(s))"
-    echo "git pull to update" 
-    # Put your update logic here (e.g., git pull)
+    read -p "Do you want to update? [y/N]: " -n 1 -r
+    echo ""
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+        git pull
+    elif
+        echo "Skipping update."
+    fi
 else
     echo "Your local version is up to date."
 fi
