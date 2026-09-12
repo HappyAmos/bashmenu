@@ -9,6 +9,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASHMENU_SCRIPT="${SCRIPT_DIR}/bashmenu.py"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 VENV_ACTIVATE="${VENV_DIR}/bin/activate"
+CACHE_DIR="$HOME/.cache/bashmenu"
+
+# Setup a cache directory
+mkdir -p "$CACHE_DIR" &>/dev/null || exit 1
+
+# Check Github version against installed version
+
+# Download latest changes from the remote server silently
+git fetch -q
+
+# Count how many commits the remote is ahead of your local branch
+CHANGES_AHEAD=$(git rev-list --count HEAD..@{u})
+
+if [ "$CHANGES_AHEAD" -gt 0 ]; then
+    echo "There has been an update! ($CHANGES_AHEAD new commit(s))"
+    echo "git pull to update" 
+    # Put your update logic here (e.g., git pull)
+else
+    echo "Your local version is up to date."
+fi
+
+
+exit
 
 if [ ! -f "$BASHMENU_SCRIPT" ]; then
     echo "Error: $BASHMENU_SCRIPT not found." >&2
