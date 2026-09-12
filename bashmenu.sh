@@ -30,7 +30,7 @@ if [ "$CHANGES_AHEAD" -gt 0 ]; then
     echo ""
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         git pull
-    elif
+    else
         echo "Skipping update."
     fi
 else
