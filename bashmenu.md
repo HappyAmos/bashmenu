@@ -77,8 +77,9 @@ Visual tree-editor tool for managing `bashmenu.mnu` items and directives.
 
 ### Directives & Attributes
 
-- `type`: `command` | `script` | `param` | `config` | `toggle` | `editor` | `confirm` | `message` |
-  `python` | `inject_block` | `theme_selector` | `back` | `exit` | `submenu`
+- `type`: `command` | `script` | `config` | `toggle` | `editor` | `confirm` |
+  `message` | `python` | `inject_block` | `theme_selector` | `back` | `exit` |
+  `submenu`
 - `label`: Display string shown in menu row.
 - `icon`: Separate icon string utilizing `nf:FALLBACK:GLYPH` syntax to display icons on supporting systems.
 - `action`: Shell command, script path, or editor target file path.
@@ -115,21 +116,32 @@ The `toggle` and `config_toggle` item types display an interactive themed modal 
 
 ## Dynamic Command Directives
 
-Any execution type (`command`, `script`, or `param`) can dynamically trigger user input or visual file/directory pickers by placing these placeholder directives within the `action` string:
+Any execution type (`command`, `script`, or `param`) can dynamically trigger
+user input or visual file/directory pickers by placing these placeholder
+directives within the `action` string:
 
-- `{param}`: Prompts the user using a single-line modal text input box. The placeholder `{param}` is replaced with the user's typed value.
-  * *Attributes:* Uses `title` (modal header, defaults to blank), `prompt` (message, defaults to `"Enter a parameter:"`), and `masked` (`true`|`false` to mask text with asterisks).
-- `{file_picker}`: Displays a visual file selection dialog. The placeholder `{file_picker}` is replaced with the absolute path of the chosen file.
-  * *Attributes:* Uses `title` (modal header, defaults to `"Select File"`) and `start_dir` (starting path, defaults to `"~"`).
-- `{dir_picker}`: Displays a visual directory selection dialog. The placeholder `{dir_picker}` is replaced with the absolute path of the chosen directory.
-  * *Attributes:* Uses `title` (modal header, defaults to `"Select Directory"`) and `start_dir` (starting path, defaults to `"~"`).
+- `{param}`: Prompts the user using a single-line modal text input box.
+  The placeholder `{param}` is replaced with the user's typed value.
+  * *Attributes:* Uses `title` (modal header, defaults to blank),
+    `prompt` (message, defaults to `"Enter a parameter:"`), and `masked`
+    (`true`|`false` to mask text with asterisks).
+- `{file_picker}`: Displays a visual file selection dialog. The placeholder
+  `{file_picker}` is replaced with the absolute path of the chosen file.
+  * *Attributes:* Uses `title` (modal header, defaults to `"Select File"`)
+    and `start_dir` (starting path, defaults to `"~"`).
+- `{dir_picker}`: Displays a visual directory selection dialog. The
+  placeholder `{dir_picker}` is replaced with the absolute path of the
+  chosen directory.
+  * *Attributes:* Uses `title` (modal header, defaults to
+    `"Select Directory"`) and `start_dir` (starting path, defaults to `"~"`).
 
-If the user cancels any of these modals/pickers (by pressing `ESC`), execution of the command/script is immediately and safely aborted.
+If the user cancels any of these modals/pickers (by pressing `ESC`),
+execution of the command/script is immediately and safely aborted.
 
 #### Example:
 ```yaml
 - label: Search Nerd Font & Emoji
-  type: param
+  type: script
   action: '{scripts_dir}/glyphs.sh {param}'
   title: Search Glyph
   prompt: 'Enter search keyword:'

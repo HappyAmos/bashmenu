@@ -82,8 +82,8 @@ options:
       block_id: bash_aliases
       refresh: false
       icon: '{nf::#eeb6}'
-    - label: Install Basics (apt install vim mc htop glow gum curl wget git shellcheck
-        shfmt)
+    - label: Install Basics [apt install vim mc htop glow gum curl wget git shellcheck
+        shfmt]
       type: command
       user_mode: root
       action: apt install -y vim mc htop glow gum curl wget git shellcheck shfmt
@@ -112,16 +112,16 @@ options:
   submenu:
     title: Network Utilities Options
     options:
-    - label: Show Hostname Information (hostname)
+    - label: Show Hostname Information [hostname]
       type: command
       action: hostname
       icon: '{nf::#f08ad}'
-    - label: Show Configured DNS (getdns.py)
+    - label: Show Configured DNS [getdns.py]
       type: script
       action: '{scripts_dir}/getdns.py'
       stream: true
       icon: '{nf::#f01d6}'
-    - label: Show Network Interfaces (ip a)
+    - label: Show Network Interfaces [ip a]
       type: command
       action: ip a
       icon: '{nf::#ef09}'
@@ -144,7 +144,7 @@ options:
       title: Edit Ping Target
       prompt: 'Enter Hostname or IP Address:'
       icon: '{nf::#f11ab}'
-    - label: Configure DNS servers (dnsconfig.sh)
+    - label: Configure DNS servers [dnsconfig.sh]
       type: script
       action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
         {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
@@ -162,24 +162,27 @@ options:
       submenu:
         title: Bashmenu Settings
         options:
-        - label: Visual Menu Editor (menuedit.py)
+        - label: Visual Menu Editor [menuedit.py]
           type: script
           action: menuedit.py
           interactive: true
           quiet: true
           refresh: true
           external: false
-        - label: Edit Menu Layout (bashmenu.mnu)
+        - label: Edit Menu Layout [bashmenu.mnu]
           type: editor
           action: bashmenu.mnu
           show_whitespace: true
         - label: Change Color Theme
           type: theme_selector
-        - label: Edit File
+        - label: Edit Templates [{templates_dir}]
           type: editor
-          action: '{file_picker}'
+          action: '{templates_dir}/{file_picker}'
           show_whitespace: true
-        - label: Edit Themes File (bashmenu.themes)
+        - label: Edit Scripts [{scripts_dir}]
+          type: editor
+          action: '{scripts_dir}/{file_picker}'
+        - label: Edit Themes File [bashmenu.themes]
           type: editor
           action: bashmenu.themes
         - label: Editor Tabstop Distance [{settings.tabstop}]
@@ -197,7 +200,7 @@ options:
           key: settings.use_nerd_fonts
           title: Toggle Nerd Fonts
           message: Enable colorful menu emojis and Nerd Fonts?
-        - label: Edit Configuration File (bashmenu.yml)
+        - label: Edit Configuration File [bashmenu.yml]
           type: editor
           action: bashmenu.yml
           show_whitespace: true
@@ -226,16 +229,16 @@ options:
   submenu:
     title: System Information Options
     options:
-    - label: Check Disk Usage (df -h)
+    - label: Check Disk Usage [df -h]
       type: command
       action: df -h
-    - label: Check RAM Usage (free -h)
+    - label: Check RAM Usage [free -h]
       type: command
       action: free -h
-    - label: Check USB Controller (lsusb -vt)
+    - label: Check USB Controller [lsusb -vt]
       type: command
       action: lsusb -vt
-    - label: Check CPU Information (lscpu)
+    - label: Check CPU Information [lscpu]
       type: command
       action: lscpu
     - label: Back to Main Menu

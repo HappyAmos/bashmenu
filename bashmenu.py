@@ -1038,6 +1038,30 @@ def resolve_dynamic_directives(stdscr, action_str, selected_item, config, theme)
     if not isinstance(action_str, str):
         return action_str
 
+    # Helper to parse starting directory from string prefix of the directive
+    def find_start_dir_and_pattern(directive_name):
+        prefix = action_str.split(directive_name, 1)[0]
+        parts = prefix.split()
+        if parts:
+            last_arg = parts[-1]
+            last_arg_clean = last_arg.strip('"\'').rstrip("/").strip()
+            exp_path = os.path.abspath(os.path.expanduser(last_arg_clean))
+            if os.path.isdir(exp_path):
+                # Found a valid starting directory from prefix path!
+                quote_offset = last_arg.find(last_arg_clean)
+                if quote_offset == -1:
+                    quote_offset = 0
+                pattern_prefix = last_arg[quote_offset:]
+                full_pattern = pattern_prefix + directive_name
+                return exp_path, full_pattern
+        
+        # Fallback to start_dir configuration or home
+        fallback_dir = interpolate_placeholders(
+            selected_item.get("start_dir", "~"), config
+        )
+        return os.path.abspath(os.path.expanduser(fallback_dir)), directive_name
+
+    # 1. Resolve {param}
     if "{param}" in action_str:
         title = selected_item.get("title", "")
         prompt = selected_item.get("prompt", "Enter a parameter:")
@@ -1047,29 +1071,27 @@ def resolve_dynamic_directives(stdscr, action_str, selected_item, config, theme)
             return None
         action_str = action_str.replace("{param}", param_val)
 
+    # 2. Resolve {file_picker}
     if "{file_picker}" in action_str:
         title = selected_item.get("title", "Select File")
-        start_dir = interpolate_placeholders(
-            selected_item.get("start_dir", "~"), config
-        )
+        start_dir, pattern_to_replace = find_start_dir_and_pattern("{file_picker}")
         chosen_path = show_file_picker(
             stdscr, title, start_dir, mode="file", theme=theme
         )
         if chosen_path is None:
             return None
-        action_str = action_str.replace("{file_picker}", chosen_path)
+        action_str = action_str.replace(pattern_to_replace, chosen_path)
 
+    # 3. Resolve {dir_picker}
     if "{dir_picker}" in action_str:
         title = selected_item.get("title", "Select Directory")
-        start_dir = interpolate_placeholders(
-            selected_item.get("start_dir", "~"), config
-        )
+        start_dir, pattern_to_replace = find_start_dir_and_pattern("{dir_picker}")
         chosen_path = show_file_picker(
             stdscr, title, start_dir, mode="dir", theme=theme
         )
         if chosen_path is None:
             return None
-        action_str = action_str.replace("{dir_picker}", chosen_path)
+        action_str = action_str.replace(pattern_to_replace, chosen_path)
 
     return action_str
 
@@ -1245,6 +1267,16 @@ def process_item_action(
         target_file = interpolate_placeholders(
             selected_item.get("action", ""), config
         )
+
+        # Resolve dynamic directives: {param}, {file_picker}, {dir_picker}
+        resolved_file = resolve_dynamic_directives(
+            stdscr, target_file, selected_item, config, theme
+        )
+        if resolved_file is None:
+            # Cancelled by user
+            return None, theme, config
+        target_file = resolved_file
+
         show_ws = selected_item.get(
             "show_whitespace", False
         ) or selected_item.get("whitespace", False)
@@ -1289,7 +1321,21 @@ def process_item_action(
 
     elif item_type == "inject_block":
         target_path_str = interpolate_placeholders(selected_item.get("target", ""), config)
+        resolved_target = resolve_dynamic_directives(
+            stdscr, target_path_str, selected_item, config, theme
+        )
+        if resolved_target is None:
+            return None, theme, config
+        target_path_str = resolved_target
+
         template_path_str = interpolate_placeholders(selected_item.get("template", ""), config)
+        resolved_template = resolve_dynamic_directives(
+            stdscr, template_path_str, selected_item, config, theme
+        )
+        if resolved_template is None:
+            return None, theme, config
+        template_path_str = resolved_template
+
         block_id = interpolate_placeholders(selected_item.get("block_id", "default"), config)
 
         if not target_path_str or not template_path_str:
@@ -1402,7 +1448,7 @@ def process_item_action(
                                     theme,
                                 )
 
-    elif item_type in ["command", "script", "param"]:
+    elif item_type in ["command", "script"]:
         mode = selected_item.get("user_mode")
         if mode == "root" and not is_root():
             show_popup_message(
@@ -1435,7 +1481,7 @@ def process_item_action(
             elif isinstance(external_val, str):
                 is_external = external_val.lower() not in ("false", "0", "no")
 
-            if item_type in ["script", "param"] and not is_external:
+            if item_type == "script" and not is_external:
                 script_file = action_str.split(" ", 1)[0]
                 if script_file.endswith(".py"):
                     module_name = script_file[:-3]
@@ -1461,7 +1507,7 @@ def process_item_action(
                         theme
                     )
             else:
-                if item_type in ["script", "param"]:
+                if item_type == "script":
                     script_parts = action_str.split(" ", 1)
                     script_path = os.path.join(BASHMENU_DIR, script_parts[0])
                     args = f" {script_parts[1]}" if len(script_parts) > 1 else ""

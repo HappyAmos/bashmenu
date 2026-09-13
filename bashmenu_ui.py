@@ -129,13 +129,14 @@ def show_popup_message(stdscr, title, message, theme):
         win.border(0)
         win.attroff(theme["border"])
 
-        safe_addstr(
-            win,
-            0,
-            max(2, (box_w - len(title) - 2) // 2),
-            f" {title} ",
-            theme["title"] | curses.A_BOLD,
-        )
+        if title:
+            safe_addstr(
+                win,
+                0,
+                max(2, (box_w - len(title) - 2) // 2),
+                f" {title} ",
+                theme["title"] | curses.A_BOLD,
+            )
 
         for i in range(max_visible):
             line_idx = scroll_offset + i
@@ -218,13 +219,14 @@ def show_confirm_box(stdscr, title, message, theme):
         win.border(0)
         win.attroff(theme["border"])
 
-        safe_addstr(
-            win,
-            0,
-            max(2, (box_w - len(title) - 2) // 2),
-            f" {title} ",
-            theme["title"] | curses.A_BOLD,
-        )
+        if title:
+            safe_addstr(
+                win,
+                0,
+                max(2, (box_w - len(title) - 2) // 2),
+                f" {title} ",
+                theme["title"] | curses.A_BOLD,
+            )
 
         for i, line in enumerate(lines[: box_h - 4]):
             safe_addstr(
@@ -316,13 +318,14 @@ def show_toggle_box(stdscr, title, message, theme):
         win.border(0)
         win.attroff(theme["border"])
 
-        safe_addstr(
-            win,
-            0,
-            max(2, (box_w - len(title) - 2) // 2),
-            f" {title} ",
-            theme["title"] | curses.A_BOLD,
-        )
+        if title:
+            safe_addstr(
+                win,
+                0,
+                max(2, (box_w - len(title) - 2) // 2),
+                f" {title} ",
+                theme["title"] | curses.A_BOLD,
+            )
 
         for i, line in enumerate(lines[: box_h - 4]):
             safe_addstr(
@@ -415,13 +418,14 @@ def show_input_box(
         win.border(0)
         win.attroff(theme["border"])
 
-        safe_addstr(
-            win,
-            0,
-            max(2, (box_w - len(title) - 2) // 2),
-            f" {title} ",
-            theme["title"] | curses.A_BOLD,
-        )
+        if title:
+            safe_addstr(
+                win,
+                0,
+                max(2, (box_w - len(title) - 2) // 2),
+                f" {title} ",
+                theme["title"] | curses.A_BOLD,
+            )
         safe_addstr(win, 2, 3, prompt, theme["text"])
 
         raw_str = "".join(input_text)
@@ -647,14 +651,15 @@ def show_file_picker(
         win.border(0)
         win.attroff(theme["border"])
 
-        header = f" {title} "
-        safe_addstr(
-            win,
-            0,
-            max(2, (box_w - len(header)) // 2),
-            header,
-            theme["title"] | curses.A_BOLD,
-        )
+        if title:
+            header = f" {title} "
+            safe_addstr(
+                win,
+                0,
+                max(2, (box_w - len(header)) // 2),
+                header,
+                theme["title"] | curses.A_BOLD,
+            )
 
         path_disp = f" Path: {current_path} "
         if len(path_disp) > box_w - 4:
