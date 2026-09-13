@@ -1195,7 +1195,7 @@ def process_item_action(
                         stdscr, title, prompt, current_val, theme, masked
                 )
 
-                # TODO: Validate param here
+                # TODO: Validate prompt here
 
                 if item_type == "param":
                     script_parts = action_str.split(" ", 1)

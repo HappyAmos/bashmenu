@@ -477,7 +477,7 @@ def show_input_box(
 
 
 def show_file_picker(
-    stdscr, title, start_dir="~", mode="file", default_val=None, theme=None
+    stdscr, title, start_dir="~", mode="file", default_val=None, theme=None, show_hidden=False
 ):
     """
     Display a themed interactive file and directory chooser modal dialog.
@@ -489,12 +489,14 @@ def show_file_picker(
         mode (str): Selection mode filter ('file', 'dir', or 'any').
         default_val (str, optional): Pre-selected item path.
         theme (dict, optional): Active theme color mapping.
+        show_hidden (bool, optional): Whether to display hidden files/folders.
 
     Returns:
         str | None: Selected absolute path, or None if cancelled via ESC.
     """
     import bashmenu
 
+    show_hidden_state = show_hidden
     target_item = None
     if default_val:
         resolved_default = os.path.abspath(
@@ -527,6 +529,9 @@ def show_file_picker(
         try:
             with os.scandir(current_path) as it:
                 all_entries = list(it)
+
+            if not show_hidden_state:
+                all_entries = [e for e in all_entries if not e.name.startswith(".")]
 
             dirs = sorted(
                 [e for e in all_entries if e.is_dir()],
@@ -657,9 +662,9 @@ def show_file_picker(
         safe_addstr(win, 1, 2, path_disp, theme["accent"])
 
         footer = (
-            " [ENTER]: Select/Open | [ESC]: Cancel "
+            " [ENTER]: Select/Open | [Ctrl+H]: Hidden | [ESC]: Cancel "
             if mode != "dir"
-            else " [ENTER]: Open | [SPACE]: Select Current Folder | [ESC]: Cancel "
+            else " [ENTER]: Open | [SPACE]: Select Folder | [Ctrl+H]: Hidden | [ESC]: Cancel "
         )
         safe_addstr(
             win,
@@ -696,6 +701,16 @@ def show_file_picker(
 
         if key == 27:
             return None
+        elif key == 8:  # Ctrl+H: Toggle Hidden Files/Directories
+            prev_selected_path = None
+            if entries and 0 <= cursor_idx < len(entries):
+                prev_selected_path = entries[cursor_idx].get("path")
+
+            show_hidden_state = not show_hidden_state
+
+            if prev_selected_path:
+                target_item = prev_selected_path
+                initial_selection_done = False
         elif key in [curses.KEY_UP, ord('k')] and cursor_idx > 0:
             cursor_idx -= 1
         elif key in [curses.KEY_DOWN, ord('j')] and cursor_idx < len(entries) - 1:
