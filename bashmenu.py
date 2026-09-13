@@ -1083,15 +1083,18 @@ def show_input_box(
         win.move(4, 4 + (cursor_pos - offset))
         win.refresh()
 
-        key = win.getch()
-        #key = stdscr.get_wch()
-        if key == 27:
+        try:
+            key = win.get_wch()
+        except curses.error:
+            continue
+
+        if key == 27 or key == '\x1b':
             curses.curs_set(0)
             return None
-        elif key in [curses.KEY_ENTER, 10, 13]:
+        elif key in [curses.KEY_ENTER, 10, 13, '\n', '\r']:
             curses.curs_set(0)
             return "".join(input_text)
-        elif key in [curses.KEY_BACKSPACE, 8, 127]:
+        elif key in [curses.KEY_BACKSPACE, 8, 127, '\x08', '\x7f', '\b']:
             if cursor_pos > 0:
                 input_text.pop(cursor_pos - 1)
                 cursor_pos -= 1
@@ -1104,12 +1107,12 @@ def show_input_box(
         elif key == curses.KEY_RIGHT:
             if cursor_pos < len(input_text):
                 cursor_pos += 1
-        elif key in [curses.KEY_HOME, 1]:
+        elif key in [curses.KEY_HOME, 1, '\x01']:
             cursor_pos = 0
-        elif key in [curses.KEY_END, 5]:
+        elif key in [curses.KEY_END, 5, '\x05']:
             cursor_pos = len(input_text)
-        elif 32 <= key <= 126:
-            input_text.insert(cursor_pos, chr(key))
+        elif isinstance(key, str) and len(key) == 1 and safe_isprintable(key):
+            input_text.insert(cursor_pos, key)
             cursor_pos += 1
 
 

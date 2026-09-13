@@ -22,12 +22,12 @@ fi
 # URL to a reliable, clean JSON list of emojis
 NERD_URL="http://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json"
 EMOJI_URL="https://raw.githubusercontent.com/muan/unicode-emoji-json/refs/heads/main/data-by-emoji.json"
-CACHE_DIR="$HOME/.cache/glyph-picker"
-NERD_CACHE="$HOME/.cache/glyph-picker/glyphs.json"
-EMOJI_CACHE="$HOME/.cache/glyph-picker/emoji_list.json"
+CACHE_DIR="$HOME/.cache/bashmenu"
+NERD_CACHE="$HOME/.cache/bashmenu/glyphs.json"
+EMOJI_CACHE="$HOME/.cache/bashmenu/emoji_list.json"
 
 # Create cache directory if it doesn't exist
-mkdir -p "$(dirname "$CACHE_DIR")"
+mkdir -p $(dirname "$CACHE_DIR") &>/dev/null
 
 # Download and cache the nerd list if not already present
 if [ ! -f "$NERD_CACHE" ]; then
@@ -55,18 +55,23 @@ fi
 
 SEARCH_TERM=$(echo "$1" | tr '[:upper:]' '[:lower:]')
 
-echo "Searching for '$1'..."
+echo "Searching for ['$1']:"
 echo "-------------------------"
 
 # Nerd Fonts:
 # SCHEMA: "cod-account":{"char":"","code":"eb99"},
-jq -r --arg query "$SEARCH_TERM" '
-    to_entries[] |
-    select(.key | ascii_downcase | contains($query)) |
-    "\(.value.char) - [\(.value.code)] - (\(.key))"
-' "$NERD_CACHE"
+COUNT=$(
+    jq -r --arg query "$SEARCH_TERM" '
+        to_entries[] |
+        select(.key | ascii_downcase | contains($query)) |
+        "\(.value.char) - [\(.value.code)] - (\(.key))"
+    ' "$NERD_CACHE" | tee /dev/tty | wc -l
+)
+echo "Found $COUNT nerd-fonts."
 
+echo ""
 
+echo "-------------------------"
 # Emoji:
 # SCHEMA
 #   "🏴󠁧󠁢󠁷󠁬󠁳󠁿": {
@@ -76,15 +81,15 @@ jq -r --arg query "$SEARCH_TERM" '
 #     "emoji_version": "5.0",
 #     "unicode_version": "5.0",
 #     "skin_tone_support": false
-
 # Parse JSON using to_entries to access the emoji character (key) and its data (value)
-jq -r --arg query "$SEARCH_TERM" '
-  to_entries[] | 
-  select(
-    (.value.name | ascii_downcase | contains($query)) or 
-    (.value.slug | ascii_downcase | contains($query))
-  ) | 
-  "\(.key) - [\(.value.name)] - (:\(.value.slug):)"
-' "$EMOJI_CACHE"
-
-
+COUNT=$(
+    jq -r --arg query "$SEARCH_TERM" '
+      to_entries[] | 
+      select(
+        (.value.name | ascii_downcase | contains($query)) or 
+        (.value.slug | ascii_downcase | contains($query))
+      ) | 
+      "\(.key) - [\(.value.name)] - (:\(.value.slug):)"
+    ' "$EMOJI_CACHE" | tee /dev/tty | wc -l
+)
+echo "Found $COUNT emoji-glyphs."
