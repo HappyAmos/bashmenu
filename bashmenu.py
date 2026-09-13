@@ -1864,7 +1864,7 @@ def main(stdscr):
             stdscr.timeout(-1)
             try:
                 import menuedit
-                menuedit.main(stdscr)
+                menuedit.main(stdscr, target_path=list(selected_rows))
             except Exception as e:
                 show_popup_message(stdscr, "Error Running Editor", str(e), theme)
             theme, config = reload_environment(

@@ -918,7 +918,7 @@ def draw_menu_editor(
     stdscr.refresh()
 
 
-def main(stdscr):
+def main(stdscr, target_path=None):
     curses.curs_set(0)
     if hasattr(curses, "set_escdelay"):
         curses.set_escdelay(25)
@@ -938,6 +938,18 @@ def main(stdscr):
     selected_idx = 0
     modified = False
 
+    # Trace and expand parent submenus to expose the target item
+    resolved_item = None
+    if target_path:
+        curr_opts = menu_data.get("options", [])
+        for depth, row_idx in enumerate(target_path):
+            if 0 <= row_idx < len(curr_opts):
+                resolved_item = curr_opts[row_idx]
+                if depth < len(target_path) - 1:
+                    expanded_map[id(resolved_item)] = True
+                    if isinstance(resolved_item, dict) and "submenu" in resolved_item:
+                        curr_opts = resolved_item["submenu"].get("options", [])
+
     marquee_offset = 0
     marquee_pause_ticks = 4
     last_idx = -1
@@ -946,6 +958,16 @@ def main(stdscr):
         if selected_idx != last_idx:
             marquee_offset = 0
             marquee_pause_ticks = 4
+            last_idx = selected_idx
+
+        # If we have a target item, find its visible index in nodes
+        if resolved_item:
+            nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
+            for idx, nd in enumerate(nodes):
+                if nd["item"] is resolved_item:
+                    selected_idx = idx
+                    break
+            resolved_item = None
             last_idx = selected_idx
 
         draw_menu_editor(
