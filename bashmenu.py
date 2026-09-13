@@ -1027,6 +1027,53 @@ def interpolate_placeholders(text, config):
     return text
 
 
+def resolve_dynamic_directives(stdscr, action_str, selected_item, config, theme):
+    """
+    Check for {param}, {file_picker}, and {dir_picker} directives in action_str,
+    prompt the user using curses modals, and substitute the values.
+
+    Returns:
+        str | None: The fully resolved action string, or None if any dialog was cancelled.
+    """
+    if not isinstance(action_str, str):
+        return action_str
+
+    if "{param}" in action_str:
+        title = selected_item.get("title", "")
+        prompt = selected_item.get("prompt", "Enter a parameter:")
+        masked = selected_item.get("masked", False)
+        param_val = show_input_box(stdscr, title, prompt, "", theme, masked)
+        if param_val is None:
+            return None
+        action_str = action_str.replace("{param}", param_val)
+
+    if "{file_picker}" in action_str:
+        title = selected_item.get("title", "Select File")
+        start_dir = interpolate_placeholders(
+            selected_item.get("start_dir", "~"), config
+        )
+        chosen_path = show_file_picker(
+            stdscr, title, start_dir, mode="file", theme=theme
+        )
+        if chosen_path is None:
+            return None
+        action_str = action_str.replace("{file_picker}", chosen_path)
+
+    if "{dir_picker}" in action_str:
+        title = selected_item.get("title", "Select Directory")
+        start_dir = interpolate_placeholders(
+            selected_item.get("start_dir", "~"), config
+        )
+        chosen_path = show_file_picker(
+            stdscr, title, start_dir, mode="dir", theme=theme
+        )
+        if chosen_path is None:
+            return None
+        action_str = action_str.replace("{dir_picker}", chosen_path)
+
+    return action_str
+
+
 PYTHON_FUNCTIONS = {
     "configure_autoexec": configure_autoexec,
 }
@@ -1138,85 +1185,6 @@ def process_item_action(
                 set_config_value(config, key_path, bool_val)
                 save_config(config)
     
-    elif item_type == "param":
-        mode = selected_item.get("user_mode")
-        if mode == "root" and not is_root():
-            show_popup_message(
-                stdscr,
-                "Permission Denied",
-                "This operation requires root permissions (run with sudo).",
-                theme,
-            )
-        else:
-            action_str = interpolate_placeholders(
-                selected_item.get("action", ""), config
-            )
-
-            # Check if script should launch in-process (external: false)
-            external_val = selected_item.get("external", True)
-            is_external = True
-            if isinstance(external_val, bool):
-                is_external = external_val
-            elif isinstance(external_val, str):
-                is_external = external_val.lower() not in ("false", "0", "no")
-
-            if item_type == "param" and not is_external:
-                script_file = action_str.split(" ", 1)[0]
-                if script_file.endswith(".py"):
-                    module_name = script_file[:-3]
-                    if BASHMENU_DIR not in sys.path:
-                        sys.path.insert(0, BASHMENU_DIR)
-                    try:
-                        import importlib
-                        if module_name in sys.modules:
-                            module = importlib.reload(sys.modules[module_name])
-                        else:
-                            module = importlib.import_module(module_name)
-                        if hasattr(module, "main"):
-                            module.main(stdscr)
-                        else:
-                            raise AttributeError(f"Module '{module_name}' does not implement 'main(stdscr)'.")
-                    except Exception as e:
-                        show_popup_message(stdscr, "In-Process Execution Error", str(e), theme)
-                else:
-                    show_popup_message(
-                        stdscr,
-                        "In-Process Execution Error",
-                        f"Non-python script '{script_file}' cannot be run in-process.",
-                        theme
-                    )
-            else:
-
-                title = selected_item.get("title", "")
-                prompt = selected_item.get("prompt", "Enter a parameter:")
-                masked = selected_item.get("masked", False)
-                current_val = "" 
-                param = show_input_box(
-                        stdscr, title, prompt, current_val, theme, masked
-                )
-
-                # TODO: Validate prompt here
-
-                if item_type == "param":
-                    script_parts = action_str.split(" ", 1)
-                    script_path = os.path.join(BASHMENU_DIR, script_parts[0])
-                    args = f" {script_parts[1]} " if len(script_parts) > 1 else ""
-                    action_str = f'"{script_path}"{args} {param}'
-
-                if selected_item.get("interactive", False):
-                    is_quiet = selected_item.get("quiet", False)
-                    run_interactive_action(stdscr, action_str, quiet=is_quiet)
-                else:
-                    run_action_in_window(
-                        stdscr,
-                        action_str,
-                        interpolate_placeholders(
-                            selected_item.get("label", ""), config
-                        ),
-                        theme,
-                        stream=selected_item.get("stream", False),
-                    )
-
     elif item_type == "config":
         key_path = selected_item.get("key", "")
         if key_path:
@@ -1434,7 +1402,7 @@ def process_item_action(
                                     theme,
                                 )
 
-    elif item_type in ["command", "script"]:
+    elif item_type in ["command", "script", "param"]:
         mode = selected_item.get("user_mode")
         if mode == "root" and not is_root():
             show_popup_message(
@@ -1448,6 +1416,17 @@ def process_item_action(
                 selected_item.get("action", ""), config
             )
 
+            # Resolve dynamic directives: {param}, {file_picker}, {dir_picker}
+            resolved_action = resolve_dynamic_directives(
+                stdscr, action_str, selected_item, config, theme
+            )
+            if resolved_action is None:
+                # Cancelled by user
+                if selected_item.get("refresh", False):
+                    theme, config = reload_environment(stdscr, menu_stack, selected_rows)
+                return None, theme, config
+            action_str = resolved_action
+
             # Check if script should launch in-process (external: false)
             external_val = selected_item.get("external", True)
             is_external = True
@@ -1456,7 +1435,7 @@ def process_item_action(
             elif isinstance(external_val, str):
                 is_external = external_val.lower() not in ("false", "0", "no")
 
-            if item_type == "script" and not is_external:
+            if item_type in ["script", "param"] and not is_external:
                 script_file = action_str.split(" ", 1)[0]
                 if script_file.endswith(".py"):
                     module_name = script_file[:-3]
@@ -1482,7 +1461,7 @@ def process_item_action(
                         theme
                     )
             else:
-                if item_type == "script":
+                if item_type in ["script", "param"]:
                     script_parts = action_str.split(" ", 1)
                     script_path = os.path.join(BASHMENU_DIR, script_parts[0])
                     args = f" {script_parts[1]}" if len(script_parts) > 1 else ""

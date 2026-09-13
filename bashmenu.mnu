@@ -48,8 +48,8 @@ options:
       interactive: true
       quiet: true
     - label: Search Nerd Font & Emoji
-      type: param
-      action: '{scripts_dir}/glyphs.sh'
+      type: script
+      action: '{scripts_dir}/glyphs.sh {param}'
       stream: true
       icon: '{nf::#f422}'
     - label: Back to Main Menu
@@ -175,6 +175,10 @@ options:
           show_whitespace: true
         - label: Change Color Theme
           type: theme_selector
+        - label: Edit File
+          type: editor
+          action: '{file_picker}'
+          show_whitespace: true
         - label: Edit Themes File (bashmenu.themes)
           type: editor
           action: bashmenu.themes

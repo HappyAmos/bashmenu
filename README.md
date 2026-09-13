@@ -131,7 +131,10 @@ necessary `PyYAML` dependency if missing or corrupted:
   `message`, `python`, `inject_block`, `theme_selector`, `back`, `exit`,
   `submenu`, `param`).
 * `label`: Display text label shown in menu row.
-* `action`: Command line string, script path, or editor file path.
+* `action`: Command line string, script path, or editor file path. Can contain dynamic directives:
+  * `{param}`: Prompts the user with a single-line text input modal box.
+  * `{file_picker}`: Opens a visual file picker dialog box.
+  * `{dir_picker}`: Opens a visual directory picker dialog box.
 * `template`: Source template path for dynamic block injection (e.g.,
   `templates/aliases.tmpl`).
 * `target`: Destination file path for dynamic block injection (e.g., `{bashrc}`).

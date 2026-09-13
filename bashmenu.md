@@ -111,7 +111,36 @@ The `toggle` and `config_toggle` item types display an interactive themed modal 
 * Selecting **False** sets the key to `False`.
 * Selecting **Cancel** (or pressing `ESC`) aborts the action without updating the configuration.
 
+---
+
+## Dynamic Command Directives
+
+Any execution type (`command`, `script`, or `param`) can dynamically trigger user input or visual file/directory pickers by placing these placeholder directives within the `action` string:
+
+- `{param}`: Prompts the user using a single-line modal text input box. The placeholder `{param}` is replaced with the user's typed value.
+  * *Attributes:* Uses `title` (modal header, defaults to blank), `prompt` (message, defaults to `"Enter a parameter:"`), and `masked` (`true`|`false` to mask text with asterisks).
+- `{file_picker}`: Displays a visual file selection dialog. The placeholder `{file_picker}` is replaced with the absolute path of the chosen file.
+  * *Attributes:* Uses `title` (modal header, defaults to `"Select File"`) and `start_dir` (starting path, defaults to `"~"`).
+- `{dir_picker}`: Displays a visual directory selection dialog. The placeholder `{dir_picker}` is replaced with the absolute path of the chosen directory.
+  * *Attributes:* Uses `title` (modal header, defaults to `"Select Directory"`) and `start_dir` (starting path, defaults to `"~"`).
+
+If the user cancels any of these modals/pickers (by pressing `ESC`), execution of the command/script is immediately and safely aborted.
+
 #### Example:
+```yaml
+- label: Search Nerd Font & Emoji
+  type: param
+  action: '{scripts_dir}/glyphs.sh {param}'
+  title: Search Glyph
+  prompt: 'Enter search keyword:'
+
+- label: Check Logs
+  type: command
+  action: 'cat "{file_picker}"'
+  start_dir: '/var/log'
+```
+
+---
 ```yaml
 - label: Toggle Nerd Fonts [{settings.use_nerd_fonts}]
   type: toggle
