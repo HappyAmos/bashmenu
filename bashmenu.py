@@ -1005,13 +1005,6 @@ def interpolate_placeholders(text, config):
         # 4. Fallback to empty string
         return ""
 
-    if text.startswith("nf:"):
-        parts = text[3:].split(":")
-        if len(parts) == 2:
-            return resolve_nf_parts("", parts[0], parts[1])
-        elif len(parts) == 3:
-            return resolve_nf_parts(parts[0], parts[1], parts[2])
-
     nf_pattern = re.compile(r"\{nf:([^}]+)\}")
     for match in nf_pattern.finditer(text):
         full_match = match.group(0)

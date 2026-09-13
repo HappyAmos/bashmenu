@@ -1,71 +1,115 @@
-.TH BASHMENU 1 "2026-09-08" "v0.0.1" "HA Bash Menu"
+.TH BASHMENU 1 "2026-09-13" "v0.0.1" "HA Bash Menu Manual"
 .SH NAME
-bashmenu \- lightweight curses TUI menu engine and setting editor
+bashmenu \- lightweight curses TUI menu engine and settings manager
 .SH SYNOPSIS
 .B bashmenu.sh
 .SH DESCRIPTION
 .B bashmenu
 is a data-driven, Curses-based Text User Interface (TUI) menu engine designed
-for Linux system administration, setting management, and command execution. It
-reads its menu structure from a YAML-formatted menu file and dynamically
-interpolates configurations and system variables.
-.SH FILES
+for Linux system administration, settings management, and command execution. It
+reads its menu structure from a YAML-formatted menu file, dynamically
+interpolates configurations and system environment variables, and supports
+custom Nerd Fonts, visual file chooser dialogs, and modular code templates.
+.SH COMPONENT FILES
 .TP
 .I bashmenu.sh
-Launcher shell script that auto-initializes and repairs Python virtualenv.
+Launcher wrapper script. Handles Python virtual environment setup and repairs.
 .TP
 .I bashmenu.py
-Core Python application containing Curses renderer and menu engine.
+Core Python application containing the Curses renderer and main menu loop.
+.TP
+.I bashedit.py
+Built-in Nano-style text editor engine.
 .TP
 .I menuedit.py
 Interactive TUI menu tree editor for managing bashmenu.mnu.
 .TP
-.I requirements.txt
-Project Python dependencies (specifically PyYAML).
-.TP
 .I bashmenu.yml
-Settings configuration file store in YAML format.
+Settings configuration database in YAML format.
 .TP
 .I bashmenu.mnu
-Menu layout structure definition and item directives.
+Menu layout structure definitions list in YAML format.
 .TP
 .I bashmenu.themes
-Color theme palette definitions (256, 16, and 8 color modes).
+Color theme definitions (supporting 256, 16, and 8 color modes).
+.TP
+.I ymlcheck.py
+Command line utility to validate YAML syntax and schemas.
+.SH MAN PAGES (MANUALS)
+The application provides a local man page for terminal-based help:
+.TP
+.I bashmenu.1
+Exhaustive terminal manual page for HA Bash Menu.
+.SH DYNAMIC SCRIPTS & TEMPLATES
+.SS Provided Utility Scripts (scripts/)
+These custom utility scripts are stored inside the scripts directory:
+.TP
+.I scripts/dnsconfig.sh
+Configures IPv4 and IPv6 DNS addresses for active connections.
+.TP
+.I scripts/get_api_key.sh
+Securely retrieves and formats credentials or keys.
+.TP
+.I scripts/getdns.py
+Discovers currently configured upstream system DNS settings.
+.TP
+.I scripts/glyphs.sh
+Curses preview dialog box utility for Unicode emojis and icons.
+.TP
+.I scripts/install_cheat.sh
+Installs interactive cheat sheet terminal tools.
+.TP
+.I scripts/install_kmscon.sh
+Installs the kmscon console emulator for better Unicode rendering.
+.TP
+.I scripts/install_scripts.sh
+Installer script that registers and deploys custom bash scripts.
+.SS Provided Templates (templates/)
+Utilized as layout sources for code generation and block injections:
+.TP
+.I templates/autoexec.sh.tmpl
+Configurable template for autoexec shell scripts.
+.TP
+.I templates/bash_aliases.tmpl
+Dynamic aliases shell template sourced inside user profiles.
 .SH KEYBOARD SHORTCUTS
-.SS Menu Navigation
+.SS Main Menu Interface (bashmenu.py)
 .TP
-.B UP / DOWN / j / k
-Navigate selected menu row.
+.B UP, DOWN, j, k
+Navigate highlighted selection row.
 .TP
-.B 0-9 / a-z / A-Z
-Select menu item directly by shortcut hotkey.
+.B 0-9, a-z, A-Z
+Select menu option directly by shortcut hotkey.
 .TP
 .B F4
-Launch menuedit.py visual menu editor directly from main menu.
+Launch menuedit.py visual menu tree editor.
 .TP
 .B F5
-Toggle visibility of menu item shortcut key badges.
+Toggle visibility of option shortcut key badges.
+.TP
+.B ENTER
+Execute active selected menu option action.
 .TP
 .B ESC
-Return to parent menu, or quit if at root.
+Return to parent menu, or quit if at the root menu level.
 .SS Visual Menu Editor (menuedit.py)
 .TP
-.B a
+.B a, Ins
 Insert new menu option node.
 .TP
-.B e / ENTER
-Edit node properties or menu header title.
+.B e, ENTER
+Edit node properties or submenu header title.
 .TP
 .B E
 Open raw YAML snippet editor for the selected node.
 .TP
-.B d / Delete
-Delete selected menu option node (with confirmation).
+.B d, Delete
+Delete selected menu option node (with confirm box).
 .TP
-.B m / M
+.B m, M
 Move selected item down (m) or up (M).
 .TP
-.B < / >
+.B <, >
 Outdent (<) item to parent menu or indent (>) item into preceding Submenu.
 .TP
 .B t
@@ -73,208 +117,197 @@ Test-run selected menu item action directly.
 .TP
 .B s
 Save changes to bashmenu.mnu (creates .bak backup).
-.SS Built-in Text Editor
-The application features a built-in, Nano-style terminal text editor for
-editing target files. It supports advanced features such as multi-level
-undo/redo, text selection, copy/cut/paste, line numbers, whitespace visibility
-toggles, and direct integration with file pickers.
+.TP
+.B ?, h, F1
+Display comprehensive Property Inspector General Help screen.
+.TP
+.B ESC
+Exit editor (prompts to save if modifications exist).
+.SS Built-in Text Editor (bashedit.py)
+The application features a built-in, Nano-style text editor for editing files.
 .TP
 .B Ctrl+X
 Exit editor (prompts to save if modifications exist).
 .TP
-.B Ctrl+O / F3
+.B Ctrl+O, F3
 WriteOut (saves the active file).
 .TP
-.B Ctrl+R / F5
-Read File (opens file picker modal to insert file content or select new file).
+.B Ctrl+R, F5
+Read File (opens file picker modal to select file to insert/open).
 .TP
-.B Ctrl+S / F6
-Save As (prompts for destination target file path).
+.B Ctrl+S, F6
+Save As (prompts for destination file path).
 .TP
-.B Ctrl+N / F4
+.B Ctrl+N, F4
 Create a new empty document.
 .TP
-.B Ctrl+G / F1
+.B Ctrl+G, F1
 Toggle bottom Nano-style shortcut keys help bar.
 .TP
-.B Ctrl+K / F8
-Cut line or highlighted text block.
+.B Ctrl+K, F8
+Cut line or active selection block.
 .TP
-.B Ctrl+U / F9
+.B Ctrl+U, F9
 Paste (uncut) cutbuffer text.
 .TP
 .B Ctrl+C
-Show cursor location, or copy selection if selection mark is active.
+Show cursor position or copy selection block.
+.TP
 .B Alt+6
-Copy line or highlighted text block.
+Copy line or selection block.
 .TP
-.B Alt+U
-Undo the last edit operation.
+.B Alt+U, Alt+E
+Undo (Alt+U) or Redo (Alt+E) edit operations.
 .TP
-.B Alt+E
-Redo the last undone edit operation.
-.TP
-.B Ctrl+^ / Alt+A
-Set/unset text selection mark.
-.TP
+.B Ctrl+^, Alt+A
+Set or unset text selection mark.
 .B Alt+N
 Toggle line numbers gutter display.
 .TP
-.B Alt+P / Alt+W
-Toggle whitespace character visibility.
+.B Alt+P, Alt+W
+Toggle whitespace visibility (spaces as dots, tabs as arrows).
 .TP
 .B F2
-Launch external system $EDITOR (e.g. nano or vim) as a fallback.
-.SH CONFIGURATION
-Settings are persistently stored in the
-.I bashmenu.yml
-file. Value lookups can use dot-notation (e.g. settings.dns.ip).
-.SH DIRECTIVES
-Menu items in
-.I bashmenu.mnu
-support the following attributes:
+Launch external $EDITOR (e.g. vim or nano).
+.SH CONFIGURATION & SCHEMA SPECIFICATIONS
+.SS Settings Store (bashmenu.yml)
+Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
+settings.dns.ipv4) can be interpolated inside menu files or actions.
+.SS Menu Structure (bashmenu.mnu)
+The menu is defined as a hierarchical YAML options list. Options can utilize the
+following configuration keys:
 .TP
 .B type
-Option type. Supported values are:
-.RS
-.IP \(bu 2
-.B command
-- Executes a shell command line string.
-.IP \(bu 2
-.B script
-- Runs a script file from the application folder.
-.IP \(bu 2
-.B config
-- Edits a bashmenu.yml value.
-.IP \(bu 2
-.B toggle
-- Launches an interactive True/False/Cancel configuration toggle modal.
-.IP \(bu 2
-.B editor
-- Opens a file in the built-in Nano-style editor.
-.IP \(bu 2
-.B confirm
-- Launches a Yes/No confirmation dialog.
-.IP \(bu 2
-.B message
-- Displays an information message popup.
-.IP \(bu 2
-.B python
-- Runs a registered built-in Python routine.
-.IP \(bu 2
-.B inject_block
-- Injects/updates a dynamic configuration block using a template.
-.IP \(bu 2
-.B theme_selector
-- Displays a dynamic theme selection menu.
-.IP \(bu 2
-.B back
-- Navigates back to the parent menu.
-.IP \(bu 2
-.B exit
-- Exits the application.
-.IP \(bu 2
-.B submenu
-- Opens a nested option submenu folder.
-.RE
+Option action type (see SECTION TYPES).
 .TP
 .B label
-Display string shown in the menu row.
+Row label. Can use dynamic placeholders.
 .TP
 .B icon
-Separate icon/emoji string utilizing the nf:FALLBACK:GLYPH format.
+Icon tags utilizing brackets: {nf:[char]:[nerd-font hex]:[emoji]}.
 .TP
 .B action
-Command string, script path, or editor file path.
+Shell command, script, or editor file path.
 .TP
-.B template
-Source template path (required for inject_block).
+.B template, target, block_id
+Path, destination, and unique tag for dynamic templates (inject_block).
 .TP
-.B target
-Destination target file path (required for inject_block).
+.B quiet, stream, interactive, external, user_mode
+Execution privilege and console behavior flags.
 .TP
-.B block_id
-Unique identifier string for block boundary tags (required for inject_block).
+.B key, picker, start_dir, masked
+Dot-notation settings key and visual configuration chooser flags.
 .TP
-.B quiet
-Whether to suppress output execution headers and pauses.
+.B show_whitespace, tab_to_spaces, tabstop
+Text editor layout configurations.
 .TP
-.B refresh
-Whether to reload environment/menu structure on action return.
+.B on_yes, on_no, message
+Confirmation options and alert prompts.
+.SH SECTION TYPES
 .TP
-.B stream
-Whether to stream command output in a real-time log window.
+.B submenu
+Opens a nested submenu options list.
 .TP
-.B interactive
-Whether to suspend Curses for full terminal interaction.
+.B command
+Executes a standard shell command.
 .TP
-.B external
-Whether to launch scripts in a separate process (true by default). If set to
-false, Python scripts containing a main(stdscr) function run in the same process.
+.B script
+Launches an external script or executable.
 .TP
-.B user_mode
-Privilege mode ("root" or "user").
+.B config
+Prompts user to edit setting value.
 .TP
-.B key
-YAML setting dot-notation key path to write.
+.B toggle
+True/False/Cancel settings toggle modal.
 .TP
-.B picker
-Visual chooser mode ("file", "dir", or "none").
+.B editor
+Opens file in built-in Nano-style editor.
 .TP
-.B start_dir
-Starting path for the file/folder picker.
+.B confirm
+Launches Yes/No confirmation dialog box.
 .TP
-.B masked
-Whether to mask password fields during input.
-.SH DYNAMIC VARIABLES
-The following tokens are resolved dynamically at runtime:
+.B message
+Informational alert or popup dialog.
 .TP
-.B {user} / {username}
+.B python
+Dispatches internal Python routine.
+.TP
+.B inject_block
+Installs or uninstalls template blocks inside profiles.
+.TP
+.B theme_selector
+Launches list of registered color themes.
+.TP
+.B back
+Navigates back to the preceding submenu level.
+.TP
+.B exit
+Shuts down the menu interface completely.
+.SH DYNAMIC DIRECTIVES & SYSTEM PLACEHOLDERS
+.SS Dynamic Input Directives
+These directives prompt the user inside curses dialogs, replacing the placeholder
+with the chosen value prior to action execution.
+.TP
+.B {param}
+Prompts for a single-line text value using a modal input box.
+.TP
+.B {file_picker}
+Launches a visual file chooser dialog box.
+.TP
+.B {dir_picker}
+Launches a visual directory chooser dialog box.
+.SS Picker Auto-Starting Folders
+Preceding file/directory pickers with a folder path (e.g.
+"{templates_dir}/{file_picker}" or "~/projects/{dir_picker}") causes the engine
+to automatically launch the visual chooser inside that directory.
+.SS System Placeholders
+The following placeholders are auto-interpolated inside actions or templates:
+.TP
+.B {user}, {username}
 Current system username.
 .TP
 .B {home}
-User's home directory path.
-.TP
-.B {bashrc} / {vimrc} / {bash_aliases}
-Standard user configuration file paths.
+User's absolute home directory path.
 .TP
 .B {bashmenu_dir}
-Path to the active application scripts folder.
+Application script directory.
 .TP
-.B {settings.path}
-Any setting loaded from bashmenu.yml (using dot-notation).
+.B {templates_dir}, {scripts_dir}
+Templates and scripts folders paths.
 .TP
-.B nf:FALLBACK:GLYPH / {nf:FALLBACK:GLYPH}
-Dynamic font/emoji resolution based on settings.use_nerd_fonts.
-If enabled, resolves to GLYPH, which can be a raw character or a hex code
-prefixed with '#' (e.g. #f0a4 or #f07c0). If disabled, resolves to FALLBACK
-(or "" empty string, which collapses the icon column for compact, perfect left alignment).
-.SH EXAMPLES
-.SS Creating a Block Template File
-A code block template file (e.g. templates/aliases.tmpl) can contain any
-standard shell scripts, configuration statements, or text blocks. You can embed
-standard placeholder tokens or dynamic config setting paths using dot-notation.
-These values will be fully resolved and expanded upon injection.
-
-Example Template File (templates/aliases.tmpl):
-.EX
-  # Dynamic system alias definitions for user {user}
-  alias my-ip="echo 'Your IP is: {settings.dns.ip}'"
-  alias edit-menu="bashmenu.sh"
-.EE
-.SS Dynamic Block Injection Directive
-Inject and manage custom alias configuration block inside .bashrc:
-.EX
-  - label: Configure Custom Aliases
-    type: inject_block
-    template: "templates/aliases.tmpl"
-    target: "{bashrc}"
-    block_id: "custom_aliases"
-    refresh: true
-.EE
-.PP
-When selected, if the block is missing, the user is prompted to install it. If
-the block is present, the user can reinstall/update it (Yes), cleanly uninstall
-it (No), or cancel.
-.SH AUTHORS
-HappyAmos.
+.B {bashrc}, {vimrc}, {bash_aliases}
+Path files system profiles.
+.TP
+.B {settings.dot_key}
+Dot-notation configuration lookup from bashmenu.yml.
+.SS Nerd Fonts & Emoji Adaptive Resolution
+The application resolves icons dynamically using three properties: a fallback
+ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:
+.RS
+.B {nf:[char]:[nerd-font hex]:[emoji-glyph]}
+.RE
+Precedence is evaluated as follows:
+.IP \(bu 2
+.B Emoji Icon (Unicode capable)
+\- Chosen if system is Unicode capable and emoji is provided.
+.IP \(bu 2
+.B Nerd Font Glyph (Nerd Fonts enabled)
+\- Chosen if system is Unicode capable, use_nerd_fonts is true, and hex is
+provided. Translates and renders the Nerd Font glyph.
+.IP \(bu 2
+.B Fallback ASCII Character
+\- Displayed if Unicode is unsupported or both above fields are missing.
+.IP \(bu 2
+.B Wiped Default
+\- Resolves to empty string if all are missing, collapsing the icon column.
+.SH MODULARITY & PLUGINS
+.SS Dynamic Block Injection
+The inject_block type installs templates inside profile files (e.g. .bashrc).
+It wraps the template in markers (# CODEBLOCK:block_id:START/END) to manage
+seamless interactive installs, updates, and uninstalls.
+.SS In-Process Python Plugins (external: false)
+Python script items of type "script" can set "external: false" to run inside
+bashmenu's parent process, avoiding terminal flashes. Plugins must implement
+"def main(stdscr)".
+.SH AUTHOR
+Distributed under the MIT License.
