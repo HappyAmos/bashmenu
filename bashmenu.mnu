@@ -2,12 +2,12 @@ version: 0.0.1
 title: Bash Menu
 options:
 - label: Applications
-  icon: "{nf::\U0001F3AE}"
+  icon: "{nf::#f003b:\U0001F3AE}"
   submenu:
     title: Applications
     options:
     - label: Antigravity
-      icon: '{nf::#EE9FB0}'
+      icon: '{nf:#EE9FB0:}'
       type: script
       action: /home/andrew/.local/bin/agy
       interactive: true
@@ -56,7 +56,7 @@ options:
       icon: '{nf::#f048}'
       type: back
 - label: Install
-  icon: "{nf::\U0001F4E5}"
+  icon: "{nf:::\U0001F4E5}"
   submenu:
     title: Install Tools Menu
     options:
@@ -108,20 +108,23 @@ options:
       type: back
       icon: '{nf::#f048}'
 - label: Network Utilities
-  icon: "{nf::\U0001F310}"
+  icon: "{nf:::\U0001F310}"
   submenu:
     title: Network Utilities Options
     options:
     - label: Show Hostname Information (hostname)
       type: command
       action: hostname
+      icon: '{nf::#f08ad}'
     - label: Show Configured DNS (getdns.py)
       type: script
       action: '{scripts_dir}/getdns.py'
       stream: true
+      icon: '{nf::#f01d6}'
     - label: Show Network Interfaces (ip a)
       type: command
       action: ip a
+      icon: '{nf::#ef09}'
     - label: Ping Target [{settings.ping_target}]
       type: confirm
       title: Confirm Ping Task
@@ -134,20 +137,24 @@ options:
         type: message
         title: Task Cancelled
         message: Ping request was cancelled by user.
+      icon: '{nf::#f11ab}'
     - label: Configure Ping Target [{settings.ping_target}]
       type: config
       key: settings.ping_target
       title: Edit Ping Target
       prompt: 'Enter Hostname or IP Address:'
+      icon: '{nf::#f11ab}'
     - label: Configure DNS servers (dnsconfig.sh)
       type: script
       action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
         {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
       stream: true
+      icon: '{nf::#f0b8c}'
     - label: Back to Main Menu
       type: back
+      icon: '{nf::#f048}'
 - label: Options & Settings
-  icon: "{nf::\u2699\uFE0F}"
+  icon: "{nf:::\u2699\uFE0F}"
   submenu:
     title: Options & Settings
     options:
@@ -211,7 +218,7 @@ options:
     - label: Back to Main Menu
       type: back
 - label: System Information
-  icon: "{nf::\u2139\uFE0F}"
+  icon: "{nf:::\u2139\uFE0F}"
   submenu:
     title: System Information Options
     options:
@@ -230,11 +237,11 @@ options:
     - label: Back to Main Menu
       type: back
 - label: Help [glow -p README.md]
-  icon: "{nf::\u2753}"
+  icon: "{nf:::\u2753}"
   type: command
   action: glow -p {bashmenu_dir}/README.md
   interactive: true
   quiet: true
 - label: Exit Menu
-  icon: "{nf::\U0001F6AA}"
+  icon: "{nf:::\U0001F6AA}"
   type: exit

@@ -60,14 +60,20 @@ echo "-------------------------"
 
 # Nerd Fonts:
 # SCHEMA: "cod-account":{"char":"","code":"eb99"},
-COUNT=$(
+RESULTS_NERD=$(
     jq -r --arg query "$SEARCH_TERM" '
         to_entries[] |
         select(.key | ascii_downcase | contains($query)) |
         "\(.value.char) - [\(.value.code)] - (\(.key))"
-    ' "$NERD_CACHE" | tee /dev/tty | wc -l
+    ' "$NERD_CACHE"
 )
-echo "Found $COUNT nerd-fonts."
+if [ -n "$RESULTS_NERD" ]; then
+    echo "$RESULTS_NERD"
+    COUNT_NERD=$(echo "$RESULTS_NERD" | wc -l)
+else
+    COUNT_NERD=0
+fi
+echo "Found $COUNT_NERD nerd-fonts."
 
 echo ""
 
@@ -82,7 +88,7 @@ echo "-------------------------"
 #     "unicode_version": "5.0",
 #     "skin_tone_support": false
 # Parse JSON using to_entries to access the emoji character (key) and its data (value)
-COUNT=$(
+RESULTS_EMOJI=$(
     jq -r --arg query "$SEARCH_TERM" '
       to_entries[] | 
       select(
@@ -90,6 +96,12 @@ COUNT=$(
         (.value.slug | ascii_downcase | contains($query))
       ) | 
       "\(.key) - [\(.value.name)] - (:\(.value.slug):)"
-    ' "$EMOJI_CACHE" | tee /dev/tty | wc -l
+    ' "$EMOJI_CACHE"
 )
-echo "Found $COUNT emoji-glyphs."
+if [ -n "$RESULTS_EMOJI" ]; then
+    echo "$RESULTS_EMOJI"
+    COUNT_EMOJI=$(echo "$RESULTS_EMOJI" | wc -l)
+else
+    COUNT_EMOJI=0
+fi
+echo "Found $COUNT_EMOJI emoji-glyphs."

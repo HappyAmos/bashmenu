@@ -1,5 +1,5 @@
 dracula:
-  indicator: "{nf:@:\uee90}"
+  indicator: "{nf:@:\uee90:}"
   256:
     background: "COLOR_BLACK"
     title: [201, -1]
@@ -44,7 +44,7 @@ dracula:
     shortcut_label: ["COLOR_WHITE", -1]
 
 nord:
-  indicator: "{nf:#:\uef66}"
+  indicator: "{nf:#:\uef66:}"
   256:
     background: "COLOR_BLACK"
     title: [111, -1]
@@ -89,7 +89,7 @@ nord:
     shortcut_label: ["COLOR_WHITE", -1]
 
 cyberpunk:
-  indicator: "{nf:>:#f07c0}"
+  indicator: "{nf:>:#f07c0:}"
   256:
     background: "COLOR_BLACK"
     title: [226, -1]
@@ -134,7 +134,7 @@ cyberpunk:
     shortcut_label: ["COLOR_CYAN", -1]
 
 gruvbox:
-  indicator: "{nf:&:#f0c6b}"
+  indicator: "{nf:&:#f0c6b:}"
   256:
     background: -1
     title: [214, -1]
@@ -179,7 +179,7 @@ gruvbox:
     shortcut_label: ["COLOR_WHITE", -1]
 
 qbasic:
-  indicator: "{nf:>:#e629}"
+  indicator: "{nf:>:#e629:}"
   256:
     background: 19
     title: [226, 19]
@@ -224,7 +224,7 @@ qbasic:
     shortcut_label: ["COLOR_WHITE", "COLOR_BLUE"]
 
 pacman:
-  indicator: "{nf:):#f0baf}"
+  indicator: "{nf:):#f0baf:}"
   256:
     background: "COLOR_BLACK"
     title: [226, -1]
@@ -269,7 +269,7 @@ pacman:
     shortcut_label: ["COLOR_WHITE", -1]
 
 industry:
-  indicator: "{nf:#:#f0b46}"
+  indicator: "{nf:#:#f0b46:}"
   256:
     background: 234
     title: [214, 234]
@@ -314,7 +314,7 @@ industry:
     shortcut_label: ["COLOR_WHITE", -1]
 
 matrix:
-  indicator: "{nf:->:#f0628}"
+  indicator: "{nf:->:#f0628:}"
   256:
     background: "COLOR_BLACK"
     title: [46, -1]
@@ -359,7 +359,7 @@ matrix:
     shortcut_label: ["COLOR_GREEN", -1]
 
 monochrome:
-  indicator: "{nf:>:#eee9}"
+  indicator: "{nf:>:#eee9:}"
   256:
     background: "COLOR_BLACK"
     title: [255, -1]
@@ -404,7 +404,7 @@ monochrome:
     shortcut_label: ["COLOR_WHITE", -1]
 
 synthwave:
-  indicator: "{nf:>:#f147d}"
+  indicator: "{nf:>:#f147d:}"
   256:
     background: "COLOR_BLACK"
     title: [207, -1]
@@ -449,7 +449,7 @@ synthwave:
     shortcut_label: ["COLOR_MAGENTA", -1]
 
 amber_crt:
-  indicator: "{nf:>:#f0379}"
+  indicator: "{nf:>:#f0379:}"
   256:
     background: "COLOR_BLACK"
     title: [214, -1]
@@ -494,7 +494,7 @@ amber_crt:
     shortcut_label: ["COLOR_YELLOW", -1]
 
 hotdog_stand:
-  indicator: "{nf:o.O:#e251}"
+  indicator: "{nf:o.O:#e251:}"
   256:
     background: 196
     title: [226, 196]
