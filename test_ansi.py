@@ -87,6 +87,47 @@ class TestAnsiParsing(unittest.TestCase):
         self.assertNotIn("{window_width}", resolved)
         self.assertNotIn("{window_height}", resolved)
 
+    def test_interpolate_placeholders_new_directives(self):
+        """Test that all newly added custom status gutter placeholders resolve properly."""
+        placeholders = [
+            "{host}",
+            "{user-mode}",
+            "{version}",
+            "{date_time_12}",
+            "{date_time_24}",
+            "{date}",
+            "{time_12}",
+            "{time_24}",
+            "{battery}",
+            "{utc_seconds}",
+        ]
+        for p in placeholders:
+            resolved = bashmenu.interpolate_placeholders(p, {})
+            self.assertNotEqual(resolved, p)
+            self.assertNotEqual(resolved, "")
+            # Ensure basic type expectations or formats
+            if p == "{utc_seconds}":
+                self.assertTrue(resolved.isdigit())
+            elif p == "{date}":
+                self.assertRegex(resolved, r"^\d{4}-\d{2}-\d{2}$")
+
+    def test_get_battery_info_caching(self):
+        """Test that get_battery_info properly caches results and avoids multiple slower lookups."""
+        import time
+        # Force a fresh fetch by clearing the cache time
+        bashmenu._last_battery_time = 0.0
+        first_call = bashmenu.get_battery_info()
+        
+        # Modify the cached value to verify cache-hits return the modified value within the 5s window
+        bashmenu._cached_battery = "42%"
+        second_call = bashmenu.get_battery_info()
+        self.assertEqual(second_call, "42%")
+
+        # Force fresh fetch again
+        bashmenu._last_battery_time = 0.0
+        third_call = bashmenu.get_battery_info()
+        self.assertEqual(third_call, first_call)
+
 
 if __name__ == "__main__":
     unittest.main()

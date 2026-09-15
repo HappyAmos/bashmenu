@@ -257,6 +257,11 @@ options:
           key: settings.tabstop
           title: Configure Tabstop Distance
           prompt: 'Enter tabstop distance (spaces per TAB press):'
+        - label: Configure Status Gutter [{settings.status_gutter}]
+          type: config
+          key: settings.status_gutter
+          title: Configure Status Gutter
+          prompt: 'Enter status gutter format (e.g., {user} | {battery} | {date_time_24}):'
         - label: Visual Menu Editor [menuedit.py]
           type: script
           action: menuedit.py

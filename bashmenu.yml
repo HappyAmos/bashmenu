@@ -18,6 +18,7 @@ settings:
   ping_target: 192.168.4.47
   scripts_dir: '{bashmenu_dir}/scripts'
   show_menu_shortcuts: true
+  status_gutter: '{user} : {user-mode} | Battery: {battery} | {date_time_24}'
   tab_to_spaces: true
   tabstop: 4
   templates_dir: '{bashmenu_dir}/templates'

@@ -83,6 +83,76 @@ def get_primary_ip():
         return "127.0.0.1"
 
 
+_last_battery_time = 0.0
+_cached_battery = "N/A"
+
+
+def get_battery_info():
+    """
+    Retrieve current battery percentage on Linux, macOS, or Windows with a 5-second cache.
+
+    Returns:
+        str: Battery percentage string (e.g. '84%'), or 'N/A' on failure or no battery.
+    """
+    global _last_battery_time, _cached_battery
+    now = time.time()
+    if now - _last_battery_time < 5.0:
+        return _cached_battery
+
+    _last_battery_time = now
+
+    # 1. Try Linux /sys/class/power_supply
+    try:
+        capacities = []
+        if os.path.exists("/sys/class/power_supply"):
+            for name in os.listdir("/sys/class/power_supply"):
+                type_path = os.path.join("/sys/class/power_supply", name, "type")
+                is_bat = name.startswith("BAT")
+                if not is_bat and os.path.exists(type_path):
+                    with open(type_path, "r") as f:
+                        if "battery" in f.read().lower():
+                            is_bat = True
+                if is_bat:
+                    cap_path = os.path.join("/sys/class/power_supply", name, "capacity")
+                    if os.path.exists(cap_path):
+                        with open(cap_path, "r") as f:
+                            cap = f.read().strip()
+                            if cap.isdigit():
+                                capacities.append(int(cap))
+        if capacities:
+            avg_cap = sum(capacities) // len(capacities)
+            _cached_battery = f"{avg_cap}%"
+            return _cached_battery
+    except Exception:
+        pass
+
+    # 2. Try macOS pmset
+    try:
+        import subprocess
+        out = subprocess.check_output(["pmset", "-g", "batt"], stderr=subprocess.DEVNULL).decode("utf-8", errors="ignore")
+        match = re.search(r"(\d+)%", out)
+        if match:
+            _cached_battery = f"{match.group(1)}%"
+            return _cached_battery
+    except Exception:
+        pass
+
+    # 3. Try Windows WMIC
+    try:
+        import subprocess
+        out = subprocess.check_output(["WMIC", "Path", "Win32_Battery", "Get", "EstimatedChargeRemaining"], stderr=subprocess.DEVNULL).decode("utf-8", errors="ignore")
+        for line in out.splitlines():
+            line = line.strip()
+            if line.isdigit():
+                _cached_battery = f"{line}%"
+                return _cached_battery
+    except Exception:
+        pass
+
+    _cached_battery = "N/A"
+    return _cached_battery
+
+
 PRIMARY_IP = get_primary_ip()
 
 # ==============================================================================
@@ -106,6 +176,7 @@ DEFAULT_CONFIG = {
         "tabstop": 8,
         "show_menu_shortcuts": True,
         "use_nerd_fonts": False,
+        "status_gutter": "{user} | {battery} | {date_time_24}",
         "dns": {
             "ipv4": {
                 "primary": "192.168.4.47",
@@ -1211,6 +1282,16 @@ def interpolate_placeholders(text, config):
         "{bashmenu_dir}": BASHMENU_DIR,
         "{templates_dir}": templates_val,
         "{scripts_dir}": scripts_val,
+        "{host}": HOSTNAME,
+        "{user-mode}": "root" if is_root() else "user",
+        "{version}": __version__,
+        "{date_time_12}": time.strftime("%Y-%m-%d %I:%M:%S %p"),
+        "{date_time_24}": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "{date}": time.strftime("%Y-%m-%d"),
+        "{time_12}": time.strftime("%I:%M:%S %p"),
+        "{time_24}": time.strftime("%H:%M:%S"),
+        "{battery}": get_battery_info(),
+        "{utc_seconds}": str(int(time.time())),
     }
 
     for key, val in replacements.items():
@@ -1911,25 +1992,24 @@ def main(stdscr):
             )
             safe_addstr(stdscr, height - 2, 2, footer_left, theme["footer"])
 
-            all_badges = [
-                f"Ver: [v{__version__}]",
-                f"User: [{USERNAME}]",
-                f"Mode: [{'ROOT' if is_root() else 'USER'}]",
-                f"Host: [{HOSTNAME}]",
-                f"IP: [{PRIMARY_IP}]",
-            ]
+            status_gutter_raw = get_config_value(config, "settings.status_gutter")
+            if not isinstance(status_gutter_raw, str):
+                status_gutter_raw = "{user} | {battery} | {date_time_24}"
+
+            raw_badges = [b.strip() for b in status_gutter_raw.split("|")]
+            all_badges = [interpolate_placeholders(b, config) for b in raw_badges if b.strip()]
 
             avail_w = width - 4 - len(footer_left)
             selected_badges = []
             for b in all_badges:
-                candidate = " | ".join(reversed(selected_badges + [b]))
+                candidate = " | ".join(selected_badges + [b])
                 if len(candidate) + 2 <= avail_w:
                     selected_badges.append(b)
                 else:
                     break
 
             if selected_badges:
-                badge_str = f" {' | '.join(reversed(selected_badges))} "
+                badge_str = f" {' | '.join(selected_badges)} "
                 safe_addstr(
                     stdscr,
                     height - 2,
