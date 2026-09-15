@@ -2,8 +2,12 @@ custom_settings:
   option_boolean: true
   option_filepath: '{bashmenu_dir}'
   option_string: A string of text
+example_custom_settings:
+  option_boolean: true
+  option_filepath: '{bashmenu_dir}'
+  option_string: A string of text
 settings:
-  check_for_updates: true
+  check_for_updates: false
   dns:
     ipv4:
       primary: 192.168.4.47
@@ -18,6 +22,6 @@ settings:
   tabstop: 4
   templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
-theme: matrix
+theme: industry
 user: null
 version: 0.0.1

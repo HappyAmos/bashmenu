@@ -93,9 +93,9 @@ DEFAULT_CONFIG = {
     "version": __version__,
     "theme": "dracula",
     "example_custom_settings": {
-        "option_boolean": True
-        "option_filepath": "{bashmenu_dir}"
-        "option_string": "A string of text"
+        "option_boolean": True,
+        "option_filepath": "{bashmenu_dir}",
+        "option_string": "A string of text",
     },
     "settings": {
         "check_for_updates": False,
