@@ -592,6 +592,7 @@ def apply_theme(theme_name):
         "status_bar",
         "shortcut_key",
         "shortcut_label",
+        "divider",
     ]
     theme_dict = {}
     for idx, key in enumerate(keys, start=1):
@@ -704,6 +705,248 @@ def run_interactive_action(stdscr, action, quiet=False):
     stdscr.refresh()
 
 
+DYNAMIC_COLOR_PAIRS = {}
+DYNAMIC_PAIR_KEYS = {}
+NEXT_DYNAMIC_PAIR_SEQ = 0
+ANSI_ESCAPE_RE = re.compile(
+    r'\x1b\[([0-9;]*)m|'            # Standard SGR parameters (captured in group 1)
+    r'\x1b\([a-zA-Z0-9]|'           # Character set selection (G0)
+    r'\x1b\)[a-zA-Z0-9]|'           # Character set selection (G1)
+    r'\x1b\[[0-9;]*[a-zA-Z]'        # General CSI escape sequences (cursor/screen control, etc.)
+)
+
+
+def get_color_pair(fg, bg):
+    """
+    Get or dynamically initialize a curses color pair for the given foreground
+    and background color IDs. Supports -1 for default terminal colors.
+    Uses a circular recycling buffer (slots 16-254) to respect ncurses 8-bit pair limits.
+    """
+    global NEXT_DYNAMIC_PAIR_SEQ
+    if fg is None:
+        fg = -1
+    if bg is None:
+        bg = -1
+
+    key = (fg, bg)
+    if key in DYNAMIC_COLOR_PAIRS:
+        return DYNAMIC_COLOR_PAIRS[key]
+
+    try:
+        # Check if color_pair works (curses is initialized)
+        test_val = curses.color_pair(0)
+    except Exception:
+        # Curses is not initialized (e.g., during tests), return 0 attribute
+        return 0
+
+    # Slots 16 to 254 inclusive (239 slots total)
+    start_slot = 16
+    num_slots = 239
+
+    slot_idx = start_slot + (NEXT_DYNAMIC_PAIR_SEQ % num_slots)
+    NEXT_DYNAMIC_PAIR_SEQ += 1
+
+    # If this slot was previously allocated to another color key, evict it from our cache
+    if slot_idx in DYNAMIC_PAIR_KEYS:
+        old_key = DYNAMIC_PAIR_KEYS[slot_idx]
+        if old_key in DYNAMIC_COLOR_PAIRS:
+            del DYNAMIC_COLOR_PAIRS[old_key]
+
+    try:
+        curses.init_pair(slot_idx, fg, bg)
+        DYNAMIC_COLOR_PAIRS[key] = curses.color_pair(slot_idx)
+        DYNAMIC_PAIR_KEYS[slot_idx] = key
+        return DYNAMIC_COLOR_PAIRS[key]
+    except Exception:
+        pass
+
+    try:
+        return curses.color_pair(0)
+    except Exception:
+        return 0
+
+
+def get_style_attr(fg, bg, bold, underline, default_theme_attr):
+    """
+    Combine styling attributes and dynamic color pair into a single curses attribute.
+    """
+    attr = 0
+    if bold:
+        attr |= curses.A_BOLD
+    if underline:
+        attr |= curses.A_UNDERLINE
+
+    if fg != -1 or bg != -1:
+        attr |= get_color_pair(fg, bg)
+    else:
+        attr |= default_theme_attr
+
+    return attr
+
+
+def parse_ansi_line(line, default_theme_attr):
+    """
+    Parse a line containing ANSI color escape sequences into a list of (text, attr) segments.
+    """
+    segments = []
+    current_fg = -1
+    current_bg = -1
+    current_bold = False
+    current_underline = False
+
+    pos = 0
+    for match in ANSI_ESCAPE_RE.finditer(line):
+        text_before = line[pos:match.start()]
+        if text_before:
+            attr = get_style_attr(
+                current_fg, current_bg, current_bold, current_underline, default_theme_attr
+            )
+            segments.append((text_before, attr))
+
+        param_str = match.group(1)
+        # If param_str is None, it's a character-set or non-SGR sequence; discard it
+        if param_str is not None:
+            params = (
+                [int(p) if p else 0 for p in param_str.split(";")]
+                if param_str
+                else [0]
+            )
+
+            idx = 0
+            while idx < len(params):
+                p = params[idx]
+                if p == 0:
+                    current_fg = -1
+                    current_bg = -1
+                    current_bold = False
+                    current_underline = False
+                    idx += 1
+                elif p == 1:
+                    current_bold = True
+                    idx += 1
+                elif p == 4:
+                    current_underline = True
+                    idx += 1
+                elif 30 <= p <= 37:
+                    current_fg = p - 30
+                    idx += 1
+                elif 40 <= p <= 47:
+                    current_bg = p - 40
+                    idx += 1
+                elif 90 <= p <= 97:
+                    current_fg = p - 90 + 8
+                    idx += 1
+                elif 100 <= p <= 107:
+                    current_bg = p - 100 + 8
+                    idx += 1
+                elif p == 38:
+                    if idx + 2 < len(params) and params[idx + 1] == 5:
+                        current_fg = params[idx + 2]
+                        idx += 3
+                    elif idx + 4 < len(params) and params[idx + 1] == 2:
+                        idx += 5
+                    else:
+                        idx += 1
+                elif p == 48:
+                    if idx + 2 < len(params) and params[idx + 1] == 5:
+                        current_bg = params[idx + 2]
+                        idx += 3
+                    elif idx + 4 < len(params) and params[idx + 1] == 2:
+                        idx += 5
+                    else:
+                        idx += 1
+                elif p == 39:
+                    current_fg = -1
+                    idx += 1
+                elif p == 49:
+                    current_bg = -1
+                    idx += 1
+                else:
+                    idx += 1
+
+        pos = match.end()
+
+    text_after = line[pos:]
+    if text_after:
+        attr = get_style_attr(
+            current_fg, current_bg, current_bold, current_underline, default_theme_attr
+        )
+        segments.append((text_after, attr))
+
+    return segments
+
+
+def expand_tabs_in_segments(segments, tabstop=4):
+    """
+    Expand tabs in a list of (text, attr) segments, keeping track of the visual
+    column position to align tab stops correctly regardless of ANSI escape codes.
+    """
+    expanded_segments = []
+    col = 0
+    for text, attr in segments:
+        new_text_chars = []
+        for c in text:
+            if c == '\t':
+                spaces_needed = tabstop - (col % tabstop)
+                new_text_chars.append(' ' * spaces_needed)
+                col += spaces_needed
+            else:
+                new_text_chars.append(c)
+                col += get_char_width(c)
+        expanded_segments.append(("".join(new_text_chars), attr))
+    return expanded_segments
+
+
+def process_line_to_segments(line, theme_text):
+    """
+    Expand tabs, parse ANSI colors, sanitize text content, and return
+    a list of (text, attr) segments.
+    """
+    raw_segments = parse_ansi_line(line, theme_text)
+    tab_aligned_segments = expand_tabs_in_segments(raw_segments, tabstop=4)
+
+    sanitized_segments = []
+    for text, attr in tab_aligned_segments:
+        san_text = "".join(c for c in text if safe_isprintable(c))
+        if san_text:
+            sanitized_segments.append((san_text, attr))
+
+    if not sanitized_segments:
+        sanitized_segments = [("", theme_text)]
+
+    return sanitized_segments
+
+
+def safe_addstr_segments(win, y, start_x, segments):
+    """
+    Safely write a line composed of multiple (text, attr) segments starting at (y, start_x).
+    """
+    h, w = win.getmaxyx()
+    if y >= h or start_x >= w:
+        return
+
+    current_x = start_x
+    for text, attr in segments:
+        if current_x >= w:
+            break
+
+        fit_text = []
+        for c in text:
+            char_w = get_char_width(c)
+            limit = w - 1 if y == h - 1 else w
+            if current_x + char_w > limit:
+                break
+            fit_text.append(c)
+            current_x += char_w
+
+        if fit_text:
+            try:
+                win.addstr(y, start_x, "".join(fit_text), attr)
+            except curses.error:
+                pass
+            start_x = current_x
+
+
 def run_action_in_window(stdscr, action, title, theme, stream=False):
     """
     Execute command or function and display output in scrolling popup window.
@@ -753,19 +996,14 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
             theme["footer"],
         )
 
-    def sanitize_line(line):
-        """Expand tabs and filter printable characters."""
-        line = line.expandtabs(4)
-        return "".join(c for c in line if safe_isprintable(c)) # c.isprintable())
-
     output_lines = []
 
     if callable(action):
         try:
             res = action()
-            output_lines = [sanitize_line(l) for l in str(res).splitlines()]
+            output_lines = [process_line_to_segments(l, theme["text"]) for l in str(res).splitlines()]
         except Exception as e:
-            output_lines = [f"Python Action Error: {e}"]
+            output_lines = [process_line_to_segments(f"Python Action Error: {e}", theme["text"])]
 
     elif stream:
         try:
@@ -779,7 +1017,7 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
             )
             last_update = 0.0
             for line in process.stdout:
-                output_lines.append(sanitize_line(line.rstrip("\r\n")))
+                output_lines.append(process_line_to_segments(line.rstrip("\r\n"), theme["text"]))
                 now = time.time()
                 if now - last_update > 0.033:
                     scroll_offset = max(0, len(output_lines) - max_visible_lines)
@@ -787,18 +1025,17 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
                     for i in range(max_visible_lines):
                         line_idx = scroll_offset + i
                         if line_idx < len(output_lines):
-                            safe_addstr(
+                            safe_addstr_segments(
                                 win,
                                 i + 2,
                                 2,
                                 output_lines[line_idx],
-                                theme["text"],
                             )
                     win.refresh()
                     last_update = now
             process.wait()
         except Exception as e:
-            output_lines.append(f"Execution Error: {e}")
+            output_lines.append(process_line_to_segments(f"Execution Error: {e}", theme["text"]))
 
     else:
         draw_window_frame(" Running... Please wait ")
@@ -812,13 +1049,13 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
                 text=True,
             )
             output_lines = [
-                sanitize_line(l) for l in result.stdout.splitlines()
+                process_line_to_segments(l, theme["text"]) for l in result.stdout.splitlines()
             ]
         except Exception as e:
-            output_lines = [f"Error executing command: {e}"]
+            output_lines = [process_line_to_segments(f"Error executing command: {e}", theme["text"])]
 
     if not output_lines:
-        output_lines = ["[Command returned no output]"]
+        output_lines = [process_line_to_segments("[Command returned no output]", theme["text"])]
 
     scroll_offset = max(0, len(output_lines) - max_visible_lines)
 
@@ -827,7 +1064,7 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
         for i in range(max_visible_lines):
             line_idx = scroll_offset + i
             if line_idx < len(output_lines):
-                safe_addstr(win, i + 2, 2, output_lines[line_idx], theme["text"])
+                safe_addstr_segments(win, i + 2, 2, output_lines[line_idx])
 
         win.refresh()
         key = win.getch()
@@ -1035,6 +1272,31 @@ def interpolate_placeholders(text, config):
         elif len(parts) == 3:
             resolved = resolve_nf_parts(parts[0], parts[1], parts[2])
         text = text.replace(full_match, resolved)
+
+    # Resolve {window_width} and {window_height}
+    if re.search(r"\{window_width\}", text, flags=re.IGNORECASE) or re.search(r"\{window_height\}", text, flags=re.IGNORECASE):
+        try:
+            cols = curses.COLS
+            lines = curses.LINES
+        except Exception:
+            import shutil
+            term_size = shutil.get_terminal_size()
+            cols = term_size.columns
+            lines = term_size.lines
+        text = re.sub(r"\{window_width\}", str(cols), text, flags=re.IGNORECASE)
+        text = re.sub(r"\{window_height\}", str(lines), text, flags=re.IGNORECASE)
+
+    # Resolve {ascii:decimal}
+    ascii_pattern = re.compile(r"\{ascii:(\d+)\}", re.IGNORECASE)
+    for match in ascii_pattern.finditer(text):
+        full_match = match.group(0)
+        try:
+            val = int(match.group(1))
+            if 0 <= val <= 255:
+                resolved = bytes([val]).decode('cp437', errors='replace')
+                text = text.replace(full_match, resolved)
+        except Exception:
+            pass
 
     return text
 
@@ -1707,11 +1969,15 @@ def main(stdscr):
 
             if option.get("type") == "divider":
                 length = option.get("length", 40)
+                if isinstance(length, str):
+                    length = interpolate_placeholders(length, config)
                 try:
                     length = int(length)
                 except (ValueError, TypeError):
                     length = 40
                 char = option.get("char", "-")
+                if char:
+                    char = interpolate_placeholders(char, config)
                 if not char:
                     char = "-"
                 divider_str = (char * length)[:length] if len(char) > 0 else "-" * length

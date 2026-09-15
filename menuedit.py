@@ -419,7 +419,11 @@ def show_directives_help(stdscr, theme):
         " - {scripts_dir}       : Scripts directory path.\n"
         " - {bash_aliases}      : Path to ~/.bash_aliases.\n"
         " - {bashrc}            : Path to ~/.bashrc.\n"
-        " - {vimrc}             : Path to ~/.vimrc.\n\n"
+        " - {vimrc}             : Path to ~/.vimrc.\n"
+        " - {window_width}      : Current window width in characters.\n"
+        " - {window_height}     : Current window height in characters.\n"
+        " - {ascii:decimal}     : Resolves CP437 decimal code to character\n"
+        "                         (e.g., {ascii:168} resolves to ¿).\n\n"
         "4. ADAPTIVE NERD FONTS & EMOJIS\n"
         "--------------------------------\n"
         " Syntax: {nf:[char]:[nerd-font hex]:[emoji-glyph]}\n"
@@ -1153,13 +1157,25 @@ def main(stdscr, target_path=None):
                     modified = True
         elif key == ord('m') and can_move_dn:
             idx = curr_node["index"]
+            item_ref = pl[idx]
             pl[idx], pl[idx + 1] = pl[idx + 1], pl[idx]
-            selected_idx += 1
+            # Dynamic tracking: Find the item's new index in the reconstructed tree nodes
+            new_nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
+            for new_idx, n in enumerate(new_nodes):
+                if n["item"] is item_ref:
+                    selected_idx = new_idx
+                    break
             modified = True
         elif key == ord('M') and can_move_up:
             idx = curr_node["index"]
+            item_ref = pl[idx]
             pl[idx], pl[idx - 1] = pl[idx - 1], pl[idx]
-            selected_idx -= 1
+            # Dynamic tracking: Find the item's new index in the reconstructed tree nodes
+            new_nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
+            for new_idx, n in enumerate(new_nodes):
+                if n["item"] is item_ref:
+                    selected_idx = new_idx
+                    break
             modified = True
         elif key in [ord('>'), ord('.'), 9] and can_indent:
             prev_item = pl[idx_in_parent - 1]

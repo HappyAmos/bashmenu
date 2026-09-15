@@ -197,6 +197,9 @@ These variables are dynamically resolved using active configuration and environm
 - `{bash_aliases}`      : Path to `~/.bash_aliases`.
 - `{bashrc}`            : Path to `~/.bashrc`.
 - `{vimrc}`             : Path to `~/.vimrc`.
+- `{window_width}`      : Current active window width in character columns.
+- `{window_height}`     : Current active window height in character lines.
+- `{ascii:decimal}`     : Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`).
 - `{settings.dot_key}`  : Resolves any nested configuration path from `bashmenu.yml`.
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution

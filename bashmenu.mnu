@@ -1,11 +1,17 @@
 version: 0.0.1
 title: Bash Menu
 options:
+- type: divider
+  length: '{window_width}'
+  char: '{ascii:196}'
 - label: Applications
   icon: "{nf::#f003b:\U0001F3AE}"
   submenu:
     title: Applications
     options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Antigravity
       icon: '{nf:#EE9FB0:}'
       type: script
@@ -47,20 +53,40 @@ options:
       action: /usr/bin/mc
       interactive: true
       quiet: true
+    - label: Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]
+      type: script
+      action: '{scripts_dir}/glyphs.sh {param}'
+      stream: true
+      icon: '{nf::#f422}'
+    - label: Unicode Block Explorer
+      type: script
+      action: '{scripts}/unicode.sh'
+      icon: '{nf::#f0ed0:}'
+      stream: false
+      quiet: true
+      interactive: true
+    - label: View ASCII Symbols [Standard and Extended]
+      type: script
+      action: '{scripts_dir}/ascii.sh'
+      icon: '{nf::#f07ef:}'
+      stream: true
+      quiet: true
+    - label: View Colors
+      type: script
+      action: '{scripts_dir}/ncurses_colors.py'
+      icon: '{nf::#f0301:}'
+      stream: true
+      quiet: true
+      external: true
     - label: Vim
       icon: '{nf::#e62b}'
       type: command
       action: vim
       interactive: true
       quiet: true
-    - label: Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]
-      type: script
-      action: '{scripts_dir}/glyphs.sh {param}'
-      stream: true
-      icon: '{nf::#f422}'
     - type: divider
-      length: 40
-      char: '-'
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Back to Main Menu
       icon: '{nf::#f048}'
       type: back
@@ -69,6 +95,9 @@ options:
   submenu:
     title: Install Tools Menu
     options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Apt update && upgrade
       type: command
       action: sudo apt update && sudo apt upgrade -y
@@ -113,6 +142,9 @@ options:
       action: '{scripts_dir}/install_scripts.sh'
       stream: true
       icon: '{nf::#ee79}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
@@ -121,6 +153,9 @@ options:
   submenu:
     title: Network Utilities Options
     options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Configure DNS servers [dnsconfig.sh]
       type: script
       action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
@@ -159,6 +194,9 @@ options:
       type: command
       action: ip a
       icon: '{nf::#ef09}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
@@ -167,10 +205,16 @@ options:
   submenu:
     title: Options & Settings
     options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Bashmenu Settings
       submenu:
         title: Bashmenu Settings
         options:
+        - type: divider
+          length: '{window_width}'
+          char: '{ascii:196}'
         - label: Change Theme
           type: theme_selector
         - label: Edit Configuration File [bashmenu.yml]
@@ -206,12 +250,6 @@ options:
           key: settings.tabstop
           title: Configure Tabstop Distance
           prompt: 'Enter tabstop distance (spaces per TAB press):'
-        - label: View Colors
-          type: script
-          action: '{scripts_dir}/tput_colors.sh'
-          icon: '{nf:::}'
-          stream: false
-          quiet: true
         - label: Visual Menu Editor [menuedit.py]
           type: script
           action: menuedit.py
@@ -219,6 +257,9 @@ options:
           quiet: true
           refresh: true
           external: false
+        - type: divider
+          length: '{window_width}'
+          char: '{ascii:196}'
         - label: Back to Options & Settings
           type: back
           icon: '{nf::#f048}'
@@ -243,6 +284,9 @@ options:
       show_whitespace: false
       tabstop: 4
       icon: '{nf::#f11e7}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
@@ -251,6 +295,9 @@ options:
   submenu:
     title: System Information Options
     options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Check Disk Usage [df -h]
       type: command
       action: df -h
@@ -278,6 +325,9 @@ options:
       stream: true
       quiet: true
       icon: ''
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - label: Back to Main Menu
       type: back
 - label: Help [glow -p bashmenu.md]
@@ -289,3 +339,6 @@ options:
 - label: Exit Menu
   icon: "{nf:::\U0001F6AA}"
   type: exit
+- type: divider
+  length: '{window_width}'
+  char: '{ascii:196}'
