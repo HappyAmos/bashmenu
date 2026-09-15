@@ -161,6 +161,7 @@ a main `options` list. Each option dictionary supports several attributes:
 | `python` | Dispatches internal Python utility function | `action` |
 | `inject_block` | Installs/removes modular code segments | `template`, `target`, `block_id` |
 | `theme_selector`| Launches list of registered themes | *(automatic)* |
+| `divider` | Renders an aesthetic horizontal line separator | `length`, `char` |
 | `back` | Navigates back to the preceding menu level| *(automatic)* |
 | `exit` | Shuts down the menu interface completely | *(automatic)* |
 

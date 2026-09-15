@@ -14,6 +14,7 @@ dracula:
     status_bar: ["COLOR_BLACK", 117]
     shortcut_key: [201, -1]
     shortcut_label: [255, -1]
+    divider: [61, -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_MAGENTA", -1]
@@ -28,6 +29,7 @@ dracula:
     status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
     shortcut_key: ["COLOR_MAGENTA", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_BLUE", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_MAGENTA", -1]
@@ -42,6 +44,7 @@ dracula:
     status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
     shortcut_key: ["COLOR_MAGENTA", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_BLUE", -1]
 
 nord:
   indicator: "{nf:#:\uef66:}"
@@ -59,6 +62,7 @@ nord:
     status_bar: [255, 60]
     shortcut_key: [111, -1]
     shortcut_label: [255, -1]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_CYAN", -1]
@@ -73,6 +77,7 @@ nord:
     status_bar: ["COLOR_WHITE", "COLOR_BLUE"]
     shortcut_key: ["COLOR_CYAN", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_CYAN", -1]
@@ -87,6 +92,7 @@ nord:
     status_bar: ["COLOR_WHITE", "COLOR_BLUE"]
     shortcut_key: ["COLOR_CYAN", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
 
 cyberpunk:
   indicator: "{nf:>:#f07c0:}"
@@ -104,6 +110,7 @@ cyberpunk:
     status_bar: ["COLOR_BLACK", 226]
     shortcut_key: [226, -1]
     shortcut_label: [51, -1]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -118,6 +125,7 @@ cyberpunk:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_CYAN", -1]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -132,6 +140,7 @@ cyberpunk:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_CYAN", -1]
+    divider: ["COLOR_WHITE", -1]
 
 gruvbox:
   indicator: "{nf:&:#f0c6b:}"
@@ -149,6 +158,7 @@ gruvbox:
     status_bar: [235, 142]
     shortcut_key: [214, -1]
     shortcut_label: [223, -1]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: -1
     title: ["COLOR_YELLOW", -1]
@@ -163,6 +173,7 @@ gruvbox:
     status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: -1
     title: ["COLOR_YELLOW", -1]
@@ -177,6 +188,7 @@ gruvbox:
     status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
 
 qbasic:
   indicator: "{nf:>:#e629:}"
@@ -194,6 +206,7 @@ qbasic:
     status_bar: [16, 51]
     shortcut_key: [226, 19]
     shortcut_label: [255, 19]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: "COLOR_BLUE"
     title: ["COLOR_YELLOW", "COLOR_BLUE"]
@@ -208,6 +221,7 @@ qbasic:
     status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
     shortcut_key: ["COLOR_YELLOW", "COLOR_BLUE"]
     shortcut_label: ["COLOR_WHITE", "COLOR_BLUE"]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: "COLOR_BLUE"
     title: ["COLOR_YELLOW", "COLOR_BLUE"]
@@ -222,6 +236,7 @@ qbasic:
     status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
     shortcut_key: ["COLOR_YELLOW", "COLOR_BLUE"]
     shortcut_label: ["COLOR_WHITE", "COLOR_BLUE"]
+    divider: ["COLOR_WHITE", -1]
 
 pacman:
   indicator: "{nf:):#f0baf:}"
@@ -239,6 +254,7 @@ pacman:
     status_bar: ["COLOR_BLACK", 226]
     shortcut_key: [205, -1]
     shortcut_label: [255, -1]
+    divider: [207, -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -253,6 +269,7 @@ pacman:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_MAGENTA", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: [13, -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -267,6 +284,7 @@ pacman:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_MAGENTA", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: [5, -1]
 
 industry:
   indicator: "{nf:#:#f0b46:}"
@@ -284,6 +302,7 @@ industry:
     status_bar: [232, 214]
     shortcut_key: [214, 234]
     shortcut_label: [250, 234]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -298,6 +317,7 @@ industry:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -312,6 +332,7 @@ industry:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
 
 matrix:
   indicator: "{nf:->:#f0628:}"
@@ -329,6 +350,7 @@ matrix:
     status_bar: ["COLOR_BLACK", 46]
     shortcut_key: [82, -1]
     shortcut_label: [46, -1]
+    divider: ["COLOR_GREEN", -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_GREEN", -1]
@@ -343,6 +365,7 @@ matrix:
     status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
     shortcut_key: ["COLOR_GREEN", -1]
     shortcut_label: ["COLOR_GREEN", -1]
+    divider: ["COLOR_GREEN", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_GREEN", -1]
@@ -357,6 +380,7 @@ matrix:
     status_bar: ["COLOR_BLACK", "COLOR_GREEN"]
     shortcut_key: ["COLOR_GREEN", -1]
     shortcut_label: ["COLOR_GREEN", -1]
+    divider: ["COLOR_GREEN", -1]
 
 monochrome:
   indicator: "{nf:>:#eee9:}"
@@ -374,6 +398,7 @@ monochrome:
     status_bar: ["COLOR_BLACK", 255]
     shortcut_key: [255, -1]
     shortcut_label: [250, -1]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_WHITE", -1]
@@ -388,6 +413,7 @@ monochrome:
     status_bar: ["COLOR_BLACK", "COLOR_WHITE"]
     shortcut_key: ["COLOR_WHITE", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_WHITE", -1]
@@ -402,6 +428,7 @@ monochrome:
     status_bar: ["COLOR_BLACK", "COLOR_WHITE"]
     shortcut_key: ["COLOR_WHITE", -1]
     shortcut_label: ["COLOR_WHITE", -1]
+    divider: ["COLOR_WHITE", -1]
 
 synthwave:
   indicator: "{nf:>:#f147d:}"
@@ -419,6 +446,7 @@ synthwave:
     status_bar: ["COLOR_BLACK", 51]
     shortcut_key: [214, -1]
     shortcut_label: [207, -1]
+    divider: ["COLOR_WHITE", -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_MAGENTA", -1]
@@ -433,6 +461,7 @@ synthwave:
     status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_MAGENTA", -1]
+    divider: ["COLOR_WHITE", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_MAGENTA", -1]
@@ -447,6 +476,7 @@ synthwave:
     status_bar: ["COLOR_BLACK", "COLOR_CYAN"]
     shortcut_key: ["COLOR_YELLOW", -1]
     shortcut_label: ["COLOR_MAGENTA", -1]
+    divider: ["COLOR_WHITE", -1]
 
 amber_crt:
   indicator: "{nf:>:#f0379:}"
@@ -464,6 +494,7 @@ amber_crt:
     status_bar: ["COLOR_BLACK", 214]
     shortcut_key: [220, -1]
     shortcut_label: [172, -1]
+    divider: [172, -1]
   16:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -478,6 +509,7 @@ amber_crt:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_WHITE", -1]
     shortcut_label: ["COLOR_YELLOW", -1]
+    divider: ["COLOR_YELLOW", -1]
   8:
     background: "COLOR_BLACK"
     title: ["COLOR_YELLOW", -1]
@@ -492,6 +524,7 @@ amber_crt:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_WHITE", -1]
     shortcut_label: ["COLOR_YELLOW", -1]
+    divider: ["COLOR_YELLOW", -1]
 
 hotdog_stand:
   indicator: "{nf:o.O:#e251:}"
@@ -509,6 +542,7 @@ hotdog_stand:
     status_bar: [16, 226]
     shortcut_key: [255, 196]
     shortcut_label: [226, 196]
+    divider: ["COLOR_YELLOW", -1]
   16:
     background: "COLOR_RED"
     title: ["COLOR_YELLOW", "COLOR_RED"]
@@ -523,6 +557,7 @@ hotdog_stand:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_WHITE", "COLOR_RED"]
     shortcut_label: ["COLOR_YELLOW", "COLOR_RED"]
+    divider: ["COLOR_YELLOW", -1]
   8:
     background: "COLOR_RED"
     title: ["COLOR_YELLOW", "COLOR_RED"]
@@ -537,3 +572,5 @@ hotdog_stand:
     status_bar: ["COLOR_BLACK", "COLOR_YELLOW"]
     shortcut_key: ["COLOR_WHITE", "COLOR_RED"]
     shortcut_label: ["COLOR_YELLOW", "COLOR_RED"]
+    divider: ["COLOR_YELLOW", -1]
+

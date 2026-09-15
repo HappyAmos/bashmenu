@@ -81,6 +81,7 @@ TYPE_BADGES = {
     "theme_selector": "[THM]",
     "back": "[BCK]",
     "exit": "[EXT]",
+    "divider": "[DIV]",
 }
 
 ITEM_TYPES = [
@@ -97,6 +98,7 @@ ITEM_TYPES = [
     ("theme_selector", "Theme Selector (dynamic theme menu)"),
     ("back", "Back Button (returns to parent menu)"),
     ("exit", "Exit Button (terminates application)"),
+    ("divider", "Visual Divider Line (aesthetic separator)"),
 ]
 
 def find_parent_options(menu_data, target_list):
@@ -443,10 +445,21 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
         if "submenu" in item_dict:
             item_type = "submenu"
 
-        fields = [
-            ("label", "Display Label", str(item_dict.get("label", ""))),
-            ("icon", "Nerd Font Icon / Emoji", str(item_dict.get("icon", "")))
-        ]
+        if item_type == "divider":
+            fields = [
+                ("length", "Divider Length", str(item_dict.get("length", 40))),
+                ("char", "Divider Character(s)", str(item_dict.get("char", "-")))
+            ]
+        else:
+            # Populate icon with default scaffolding if empty/null/missing
+            icon_val = item_dict.get("icon")
+            if icon_val is None or (isinstance(icon_val, str) and not icon_val.strip()):
+                item_dict["icon"] = "{nf::#:}"
+
+            fields = [
+                ("label", "Display Label", str(item_dict.get("label", ""))),
+                ("icon", "Nerd Font Icon / Emoji", str(item_dict.get("icon", "")))
+            ]
 
         if item_type == "submenu":
             sub_title = item_dict.get("submenu", {}).get("title", "")
@@ -607,6 +620,9 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                         if new_t == "submenu":
                             item_dict.pop("type", None)
                             item_dict.setdefault("submenu", {"title": item_dict.get("label", "Submenu"), "options": []})
+                        elif new_t == "divider":
+                            item_dict.setdefault("length", 40)
+                            item_dict.setdefault("char", "-")
                     break
                 elif selected_key == "submenu.title":
                     win.timeout(-1)
@@ -726,6 +742,12 @@ def create_default_item(item_type):
         return {"label": "Back to Main Menu", "type": "back"}
     elif item_type == "exit":
         return {"label": "Exit Utility", "type": "exit"}
+    elif item_type == "divider":
+        return {
+            "type": "divider",
+            "length": 40,
+            "char": "-"
+        }
     return {"label": "New Option"}
 
 def wrap_detail_lines(details, prop_w):
@@ -828,6 +850,8 @@ def draw_menu_editor(
 
         indent = "  " * nd["depth"]
         label = item.get("label", "Untitled")
+        if item_type == "divider":
+            label = f"Divider: {item.get('char', '-')} x {item.get('length', 40)}"
         pfx = nd.get("prefix", "")
 
         pfx_len = len(indent) + len(fold) + 1 + len(badge) + 1 + len(pfx)
@@ -861,13 +885,21 @@ def draw_menu_editor(
             f"Count : {len(curr_node['root_data'].get('options', []))} top-level options",
         ]
     else:
-        details = [
-            f"Label : {curr_item.get('label', '')}",
-            f"Type  : {curr_type}",
-        ]
-        for k in ["icon", "action", "key", "title", "prompt", "user_mode", "stream", "interactive", "show_whitespace", "tabstop", "quiet", "refresh"]:
-            if k in curr_item:
-                details.append(f"{k:<10}: {curr_item[k]}")
+        if curr_type == "divider":
+            details = [
+                f"Type  : {curr_type}",
+            ]
+            for k in ["length", "char"]:
+                if k in curr_item:
+                    details.append(f"{k:<10}: {curr_item[k]}")
+        else:
+            details = [
+                f"Label : {curr_item.get('label', '')}",
+                f"Type  : {curr_type}",
+            ]
+            for k in ["icon", "action", "key", "title", "prompt", "user_mode", "stream", "interactive", "show_whitespace", "tabstop", "quiet", "refresh"]:
+                if k in curr_item:
+                    details.append(f"{k:<10}: {curr_item[k]}")
 
     wrapped_details = wrap_detail_lines(details, prop_w)
 

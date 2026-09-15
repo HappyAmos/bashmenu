@@ -153,22 +153,34 @@ def get_option_shortcut(index):
     return ""
 
 
-def build_shortcut_map(options_count):
+def build_shortcut_map(options, show_shortcuts=True):
     """
-    Build lookup table mapping shortcut key ASCII ordinals to option indexes.
+    Build lookup table mapping shortcut key ASCII ordinals to option indexes,
+    and a lookup table mapping option indexes to shortcut characters.
+    Skips divider items so they don't consume/display shortcuts.
 
     Args:
-        options_count (int): Total number of menu options present.
+        options (list[dict]): Options list.
+        show_shortcuts (bool): True if shortcuts should be shown.
 
     Returns:
-        dict[int, int]: Mapping of character key ordinals to option index.
+        tuple[dict[int, int], dict[int, str]]: (shortcut_map, idx_to_shortcut).
     """
     shortcut_map = {}
-    for idx in range(min(options_count, 62)):
-        shortcut_char = get_option_shortcut(idx)
+    idx_to_shortcut = {}
+    if not show_shortcuts:
+        return shortcut_map, idx_to_shortcut
+
+    non_divider_idx = 0
+    for idx, opt in enumerate(options):
+        if opt.get("type") == "divider":
+            continue
+        shortcut_char = get_option_shortcut(non_divider_idx)
         if shortcut_char:
+            idx_to_shortcut[idx] = shortcut_char
             shortcut_map[ord(shortcut_char)] = idx
-    return shortcut_map
+            non_divider_idx += 1
+    return shortcut_map, idx_to_shortcut
 
 
 def deep_merge(default, user):
@@ -387,6 +399,7 @@ FALLBACK_THEME = {
     "status_bar": (curses.COLOR_BLACK, curses.COLOR_CYAN),
     "shortcut_key": (curses.COLOR_MAGENTA, -1),
     "shortcut_label": (curses.COLOR_WHITE, -1),
+    "divider": (curses.COLOR_BLUE, -1),
 }
 
 THEMES, THEME_ERROR = load_themes()
@@ -498,7 +511,13 @@ def reload_environment(stdscr, menu_stack, selected_rows):
     menu_stack.clear()
     menu_stack.append(main_menu)
     selected_rows.clear()
-    selected_rows.append(0)
+    main_options = main_menu.get("options", [])
+    start_idx = 0
+    while start_idx < len(main_options) and main_options[start_idx].get("type") == "divider":
+        start_idx += 1
+    if start_idx >= len(main_options):
+        start_idx = 0
+    selected_rows.append(start_idx)
 
     if THEME_ERROR:
         show_popup_message(stdscr, "Theme File Error", THEME_ERROR, theme)
@@ -1138,8 +1157,15 @@ def process_item_action(
             selected_rows.pop()
 
     elif "submenu" in selected_item:
-        menu_stack.append(selected_item["submenu"])
-        selected_rows.append(0)
+        submenu = selected_item["submenu"]
+        menu_stack.append(submenu)
+        sub_options = submenu.get("options", [])
+        start_idx = 0
+        while start_idx < len(sub_options) and sub_options[start_idx].get("type") == "divider":
+            start_idx += 1
+        if start_idx >= len(sub_options):
+            start_idx = 0
+        selected_rows.append(start_idx)
 
     elif "set_theme" in selected_item:
         new_theme = selected_item["set_theme"]
@@ -1558,7 +1584,13 @@ def main(stdscr):
         show_popup_message(stdscr, "Menu File Error", menu_err, theme)
 
     menu_stack = [main_menu]
-    selected_rows = [0]
+    main_options = main_menu.get("options", [])
+    start_idx = 0
+    while start_idx < len(main_options) and main_options[start_idx].get("type") == "divider":
+        start_idx += 1
+    if start_idx >= len(main_options):
+        start_idx = 0
+    selected_rows = [start_idx]
 
     marquee_offset = 0
     marquee_pause_ticks = 4
@@ -1641,9 +1673,7 @@ def main(stdscr):
                 )
 
         options = current_menu.get("options", [])
-        shortcut_map = (
-            build_shortcut_map(len(options)) if show_shortcuts else {}
-        )
+        shortcut_map, idx_to_shortcut = build_shortcut_map(options, show_shortcuts)
         start_y = 3
         max_pad = max(1, width - 10)
 
@@ -1674,6 +1704,23 @@ def main(stdscr):
             if y >= height - 3:
                 break
             x = 4
+
+            if option.get("type") == "divider":
+                length = option.get("length", 40)
+                try:
+                    length = int(length)
+                except (ValueError, TypeError):
+                    length = 40
+                char = option.get("char", "-")
+                if not char:
+                    char = "-"
+                divider_str = (char * length)[:length] if len(char) > 0 else "-" * length
+                divider_x = 4 + len(prefix_inactive)
+                max_w = width - divider_x - 4
+                if len(divider_str) > max_w:
+                    divider_str = divider_str[:max_w]
+                safe_addstr(stdscr, y, divider_x, divider_str, theme.get("divider", theme.get("border", theme["text"])))
+                continue
 
             label = interpolate_placeholders(option.get("label", ""), config)
             if option.get("set_theme") == config.get("theme"):
@@ -1748,7 +1795,7 @@ def main(stdscr):
 
             # 2. Print shortcut if showing
             if show_shortcuts:
-                shortcut_char = get_option_shortcut(idx)
+                shortcut_char = idx_to_shortcut.get(idx)
                 if shortcut_char:
                     badge_str = f"[{shortcut_char}]"
                     badge_attr = (
@@ -1820,20 +1867,34 @@ def main(stdscr):
             continue
 
         if key == curses.KEY_UP:
-            selected_rows[-1] = (
-                (current_row - 1) % len(options) if options else 0
-            )
+            orig = selected_rows[-1]
+            idx = (orig - 1) % len(options) if options else 0
+            while idx != orig and options[idx].get("type") == "divider":
+                idx = (idx - 1) % len(options)
+            if options and options[idx].get("type") != "divider":
+                selected_rows[-1] = idx
 
         elif key == curses.KEY_DOWN:
-            selected_rows[-1] = (
-                (current_row + 1) % len(options) if options else 0
-            )
+            orig = selected_rows[-1]
+            idx = (orig + 1) % len(options) if options else 0
+            while idx != orig and options[idx].get("type") == "divider":
+                idx = (idx + 1) % len(options)
+            if options and options[idx].get("type") != "divider":
+                selected_rows[-1] = idx
 
         elif key in [curses.KEY_PPAGE, curses.KEY_HOME]:
-            selected_rows[-1] = 0
+            idx = 0
+            while idx < len(options) and options[idx].get("type") == "divider":
+                idx += 1
+            if idx < len(options):
+                selected_rows[-1] = idx
 
         elif key in [curses.KEY_NPAGE, curses.KEY_END]:
-            selected_rows[-1] = len(options) - 1 if options else 0
+            idx = len(options) - 1
+            while idx >= 0 and options[idx].get("type") == "divider":
+                idx -= 1
+            if idx >= 0:
+                selected_rows[-1] = idx
 
         elif key == curses.KEY_F5:
             show_shortcuts = not show_shortcuts

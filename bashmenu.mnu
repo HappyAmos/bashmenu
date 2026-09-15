@@ -58,6 +58,9 @@ options:
       action: '{scripts_dir}/glyphs.sh {param}'
       stream: true
       icon: '{nf::#f422}'
+    - type: divider
+      length: 40
+      char: '-'
     - label: Back to Main Menu
       icon: '{nf::#f048}'
       type: back
@@ -203,6 +206,12 @@ options:
           key: settings.tabstop
           title: Configure Tabstop Distance
           prompt: 'Enter tabstop distance (spaces per TAB press):'
+        - label: View Colors
+          type: script
+          action: '{scripts_dir}/tput_colors.sh'
+          icon: '{nf:::}'
+          stream: false
+          quiet: true
         - label: Visual Menu Editor [menuedit.py]
           type: script
           action: menuedit.py
@@ -271,7 +280,7 @@ options:
       icon: ''
     - label: Back to Main Menu
       type: back
-- label: Help [glow -p README.md]
+- label: Help [glow -p bashmenu.md]
   icon: "{nf:::\u2753}"
   type: command
   action: glow -p {bashmenu_dir}/bashmenu.md
