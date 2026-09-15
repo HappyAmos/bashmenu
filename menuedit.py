@@ -988,6 +988,28 @@ def main(stdscr, target_path=None):
         if tree_w >= width - 4:
             tree_w = max(10, width - 15)
 
+        # Calculate dynamic state flags for current node to support move/indent/outdent
+        curr_item = curr_node["item"]
+        curr_type = curr_item.get("type", "submenu" if "submenu" in curr_item else "option")
+        is_root = curr_type == "root_menu"
+        pl = curr_node.get("parent_list")
+        idx_in_parent = curr_node.get("index")
+
+        can_move_up = pl is not None and idx_in_parent is not None and idx_in_parent > 0
+        can_move_dn = pl is not None and idx_in_parent is not None and idx_in_parent < len(pl) - 1
+
+        can_indent = False
+        if not is_root and pl and idx_in_parent is not None and idx_in_parent > 0:
+            prev_item = pl[idx_in_parent - 1]
+            if isinstance(prev_item, dict) and "submenu" in prev_item:
+                can_indent = True
+
+        can_outdent = False
+        if not is_root and pl and idx_in_parent is not None:
+            parent_opts, _ = find_parent_options(menu_data, pl)
+            if parent_opts is not None:
+                can_outdent = True
+
         stdscr.timeout(250)
         key = stdscr.getch()
 

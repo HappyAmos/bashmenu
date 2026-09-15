@@ -12,6 +12,11 @@ options:
       action: /home/andrew/.local/bin/agy
       interactive: true
       quiet: true
+    - label: Built-In Text Editor
+      icon: '{nf::#f11e7}'
+      type: editor
+      show_whitespace: true
+      tabstop: 4
     - label: Copilot
       icon: '{nf::#F0372}'
       type: command
@@ -30,24 +35,25 @@ options:
       action: gemini --resume latest
       interactive: true
       quiet: true
+    - label: Glow
+      type: command
+      action: glow -t {home}/cheat
+      interactive: true
+      quiet: true
+      icon: '{nf::#eeab:}'
     - label: Midnight Commander
       icon: '{nf::#f0ab6}'
       type: script
       action: /usr/bin/mc
       interactive: true
       quiet: true
-    - label: Built-In Text Editor
-      icon: '{nf::#f11e7}'
-      type: editor
-      show_whitespace: true
-      tabstop: 4
     - label: Vim
       icon: '{nf::#e62b}'
       type: command
       action: vim
       interactive: true
       quiet: true
-    - label: Search Nerd Font & Emoji
+    - label: Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]
       type: script
       action: '{scripts_dir}/glyphs.sh {param}'
       stream: true
@@ -98,7 +104,7 @@ options:
       type: script
       action: '{scripts_dir}/install_kmscon.sh'
       stream: true
-      icon: '{nf::#ec84}'
+      icon: '{nf::#f0e51}'
     - label: Install Scripts From Private Repo [https://github.com/HappyAmos/scripts.git]
       type: script
       action: '{scripts_dir}/install_scripts.sh'
@@ -112,19 +118,18 @@ options:
   submenu:
     title: Network Utilities Options
     options:
-    - label: Show Hostname Information [hostname]
-      type: command
-      action: hostname
-      icon: '{nf::#f08ad}'
-    - label: Show Configured DNS [getdns.py]
+    - label: Configure DNS servers [dnsconfig.sh]
       type: script
-      action: '{scripts_dir}/getdns.py'
+      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
+        {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
       stream: true
-      icon: '{nf::#f01d6}'
-    - label: Show Network Interfaces [ip a]
-      type: command
-      action: ip a
-      icon: '{nf::#ef09}'
+      icon: '{nf::#f0b8c}'
+    - label: Configure Ping Target [{settings.ping_target}]
+      type: config
+      key: settings.ping_target
+      title: Edit Ping Target
+      prompt: 'Enter Hostname or IP Address:'
+      icon: '{nf::#f11ab}'
     - label: Ping Target [{settings.ping_target}]
       type: confirm
       title: Confirm Ping Task
@@ -138,18 +143,19 @@ options:
         title: Task Cancelled
         message: Ping request was cancelled by user.
       icon: '{nf::#f11ab}'
-    - label: Configure Ping Target [{settings.ping_target}]
-      type: config
-      key: settings.ping_target
-      title: Edit Ping Target
-      prompt: 'Enter Hostname or IP Address:'
-      icon: '{nf::#f11ab}'
-    - label: Configure DNS servers [dnsconfig.sh]
+    - label: Show Configured DNS [getdns.py]
       type: script
-      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
-        {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
+      action: '{scripts_dir}/getdns.py'
       stream: true
-      icon: '{nf::#f0b8c}'
+      icon: '{nf::#f01d6}'
+    - label: Show Hostname Information [hostname]
+      type: command
+      action: hostname
+      icon: '{nf::#f08ad}'
+    - label: Show Network Interfaces [ip a]
+      type: command
+      action: ip a
+      icon: '{nf::#ef09}'
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
@@ -162,6 +168,41 @@ options:
       submenu:
         title: Bashmenu Settings
         options:
+        - label: Change Theme
+          type: theme_selector
+        - label: Edit Configuration File [bashmenu.yml]
+          type: editor
+          action: bashmenu.yml
+          show_whitespace: true
+        - label: Edit Menu Layout [bashmenu.mnu]
+          type: editor
+          action: bashmenu.mnu
+          show_whitespace: true
+        - label: Edit Scripts [{scripts_dir}]
+          type: editor
+          action: '{scripts_dir}/{file_picker}'
+        - label: Edit Templates [{templates_dir}]
+          type: editor
+          action: '{templates_dir}/{file_picker}'
+          show_whitespace: true
+        - label: Edit Themes File [bashmenu.themes]
+          type: editor
+          action: bashmenu.themes
+        - label: Enable Nerd Fonts [{settings.use_nerd_fonts}]
+          type: toggle
+          key: settings.use_nerd_fonts
+          title: Toggle Nerd Fonts
+          message: Enable colorful menu emojis and Nerd Fonts?
+        - label: Editor Tab to Spaces Mode [{settings.tab_to_spaces}]
+          type: toggle
+          key: settings.tab_to_spaces
+          title: Configure Tab Mode
+          prompt: 'Convert TAB key to spaces? (true/false):'
+        - label: Editor Tabstop Distance [{settings.tabstop}]
+          type: config
+          key: settings.tabstop
+          title: Configure Tabstop Distance
+          prompt: 'Enter tabstop distance (spaces per TAB press):'
         - label: Visual Menu Editor [menuedit.py]
           type: script
           action: menuedit.py
@@ -169,61 +210,33 @@ options:
           quiet: true
           refresh: true
           external: false
-        - label: Edit Menu Layout [bashmenu.mnu]
-          type: editor
-          action: bashmenu.mnu
-          show_whitespace: true
-        - label: Change Color Theme
-          type: theme_selector
-        - label: Edit Templates [{templates_dir}]
-          type: editor
-          action: '{templates_dir}/{file_picker}'
-          show_whitespace: true
-        - label: Edit Scripts [{scripts_dir}]
-          type: editor
-          action: '{scripts_dir}/{file_picker}'
-        - label: Edit Themes File [bashmenu.themes]
-          type: editor
-          action: bashmenu.themes
-        - label: Editor Tabstop Distance [{settings.tabstop}]
-          type: config
-          key: settings.tabstop
-          title: Configure Tabstop Distance
-          prompt: 'Enter tabstop distance (spaces per TAB press):'
-        - label: Editor Tab to Spaces Mode [{settings.tab_to_spaces}]
-          type: toggle
-          key: settings.tab_to_spaces
-          title: Configure Tab Mode
-          prompt: 'Convert TAB key to spaces? (true/false):'
-        - label: Enable Nerd Fonts [{settings.use_nerd_fonts}]
-          type: toggle
-          key: settings.use_nerd_fonts
-          title: Toggle Nerd Fonts
-          message: Enable colorful menu emojis and Nerd Fonts?
-        - label: Edit Configuration File [bashmenu.yml]
-          type: editor
-          action: bashmenu.yml
-          show_whitespace: true
         - label: Back to Options & Settings
           type: back
+          icon: '{nf::#f048}'
+      icon: '{nf::#f013}'
+    - label: Edit autoexec.sh [{home}/autoexec.sh]
+      type: editor
+      action: '{home}/autoexec.sh'
+      icon: '{nf::#f11e7}'
     - label: Edit .bashrc [{bashrc}]
       type: editor
       action: '{bashrc}'
       show_whitespace: true
+      icon: '{nf::#f11e7}'
+    - label: Edit .bash_aliases [{bash_aliases}]
+      type: editor
+      action: '{bash_aliases}'
+      show_whitespace: true
+      icon: '{nf::#f11e7}'
     - label: Edit .vimrc [{vimrc}]
       type: editor
       action: '{vimrc}'
       show_whitespace: false
       tabstop: 4
-    - label: Edit .bash_aliases [{bash_aliases}]
-      type: editor
-      action: '{bash_aliases}'
-      show_whitespace: true
-    - label: Edit autoexec.sh [{home}/autoexec.sh]
-      type: editor
-      action: '{home}/autoexec.sh'
+      icon: '{nf::#f11e7}'
     - label: Back to Main Menu
       type: back
+      icon: '{nf::#f048}'
 - label: System Information
   icon: "{nf:::\u2139\uFE0F}"
   submenu:
@@ -238,9 +251,24 @@ options:
     - label: Check USB Controller [lsusb -vt]
       type: command
       action: lsusb -vt
-    - label: Check CPU Information [lscpu]
+      stream: true
+      quiet: true
+    - label: Display CPU Information [lscpu]
       type: command
       action: lscpu
+      quiet: true
+      stream: true
+    - label: Display All PCI Devices [lspci]
+      type: command
+      action: lspci
+      quiet: true
+      stream: true
+    - label: Which [which [param]]
+      type: command
+      action: which {param}
+      stream: true
+      quiet: true
+      icon: ''
     - label: Back to Main Menu
       type: back
 - label: Help [glow -p README.md]

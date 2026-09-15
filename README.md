@@ -62,7 +62,7 @@ Launch the menu interface directly:
 For comprehensive guides, lists of all item types, placeholder directives, and
 full YAML schemas:
 
-- **Complete User Manual** : Refer to the localized **`bashmenu.md`** file.
+- **Complete User Manual** : Refer to the localized **[bashmenu.md](bashmenu.md)** file.
 - **Unix Man Page**        : Execute **`man ./bashmenu.1`** from your terminal
   to pull up the exhaustively detailed manual page in standard formatting.
 
