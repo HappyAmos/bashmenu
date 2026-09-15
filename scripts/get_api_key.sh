@@ -1,6 +1,6 @@
 #!/bin/bash
 # Version: 0.0.1
-# Author:  HA Bash Menu Development Team
+# Author:  HappyAmos
 # Echo's out string contained on a directory in a remote server
 # Passes string, or exits with an error code on failure.
 

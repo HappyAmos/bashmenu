@@ -1,6 +1,9 @@
 #!/bin/bash
+
+# Personal script to clone a private repo from Github. Uses get_api_key.sh to retrieve
+# an api key via ssh from another pc on the local network. 
+
 # Get the directory that the script is located in:
-# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 SCRIPT_DIR="$(cd -P "$(dirname "$BASH_SOURCE")" && pwd)"
 INSTALL_DIR="$HOME/scripts"
 

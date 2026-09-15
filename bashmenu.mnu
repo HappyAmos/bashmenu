@@ -235,11 +235,18 @@ options:
         - label: Edit Themes File [bashmenu.themes]
           type: editor
           action: bashmenu.themes
+        - label: Enable Automatic Updates (git pull) [{settings.check_for_updates}]
+          type: toggle
+          key: settings.check_for_updates
+          title: Toggle Auto Update
+          message: Enable automatic updates?
+          icon: '{nf:::}'
         - label: Enable Nerd Fonts [{settings.use_nerd_fonts}]
           type: toggle
           key: settings.use_nerd_fonts
           title: Toggle Nerd Fonts
           message: Enable colorful menu emojis and Nerd Fonts?
+          icon: '{nf:::}'
         - label: Editor Tab to Spaces Mode [{settings.tab_to_spaces}]
           type: toggle
           key: settings.tab_to_spaces

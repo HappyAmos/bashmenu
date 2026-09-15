@@ -11,7 +11,7 @@ import argparse
 import json
 
 __version__ = "0.0.1"
-__author__ = "HA Bash Menu Development Team"
+__author__ = "HappyAmos"
 import os
 import re
 import shutil

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Version: 0.0.1
-# Author:  HA Bash Menu Development Team
+# Author:  HappyAmos
 
 # ==============================================================================
 # SCRIPT: set-dns.sh

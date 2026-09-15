@@ -1,6 +1,11 @@
 #!/bin/bash
+
+# Personal script to clone private Github repo of cheatsheets (markdown) to a subdirectory 
+# in my home folder. get_api_key.sh is a farily universal script to grab text 
+# via ssh from another device on the network. Values are hard coded in script
+# but very easy to customize.
+
 # Get the directory that the script is located in:
-# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 SCRIPT_DIR="$(cd -P "$(dirname "$BASH_SOURCE")" && pwd)"
 INSTALL_DIR="$HOME/cheatsheets"
 

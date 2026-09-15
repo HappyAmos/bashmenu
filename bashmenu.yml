@@ -2,10 +2,8 @@ custom_settings:
   option_boolean: true
   option_filepath: '{bashmenu_dir}'
   option_string: A string of text
-git_pat: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
-google_gemini_api_key: YOUR_GOOGLE_GEMINI_API_KEY
-scripts: scripts
 settings:
+  check_for_updates: true
   dns:
     ipv4:
       primary: 192.168.4.47
@@ -20,7 +18,6 @@ settings:
   tabstop: 4
   templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
-templates: templates
 theme: matrix
 user: null
 version: 0.0.1

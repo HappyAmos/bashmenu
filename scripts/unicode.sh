@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Simple bash script to print unicode characters to the screen.
+# Since there are literally millions of them, only a few chosen
+# blocks have been included, but you could easily configure more
+# blocks using a tool like https://unicode-explorer.com/search/
+# to find the unicode blocks you are interested in.
+#
+# All you'd have to do is include a menu item in the interactive
+# menu loop below, and add the retrieval line in the case 
+# statement below.
+
 # Function to cleanly print a specific range with a header
 print_unicode_range() {
     local label="$1"

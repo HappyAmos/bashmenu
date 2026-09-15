@@ -92,9 +92,13 @@ PRIMARY_IP = get_primary_ip()
 DEFAULT_CONFIG = {
     "version": __version__,
     "theme": "dracula",
-    "templates": "templates",
-    "scripts": "scripts",
+    "example_custom_settings": {
+        "option_boolean": True
+        "option_filepath": "{bashmenu_dir}"
+        "option_string": "A string of text"
+    },
     "settings": {
+        "check_for_updates": False,
         "templates_dir": "{bashmenu_dir}/templates",
         "scripts_dir": "{bashmenu_dir}/scripts",
         "ping_target": "1.1.1.1",
