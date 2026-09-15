@@ -109,12 +109,15 @@ theme: dracula
 settings:
   use_nerd_fonts: true
   tabstop: 4
+  status_gutter: "{user} | {battery} | {date_time_24}"
   dns:
     ipv4:
       primary: 1.1.1.1
 ```
-Any dot-notation key (e.g., `settings.dns.ipv4.primary`) can be interpolated
+Any dot-notation key (e.g., `settings.dns.ipv4.primary` or `settings.status_gutter`) can be interpolated
 inside menu titles, actions, labels, or template files using brackets.
+
+The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders (such as `{user}`, `{battery}`, or `{date_time_24}`) separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width.
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under
@@ -190,6 +193,9 @@ visual chooser inside that directory**, completely avoiding double-prefixing.
 These variables are dynamically resolved using active configuration and environment values:
 
 - `{user}` / `{username}` : Current system username.
+- `{host}`              : System host name.
+- `{user-mode}`         : Current privilege mode (`"root"` if running with root/sudo privileges, otherwise `"user"`).
+- `{version}`           : Script version (e.g., `0.0.1`).
 - `{home}`              : User's absolute home directory path.
 - `{bashmenu_dir}`      : Application root directory path.
 - `{templates_dir}`     : Templates folder path (`settings.templates_dir`).
@@ -197,6 +203,13 @@ These variables are dynamically resolved using active configuration and environm
 - `{bash_aliases}`      : Path to `~/.bash_aliases`.
 - `{bashrc}`            : Path to `~/.bashrc`.
 - `{vimrc}`             : Path to `~/.vimrc`.
+- `{date_time_12}`      : 12-hour formatted date-time (e.g., `2026-09-15 03:00:00 PM`).
+- `{date_time_24}`      : 24-hour formatted date-time (e.g., `2026-09-15 15:00:00`).
+- `{date}`              : Current date formatted as `YYYY-MM-DD`.
+- `{time_12}`           : 12-hour formatted time (e.g., `03:00:00 PM`).
+- `{time_24}`           : 24-hour formatted time (e.g., `15:00:00`).
+- `{battery}`           : Current battery percentage (e.g., `84%`, or `N/A` if no battery is detected). Performance-optimized with a 5-second cache to prevent rendering lag.
+- `{utc_seconds}`       : Current UTC time in seconds since epoch.
 - `{window_width}`      : Current active window width in character columns.
 - `{window_height}`     : Current active window height in character lines.
 - `{ascii:decimal}`     : Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`).

@@ -173,6 +173,12 @@ Launch external $EDITOR (e.g. vim or nano).
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
 settings.dns.ipv4) can be interpolated inside menu files or actions.
+The special setting
+.I settings.status_gutter
+defines which system badges (such as {user}, {battery}, or {date_time_24}) are
+displayed in the bottom right corner (the status gutter). This value is specified
+as a string of badges separated by pipe symbols (|). The engine will fit as many
+of these badges as possible based on the terminal's available width.
 .SS Menu Structure (bashmenu.mnu)
 The menu is defined as a hierarchical YAML options list. Options can utilize the
 following configuration keys:
@@ -269,6 +275,15 @@ The following placeholders are auto-interpolated inside actions or templates:
 .B {user}, {username}
 Current system username.
 .TP
+.B {host}
+System host name.
+.TP
+.B {user-mode}
+Current privilege mode ("root" if running with root/sudo privileges, otherwise "user").
+.TP
+.B {version}
+Script version (e.g., 0.0.1).
+.TP
 .B {home}
 User's absolute home directory path.
 .TP
@@ -281,6 +296,21 @@ Templates and scripts folders paths.
 .B {bashrc}, {vimrc}, {bash_aliases}
 Path files system profiles.
 .TP
+.B {date_time_12}, {date_time_24}
+12-hour and 24-hour formatted date-time.
+.TP
+.B {date}
+Current date (YYYY-MM-DD).
+.TP
+.B {time_12}, {time_24}
+12-hour and 24-hour current time.
+.TP
+.B {battery}
+Current battery percentage (e.g. 84% or N/A). Includes a 5-second performance cache.
+.TP
+.B {utc_seconds}
+Current UTC epoch seconds.
+.TP
 .B {window_width}, {window_height}
 Current active window width (columns) and height (lines) in characters.
 .TP
@@ -288,7 +318,7 @@ Current active window width (columns) and height (lines) in characters.
 Prints character corresponding to decimal code (uses CP437 for extended ASCII, e.g. {ascii:168} resolves to ¿).
 .TP
 .B {settings.dot_key}
-Dot-notation configuration lookup from bashmenu.yml.
+Dot-notation configuration lookup from bashmenu.yml (e.g., {settings.status_gutter}).
 .SS Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically using three properties: a fallback
 ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:
