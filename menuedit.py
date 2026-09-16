@@ -223,7 +223,16 @@ def select_item_type(stdscr, theme):
     win.keypad(True)
 
     curr_idx = 0
+    type_marquee_offset = 0
+    type_marquee_pause_ticks = 4
+    last_idx = -1
+
     while True:
+        if curr_idx != last_idx:
+            type_marquee_offset = 0
+            type_marquee_pause_ticks = 4
+            last_idx = curr_idx
+
         win.erase()
         win.attron(theme["border"])
         win.border(0)
@@ -233,24 +242,56 @@ def select_item_type(stdscr, theme):
         bashmenu.safe_addstr(win, 0, (box_w - len(title)) // 2, title, theme["title"] | curses.A_BOLD)
 
         for idx, (type_key, desc) in enumerate(ITEM_TYPES):
-            attr = (theme["highlight"] | curses.A_BOLD) if idx == curr_idx else theme["text"]
             badge = TYPE_BADGES.get(type_key, "[   ]")
-            label_str = f" {badge} {type_key:<15} {desc[:box_w - 28]}"
+            avail_w = box_w - 28
+
+            if idx == curr_idx:
+                attr = theme["highlight"] | curses.A_BOLD
+                if len(desc) > avail_w:
+                    desc_padded = desc + "   " + desc[:avail_w]
+                    sliced_desc = desc_padded[type_marquee_offset : type_marquee_offset + avail_w]
+                    sliced_desc = f"{sliced_desc:<{avail_w}}"
+                else:
+                    sliced_desc = f"{desc:<{avail_w}}"
+            else:
+                attr = theme["text"]
+                if len(desc) > avail_w:
+                    sliced_desc = f"{desc[:avail_w-3]}..."
+                else:
+                    sliced_desc = f"{desc:<{avail_w}}"
+
+            label_str = f" {badge} {type_key:<15} {sliced_desc}"
             bashmenu.safe_addstr(win, 2 + idx, 2, label_str, attr)
 
         footer = " [UP/DN]: Navigate | [ENTER]: Select | [ESC]: Cancel "
         bashmenu.safe_addstr(win, box_h - 1, max(2, (box_w - len(footer)) // 2), footer, theme["footer"])
 
         win.refresh()
+        win.timeout(250)
         key = win.getch()
 
+        if key == -1:
+            active_desc = ITEM_TYPES[curr_idx][1]
+            avail_w = box_w - 28
+            if len(active_desc) > avail_w:
+                if type_marquee_pause_ticks > 0:
+                    type_marquee_pause_ticks -= 1
+                else:
+                    type_marquee_offset += 1
+                    if type_marquee_offset >= len(active_desc) + 3:
+                        type_marquee_offset = 0
+                        type_marquee_pause_ticks = 4
+            continue
+
         if key == 27:
+            win.timeout(-1)
             return None
         elif key in [curses.KEY_UP, ord('k')] and curr_idx > 0:
             curr_idx -= 1
         elif key in [curses.KEY_DOWN, ord('j')] and curr_idx < len(ITEM_TYPES) - 1:
             curr_idx += 1
         elif key in [curses.KEY_ENTER, 10, 13]:
+            win.timeout(-1)
             return ITEM_TYPES[curr_idx][0]
 
 
@@ -261,6 +302,7 @@ def select_script_action(stdscr, curr_val, config, theme):
         ("{file_picker}", "Prompt File Picker upon execution"),
         ("{file_picker_new}", "Prompt File Picker (w/ File Creation)"),
         ("{dir_picker}", "Prompt Directory Picker upon execution"),
+        ("{dir_picker_new}", "Prompt Directory Picker (w/ Dir Creation)"),
         ("{param}", "Prompt Modal Input text box upon execution"),
         ("[EDIT]", "Manual Command Entry (Custom script/args)..."),
     ]
@@ -325,6 +367,7 @@ def select_editor_target(stdscr, curr_val, item_type, selected_key, config, them
         ("{file_picker}", "Prompt File Picker upon execution"),
         ("{file_picker_new}", "Prompt File Picker (w/ File Creation)"),
         ("{dir_picker}", "Prompt Directory Picker upon execution"),
+        ("{dir_picker_new}", "Prompt Directory Picker (w/ Dir Creation)"),
         ("{param}", "Prompt Modal Input text box upon execution"),
         ("[EDIT]", "Manual Text Entry (Custom Path / Placeholder)..."),
     ]
@@ -415,7 +458,9 @@ def show_directives_help(stdscr, theme):
         " - {file_picker_new}: Opens a visual file chooser allowing creation of\n"
         "                     new files, and replaces it with the absolute path.\n"
         " - {dir_picker}    : Opens a visual directory chooser dialog and replaces\n"
-        "                     it with the absolute path of the selected folder.\n\n"
+        "                     it with the absolute path of the selected folder.\n"
+        " - {dir_picker_new}: Opens a visual directory chooser allowing creation of\n"
+        "                     new folders, and replaces it with the absolute path.\n\n"
         " * PRO TIP (Starting Directories):\n"
         "   If you precede a picker placeholder with a directory path, like:\n"
         "     '{templates_dir}/{file_picker}' or '~/projects/{dir_picker}'\n"
@@ -493,8 +538,8 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
             fields.append(("title", "Input Popup Title", str(item_dict.get("title", ""))))
             fields.append(("prompt", "Input Prompt Text", str(item_dict.get("prompt", ""))))
             fields.append(("picker", "Picker Type (none/file/dir)", str(item_dict.get("picker", "none"))))
-            if item_dict.get("picker") == "file":
-                fields.append(("allow_new", "Allow Creating New Files", str(item_dict.get("allow_new", False))))
+            if item_dict.get("picker") in ["file", "dir"]:
+                fields.append(("allow_new", "Allow Creating New Files/Folders", str(item_dict.get("allow_new", False))))
             fields.append(("start_dir", "Picker Starting Directory", str(item_dict.get("start_dir", "~"))))
             fields.append(("masked", "Mask Typed Password Input", str(item_dict.get("masked", False))))
         elif item_type in ["toggle", "config_toggle"]:

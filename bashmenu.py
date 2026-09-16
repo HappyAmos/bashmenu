@@ -1519,12 +1519,17 @@ def resolve_dynamic_directives(stdscr, action_str, selected_item, config, theme)
             return None
         action_str = action_str.replace(pattern_to_replace, chosen_path)
 
-    # 3. Resolve {dir_picker}
-    if "{dir_picker}" in action_str:
+    # 3. Resolve {dir_picker} and {dir_picker_new}
+    has_dir_new = "{dir_picker_new}" in action_str or "{dir_picker:new}" in action_str
+    has_dir_std = "{dir_picker}" in action_str
+
+    if has_dir_new or has_dir_std:
+        directive = "{dir_picker_new}" if "{dir_picker_new}" in action_str else ("{dir_picker:new}" if "{dir_picker:new}" in action_str else "{dir_picker}")
         title = selected_item.get("title", "Select Directory")
-        start_dir, pattern_to_replace = find_start_dir_and_pattern("{dir_picker}")
+        start_dir, pattern_to_replace = find_start_dir_and_pattern(directive)
+        allow_new = has_dir_new or selected_item.get("allow_new", False)
         chosen_path = show_file_picker(
-            stdscr, title, start_dir, mode="dir", theme=theme
+            stdscr, title, start_dir, mode="dir", theme=theme, allow_new=allow_new
         )
         if chosen_path is None:
             return None

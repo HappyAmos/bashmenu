@@ -354,35 +354,41 @@ options:
     - label: Check Disk Usage [df -h]
       type: command
       action: df -h
+      icon: '{nf:::}'
     - label: Check RAM Usage [free -h]
       type: command
       action: free -h
+      icon: '{nf:::}'
     - label: Check USB Controller [lsusb -vt]
       type: command
       action: lsusb -vt
       stream: true
       quiet: true
+      icon: '{nf:::}'
     - label: Display CPU Information [lscpu]
       type: command
       action: lscpu
       quiet: true
       stream: true
+      icon: '{nf:::}'
     - label: Display All PCI Devices [lspci]
       type: command
       action: lspci
       quiet: true
       stream: true
+      icon: '{nf:::}'
     - label: Which [which [param]]
       type: command
       action: which {param}
       stream: true
       quiet: true
-      icon: ''
+      icon: '{nf:::}'
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
     - label: Back to Main Menu
       type: back
+      icon: '{nf:::}'
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'

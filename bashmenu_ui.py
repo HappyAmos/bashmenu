@@ -671,8 +671,11 @@ def show_file_picker(
         else:
             footer_parts.append("[ENTER]: Select/Open")
 
-        if allow_new and mode != "dir":
-            footer_parts.append("[N]: New File")
+        if allow_new:
+            if mode == "dir":
+                footer_parts.append("[N]: New Folder")
+            else:
+                footer_parts.append("[N]: New File")
 
         footer_parts.append("[Ctrl+H]: Hidden")
         footer_parts.append("[ESC]: Cancel")
@@ -751,31 +754,59 @@ def show_file_picker(
                 return selected["path"]
         elif key == ord(' ') and mode == "dir":
             return current_path
-        elif key in [ord('n'), ord('N')] and allow_new and mode != "dir":
-            new_name = show_input_box(
-                stdscr, "Create New File", "Enter new filename:", "", theme
-            )
-            if new_name is not None:
-                new_name = new_name.strip()
-                if new_name:
-                    new_filepath = os.path.join(current_path, new_name)
-                    if os.path.exists(new_filepath):
-                        show_popup_message(
-                            stdscr,
-                            "Error",
-                            f"File already exists:\n{new_name}",
-                            theme,
-                        )
-                    else:
-                        try:
-                            with open(new_filepath, "w", encoding="utf-8"):
-                                pass
-                            target_item = new_filepath
-                            initial_selection_done = False
-                        except OSError as e:  # Catch filesystem write errors safely
+        elif key in [ord('n'), ord('N')] and allow_new:
+            if mode == "dir":
+                new_name = show_input_box(
+                    stdscr, "Create New Directory", "Enter new directory name:", "", theme
+                )
+                if new_name is not None:
+                    new_name = new_name.strip()
+                    if new_name:
+                        new_dirpath = os.path.join(current_path, new_name)
+                        if os.path.exists(new_dirpath):
                             show_popup_message(
                                 stdscr,
                                 "Error",
-                                f"Failed to create file:\n{e}",
+                                f"Directory or file already exists:\n{new_name}",
                                 theme,
                             )
+                        else:
+                            try:
+                                os.makedirs(new_dirpath, exist_ok=True)
+                                target_item = new_dirpath
+                                initial_selection_done = False
+                            except OSError as e:  # Catch directory creation failures safely
+                                show_popup_message(
+                                    stdscr,
+                                    "Error",
+                                    f"Failed to create directory:\n{e}",
+                                    theme,
+                                )
+            else:
+                new_name = show_input_box(
+                    stdscr, "Create New File", "Enter new filename:", "", theme
+                )
+                if new_name is not None:
+                    new_name = new_name.strip()
+                    if new_name:
+                        new_filepath = os.path.join(current_path, new_name)
+                        if os.path.exists(new_filepath):
+                            show_popup_message(
+                                stdscr,
+                                "Error",
+                                f"File already exists:\n{new_name}",
+                                theme,
+                            )
+                        else:
+                            try:
+                                with open(new_filepath, "w", encoding="utf-8"):
+                                    pass
+                                target_item = new_filepath
+                                initial_selection_done = False
+                            except OSError as e:  # Catch filesystem write errors safely
+                                show_popup_message(
+                                    stdscr,
+                                    "Error",
+                                    f"Failed to create file:\n{e}",
+                                    theme,
+                                )
