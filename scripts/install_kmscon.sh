@@ -23,6 +23,7 @@ fi
 
 
 # Source the file directly into your current shell session
+# shellcheck source=/dev/null
 source /etc/os-release
 
 echo "Found OS: $NAME, Version: $VERSION, ID: $ID, Codename: $VERSION_CODENAME"
@@ -69,5 +70,3 @@ else
     echo "Failed to disable getty. Please check your system configuration."
     exit 1
 fi
-
-exit 1 # Uncaught error, should not reach here if everything went well

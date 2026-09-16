@@ -4,7 +4,7 @@
 # an api key via ssh from another pc on the local network. 
 
 # Get the directory that the script is located in:
-SCRIPT_DIR="$(cd -P "$(dirname "$BASH_SOURCE")" && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/scripts"
 
 # Make sure our target directory exists
@@ -22,5 +22,5 @@ else
     echo "Directory is empty, cloning git repository."
     # The '.' at the end tells git to install in the current directory, instead of creating a new folder in the 
     # current directory
-    git clone https://HappyAmos:$("$SCRIPT_DIR/get_api_key.sh" "gitpat.txt")@github.com/HappyAmos/scripts.git .
+    git clone "https://HappyAmos:$("$SCRIPT_DIR/get_api_key.sh" "gitpat.txt")@github.com/HappyAmos/scripts.git" .
 fi

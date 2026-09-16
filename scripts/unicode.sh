@@ -24,7 +24,8 @@ print_unicode_range() {
     
     for ((i=start; i<=end; i++)); do
         # Format code point to 8 hex digits for the Bash \U escape sequence
-        local hex=$(printf "%08X" "$i")
+        local hex
+        hex=$(printf "%08X" "$i")
         
         # Display short code point notation and the rendered symbol
         printf "U+%04X:\U$hex\t" "$i"
@@ -64,7 +65,7 @@ while true; do
     echo ""
     
     # Prompt the user for choice
-    read -p "Select an option [1-10, c, q]: " choice
+    read -r -p "Select an option [1-10, c, q]: " choice
     
     # Check if user wants to quit
     if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
@@ -88,8 +89,8 @@ while true; do
         [cC])
             echo ""
             echo "--- Custom Range Configuration ---"
-            read -p "Enter START hexadecimal value (e.g., 2500 or 1F600): " start_input
-            read -p "Enter END hexadecimal value (e.g., 257F or 1F64F): " end_input
+            read -r -p "Enter START hexadecimal value (e.g., 2500 or 1F600): " start_input
+            read -r -p "Enter END hexadecimal value (e.g., 257F or 1F64F): " end_input
             
             # Clean inputs by stripping common user additions like 'U+' or '0x'
             start_hex=$(echo "$start_input" | sed -E 's/^[Uu]\+//; s/^0[xX]//')
@@ -98,7 +99,7 @@ while true; do
             # Validate that the strings are actual hex numbers
             if [[ ! "$start_hex" =~ ^[0-9a-fA-F]+$ || ! "$end_hex" =~ ^[0-9a-fA-F]+$ ]]; then
                 echo -e "\n❌ Error: Invalid hexadecimal input. Use characters 0-9 and A-F."
-                read -p "Press Enter to return to the menu..."
+                read -r -p "Press Enter to return to the menu..."
                 continue
             fi
             
@@ -109,7 +110,7 @@ while true; do
             # Make sure start code point is less than or equal to end code point
             if [ $start_dec -gt $end_dec ]; then
                 echo -e "\n❌ Error: Start value cannot be greater than the End value."
-                read -p "Press Enter to return to the menu..."
+                read -r -p "Press Enter to return to the menu..."
                 continue
             fi
             
@@ -117,7 +118,7 @@ while true; do
             range_size=$((end_dec - start_dec))
             if [ $range_size -gt 2000 ]; then
                 echo "⚠️  Warning: You are attempting to print $range_size characters."
-                read -p "This could flood your terminal. Proceed anyway? (y/n): " confirm
+                read -r -p "This could flood your terminal. Proceed anyway? (y/n): " confirm
                 if [[ ! "$confirm" =~ ^[yY]$ ]]; then
                     continue
                 fi
@@ -129,13 +130,13 @@ while true; do
             
         *)  
             echo -e "\nInvalid choice! Please choose a number from 1 to 10, 'c', or 'q'."
-            read -p "Press Enter to return to the menu..."
+            read -r -p "Press Enter to return to the menu..."
             continue 
             ;;
     esac
     
     # Pause mechanism to let them review before clearing and returning to prompt
     echo "--------------------------------------------------"
-    read -p "Finished printing. Press [Enter] to return to the menu..."
+    read -r -p "Finished printing. Press [Enter] to return to the menu..."
 done
 

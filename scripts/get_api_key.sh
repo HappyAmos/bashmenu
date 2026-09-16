@@ -39,10 +39,8 @@ TRIMMED="${TRIMMED%"${TRIMMED##*[![:space:]]*}"}"
 TRIMMED="${TRIMMED#/}"
 REMOTE_FILE_PATH="$REMOTE_FILE_DIR/$TRIMMED"
 
-SECRET=$(ssh -o ConnectTimeout=5 -o BatchMode=yes "$SERVER" "cat '$REMOTE_FILE_PATH'" 2>/dev/null)
-
-# Check if the SSH command succeeded
-if [ $? -ne 0 ] || [ -z "$SECRET" ]; then
+# Check if the SSH command succeeded and returned data
+if ! SECRET=$(ssh -o ConnectTimeout=5 -o BatchMode=yes "$SERVER" "cat '$REMOTE_FILE_PATH'" 2>/dev/null) || [ -z "$SECRET" ]; then
     #echo "Error: Could not connect to $SERVER, the file was empty, or the file doesn't exist." >&2
     exit 1
 fi

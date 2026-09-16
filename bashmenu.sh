@@ -99,9 +99,7 @@ if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
     echo ""
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         # Passing the array expanded as separate arguments
-        install_apps "${MISSING_TOOLS[@]}"
-        
-        if [ $? -eq 0 ]; then
+        if install_apps "${MISSING_TOOLS[@]}"; then
             echo "All dependencies resolved successfully!"
         else
             echo "Dependency installation failed. Exiting script." >&2
@@ -123,7 +121,7 @@ if [[ "${UPDATES,,}" == "true" ]]; then
     git fetch -q
 
     # Count how many commits the remote is ahead of your local branch
-    CHANGES_AHEAD=$(git rev-list --count HEAD..@{u})
+    CHANGES_AHEAD=$(git rev-list --count "HEAD..@{u}")
 
     if [ "$CHANGES_AHEAD" -gt 0 ]; then
         echo "There has been an update! ($CHANGES_AHEAD new commit(s))"
@@ -171,6 +169,7 @@ if [ "$USE_VENV" = false ]; then
 fi
 
 if [ "$USE_VENV" = true ]; then
+    # shellcheck source=/dev/null
     source "$VENV_ACTIVATE"
     PYTHON_BIN="python3"
 else

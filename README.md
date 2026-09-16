@@ -6,6 +6,9 @@ and settings editor for Linux, configured entirely through modular YAML files.
 Extend your shell script experience with beautiful widgets, visual file choosers,
 in-process python sub-apps, and self-installing settings templates!
 
+Contains a few personal scripts as examples, all of which have been cleared
+as clean by shellcheck, a linux shell script validator.
+
 ---
 
 ## 🚀 Core Features

@@ -27,7 +27,7 @@ NERD_CACHE="$HOME/.cache/bashmenu/glyphs.json"
 EMOJI_CACHE="$HOME/.cache/bashmenu/emoji_list.json"
 
 # Create cache directory if it doesn't exist
-mkdir -p $(dirname "$CACHE_DIR") &>/dev/null
+mkdir -p "$(dirname "$CACHE_DIR")" &>/dev/null
 
 # Download and cache the nerd list if not already present
 if [ ! -f "$NERD_CACHE" ]; then

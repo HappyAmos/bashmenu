@@ -5,7 +5,7 @@ printf "Standard ASCII Range (32 - 126)\n"
 c=0
 for i in {32..126}; do
     # Convert decimal value to its corresponding ASCII character
-    printf "$i:\\$(printf '%03o' "$i")"
+    printf "%b" "$i:\\$(printf '%03o' "$i")"
     printf "\t"
     ((c++))
     if [[ $c -eq 10 ]]; then
@@ -24,7 +24,7 @@ for i in {128..255}; do
     octal_byte=$(printf '\\%03o' "$i")
     
     # Use iconv to safely convert the CP437 byte into modern UTF-8 text
-    char=$(printf "$octal_byte" | iconv -f CP437 -t UTF-8 2>/dev/null)
+    char=$(printf "%b" "$octal_byte" | iconv -f CP437 -t UTF-8 2>/dev/null)
     
     # Print the index and the converted symbol
     printf "%d:%s\t" "$i" "$char"
