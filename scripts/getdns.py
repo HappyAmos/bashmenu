@@ -34,10 +34,10 @@ def get_resolvectl_dns():
         cmd = [bin_path, "status"]
         res = subprocess.run(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=3,
+            check=False,
         )
         if res.returncode != 0 or not res.stdout:
             return None
@@ -63,9 +63,7 @@ def get_resolvectl_dns():
                             dns_map.setdefault(current_iface, []).append(
                                 s_clean
                             )
-            elif line_str.startswith("DNS:") or line_str.startswith(
-                "Protocols:"
-            ):
+            elif line_str.startswith(("DNS:", "Protocols:")):
                 pass
             elif re.match(r"^[\da-fA-F:\.]+$", line_str) and not is_loopback(
                 line_str
@@ -74,7 +72,7 @@ def get_resolvectl_dns():
                 dns_map.setdefault(current_iface, []).append(line_str)
 
         return dns_map if dns_map else None
-    except Exception:
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, AttributeError):  # Catch command execution or layout parsing errors safely
         return None
 
 
@@ -88,10 +86,10 @@ def get_nmcli_dns():
         cmd = [bin_path, "dev", "show"]
         res = subprocess.run(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=3,
+            check=False,
         )
         if res.returncode != 0 or not res.stdout:
             return None
@@ -107,12 +105,11 @@ def get_nmcli_dns():
             key, val = parts[0], parts[1]
             if key == "GENERAL.DEVICE":
                 current_iface = val
-            elif "IP4.DNS" in key or "IP6.DNS" in key:
-                if val and not is_loopback(val):
-                    dns_map.setdefault(current_iface, []).append(val)
+            elif ("IP4.DNS" in key or "IP6.DNS" in key) and val and not is_loopback(val):
+                dns_map.setdefault(current_iface, []).append(val)
 
         return dns_map if dns_map else None
-    except Exception:
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, AttributeError):  # Catch command execution or layout parsing errors safely
         return None
 
 
@@ -132,7 +129,7 @@ def parse_resolv_file(filepath):
                         ip = parts[1].strip()
                         if ip and not is_loopback(ip) and ip not in servers:
                             servers.append(ip)
-    except Exception:
+    except OSError:  # Catch filesystem/file-read access errors safely
         pass
     return servers
 

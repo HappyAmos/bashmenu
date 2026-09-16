@@ -58,7 +58,7 @@ def copy_to_clipboard(text):
                 stderr=subprocess.DEVNULL
             )
             return True
-    except Exception:
+    except (OSError, subprocess.SubprocessError):  # Catch system execution or process errors safely
         pass
     return False
 
@@ -258,6 +258,10 @@ def select_script_action(stdscr, curr_val, config, theme):
     """Chooser modal for script action with option to browse or enter manually."""
     presets = [
         ("[PICK]", "Browse Local Directory (File Picker)..."),
+        ("{file_picker}", "Prompt File Picker upon execution"),
+        ("{file_picker_new}", "Prompt File Picker (w/ File Creation)"),
+        ("{dir_picker}", "Prompt Directory Picker upon execution"),
+        ("{param}", "Prompt Modal Input text box upon execution"),
         ("[EDIT]", "Manual Command Entry (Custom script/args)..."),
     ]
 
@@ -309,7 +313,7 @@ def select_script_action(stdscr, curr_val, config, theme):
                 scripts_dir = bashmenu.interpolate_placeholders(scripts_dir, config)
                 if not os.path.isabs(scripts_dir):
                     scripts_dir = os.path.abspath(os.path.join(SCRIPT_DIR, scripts_dir))
-                return bashmenu.show_file_picker(stdscr, "Select Script File", start_dir=scripts_dir, mode="file", default_val=curr_val, theme=theme)
+                return bashmenu.show_file_picker(stdscr, "Select Script File", start_dir=scripts_dir, mode="file", default_val=curr_val, theme=theme, allow_new=True)
             elif selected_key == "[EDIT]":
                 return bashmenu.show_input_box(stdscr, "Script Action", "Script filename or command line:", curr_val, theme)
 
@@ -318,6 +322,10 @@ def select_editor_target(stdscr, curr_val, item_type, selected_key, config, them
     """Chooser modal for editor target path or built-in file variable."""
     presets = [
         ("[PICK]", "Browse Filesystem (File Picker)..."),
+        ("{file_picker}", "Prompt File Picker upon execution"),
+        ("{file_picker_new}", "Prompt File Picker (w/ File Creation)"),
+        ("{dir_picker}", "Prompt Directory Picker upon execution"),
+        ("{param}", "Prompt Modal Input text box upon execution"),
         ("[EDIT]", "Manual Text Entry (Custom Path / Placeholder)..."),
     ]
 
@@ -372,7 +380,7 @@ def select_editor_target(stdscr, curr_val, item_type, selected_key, config, them
                     if not os.path.isabs(templates_dir):
                         templates_dir = os.path.abspath(os.path.join(SCRIPT_DIR, templates_dir))
                     start_dir = templates_dir
-                return bashmenu.show_file_picker(stdscr, "Select Target File", start_dir=start_dir, mode="file", default_val=curr_val, theme=theme)
+                return bashmenu.show_file_picker(stdscr, "Select Target File", start_dir=start_dir, mode="file", default_val=curr_val, theme=theme, allow_new=True)
             elif selected_key_opt == "[EDIT]":
                 return bashmenu.show_input_box(stdscr, "Target File Path", "File path or placeholder:", curr_val, theme)
             else:
@@ -404,6 +412,8 @@ def show_directives_help(stdscr, theme):
         "                     a modal input box, and replaces it with that value.\n"
         " - {file_picker}   : Opens a visual file chooser dialog and replaces it\n"
         "                     with the absolute path of the selected file.\n"
+        " - {file_picker_new}: Opens a visual file chooser allowing creation of\n"
+        "                     new files, and replaces it with the absolute path.\n"
         " - {dir_picker}    : Opens a visual directory chooser dialog and replaces\n"
         "                     it with the absolute path of the selected folder.\n\n"
         " * PRO TIP (Starting Directories):\n"
@@ -483,6 +493,8 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
             fields.append(("title", "Input Popup Title", str(item_dict.get("title", ""))))
             fields.append(("prompt", "Input Prompt Text", str(item_dict.get("prompt", ""))))
             fields.append(("picker", "Picker Type (none/file/dir)", str(item_dict.get("picker", "none"))))
+            if item_dict.get("picker") == "file":
+                fields.append(("allow_new", "Allow Creating New Files", str(item_dict.get("allow_new", False))))
             fields.append(("start_dir", "Picker Starting Directory", str(item_dict.get("start_dir", "~"))))
             fields.append(("masked", "Mask Typed Password Input", str(item_dict.get("masked", False))))
         elif item_type in ["toggle", "config_toggle"]:
@@ -575,7 +587,7 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                 if copied_feedback_ticks > 0:
                     copied_feedback_ticks -= 1
                 if fields and curr_field < len(fields):
-                    fk, fn, fv = fields[curr_field]
+                    fk, _fn, fv = fields[curr_field]
                     val_avail_w = box_w - 35
                     if not fk.startswith("[") and len(fv) > val_avail_w:
                         if prop_marquee_pause_ticks > 0:
@@ -600,9 +612,8 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
             elif CLIPBOARD_TOOL and key in [ord('y'), ord('Y')]:
                 if fields and curr_field < len(fields):
                     selected_key, field_label, curr_val = fields[curr_field]
-                    if not selected_key.startswith("["):
-                        if copy_to_clipboard(curr_val):
-                            copied_feedback_ticks = 4
+                    if not selected_key.startswith("[") and copy_to_clipboard(curr_val):
+                        copied_feedback_ticks = 4
                 continue
             elif key in [curses.KEY_UP, ord('k')] and curr_field > 0:
                 curr_field -= 1
@@ -643,7 +654,7 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                             item_dict.setdefault("submenu", {})["title"] = new_val_str
                             was_modified = True
                     break
-                elif selected_key in ["stream", "interactive", "masked", "show_whitespace", "tab_to_spaces", "quiet", "refresh", "external"]:
+                elif selected_key in ["stream", "interactive", "masked", "show_whitespace", "tab_to_spaces", "quiet", "refresh", "external", "allow_new"]:
                     bool_val = curr_val.lower() == "true"
                     item_dict[selected_key] = not bool_val
                     was_modified = True
@@ -799,9 +810,8 @@ def save_menu_file(menu_data, stdscr, theme):
     bak_file = bashmenu.MENU_FILE + ".bak"
     try:
         if os.path.exists(bashmenu.MENU_FILE):
-            with open(bashmenu.MENU_FILE, "r", encoding="utf-8") as f_in:
-                with open(bak_file, "w", encoding="utf-8") as f_out:
-                    f_out.write(f_in.read())
+            with open(bashmenu.MENU_FILE, "r", encoding="utf-8") as f_in, open(bak_file, "w", encoding="utf-8") as f_out:
+                f_out.write(f_in.read())
 
         with open(bashmenu.MENU_FILE, "w", encoding="utf-8") as f:
             yaml.dump(menu_data, f, default_flow_style=False, sort_keys=False)
@@ -809,7 +819,7 @@ def save_menu_file(menu_data, stdscr, theme):
         msg = "Menu structure saved successfully to bashmenu.mnu!\nBackup written to bashmenu.mnu.bak."
         bashmenu.show_popup_message(stdscr, "Save Successful", msg, theme)
         return True
-    except Exception as e:
+    except (OSError, yaml.YAMLError, TypeError, ValueError) as e:  # Catch filesystem IO, serialization, or type formatting errors safely
         bashmenu.show_popup_message(stdscr, "Save Error", f"Error writing file:\n{e}", theme)
         return False
 
@@ -1037,7 +1047,7 @@ def main(stdscr, target_path=None):
             stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
         )
 
-        height, width = stdscr.getmaxyx()
+        _height, width = stdscr.getmaxyx()
         nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
         selected_idx = max(0, min(selected_idx, len(nodes) - 1))
         curr_node = nodes[selected_idx]
@@ -1108,7 +1118,7 @@ def main(stdscr, target_path=None):
                     curr_node["root_data"]["title"] = new_title.strip()
                     modified = True
             else:
-                def redraw_bg():
+                def redraw_bg(selected_idx=selected_idx, modified=modified, marquee_offset=marquee_offset):
                     draw_menu_editor(
                         stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
                     )
@@ -1134,7 +1144,7 @@ def main(stdscr, target_path=None):
                         target_dict.clear()
                         target_dict.update(parsed)
                         modified = True
-            except Exception as ex:
+            except (OSError, yaml.YAMLError) as ex:  # Catch filesystem reads or YAML structure parse errors safely
                 bashmenu.show_popup_message(stdscr, "YAML Error", f"Invalid YAML structure:\n{ex}", theme)
             finally:
                 if os.path.exists(tmp_path):
@@ -1154,7 +1164,7 @@ def main(stdscr, target_path=None):
                     else:
                         menu_data.setdefault("options", []).append(new_item)
 
-                def redraw_bg():
+                def redraw_bg(selected_idx=selected_idx, modified=modified, marquee_offset=marquee_offset):
                     draw_menu_editor(
                         stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
                     )

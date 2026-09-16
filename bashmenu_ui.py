@@ -482,7 +482,7 @@ def show_input_box(
 
 
 def show_file_picker(
-    stdscr, title, start_dir="~", mode="file", default_val=None, theme=None, show_hidden=False
+    stdscr, title, start_dir="~", mode="file", default_val=None, theme=None, show_hidden=False, allow_new=False
 ):
     """
     Display a themed interactive file and directory chooser modal dialog.
@@ -590,7 +590,7 @@ def show_file_picker(
                 "path": None,
                 "error": True,
             }]
-        except Exception as e:
+        except OSError as e:  # Catch directory scanning/listing issues safely
             entries = [{
                 "name": f"![ Error: {e} ]",
                 "is_dir": False,
@@ -664,11 +664,20 @@ def show_file_picker(
             path_disp = " Path: ..." + path_disp[-(box_w - 10) :]
         safe_addstr(win, 1, 2, path_disp, theme["accent"])
 
-        footer = (
-            " [ENTER]: Select/Open | [Ctrl+H]: Hidden | [ESC]: Cancel "
-            if mode != "dir"
-            else " [ENTER]: Open | [SPACE]: Select Folder | [Ctrl+H]: Hidden | [ESC]: Cancel "
-        )
+        footer_parts = []
+        if mode == "dir":
+            footer_parts.append("[ENTER]: Open")
+            footer_parts.append("[SPACE]: Select Folder")
+        else:
+            footer_parts.append("[ENTER]: Select/Open")
+
+        if allow_new and mode != "dir":
+            footer_parts.append("[N]: New File")
+
+        footer_parts.append("[Ctrl+H]: Hidden")
+        footer_parts.append("[ESC]: Cancel")
+
+        footer = " " + " | ".join(footer_parts) + " " 
         safe_addstr(
             win,
             box_h - 1,
@@ -742,3 +751,31 @@ def show_file_picker(
                 return selected["path"]
         elif key == ord(' ') and mode == "dir":
             return current_path
+        elif key in [ord('n'), ord('N')] and allow_new and mode != "dir":
+            new_name = show_input_box(
+                stdscr, "Create New File", "Enter new filename:", "", theme
+            )
+            if new_name is not None:
+                new_name = new_name.strip()
+                if new_name:
+                    new_filepath = os.path.join(current_path, new_name)
+                    if os.path.exists(new_filepath):
+                        show_popup_message(
+                            stdscr,
+                            "Error",
+                            f"File already exists:\n{new_name}",
+                            theme,
+                        )
+                    else:
+                        try:
+                            with open(new_filepath, "w", encoding="utf-8"):
+                                pass
+                            target_item = new_filepath
+                            initial_selection_done = False
+                        except OSError as e:  # Catch filesystem write errors safely
+                            show_popup_message(
+                                stdscr,
+                                "Error",
+                                f"Failed to create file:\n{e}",
+                                theme,
+                            )

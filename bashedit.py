@@ -52,7 +52,7 @@ def run_curses_editor(
         new_settings = termios.tcgetattr(fd)
         new_settings[0] &= ~termios.IXON
         termios.tcsetattr(fd, termios.TCSANOW, new_settings)
-    except Exception:
+    except (termios.error, AttributeError):  # Catch termios configuration or parameter access failures safely
         pass
 
     lines = [""]
@@ -61,7 +61,7 @@ def run_curses_editor(
             with open(abs_path, "r") as f:
                 content = f.read().splitlines()
                 lines = content if content else [""]
-        except Exception as e:
+        except OSError as e:  # Catch filesystem read access errors safely
             lines = [f"# Error opening file: {e}"]
 
     cursor_y = cursor_x = scroll_y = scroll_x = 0
@@ -148,7 +148,7 @@ def run_curses_editor(
         if old_settings:
             try:
                 termios.tcsetattr(fd, termios.TCSANOW, old_settings)
-            except Exception:
+            except (termios.error, AttributeError):  # Catch termios restoration failures safely
                 pass
 
     def action_exit():
@@ -188,7 +188,7 @@ def run_curses_editor(
                 f.write("\n".join(lines) + "\n")
             modified = False
             status_msg = " [ File Saved Successfully! ] "
-        except Exception as e:
+        except OSError as e:  # Catch filesystem write access errors safely
             status_msg = f" [ Save Error: {e} ] "
 
     def action_save_as():
@@ -245,7 +245,7 @@ def run_curses_editor(
                 redo_stack.clear()
                 typing_group = False
                 status_msg = f" [ Opened '{rel_name}' ] "
-            except Exception as e:
+            except OSError as e:  # Catch filesystem read access errors safely
                 status_msg = f" [ Open Error: {e} ] "
 
     def action_new():
@@ -290,15 +290,15 @@ def run_curses_editor(
         print(f"\n--- Launching {editor_bin} for '{rel_name}' ---\n")
         try:
             cmd = shlex.split(editor_bin) + [abs_path]
-            subprocess.run(cmd)
-        except Exception as e:
+            subprocess.run(cmd, check=False)
+        except (OSError, subprocess.SubprocessError) as e:  # Catch binary invocation or process execution failures safely
             print(f"Error starting editor '{editor_bin}': {e}")
             input("Press [ENTER] to continue...")
         stdscr.clear()
         stdscr.refresh()
         try:
-            termios.tcsetattr(fd, termios.TCSANOW, new_settings)
-        except Exception:
+                termios.tcsetattr(fd, termios.TCSANOW, new_settings)
+        except (termios.error, AttributeError):  # Catch termios configuration or attribute access failures safely
             pass
 
     def get_selection_range():

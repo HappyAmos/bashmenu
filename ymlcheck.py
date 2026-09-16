@@ -57,8 +57,7 @@ def validate_indicator_value(val: Any, path: str) -> list[str]:
     if isinstance(val, (str, int)):
         return []
     return [
-        f"'{path}': Invalid type {type(val).__name__} for indicator."
-        " Expected string or character symbol."
+        f"'{path}': Invalid type {type(val).__name__} for indicator. Expected string or character symbol."
     ]
 
 
@@ -170,7 +169,7 @@ def validate_theme_file(filepath: str) -> bool:
 
     # Step 2: Determine if root contains multiple themes or a single theme
     is_multi_theme = any(
-        isinstance(v, dict) and any(str(k) in VALID_DEPTHS for k in v.keys())
+        isinstance(v, dict) and any(str(k) in VALID_DEPTHS for k in v)
         for v in data.values()
     )
 

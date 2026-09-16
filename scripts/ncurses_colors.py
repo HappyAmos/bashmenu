@@ -29,7 +29,7 @@ def print_tput_colors():
         def sgr0():
             return sgr0_bytes.decode('utf-8', errors='ignore')
             
-    except Exception:
+    except (curses.error, ImportError, TypeError, AttributeError):  # Catch missing curses, library attributes, or initialization errors safely
         # Fallback to hardcoded ANSI sequences that precisely emulate tput setaf/sgr0
         def setaf(color_id):
             if color_id < 8:

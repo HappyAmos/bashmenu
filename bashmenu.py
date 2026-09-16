@@ -79,7 +79,7 @@ def get_primary_ip():
             s.settimeout(0.1)
             s.connect(("1.1.1.1", 80))
             return s.getsockname()[0]
-    except Exception:
+    except OSError:  # Catch socket/network-related failures safely (e.g. unreachable)
         return "127.0.0.1"
 
 
@@ -123,7 +123,7 @@ def get_battery_info():
             avg_cap = sum(capacities) // len(capacities)
             _cached_battery = f"{avg_cap}%"
             return _cached_battery
-    except Exception:
+    except (OSError, ValueError, TypeError):  # Catch filesystem access or numeric parsing errors safely
         pass
 
     # 2. Try macOS pmset
@@ -134,7 +134,7 @@ def get_battery_info():
         if match:
             _cached_battery = f"{match.group(1)}%"
             return _cached_battery
-    except Exception:
+    except (OSError, subprocess.SubprocessError, AttributeError):  # Catch command execution or pattern extraction failures safely
         pass
 
     # 3. Try Windows WMIC
@@ -146,7 +146,7 @@ def get_battery_info():
             if line.isdigit():
                 _cached_battery = f"{line}%"
                 return _cached_battery
-    except Exception:
+    except (OSError, subprocess.SubprocessError):  # Catch missing WMIC command or execution failures safely
         pass
 
     _cached_battery = "N/A"
@@ -368,7 +368,7 @@ def load_yaml_file(filepath):
                         code_line = file_lines[mark.line].rstrip()
                         pointer = " " * (col - 1) + "^"
                         snippet = f"\n\nContext:\n  {code_line}\n  {pointer}"
-            except Exception:
+            except OSError:  # Catch file IO errors when retrieving error context lines safely
                 pass
             err_msg = (
                 f"YAML Error in '{filename}'\n"
@@ -377,7 +377,7 @@ def load_yaml_file(filepath):
             )
             return None, err_msg
         return None, f"YAML Parse Error in '{filename}':\n{exc}"
-    except Exception as e:
+    except (OSError, TypeError, ValueError) as e:  # Catch filesystem reading, type mismatches, or serialization issues safely
         return None, f"Error reading '{filename}':\n{e}"
 
 
@@ -493,7 +493,7 @@ def configure_autoexec():
         try:
             autoexec_path.touch()
             autoexec_path.chmod(0o755)
-        except Exception as e:
+        except OSError as e:  # Catch file touch or permission modification errors on disk
             return f"Error creating autoexec.sh: {e}"
 
     try:
@@ -503,7 +503,7 @@ def configure_autoexec():
                 f.write("\n" + BLOCK_AUTOEXEC + "\n")
         else:
             return "Autoexec sourcing block already present in ~/.bashrc."
-    except Exception as e:
+    except OSError as e:  # Catch file read/write access errors on disk safely
         return f"Error updating ~/.bashrc: {e}"
 
     return "Autoexec configuration completed successfully."
@@ -519,7 +519,7 @@ def save_config(config):
     try:
         with open(CONFIG_FILE, "w") as f:
             yaml.dump(config, f, default_flow_style=False)
-    except Exception:
+    except (OSError, yaml.YAMLError, TypeError, ValueError):  # Catch file access, serialization, or type formatting errors safely
         pass
 
 
@@ -757,7 +757,7 @@ def build_dynamic_theme_submenu():
     """
     options = []
     if THEMES:
-        for theme_key in THEMES.keys():
+        for theme_key in THEMES:
             formatted_name = theme_key.replace("_", " ").title()
             options.append({"label": formatted_name, "set_theme": theme_key})
     options.append({"label": "Back to Options", "type": "back"})
@@ -794,8 +794,8 @@ def run_interactive_action(stdscr, action, quiet=False):
     if not quiet:
         print(f"\n--- Running: {action} ---\n")
     try:
-        subprocess.run(action, shell=True)
-    except Exception as e:
+        subprocess.run(action, shell=True, check=False)
+    except (OSError, subprocess.SubprocessError) as e:  # Catch missing shell executable or process creation failures safely
         if not quiet:
             print(f"\nExecution Error: {e}")
 
@@ -836,9 +836,8 @@ def get_color_pair(fg, bg):
 
     try:
         # Check if color_pair works (curses is initialized)
-        test_val = curses.color_pair(0)
-    except Exception:
-        # Curses is not initialized (e.g., during tests), return 0 attribute
+        curses.color_pair(0)
+    except (curses.error, AttributeError):  # Catch uninitialized curses state gracefully (e.g., during tests)
         return 0
 
     # Slots 16 to 254 inclusive (239 slots total)
@@ -858,12 +857,12 @@ def get_color_pair(fg, bg):
         DYNAMIC_COLOR_PAIRS[key] = curses.color_pair(slot_idx)
         DYNAMIC_PAIR_KEYS[slot_idx] = key
         return DYNAMIC_COLOR_PAIRS[key]
-    except Exception:
+    except (curses.error, TypeError, ValueError, AttributeError):  # Catch curses errors or invalid color parameter types safely
         pass
 
     try:
         return curses.color_pair(0)
-    except Exception:
+    except (curses.error, AttributeError):  # Catch uninitialized curses or default pair access failures safely
         return 0
 
 
@@ -1119,7 +1118,9 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
         try:
             res = action()
             output_lines = [process_line_to_segments(l, theme["text"]) for l in str(res).splitlines()]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
+            # Broad exception catch is required here because custom callable actions can raise
+            # arbitrary exceptions, and we must ensure the interface does not crash.
             output_lines = [process_line_to_segments(f"Python Action Error: {e}", theme["text"])]
 
     elif stream:
@@ -1151,7 +1152,7 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
                     win.refresh()
                     last_update = now
             process.wait()
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:  # Catch process execution failures (e.g. missing binary or execution permissions)
             output_lines.append(process_line_to_segments(f"Execution Error: {e}", theme["text"]))
 
     else:
@@ -1164,11 +1165,12 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                check=False,
             )
             output_lines = [
                 process_line_to_segments(l, theme["text"]) for l in result.stdout.splitlines()
             ]
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:  # Catch shell invocation or process creation failures safely
             output_lines = [process_line_to_segments(f"Error executing command: {e}", theme["text"])]
 
     if not output_lines:
@@ -1261,7 +1263,7 @@ def resolve_glyph(glyph_str):
                 if val <= 0x10FFFF:
                     return chr(val)
                 return bytes.fromhex(hex_val).decode("utf-8")
-            except Exception:
+            except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid characters, out-of-range codepoints, or parsing issues safely
                 pass
 
     # If it was just prefixed by '#' but has no other prefix (e.g., '#e7f0' or '#EE9FB0')
@@ -1271,7 +1273,7 @@ def resolve_glyph(glyph_str):
             if val <= 0x10FFFF:
                 return chr(val)
             return bytes.fromhex(temp_str).decode("utf-8")
-        except Exception:
+        except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid hex or codepoint overflow safely
             pass
 
     # Direct check if the original string starts directly with any of the prefixes
@@ -1283,7 +1285,7 @@ def resolve_glyph(glyph_str):
                 if val <= 0x10FFFF:
                     return chr(val)
                 return bytes.fromhex(hex_val).decode("utf-8")
-            except Exception:
+            except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid characters, out-of-range codepoints, or parsing issues safely
                 pass
 
     return glyph_str
@@ -1364,13 +1366,13 @@ def interpolate_placeholders(text, config):
     encoding = ""
     try:
         encoding = sys.stdout.encoding or ""
-    except Exception:
+    except AttributeError:  # Catch cases where sys.stdout is overridden/mocked without standard attributes
         pass
     if not encoding:
         import locale
         try:
             encoding = locale.getpreferredencoding() or ""
-        except Exception:
+        except (locale.Error, AttributeError, ValueError):  # Catch missing locale capabilities or invalid formats gracefully
             pass
     supports_unicode = "UTF" in encoding.upper() or "utf" in encoding.upper()
     can_display_unicode = supports_unicode and not is_linux_console
@@ -1388,16 +1390,45 @@ def interpolate_placeholders(text, config):
         # 4. Fallback to empty string
         return ""
 
+    def parse_nf_tag(content):
+        parts = content.split(":")
+        char = ""
+        nerd_font = ""
+        emoji = ""
+
+        if len(parts) == 3:
+            char = parts[0]
+            nerd_font = parts[1]
+            emoji = parts[2]
+        elif len(parts) == 2:
+            p0, p1 = parts[0], parts[1]
+            is_p0_hex = any(p0.startswith(pre) for pre in ["#", "U+", "u+", "0x", "0X", "\\u", "\\U", "\\"])
+            is_p1_hex = any(p1.startswith(pre) for pre in ["#", "U+", "u+", "0x", "0X", "\\u", "\\U", "\\"])
+
+            if not p1:  # Format is {nf:nerd_font:}
+                nerd_font = p0
+            elif not p0:  # Format is {nf::nerd_font}
+                nerd_font = p1
+            elif is_p0_hex:  # Format is {nf:nerd_font:emoji}
+                nerd_font = p0
+                emoji = p1
+            elif is_p1_hex:  # Format is {nf:char:nerd_font}
+                char = p0
+                nerd_font = p1
+            else:  # Fallback mapping
+                char = p0
+                nerd_font = p1
+        elif len(parts) == 1:
+            char = parts[0]
+
+        return char, nerd_font, emoji
+
     nf_pattern = re.compile(r"\{nf:([^}]+)\}")
     for match in nf_pattern.finditer(text):
         full_match = match.group(0)
         content = match.group(1)
-        parts = content.split(":")
-        resolved = full_match
-        if len(parts) == 2:
-            resolved = resolve_nf_parts("", parts[0], parts[1])
-        elif len(parts) == 3:
-            resolved = resolve_nf_parts(parts[0], parts[1], parts[2])
+        char, nerd_font, emoji = parse_nf_tag(content)
+        resolved = resolve_nf_parts(char, nerd_font, emoji)
         text = text.replace(full_match, resolved)
 
     # Resolve {window_width} and {window_height}
@@ -1405,7 +1436,7 @@ def interpolate_placeholders(text, config):
         try:
             cols = curses.COLS
             lines = curses.LINES
-        except Exception:
+        except (AttributeError, NameError):  # Fall back to shutil if curses window state is uninitialized or missing
             import shutil
             term_size = shutil.get_terminal_size()
             cols = term_size.columns
@@ -1422,7 +1453,7 @@ def interpolate_placeholders(text, config):
             if 0 <= val <= 255:
                 resolved = bytes([val]).decode('cp437', errors='replace')
                 text = text.replace(full_match, resolved)
-        except Exception:
+        except (ValueError, OverflowError, UnicodeDecodeError):  # Catch out-of-bounds numeric conversion or decoding failures safely
             pass
 
     return text
@@ -1472,12 +1503,17 @@ def resolve_dynamic_directives(stdscr, action_str, selected_item, config, theme)
             return None
         action_str = action_str.replace("{param}", param_val)
 
-    # 2. Resolve {file_picker}
-    if "{file_picker}" in action_str:
+    # 2. Resolve {file_picker} and {file_picker_new}
+    has_picker_new = "{file_picker_new}" in action_str or "{file_picker:new}" in action_str
+    has_picker_std = "{file_picker}" in action_str
+
+    if has_picker_new or has_picker_std:
+        directive = "{file_picker_new}" if "{file_picker_new}" in action_str else ("{file_picker:new}" if "{file_picker:new}" in action_str else "{file_picker}")
         title = selected_item.get("title", "Select File")
-        start_dir, pattern_to_replace = find_start_dir_and_pattern("{file_picker}")
+        start_dir, pattern_to_replace = find_start_dir_and_pattern(directive)
+        allow_new = has_picker_new or selected_item.get("allow_new", False)
         chosen_path = show_file_picker(
-            stdscr, title, start_dir, mode="file", theme=theme
+            stdscr, title, start_dir, mode="file", theme=theme, allow_new=allow_new
         )
         if chosen_path is None:
             return None
@@ -1534,7 +1570,7 @@ def process_item_action(
     Returns:
         tuple[str | None, dict, dict]: ('EXIT' or None, new_theme, new_config).
     """
-    global THEMES, THEME_ERROR
+    # THEMES and THEME_ERROR are read here from the module scope. No global declaration is needed as they are not mutated.
     item_type = selected_item.get("type")
 
     if item_type == "exit":
@@ -1650,6 +1686,7 @@ def process_item_action(
                     mode=picker_mode,
                     default_val=existing_val if existing_val else None,
                     theme=theme,
+                    allow_new=selected_item.get("allow_new", False),
                 )
                 if chosen_path is not None:
                     set_config_value(config, key_path, chosen_path)
@@ -1771,7 +1808,7 @@ def process_item_action(
                 try:
                     template_content = template_path.read_text()
                     interpolated_content = interpolate_placeholders(template_content, config)
-                except Exception as e:
+                except (OSError, KeyError, ValueError) as e:  # Catch filesystem access, formatting, or config key errors safely
                     show_popup_message(
                         stdscr,
                         "Read Error",
@@ -1792,7 +1829,7 @@ def process_item_action(
                         try:
                             target_content = target_path.read_text()
                             block_present = start_marker in target_content and end_marker in target_content
-                        except Exception as e:
+                        except OSError as e:  # Catch filesystem read access errors safely
                             show_popup_message(
                                 stdscr,
                                 "Read Error",
@@ -1830,7 +1867,7 @@ def process_item_action(
                                     f"Code block '{block_id}' successfully installed/updated in:\n{target_path}",
                                     theme,
                                 )
-                            except Exception as e:
+                            except OSError as e:  # Catch disk/filesystem write and permission errors safely
                                 show_popup_message(
                                     stdscr,
                                     "Write Error",
@@ -1848,7 +1885,7 @@ def process_item_action(
                                     f"Code block '{block_id}' successfully removed from:\n{target_path}",
                                     theme,
                                 )
-                            except Exception as e:
+                            except OSError as e:  # Catch disk/filesystem write and permission errors safely
                                 show_popup_message(
                                     stdscr,
                                     "Write Error",
@@ -1905,7 +1942,10 @@ def process_item_action(
                             module.main(stdscr)
                         else:
                             raise AttributeError(f"Module '{module_name}' does not implement 'main(stdscr)'.")
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
+                        # Broad exception catch is required here because imported external scripts or dynamic python
+                        # modules run-in-process can raise any user-defined exceptions, and we must handle them
+                        # gracefully to prevent the host menu process from crashing.
                         show_popup_message(stdscr, "In-Process Execution Error", str(e), theme)
                 else:
                     show_popup_message(
@@ -1948,7 +1988,7 @@ def main(stdscr):
     Args:
         stdscr (curses.window): Curses main window handle provided by wrapper.
     """
-    global THEMES, THEME_ERROR
+    # THEMES and THEME_ERROR are read here from the module scope. No global declaration is needed as they are not mutated.
     curses.curs_set(0)
     if hasattr(curses, "set_escdelay"):
         curses.set_escdelay(25)
@@ -2361,7 +2401,10 @@ def main(stdscr):
             try:
                 import menuedit
                 menuedit.main(stdscr, target_path=list(selected_rows))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
+                # Broad exception catch is required here because the visual menu editor (menuedit)
+                # is a complex interactive curses module that can raise a variety of runtime, key,
+                # or formatting exceptions, and we must ensure the main menu gracefully survives.
                 show_popup_message(stdscr, "Error Running Editor", str(e), theme)
             theme, config = reload_environment(
                 stdscr, menu_stack, selected_rows

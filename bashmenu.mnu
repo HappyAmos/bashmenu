@@ -193,6 +193,12 @@ options:
       title: Edit Ping Target
       prompt: 'Enter Hostname or IP Address:'
       icon: '{nf::#f11ab}'
+    - label: IP Information
+      type: script
+      action: '{scripts_dir}/ip_info.sh'
+      icon: '{nf::#F0A5F:}'
+      interactive: false
+      stream: true
     - label: Ping Target [{settings.ping_target}]
       type: confirm
       title: Confirm Ping Task
@@ -255,7 +261,8 @@ options:
           show_whitespace: true
         - label: Edit Scripts [{scripts_dir}]
           type: editor
-          action: '{scripts_dir}/{file_picker}'
+          action: '{scripts_dir}/{file_picker_new}'
+          icon: '{nf:::}'
         - label: Edit Templates [{templates_dir}]
           type: editor
           action: '{templates_dir}/{file_picker}'

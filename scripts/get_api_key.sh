@@ -16,6 +16,7 @@ REMOTE_FILE_DIR="/mnt/wd320/private/andrew/Linux/"
 # Sample files:
 # gapikey.txt
 # gitpat.txt
+# codeium.txt
 
 # Function to display help information
 function print_help_text {
