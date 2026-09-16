@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: glyphs.sh
+# DESCRIPTION: Searches for Nerd Fonts and Emoji glyphs using online JSON
+#              databases and caches them locally for faster subsequent lookups.
+# ==============================================================================
 
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8

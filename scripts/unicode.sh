@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: unicode.sh
+# DESCRIPTION: Interactive Unicode Block Explorer. Allows viewing predefined
+#              or custom ranges of Unicode characters printed directly to the terminal.
+# ==============================================================================
 
 # Simple bash script to print unicode characters to the screen.
 # Since there are literally millions of them, only a few chosen

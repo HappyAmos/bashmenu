@@ -45,6 +45,12 @@ These scripts are stored in the `/scripts` directory and can be used directly or
                               video support on raw Linux text consoles.
 - `scripts/install_scripts.sh`: Deployment script to copy and register utility
                               bash configurations.
+- `scripts/install_basics.sh`: Cross-platform basic tools installer wrapper.
+- `scripts/system_update.sh` : Cross-platform system update wrapper supporting
+                              apt, dnf, pacman, pkg, and brew.
+- `scripts/unicode.sh`       : Interactive Unicode Block Explorer script.
+- `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
+- `scripts/ncurses_colors.py`: Visual tester for ncurses color support.
 
 ### 2.2 Provided Templates (`templates/`)
 Used as dynamic templates for code generation, settings, or block injections:
@@ -61,10 +67,13 @@ Used as dynamic templates for code generation, settings, or block injections:
 ### 3.1 Main Menu Engine (`bashmenu.py`)
 - `UP` / `DOWN` / `j` / `k` : Navigate highlighted selection row.
 - `0` - `9`, `a` - `z`, `A` - `Z` : Direct option shortcut hotkey jump.
+- `F1`                     : Display this markdown help manual using the `glow` terminal pager.
 - `F4`                     : Launch visual menu editor (`menuedit.py`).
 - `F5`                     : Toggle option shortcut key badges display.
 - `ENTER`                  : Execute selected item action.
 - `ESC`                    : Return to parent submenu or exit application.
+
+*Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 
 ### 3.2 Visual Menu Editor (`menuedit.py`)
 - `a` / `Ins`             : Insert new menu option node.
@@ -117,7 +126,7 @@ settings:
 Any dot-notation key (e.g., `settings.dns.ipv4.primary` or `settings.status_gutter`) can be interpolated
 inside menu titles, actions, labels, or template files using brackets.
 
-The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders (such as `{user}`, `{battery}`, or `{date_time_24}`) separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width.
+The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders (such as `{user}`, `{battery}`, or `{date_time_24}`) separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under
@@ -274,3 +283,10 @@ clipping and console flashes:
 ```
 *Plugin requirement:* The python script must implement a `def main(stdscr)`
 function taking the active curses screen as its sole argument.
+
+### 7.3 Multi-Platform Support & Environment Detection
+HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabling graceful degradation and multi-platform compatibility without manual configuration.
+
+- **Universal Shebangs:** All `.py` and `.sh` files leverage `#!/usr/bin/env` for maximum portability.
+- **Cross-Platform Package Wrappers:** By routing operations through wrappers like `scripts/system_update.sh`, the engine automatically translates dependency installs to the correct local package manager (`apt`, `dnf`, `pacman`, `pkg`, or `brew`), and smartly adds or omits `sudo` depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
+- **Graceful Degradation:** Features dependent on low-level system daemon frameworks (e.g., `kmscon` or `systemd-resolved` DNS modification) check for Termux/WSL and fail gracefully, rather than crashing with environment errors.

@@ -1,9 +1,14 @@
+# ==============================================================================
+# TEMPLATE: autoexec.sh.tmpl
+# DESCRIPTION: A bash script template used to generate the user's autoexec.sh,
+#              which sets up environment variables and useful aliases/hints on login.
+# ==============================================================================
 if [ -f "$HOME/autoexec.sh" ]; then
   . "$HOME/autoexec.sh"
 else
   touch "$HOME/autoexec.sh"
 cat << 'EOF' > "$HOME/autoexec.sh"
-#!/bin/bash
+#!/usr/bin/env bash
 # autoexec.sh is run from .bashrc when loggin in to
 # the terminal. This is just an alternate location
 # to keep .bashrc as clean (oem) as possible.

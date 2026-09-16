@@ -444,6 +444,7 @@ def show_directives_help(stdscr, theme):
 
 def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
     """Interactive property inspector modal for editing an item's keys."""
+    was_modified = False
     while True:
         item_type = item_dict.get("type")
         if "submenu" in item_dict:
@@ -587,7 +588,7 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                 continue
 
             if key == 27:
-                return
+                return was_modified
             elif key in [ord('?'), ord('h'), curses.KEY_F1]:
                 win.timeout(-1)
                 show_directives_help(stdscr, theme)
@@ -611,7 +612,7 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                 selected_key, field_label, curr_val = fields[curr_field]
 
                 if selected_key == "[DONE]":
-                    return
+                    return was_modified
                 elif selected_key == "[TYPE]":
                     win.timeout(-1)
                     new_t = select_item_type(stdscr, theme)
@@ -627,6 +628,7 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                         elif new_t == "divider":
                             item_dict.setdefault("length", 40)
                             item_dict.setdefault("char", "-")
+                        was_modified = True
                     break
                 elif selected_key == "submenu.title":
                     win.timeout(-1)
@@ -636,11 +638,15 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                     if redraw_bg:
                         redraw_bg()
                     if new_val is not None:
-                        item_dict.setdefault("submenu", {})["title"] = new_val.strip()
+                        new_val_str = new_val.strip()
+                        if item_dict.get("submenu", {}).get("title", "") != new_val_str:
+                            item_dict.setdefault("submenu", {})["title"] = new_val_str
+                            was_modified = True
                     break
                 elif selected_key in ["stream", "interactive", "masked", "show_whitespace", "tab_to_spaces", "quiet", "refresh", "external"]:
                     bool_val = curr_val.lower() == "true"
                     item_dict[selected_key] = not bool_val
+                    was_modified = True
                     break
                 elif selected_key in ["picker", "user_mode"]:
                     if selected_key == "picker":
@@ -649,6 +655,7 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                         opts = ["user", "root"]
                     next_idx = (opts.index(curr_val) + 1) % len(opts) if curr_val in opts else 0
                     item_dict[selected_key] = opts[next_idx]
+                    was_modified = True
                     break
                 elif selected_key == "action" and item_type == "script":
                     win.timeout(-1)
@@ -657,8 +664,9 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                     stdscr.refresh()
                     if redraw_bg:
                         redraw_bg()
-                    if chosen is not None:
+                    if chosen is not None and chosen != curr_val:
                         item_dict[selected_key] = chosen
+                        was_modified = True
                     break
                 elif (
                     (selected_key == "action" and item_type == "editor")
@@ -670,8 +678,9 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                     stdscr.refresh()
                     if redraw_bg:
                         redraw_bg()
-                    if chosen is not None:
+                    if chosen is not None and chosen != curr_val:
                         item_dict[selected_key] = chosen
+                        was_modified = True
                     break
                 else:
                     win.timeout(-1)
@@ -686,7 +695,9 @@ def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
                             val_str = int(val_str)
                         elif val_str.lower() in ["true", "false"]:
                             val_str = val_str.lower() == "true"
-                        item_dict[selected_key] = val_str
+                        if item_dict.get(selected_key) != val_str:
+                            item_dict[selected_key] = val_str
+                            was_modified = True
                     break
 
 def create_default_item(item_type):
@@ -961,6 +972,16 @@ def draw_menu_editor(
 
 
 def main(stdscr, target_path=None):
+    """
+    Main curses execution loop for the visual menu editor.
+    
+    Initializes the UI, loads the menu structure, and handles user input
+    for navigating the tree and invoking the property inspector.
+    
+    Args:
+        stdscr: Curses main window handle.
+        target_path (list[int], optional): Path of node indices to automatically select and focus on startup.
+    """
     curses.curs_set(0)
     if hasattr(curses, "set_escdelay"):
         curses.set_escdelay(25)
@@ -1083,7 +1104,7 @@ def main(stdscr, target_path=None):
             if curr_node["item"].get("type") == "root_menu":
                 curr_title = curr_node["root_data"].get("title", "")
                 new_title = bashmenu.show_input_box(stdscr, "Edit Main Menu Title", "Main Menu Header Title:", curr_title, theme)
-                if new_title is not None:
+                if new_title is not None and new_title.strip() != curr_title:
                     curr_node["root_data"]["title"] = new_title.strip()
                     modified = True
             else:
@@ -1091,8 +1112,8 @@ def main(stdscr, target_path=None):
                     draw_menu_editor(
                         stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
                     )
-                edit_item_properties(stdscr, curr_node["item"], config, theme, redraw_bg=redraw_bg)
-                modified = True
+                if edit_item_properties(stdscr, curr_node["item"], config, theme, redraw_bg=redraw_bg):
+                    modified = True
         elif key == ord('E'):
             stdscr.timeout(-1)
             if curr_node["item"].get("type") == "root_menu":
@@ -1109,7 +1130,7 @@ def main(stdscr, target_path=None):
             try:
                 with open(tmp_path, "r", encoding="utf-8") as f:
                     parsed = yaml.safe_load(f)
-                    if isinstance(parsed, dict):
+                    if isinstance(parsed, dict) and parsed != target_dict:
                         target_dict.clear()
                         target_dict.update(parsed)
                         modified = True

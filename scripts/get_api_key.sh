@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: get_api_key.sh
+# DESCRIPTION: Retrieves text from a file on a remote server via SSH.
+#              Useful for fetching API keys or tokens securely.
+# ==============================================================================
 # Version: 0.0.1
 # Author:  HappyAmos
 # Echo's out string contained on a directory in a remote server
@@ -12,6 +17,7 @@ REMOTE_FILE_DIR="/mnt/wd320/private/andrew/Linux/"
 # gapikey.txt
 # gitpat.txt
 
+# Function to display help information
 function print_help_text {
     echo "Download the text from a file via SSH from [$SERVER@$REMOTE_FILE_DIR]"
     echo "Usage: [options] <filename>"

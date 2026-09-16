@@ -13,7 +13,16 @@
 set -e
 
 # ------------------------------------------------------------------------------
-# 1. PRIVILEGE CHECK
+# 1. ENVIRONMENT CHECK (Termux / WSL)
+# ------------------------------------------------------------------------------
+if [ -n "$TERMUX_VERSION" ] || [[ "$PREFIX" == *"/com.termux/"* ]] || grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "Notice: Global DNS configuration requires systemd-resolved or NetworkManager, which are not used natively in Termux or WSL."
+    echo "Skipping DNS configuration."
+    exit 0
+fi
+
+# ------------------------------------------------------------------------------
+# 2. PRIVILEGE CHECK
 # ------------------------------------------------------------------------------
 # Network configuration requires root (administrator) privileges.
 if [ "$EUID" -ne 0 ]; then

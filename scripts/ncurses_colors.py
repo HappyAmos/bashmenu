@@ -65,6 +65,9 @@ def print_ncurses_colors():
 
 
 def main():
+    """
+    Parse command-line arguments and run the appropriate color printing mode.
+    """
     parser = argparse.ArgumentParser(
         description="Display the 256 terminal color palette used in the menu system."
     )

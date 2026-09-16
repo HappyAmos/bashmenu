@@ -1,4 +1,4 @@
-#!/usr/bin/env LANG=en_US.UTF-8 /usr/local/bin/python3
+#!/usr/bin/env python3
 """
 bashmenu.py - A lightweight TUI menu engine loaded from menu and theme files.
 
@@ -583,16 +583,43 @@ def reload_environment(stdscr, menu_stack, selected_rows):
     main_menu, menu_err = load_menu()
     inject_dynamic_menus(main_menu)
 
+    saved_path = list(selected_rows)
     menu_stack.clear()
-    menu_stack.append(main_menu)
     selected_rows.clear()
-    main_options = main_menu.get("options", [])
-    start_idx = 0
-    while start_idx < len(main_options) and main_options[start_idx].get("type") == "divider":
-        start_idx += 1
-    if start_idx >= len(main_options):
-        start_idx = 0
-    selected_rows.append(start_idx)
+    
+    menu_stack.append(main_menu)
+    curr_menu = main_menu
+    
+    for i, row_idx in enumerate(saved_path):
+        opts = curr_menu.get("options", [])
+        if not opts:
+            selected_rows.append(0)
+            break
+            
+        safe_idx = max(0, min(row_idx, len(opts) - 1))
+        
+        while safe_idx >= 0 and opts[safe_idx].get("type") == "divider":
+            safe_idx -= 1
+        if safe_idx < 0:
+            safe_idx = 0
+            while safe_idx < len(opts) and opts[safe_idx].get("type") == "divider":
+                safe_idx += 1
+            if safe_idx >= len(opts):
+                safe_idx = 0
+                
+        selected_rows.append(safe_idx)
+        
+        # Only descend into a submenu if there is a next level in the saved path
+        if i < len(saved_path) - 1:
+            selected_item = opts[safe_idx] if safe_idx < len(opts) else {}
+            if "submenu" in selected_item:
+                curr_menu = selected_item["submenu"]
+                menu_stack.append(curr_menu)
+            else:
+                break
+
+    if not selected_rows:
+        selected_rows.append(0)
 
     if THEME_ERROR:
         show_popup_message(stdscr, "Theme File Error", THEME_ERROR, theme)
@@ -891,52 +918,68 @@ def parse_ansi_line(line, default_theme_attr):
             while idx < len(params):
                 p = params[idx]
                 if p == 0:
+                    # Reset all text formatting and colors
                     current_fg = -1
                     current_bg = -1
                     current_bold = False
                     current_underline = False
                     idx += 1
                 elif p == 1:
+                    # Enable bold text attribute
                     current_bold = True
                     idx += 1
                 elif p == 4:
+                    # Enable underline text attribute
                     current_underline = True
                     idx += 1
                 elif 30 <= p <= 37:
+                    # Standard 8 foreground colors
                     current_fg = p - 30
                     idx += 1
                 elif 40 <= p <= 47:
+                    # Standard 8 background colors
                     current_bg = p - 40
                     idx += 1
                 elif 90 <= p <= 97:
+                    # High-intensity (bright) 8 foreground colors
                     current_fg = p - 90 + 8
                     idx += 1
                 elif 100 <= p <= 107:
+                    # High-intensity (bright) 8 background colors
                     current_bg = p - 100 + 8
                     idx += 1
                 elif p == 38:
+                    # Extended foreground color (256 colors or true color)
                     if idx + 2 < len(params) and params[idx + 1] == 5:
+                        # 256-color mode: sequence is 38;5;n
                         current_fg = params[idx + 2]
                         idx += 3
                     elif idx + 4 < len(params) and params[idx + 1] == 2:
+                        # True color mode: 38;2;r;g;b (not fully supported by base curses yet, so we skip it)
                         idx += 5
                     else:
                         idx += 1
                 elif p == 48:
+                    # Extended background color (256 colors or true color)
                     if idx + 2 < len(params) and params[idx + 1] == 5:
+                        # 256-color mode: sequence is 48;5;n
                         current_bg = params[idx + 2]
                         idx += 3
                     elif idx + 4 < len(params) and params[idx + 1] == 2:
+                        # True color mode: 48;2;r;g;b (skip unsupported sequence)
                         idx += 5
                     else:
                         idx += 1
                 elif p == 39:
+                    # Default foreground color
                     current_fg = -1
                     idx += 1
                 elif p == 49:
+                    # Default background color
                     current_bg = -1
                     idx += 1
                 else:
+                    # Ignore unsupported parameter
                     idx += 1
 
         pos = match.end()

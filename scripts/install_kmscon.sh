@@ -1,9 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: install_kmscon.sh
+# DESCRIPTION: Installs kmscon on a Linux system (Debian/Ubuntu/Mint) and configures
+#              it as a systemd service. Useful for headless base systems.
+# ==============================================================================
 # Version: 0.0.1
 # Author:  HA Bash Menu Development Team
 # This script installs kmscon on a Linux system. Great for a headless base system without a GUI that doesn't
 # install a system with a frame buffer
 # It is intended for use on systems that use systemd and have access to the necessary package repositories.
+
+# Check for incompatible environments (Termux / WSL)
+if [ -n "$TERMUX_VERSION" ] || [[ "$PREFIX" == *"/com.termux/"* ]] || grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "Notice: kmscon requires systemd and hardware TTYs, which are not supported in Termux or WSL."
+    echo "Skipping installation."
+    exit 0
+fi
 
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then

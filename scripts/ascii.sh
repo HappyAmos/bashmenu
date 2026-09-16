@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: ascii.sh
+# DESCRIPTION: Prints the standard ASCII character set and the extended CP437
+#              character set safely to the terminal using iconv for conversion.
+# ==============================================================================
 
 # Loop through the printable Standard ASCII range (32 to 126)
 printf "Standard ASCII Range (32 - 126)\n"

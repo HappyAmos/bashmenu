@@ -14,6 +14,10 @@ import bashmenu
 
 
 class TestAnsiParsing(unittest.TestCase):
+    """
+    Test suite for ANSI escape sequence parsing, sanitization, and curses
+    color attribute resolution within the bashmenu engine.
+    """
     def test_parse_ansi_line_empty(self):
         """Test parsing an empty string."""
         segments = bashmenu.parse_ansi_line("", 0)

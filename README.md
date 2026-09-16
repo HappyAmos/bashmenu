@@ -28,6 +28,9 @@ as clean by shellcheck, a linux shell script validator.
   `~/.bashrc`), with automatic install, update, and uninstall prompts.
 - **Self-Healing Virtualenv**: The `bashmenu.sh` launcher manages Python virtual
   environments and dependencies automatically without user friction.
+- **Multi-Platform Support**: Features smart environment detection and package
+  manager abstraction (pkg, apt, dnf, pacman, brew) ensuring seamless execution
+  across standard Linux, Termux, WSL, and macOS.
 
 ---
 

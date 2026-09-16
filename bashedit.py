@@ -410,6 +410,7 @@ def run_curses_editor(
 
         if cutbuffer_is_block:
             if len(cutbuffer) == 1:
+                # Single-line block paste: insert text directly at cursor position
                 lines[cursor_y] = (
                     lines[cursor_y][:cursor_x]
                     + cutbuffer[0]
@@ -417,6 +418,7 @@ def run_curses_editor(
                 )
                 cursor_x += len(cutbuffer[0])
             else:
+                # Multi-line block paste: split current line, insert middle lines, and append the tail
                 tail = lines[cursor_y][cursor_x:]
                 lines[cursor_y] = lines[cursor_y][:cursor_x] + cutbuffer[0]
                 for idx, mid in enumerate(cutbuffer[1:-1]):
@@ -426,6 +428,7 @@ def run_curses_editor(
                 cursor_y = last_idx
                 cursor_x = len(cutbuffer[-1])
         else:
+            # Full-line paste: insert entire lines directly below or at cursor line
             for idx, l in enumerate(cutbuffer):
                 lines.insert(cursor_y + idx, l)
             cursor_y += len(cutbuffer)

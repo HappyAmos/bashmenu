@@ -64,6 +64,21 @@ Installs the kmscon console emulator for better Unicode rendering.
 .TP
 .I scripts/install_scripts.sh
 Installer script that registers and deploys custom bash scripts.
+.TP
+.I scripts/install_basics.sh
+Cross-platform basic tools installer wrapper.
+.TP
+.I scripts/system_update.sh
+Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
+.TP
+.I scripts/unicode.sh
+Interactive Unicode Block Explorer script.
+.TP
+.I scripts/ascii.sh
+Standard and Extended ASCII viewing utility.
+.TP
+.I scripts/ncurses_colors.py
+Visual tester for ncurses color support.
 .SS Provided Templates (templates/)
 Utilized as layout sources for code generation and block injections:
 .TP
@@ -81,6 +96,9 @@ Navigate highlighted selection row.
 .B 0-9, a-z, A-Z
 Select menu option directly by shortcut hotkey.
 .TP
+.B F1
+Display the markdown help manual using the glow terminal pager.
+.TP
 .B F4
 Launch menuedit.py visual menu tree editor.
 .TP
@@ -92,6 +110,10 @@ Execute active selected menu option action.
 .TP
 .B ESC
 Return to parent menu, or quit if at the root menu level.
+
+.PP
+.B Intelligent State Retention:
+When returning from editors, or scripts with refresh: true, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 .SS Visual Menu Editor (menuedit.py)
 .TP
 .B a, Ins
@@ -178,7 +200,7 @@ The special setting
 defines which system badges (such as {user}, {battery}, or {date_time_24}) are
 displayed in the bottom right corner (the status gutter). This value is specified
 as a string of badges separated by pipe symbols (|). The engine will fit as many
-of these badges as possible based on the terminal's available width.
+of these badges as possible based on the terminal's available width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
 .SS Menu Structure (bashmenu.mnu)
 The menu is defined as a hierarchical YAML options list. Options can utilize the
 following configuration keys:
@@ -348,5 +370,7 @@ seamless interactive installs, updates, and uninstalls.
 Python script items of type "script" can set "external: false" to run inside
 bashmenu's parent process, avoiding terminal flashes. Plugins must implement
 "def main(stdscr)".
+.SS Multi-Platform Support & Environment Detection
+HA Bash Menu incorporates an environment detection engine in bashmenu.sh enabling graceful degradation and multi-platform compatibility without manual configuration. All files leverage universal shebangs. Cross-Platform package wrappers automatically translate dependency installs to the correct local package manager (apt, dnf, pacman, pkg, or brew), and smartly add or omit sudo depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
 .SH AUTHOR
 Distributed under the MIT License.

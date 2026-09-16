@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: install_scripts.sh
+# DESCRIPTION: Clones a private scripts repository from Github into a local
+#              directory. Uses get_api_key.sh to securely fetch the Git PAT.
+# ==============================================================================
 
 # Personal script to clone a private repo from Github. Uses get_api_key.sh to retrieve
 # an api key via ssh from another pc on the local network. 

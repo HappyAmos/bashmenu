@@ -209,6 +209,10 @@ def collect_dns_data():
 
 
 def main():
+    """
+    Parse command-line arguments, trigger DNS discovery, and format output.
+    Supports custom formats like TSV (--parse) and JSON (--json).
+    """
     parser = argparse.ArgumentParser(
         description="Universal Upstream DNS Server Discovery Tool"
     )

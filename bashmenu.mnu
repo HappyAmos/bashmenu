@@ -5,7 +5,7 @@ options:
   length: '{window_width}'
   char: '{ascii:196}'
 - label: Applications
-  icon: "{nf::#f003b:\U0001F3AE}"
+  icon: "{nf::#f003b:\U0001F680}"
   submenu:
     title: Applications
     options:
@@ -60,11 +60,10 @@ options:
       icon: '{nf::#f422}'
     - label: Unicode Block Explorer
       type: script
-      action: '{scripts}/unicode.sh'
+      action: '{scripts_dir}/unicode.sh'
       icon: '{nf::#f0ed0:}'
-      stream: false
-      quiet: true
       interactive: true
+      quiet: true
     - label: View ASCII Symbols [Standard and Extended]
       type: script
       action: '{scripts_dir}/ascii.sh'
@@ -93,8 +92,25 @@ options:
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
+- label: Games
+  submenu:
+    title: Games
+    options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+    - label: Back to Main Menu
+      type: back
+      icon: '{nf::#f048}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+  icon: '{nf::#f003b:\U0001F3AE}'
 - label: Install
-  icon: "{nf:::\U0001F4E5}"
+  icon: "{nf::#f01da:\U0001F4E5}"
   submenu:
     title: Install Tools Menu
     options:
@@ -102,11 +118,10 @@ options:
       length: '{window_width}'
       char: '{ascii:196}'
     - label: Apt update && upgrade
-      type: command
-      action: sudo apt update && sudo apt upgrade -y
+      type: script
+      action: '{scripts_dir}/system_update.sh'
       stream: false
       interactive: true
-      user_mode: root
       quiet: true
       icon: '{nf::#f487}'
     - label: Install autoexec.sh Launcher
@@ -123,11 +138,10 @@ options:
       block_id: bash_aliases
       refresh: false
       icon: '{nf::#eeb6}'
-    - label: Install Basics [apt install vim mc htop glow gum curl wget git shellcheck
-        shfmt]
-      type: command
-      user_mode: root
-      action: apt install -y vim mc htop glow gum curl wget git shellcheck shfmt
+    - label: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq
+        yq]
+      type: script
+      action: '{scripts_dir}/install_basics.sh'
       stream: true
       icon: '{nf::#ed5b}'
     - label: Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]
@@ -140,6 +154,11 @@ options:
       action: '{scripts_dir}/install_kmscon.sh'
       stream: true
       icon: '{nf::#f0e51}'
+    - label: Install Nerd Fonts [curl https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh]
+      type: command
+      action: bash -c "$(curl -fsSL https://raw.githubusercontent.com/officialrajdeepsingh/nerd-fonts-installer/main/install.sh)"
+      icon: '{nf::#eb54:}'
+      interactive: true
     - label: Install Scripts From Private Repo [https://github.com/HappyAmos/scripts.git]
       type: script
       action: '{scripts_dir}/install_scripts.sh'
@@ -155,7 +174,7 @@ options:
       length: '{window_width}'
       char: '{ascii:196}'
 - label: Network Utilities
-  icon: "{nf:::\U0001F310}"
+  icon: "{nf::#ef09:\U0001F310}"
   submenu:
     title: Network Utilities Options
     options:
@@ -210,7 +229,7 @@ options:
       length: '{window_width}'
       char: '{ascii:196}'
 - label: Options & Settings
-  icon: "{nf:::\u2699\uFE0F}"
+  icon: "{nf::#f423:\u2699\uFE0F}"
   submenu:
     title: Options & Settings
     options:
@@ -318,7 +337,7 @@ options:
       length: '{window_width}'
       char: '{ascii:196}'
 - label: System Information
-  icon: "{nf:::\u2139\uFE0F}"
+  icon: "{nf::#e66a:\u2139\uFE0F}"
   submenu:
     title: System Information Options
     options:
@@ -364,13 +383,13 @@ options:
   length: '{window_width}'
   char: '{ascii:196}'
 - label: Help [glow -p bashmenu.md]
-  icon: "{nf:::\u2753}"
+  icon: "{nf::#f02d6:\u2753}"
   type: command
   action: glow -p {bashmenu_dir}/bashmenu.md
   interactive: true
   quiet: true
 - label: Exit Menu
-  icon: "{nf:::\U0001F6AA}"
+  icon: "{nf::#f0a48:\U0001F6AA}"
   type: exit
 - type: divider
   length: '{window_width}'

@@ -1,4 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: install_cheat.sh
+# DESCRIPTION: Clones a private Github repository of cheatsheets into a local
+#              directory. Uses get_api_key.sh to securely fetch the Git PAT.
+# ==============================================================================
 
 # Personal script to clone private Github repo of cheatsheets (markdown) to a subdirectory 
 # in my home folder. get_api_key.sh is a farily universal script to grab text 
