@@ -20,17 +20,17 @@ import getpass
 import io
 import os
 import re
-import shlex
 import socket
 import subprocess
 import sys
-import termios
 import time
 import unicodedata
 from pathlib import Path
+
 import yaml
-import bashmenu_ui
+
 import bashedit
+import bashmenu_ui
 
 # Speed up ESC key response time (25ms instead of default 1000ms)
 os.environ.setdefault("ESCDELAY", "25")
@@ -851,8 +851,7 @@ def get_color_pair(fg, bg):
     # If this slot was previously allocated to another color key, evict it from our cache
     if slot_idx in DYNAMIC_PAIR_KEYS:
         old_key = DYNAMIC_PAIR_KEYS[slot_idx]
-        if old_key in DYNAMIC_COLOR_PAIRS:
-            del DYNAMIC_COLOR_PAIRS[old_key]
+        DYNAMIC_COLOR_PAIRS.pop(old_key, None)
 
     try:
         curses.init_pair(slot_idx, fg, bg)

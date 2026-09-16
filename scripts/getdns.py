@@ -16,7 +16,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 
 
 def is_loopback(ip_str):

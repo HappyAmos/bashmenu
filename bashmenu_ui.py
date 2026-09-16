@@ -6,6 +6,7 @@ import curses
 import os
 import unicodedata
 
+
 def safe_isprintable(s: str) -> bool:
     """
     Returns True if the string contains only valid printable characters,
@@ -612,10 +613,7 @@ def show_file_picker(
                         mode == "dir"
                         and ent.get("is_self")
                         and target_item == current_path
-                    ):
-                        cursor_idx = idx
-                        break
-                    elif ent.get("path") == target_item:
+                    ) or ent.get("path") == target_item:
                         cursor_idx = idx
                         break
             elif mode == "dir":

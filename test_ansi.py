@@ -3,9 +3,9 @@
 test_ansi.py - Unit tests for ANSI escape code parsing and color rendering in bashmenu.py
 """
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -117,7 +117,6 @@ class TestAnsiParsing(unittest.TestCase):
 
     def test_get_battery_info_caching(self):
         """Test that get_battery_info properly caches results and avoids multiple slower lookups."""
-        import time
         # Force a fresh fetch by clearing the cache time
         bashmenu._last_battery_time = 0.0
         first_call = bashmenu.get_battery_info()

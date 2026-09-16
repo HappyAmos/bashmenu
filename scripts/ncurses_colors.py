@@ -8,8 +8,8 @@ the standard curses/tput color mappings (default, matching bashmenu.py and menue
 and raw ANSI 256-color sequences.
 """
 
-import sys
 import argparse
+import sys
 
 __version__ = "0.0.1"
 __author__ = "HappyAmos"

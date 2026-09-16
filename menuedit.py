@@ -9,13 +9,13 @@ dialogs, themes, and configuration utilities directly from bashmenu.py.
 __version__ = "0.0.1"
 __author__ = "HappyAmos"
 
-import copy
 import curses
 import os
 import shutil
 import subprocess
 import sys
 import textwrap
+
 import yaml
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -896,7 +896,7 @@ def draw_menu_editor(
     if curr_type == "root_menu":
         details = [
             f"Title : {curr_node['root_data'].get('title', '')}",
-            f"Type  : Main Menu Root",
+            "Type  : Main Menu Root",
             f"Count : {len(curr_node['root_data'].get('options', []))} top-level options",
         ]
     else:

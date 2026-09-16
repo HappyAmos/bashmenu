@@ -1,8 +1,9 @@
-import sys
 import os
+import sys
 
 # Mock curses BEFORE importing bashmenu
-import unittest.mock as mock
+from unittest import mock
+
 mock_curses = mock.MagicMock()
 mock_curses.COLORS = 256
 sys.modules['curses'] = mock_curses
@@ -11,6 +12,7 @@ sys.modules['curses'] = mock_curses
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import bashmenu
+
 
 class MockStdscr:
     def bkgd(self, *args): pass

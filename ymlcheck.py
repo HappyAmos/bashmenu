@@ -12,7 +12,8 @@ import sys
 
 __version__ = "0.0.1"
 __author__ = "HA Bash Menu Development Team"
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any
+
 import yaml
 
 # Standard 16-color curses constants valid in 16/8 color depth modes
@@ -45,7 +46,7 @@ def format_yaml_error(error: yaml.YAMLError) -> str:
     return f"YAML Parsing Error: {error}"
 
 
-def validate_indicator_value(val: Any, path: str) -> List[str]:
+def validate_indicator_value(val: Any, path: str) -> list[str]:
     """
     Validate menu cursor selection indicator or prefix symbol.
 
@@ -61,7 +62,7 @@ def validate_indicator_value(val: Any, path: str) -> List[str]:
     ]
 
 
-def validate_color_value(val: Any, depth_mode: str, path: str) -> List[str]:
+def validate_color_value(val: Any, depth_mode: str, path: str) -> list[str]:
     """
     Validate an individual color value (foreground, background, or standalone).
 
@@ -99,7 +100,7 @@ def validate_color_value(val: Any, depth_mode: str, path: str) -> List[str]:
     return errors
 
 
-def validate_color_pair(pair: Any, depth_mode: str, path: str) -> List[str]:
+def validate_color_pair(pair: Any, depth_mode: str, path: str) -> list[str]:
     """
     Validate a [foreground, background] color pair list.
 
@@ -115,7 +116,7 @@ def validate_color_pair(pair: Any, depth_mode: str, path: str) -> List[str]:
     return errors
 
 
-def validate_depth_section(depth_str: str, keys: Any, base_path: str) -> List[str]:
+def validate_depth_section(depth_str: str, keys: Any, base_path: str) -> list[str]:
     """
     Validate a specific color depth mapping (e.g., '256', '16', '8').
 
