@@ -90,6 +90,9 @@ options:
     - label: Back to Main Menu
       icon: '{nf::#f048}'
       type: back
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
 - label: Install
   icon: "{nf:::\U0001F4E5}"
   submenu:
@@ -148,6 +151,9 @@ options:
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
 - label: Network Utilities
   icon: "{nf:::\U0001F310}"
   submenu:
@@ -200,6 +206,9 @@ options:
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
 - label: Options & Settings
   icon: "{nf:::\u2699\uFE0F}"
   submenu:
@@ -275,6 +284,9 @@ options:
         - label: Back to Options & Settings
           type: back
           icon: '{nf::#f048}'
+        - type: divider
+          length: '{window_width}'
+          char: '{ascii:196}'
       icon: '{nf::#f013}'
     - label: Edit autoexec.sh [{home}/autoexec.sh]
       type: editor
@@ -302,6 +314,9 @@ options:
     - label: Back to Main Menu
       type: back
       icon: '{nf::#f048}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
 - label: System Information
   icon: "{nf:::\u2139\uFE0F}"
   submenu:
@@ -342,6 +357,12 @@ options:
       char: '{ascii:196}'
     - label: Back to Main Menu
       type: back
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+- type: divider
+  length: '{window_width}'
+  char: '{ascii:196}'
 - label: Help [glow -p bashmenu.md]
   icon: "{nf:::\u2753}"
   type: command

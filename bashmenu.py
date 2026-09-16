@@ -1983,14 +1983,27 @@ def main(stdscr):
         )
 
         if height > 4:
-            footer_left = (
-                " [UP/DN]: Nav | [0-9/a-z]: Direct | [F5]: Keys | "
-                "[F4]: Edit | [ESC]: Back "
+            footer_left_full = (
+                " [UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back "
                 if show_shortcuts
-                else " [UP/DN]: Nav | [ENTER]: Select | [F5]: Keys | "
-                "[F4]: Edit | [ESC]: Back "
+                else " [UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back "
             )
-            safe_addstr(stdscr, height - 2, 2, footer_left, theme["footer"])
+
+            # Determine left gutter splitting
+            footer_left_top = ""
+            footer_left_bottom = footer_left_full
+            
+            if len(footer_left_full) + 4 > width and height > 5:
+                parts = footer_left_full.strip().split(" | ")
+                mid = len(parts) // 2 + 1
+                footer_left_top = " " + " | ".join(parts[:mid]) + " | "
+                footer_left_bottom = " " + " | ".join(parts[mid:]) + " "
+            elif len(footer_left_full) + 4 > width:
+                footer_left_bottom = footer_left_full[:width - 4]
+
+            if footer_left_top:
+                safe_addstr(stdscr, height - 3, 2, footer_left_top, theme["footer"])
+            safe_addstr(stdscr, height - 2, 2, footer_left_bottom, theme["footer"])
 
             status_gutter_raw = get_config_value(config, "settings.status_gutter")
             if not isinstance(status_gutter_raw, str):
@@ -1999,17 +2012,12 @@ def main(stdscr):
             raw_badges = [b.strip() for b in status_gutter_raw.split("|")]
             all_badges = [interpolate_placeholders(b, config) for b in raw_badges if b.strip()]
 
-            avail_w = width - 4 - len(footer_left)
-            selected_badges = []
-            for b in all_badges:
-                candidate = " | ".join(selected_badges + [b])
-                if len(candidate) + 2 <= avail_w:
-                    selected_badges.append(b)
-                else:
-                    break
+            avail_w_bottom = max(0, width - 4 - len(footer_left_bottom))
+            avail_w_top = max(0, width - 4 - len(footer_left_top)) if height > 5 else 0
 
-            if selected_badges:
-                badge_str = f" {' | '.join(selected_badges)} "
+            candidate_all = " | ".join(all_badges)
+            if all_badges and len(candidate_all) + 2 <= avail_w_bottom:
+                badge_str = f" {candidate_all} "
                 safe_addstr(
                     stdscr,
                     height - 2,
@@ -2017,6 +2025,43 @@ def main(stdscr):
                     badge_str,
                     theme["accent"] | curses.A_BOLD,
                 )
+            elif all_badges:
+                top_badges = []
+                remaining_badges = []
+                for i, b in enumerate(all_badges):
+                    candidate = " | ".join(top_badges + [b])
+                    if avail_w_top > 0 and len(candidate) + 2 <= avail_w_top:
+                        top_badges.append(b)
+                    else:
+                        remaining_badges = all_badges[i:]
+                        break
+                
+                bottom_badges = []
+                for b in remaining_badges:
+                    candidate = " | ".join(bottom_badges + [b])
+                    if len(candidate) + 2 <= avail_w_bottom:
+                        bottom_badges.append(b)
+                    else:
+                        break
+                
+                if top_badges:
+                    badge_str = f" {' | '.join(top_badges)} "
+                    safe_addstr(
+                        stdscr,
+                        height - 3,
+                        max(2, width - len(badge_str) - 2),
+                        badge_str,
+                        theme["accent"] | curses.A_BOLD,
+                    )
+                if bottom_badges:
+                    badge_str = f" {' | '.join(bottom_badges)} "
+                    safe_addstr(
+                        stdscr,
+                        height - 2,
+                        max(2, width - len(badge_str) - 2),
+                        badge_str,
+                        theme["accent"] | curses.A_BOLD,
+                    )
 
         options = current_menu.get("options", [])
         shortcut_map, idx_to_shortcut = build_shortcut_map(options, show_shortcuts)
@@ -2245,6 +2290,11 @@ def main(stdscr):
                 idx -= 1
             if idx >= 0:
                 selected_rows[-1] = idx
+
+        elif key == curses.KEY_F1:
+            help_path = os.path.join(BASHMENU_DIR, "bashmenu.md")
+            stdscr.timeout(-1)
+            run_interactive_action(stdscr, f"glow -p '{help_path}'", quiet=True)
 
         elif key == curses.KEY_F5:
             show_shortcuts = not show_shortcuts
