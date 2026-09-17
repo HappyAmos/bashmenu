@@ -1,3 +1,9 @@
+version: 0.0.1
+user:
+  example_boolean: true
+  example_filepath: '{bashmenu_dir}'
+  example_string: A string of text
+  localip: "[b]{command:hostname -I | awk '{print $1}'}[/b]"
 settings:
   check_for_updates: false
   dns:
@@ -9,16 +15,10 @@ settings:
       secondary: 2606:4700:4700::1111
   ping_target: 192.168.4.47
   scripts_dir: '{bashmenu_dir}/scripts'
-  show_menu_shortcuts: false
+  show_menu_shortcuts: true
   status_gutter: '{user} : {user-mode} | Battery: {battery} | {date_time_24_short} | {user.localip}'
   tab_to_spaces: true
   tabstop: 4
   templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
 theme: pacman
-user:
-  example_boolean: true
-  example_filepath: '{bashmenu_dir}'
-  example_string: A string of text
-  localip: "[b]{command:hostname -I | awk '{print $1}'}[/b]"
-version: 0.0.1

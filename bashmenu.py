@@ -265,7 +265,7 @@ DEFAULT_CONFIG = {
         "example_boolean": True, 
         "example_filepath": "{bashmenu_dir}", 
         "example_string": "A string of text",
-        "localip": "[color=title]{command:hostname -I | awk '{print $1}'}[/color]",
+        "localip": "[b]{command:hostname -I | awk '{print $1}'}[/b]",
     },
     "settings": {
         "check_for_updates": False,
@@ -276,7 +276,7 @@ DEFAULT_CONFIG = {
         "tabstop": 8,
         "show_menu_shortcuts": True,
         "use_nerd_fonts": False,
-        "status_gutter": "{user} | {battery} | {date_time_24_short}",
+        "status_gutter": "{user} | {battery} | {date_time_24_short} | {user.localip}",
         "dns": {
             "ipv4": {
                 "primary": "192.168.4.47",
@@ -360,7 +360,8 @@ def build_shortcut_map(options, show_shortcuts=True):
 
 def deep_merge(default, user):
     """
-    Recursively merge user settings into a default configuration dictionary.
+    Recursively merge user settings into a default configuration dictionary,
+    preserving the user's custom key order.
 
     Args:
         default (dict): Base dictionary containing default key-value pairs.
@@ -371,16 +372,25 @@ def deep_merge(default, user):
     """
     if not isinstance(user, dict):
         return default
+
+    merged = {}
+    # 1. Add user keys in their exact custom order
     for key, value in user.items():
         if (
             isinstance(value, dict)
             and key in default
             and isinstance(default[key], dict)
         ):
-            deep_merge(default[key], value)
+            merged[key] = deep_merge(default[key], value)
         else:
-            default[key] = value
-    return default
+            merged[key] = value
+
+    # 2. Append any missing keys from the default config at the end
+    for key, value in default.items():
+        if key not in merged:
+            merged[key] = value
+
+    return merged
 
 
 def get_config_value(config, key_path):
@@ -618,7 +628,7 @@ def save_config(config):
     """
     try:
         with open(CONFIG_FILE, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, width=float('inf'))
+            yaml.dump(config, f, default_flow_style=False, width=float('inf'), sort_keys=False)
     except (OSError, yaml.YAMLError, TypeError, ValueError):  # Catch file access, serialization, or type formatting errors safely
         pass
 
