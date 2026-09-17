@@ -99,6 +99,11 @@ options:
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
+    - label: BSD Games
+      type: script
+      action: '{scripts_dir}/bsdgames.sh'
+      icon: '{nf:::}'
+      interactive: true
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
@@ -138,8 +143,7 @@ options:
       block_id: bash_aliases
       refresh: false
       icon: '{nf::#eeb6}'
-    - label: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq
-        yq]
+    - label: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]
       type: script
       action: '{scripts_dir}/install_basics.sh'
       stream: true
@@ -183,8 +187,7 @@ options:
       char: '{ascii:196}'
     - label: Configure DNS servers [dnsconfig.sh]
       type: script
-      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
-        {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
+      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary} {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
       stream: true
       icon: '{nf::#f0b8c}'
     - label: Configure Ping Target [{settings.ping_target}]
@@ -296,9 +299,7 @@ options:
           type: config
           key: settings.status_gutter
           title: Configure Status Gutter
-          prompt: 'Enter status gutter format. Available options: {user}, {battery},
-            {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short},
-            {host}, {user-mode}, {version}, {utc_seconds}'
+          prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
           icon: '{nf:::}'
         - label: Visual Menu Editor [menuedit.py]
           type: script
