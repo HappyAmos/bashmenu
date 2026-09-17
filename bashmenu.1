@@ -197,10 +197,29 @@ Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
 settings.dns.ipv4) can be interpolated inside menu files or actions.
 The special setting
 .I settings.status_gutter
-defines which system badges (such as {user}, {battery}, or {date_time_24}) are
-displayed in the bottom right corner (the status gutter). This value is specified
-as a string of badges separated by pipe symbols (|). The engine will fit as many
-of these badges as possible based on the terminal's available width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
+defines which system badges are displayed in the bottom right corner (the status
+gutter). This value is specified as a string of badges separated by pipe symbols
+(|). The engine will fit as many of these badges as possible based on the
+terminal's available width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
+Available badges include:
+.I {user}, {username}
+(current user),
+.I {host}
+(hostname),
+.I {battery}
+(battery percentage),
+.I {date_time_12}, {date_time_24}
+(full date/time),
+.I {date_time_12_short}, {date_time_24_short}
+(short date/time; optimal for performance),
+.I {time_12}, {time_24}
+(current time),
+.I {time_12_short}, {time_24_short}
+(short time; optimal for performance),
+.I {date}
+(YYYY-MM-DD), and
+.I {utc_seconds}
+(epoch seconds).
 .SS Menu Structure (bashmenu.mnu)
 The menu is defined as a hierarchical YAML options list. Options can utilize the
 following configuration keys:
@@ -285,8 +304,14 @@ Prompts for a single-line text value using a modal input box.
 .B {file_picker}
 Launches a visual file chooser dialog box.
 .TP
+.B {file_picker_new}, {file_picker:new}
+Launches a visual file chooser dialog box allowing creation of new files.
+.TP
 .B {dir_picker}
 Launches a visual directory chooser dialog box.
+.TP
+.B {dir_picker_new}, {dir_picker:new}
+Launches a visual directory chooser dialog box allowing creation of new folders.
 .SS Picker Auto-Starting Folders
 Preceding file/directory pickers with a folder path (e.g.
 "{templates_dir}/{file_picker}" or "~/projects/{dir_picker}") causes the engine
@@ -319,13 +344,19 @@ Templates and scripts folders paths.
 Path files system profiles.
 .TP
 .B {date_time_12}, {date_time_24}
-12-hour and 24-hour formatted date-time.
+12-hour and 24-hour formatted date-time (includes seconds).
+.TP
+.B {date_time_12_short}, {date_time_24_short}
+Short 12-hour and 24-hour formatted date-time (excludes seconds; optimal for performance).
 .TP
 .B {date}
 Current date (YYYY-MM-DD).
 .TP
 .B {time_12}, {time_24}
-12-hour and 24-hour current time.
+12-hour and 24-hour current time (includes seconds).
+.TP
+.B {time_12_short}, {time_24_short}
+Short 12-hour and 24-hour current time (excludes seconds; optimal for performance).
 .TP
 .B {battery}
 Current battery percentage (e.g. 84% or N/A). Includes a 5-second performance cache.
@@ -341,6 +372,9 @@ Prints character corresponding to decimal code (uses CP437 for extended ASCII, e
 .TP
 .B {settings.dot_key}
 Dot-notation configuration lookup from bashmenu.yml (e.g., {settings.status_gutter}).
+.TP
+.B {command:shell_cmd}
+Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 5.0-second performance cache TTL and a 2.0-second safety execution timeout.
 .SS Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically using three properties: a fallback
 ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:
@@ -361,6 +395,24 @@ provided. Translates and renders the Nerd Font glyph.
 .IP \(bu 2
 .B Wiped Default
 \- Resolves to empty string if all are missing, collapsing the icon column.
+.SS Console Tag Rich Formatting
+The application incorporates a rich inline formatting parser allowing developers to
+use nested bracketed formatting tags inside labels, headers, status gutters, and dialogues.
+.TP
+.B [b]text[/b]
+Renders bold text (using curses.A_BOLD).
+.TP
+.B [u]text[/u]
+Renders underlined text (using curses.A_UNDERLINE).
+.TP
+.B [dim]text[/dim]
+Renders dimmed contrast text (using curses.A_DIM).
+.TP
+.B [reverse]text[/reverse]
+Renders reversed contrast text (using curses.A_REVERSE).
+.TP
+.B [color=color_name]text[/color]
+Renders custom theme-colored text. Available color names include: text, border, title, highlight, footer, shortcut_key, accent, and divider.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

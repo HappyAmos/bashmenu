@@ -18,6 +18,28 @@ import textwrap
 
 import yaml
 
+
+def string_representer(dumper, data):
+    """
+    Custom YAML representer for strings to preserve double quotes
+    when single quotes are present inside, preventing PyYAML from
+    rewriting quotes into doubled single quotes (e.g., ''cmd'').
+    """
+    if "\n" in data:
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    if "'" in data:
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+
+yaml.add_representer(str, string_representer)
+for d_name in ["Dumper", "SafeDumper", "CDumper", "CSafeDumper"]:
+    try:
+        cls = getattr(yaml, d_name)
+        yaml.add_representer(str, string_representer, Dumper=cls)
+    except AttributeError:
+        pass
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASHMENU_DIR = SCRIPT_DIR
 if SCRIPT_DIR not in sys.path:
@@ -859,7 +881,7 @@ def save_menu_file(menu_data, stdscr, theme):
                 f_out.write(f_in.read())
 
         with open(bashmenu.MENU_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(menu_data, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(menu_data, f, default_flow_style=False, sort_keys=False, width=float('inf'))
 
         msg = "Menu structure saved successfully to bashmenu.mnu!\nBackup written to bashmenu.mnu.bak."
         bashmenu.show_popup_message(stdscr, "Save Successful", msg, theme)
@@ -1176,7 +1198,7 @@ def main(stdscr, target_path=None):
             else:
                 target_dict = curr_node["item"]
 
-            raw_str = yaml.dump(target_dict, default_flow_style=False, sort_keys=False)
+            raw_str = yaml.dump(target_dict, default_flow_style=False, sort_keys=False, width=float('inf'))
             tmp_path = os.path.join(SCRIPT_DIR, ".tmp_node.yml")
             with open(tmp_path, "w", encoding="utf-8") as f:
                 f.write(raw_str)

@@ -28,6 +28,93 @@ def safe_isprintable(s: str) -> bool:
     return True
 
 
+def get_visible_len(text):
+    """
+    Return the visible length of a string by stripping out any formatting tags [tag].
+    """
+    import re
+    if not isinstance(text, str):
+        return len(str(text))
+    clean_text = re.sub(r"\[/?([a-zA-Z_0-9=]+)\]", "", text)
+    return len(clean_text)
+
+
+def parse_formatting_to_segments(text, base_attr, theme):
+    """
+    Parse console bracket formatting tags [b], [u], [dim], [reverse], [color=...] and
+    return a list of (text, attr) segments. Supports tag nesting.
+    """
+    import re
+    if not isinstance(text, str):
+        text = str(text)
+
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    segments = []
+    
+    current_attr = base_attr
+    attr_stack = [current_attr]
+    
+    last_idx = 0
+    for match in tag_pattern.finditer(text):
+        tag = match.group(1)
+        start, end = match.span()
+        
+        # Append preceding text
+        if start > last_idx:
+            segments.append((text[last_idx:start], current_attr))
+            
+        if tag.startswith("/"):
+            if len(attr_stack) > 1:
+                attr_stack.pop()
+                current_attr = attr_stack[-1]
+        else:
+            new_attr = current_attr
+            if tag == "b":
+                new_attr |= curses.A_BOLD
+            elif tag == "u":
+                new_attr |= curses.A_UNDERLINE
+            elif tag == "dim":
+                new_attr |= curses.A_DIM
+            elif tag == "reverse":
+                new_attr |= curses.A_REVERSE
+            elif tag.startswith("color="):
+                color_name = tag.split("=")[1].strip()
+                if theme and color_name in theme:
+                    new_attr = (new_attr & ~curses.A_COLOR) | theme[color_name]
+                    
+            attr_stack.append(new_attr)
+            current_attr = new_attr
+            
+        last_idx = end
+        
+    if last_idx < len(text):
+        segments.append((text[last_idx:], current_attr))
+        
+    return segments
+
+
+def safe_addstr_segments(win, y, x, segments):
+    """
+    Safely write a line composed of multiple (text, attr) segments starting at (y, x).
+    """
+    h, w = win.getmaxyx()
+    if y >= h or x >= w:
+        return
+
+    current_x = x
+    for text, attr in segments:
+        if current_x >= w:
+            break
+        max_len = w - current_x if y < h - 1 else w - current_x - 1
+        if max_len > 0:
+            part = text[:max_len]
+            try:
+                win.addstr(y, current_x, part, attr)
+            except curses.error:
+                pass
+            current_x += len(part)
+
+
 def safe_addstr(win, y, x, text, attr=0):
     """
     Safely write a string within window boundaries to prevent curses crashes.
@@ -105,13 +192,20 @@ def show_popup_message(stdscr, title, message, theme):
         message (str): Body text or detailed exception content.
         theme (dict): Active color theme mapping.
     """
+    import textwrap
+
     height, width = stdscr.getmaxyx()
-    lines = str(message).splitlines() if str(message).strip() else [""]
+    box_w = min(width - 4, 65)
+
+    raw_lines = str(message).splitlines() if str(message).strip() else [""]
+    lines = []
+    for l in raw_lines:
+        if l.strip():
+            lines.extend(textwrap.wrap(l, width=box_w - 6))
+        else:
+            lines.append("")
 
     box_h = min(height - 2, max(8, len(lines) + 4))
-    max_line_w = max((len(l) for l in lines), default=30)
-    box_w = min(width - 4, max(46, max_line_w + 6))
-
     start_y = (height - box_h) // 2
     start_x = (width - box_w) // 2
 
@@ -134,7 +228,7 @@ def show_popup_message(stdscr, title, message, theme):
             safe_addstr(
                 win,
                 0,
-                max(2, (box_w - len(title) - 2) // 2),
+                max(2, (box_w - get_visible_len(title) - 2) // 2),
                 f" {title} ",
                 theme["title"] | curses.A_BOLD,
             )
@@ -142,7 +236,8 @@ def show_popup_message(stdscr, title, message, theme):
         for i in range(max_visible):
             line_idx = scroll_offset + i
             if line_idx < len(lines):
-                safe_addstr(win, i + 1, 2, lines[line_idx], theme["text"])
+                segments = parse_formatting_to_segments(lines[line_idx], theme["text"], theme)
+                safe_addstr_segments(win, i + 1, 2, segments)
 
         footer = (
             " [Press ENTER or ESC] "
@@ -194,13 +289,20 @@ def show_confirm_box(stdscr, title, message, theme):
     Returns:
         str | None: 'yes', 'no', or None if user pressed ESC or Cancel.
     """
+    import textwrap
+
     height, width = stdscr.getmaxyx()
-    lines = str(message).splitlines() if str(message).strip() else [""]
+    box_w = min(width - 4, 65)
+
+    raw_lines = str(message).splitlines() if str(message).strip() else [""]
+    lines = []
+    for l in raw_lines:
+        if l.strip():
+            lines.extend(textwrap.wrap(l, width=box_w - 6))
+        else:
+            lines.append("")
 
     box_h = min(height - 2, max(7, len(lines) + 5))
-    max_line_w = max((len(l) for l in lines), default=30)
-    box_w = min(width - 4, max(52, max_line_w + 6))
-
     start_y = (height - box_h) // 2
     start_x = (width - box_w) // 2
 
@@ -224,14 +326,15 @@ def show_confirm_box(stdscr, title, message, theme):
             safe_addstr(
                 win,
                 0,
-                max(2, (box_w - len(title) - 2) // 2),
+                max(2, (box_w - get_visible_len(title) - 2) // 2),
                 f" {title} ",
                 theme["title"] | curses.A_BOLD,
             )
 
         for i, line in enumerate(lines[: box_h - 4]):
-            safe_addstr(
-                win, 2 + i, max(2, (box_w - len(line)) // 2), line, theme["text"]
+            segments = parse_formatting_to_segments(line, theme["text"], theme)
+            safe_addstr_segments(
+                win, 2 + i, max(2, (box_w - get_visible_len(line)) // 2), segments
             )
 
         btn_y = box_h - 2
@@ -293,13 +396,20 @@ def show_toggle_box(stdscr, title, message, theme):
     Returns:
         str | None: 'true', 'false', or None if user pressed ESC or Cancel.
     """
+    import textwrap
+
     height, width = stdscr.getmaxyx()
-    lines = str(message).splitlines() if str(message).strip() else [""]
+    box_w = min(width - 4, 65)
+
+    raw_lines = str(message).splitlines() if str(message).strip() else [""]
+    lines = []
+    for l in raw_lines:
+        if l.strip():
+            lines.extend(textwrap.wrap(l, width=box_w - 6))
+        else:
+            lines.append("")
 
     box_h = min(height - 2, max(7, len(lines) + 5))
-    max_line_w = max((len(l) for l in lines), default=30)
-    box_w = min(width - 4, max(52, max_line_w + 6))
-
     start_y = (height - box_h) // 2
     start_x = (width - box_w) // 2
 
@@ -323,14 +433,15 @@ def show_toggle_box(stdscr, title, message, theme):
             safe_addstr(
                 win,
                 0,
-                max(2, (box_w - len(title) - 2) // 2),
+                max(2, (box_w - get_visible_len(title) - 2) // 2),
                 f" {title} ",
                 theme["title"] | curses.A_BOLD,
             )
 
         for i, line in enumerate(lines[: box_h - 4]):
-            safe_addstr(
-                win, 2 + i, max(2, (box_w - len(line)) // 2), line, theme["text"]
+            segments = parse_formatting_to_segments(line, theme["text"], theme)
+            safe_addstr_segments(
+                win, 2 + i, max(2, (box_w - get_visible_len(line)) // 2), segments
             )
 
         btn_y = box_h - 2
@@ -396,9 +507,14 @@ def show_input_box(
     Returns:
         str | None: User input string, or None if cancelled via ESC.
     """
+    import textwrap
+
     height, width = stdscr.getmaxyx()
-    box_h = 7
-    box_w = min(width - 4, max(50, len(prompt) + 8))
+    box_w = min(width - 4, 65)
+    
+    prompt_lines = textwrap.wrap(prompt, width=box_w - 6) if prompt else [""]
+    box_h = len(prompt_lines) + 6
+    
     start_y = (height - box_h) // 2
     start_x = (width - box_w) // 2
 
@@ -423,11 +539,14 @@ def show_input_box(
             safe_addstr(
                 win,
                 0,
-                max(2, (box_w - len(title) - 2) // 2),
+                max(2, (box_w - get_visible_len(title) - 2) // 2),
                 f" {title} ",
                 theme["title"] | curses.A_BOLD,
             )
-        safe_addstr(win, 2, 3, prompt, theme["text"])
+            
+        for idx, line in enumerate(prompt_lines):
+            segments = parse_formatting_to_segments(line, theme["text"], theme)
+            safe_addstr_segments(win, 2 + idx, 3, segments)
 
         raw_str = "".join(input_text)
         display_str = "*" * len(raw_str) if masked else raw_str
@@ -436,7 +555,8 @@ def show_input_box(
         visible_text = display_str[offset : offset + field_w]
 
         field_padded = visible_text.ljust(field_w)
-        safe_addstr(win, 4, 3, f" {field_padded} ", theme["highlight"])
+        input_field_y = 2 + len(prompt_lines) + 1
+        safe_addstr(win, input_field_y, 3, f" {field_padded} ", theme["highlight"])
         safe_addstr(
             win,
             box_h - 1,
@@ -445,7 +565,7 @@ def show_input_box(
             theme["footer"],
         )
 
-        win.move(4, 4 + (cursor_pos - offset))
+        win.move(input_field_y, 4 + (cursor_pos - offset))
         win.refresh()
 
         try:

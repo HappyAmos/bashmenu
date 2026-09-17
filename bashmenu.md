@@ -126,7 +126,18 @@ settings:
 Any dot-notation key (e.g., `settings.dns.ipv4.primary` or `settings.status_gutter`) can be interpolated
 inside menu titles, actions, labels, or template files using brackets.
 
-The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders (such as `{user}`, `{battery}`, or `{date_time_24}`) separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
+The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
+
+Available status gutter placeholders (badges) include:
+- `{user}` / `{username}` : Current system username.
+- `{host}` : System hostname.
+- `{battery}` : Current battery percentage (with a 5-second performance cache).
+- `{date_time_12}` / `{date_time_24}` : Full date and time (includes seconds).
+- `{date_time_12_short}` / `{date_time_24_short}` : Short date and time (excludes seconds; optimal for snappier performance).
+- `{time_12}` / `{time_24}` : Current time (includes seconds).
+- `{time_12_short}` / `{time_24_short}` : Short time (excludes seconds; optimal for snappier performance).
+- `{date}` : Current date (YYYY-MM-DD).
+- `{utc_seconds}` : Current epoch seconds.
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under
@@ -189,7 +200,11 @@ substituting the placeholder in the action string prior to execution:
   * Uses attributes: `title` (modal header) and `prompt` (body text).
 - `{file_picker}` : Launches a visual file chooser dialog.
   * Uses attributes: `title` and `start_dir`.
+- `{file_picker_new}` / `{file_picker:new}` : Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`).
+  * Uses attributes: `title` and `start_dir`.
 - `{dir_picker}` : Launches a visual directory chooser dialog.
+  * Uses attributes: `title` and `start_dir`.
+- `{dir_picker_new}` / `{dir_picker:new}` : Launches a visual directory chooser dialog that permits creating **new folders** (by pressing `n` or `N`).
   * Uses attributes: `title` and `start_dir`.
 
 #### Picker Auto-Starting Folders (Pro Tip):
@@ -223,6 +238,10 @@ These variables are dynamically resolved using active configuration and environm
 - `{window_height}`     : Current active window height in character lines.
 - `{ascii:decimal}`     : Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`).
 - `{settings.dot_key}`  : Resolves any nested configuration path from `bashmenu.yml`.
+- `{command:shell_cmd}` : Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output.
+  * **Brace Balancing**: Fully supports nested curly braces (e.g. `{command:hostname -I | awk '{print $1}'}`).
+  * **Performance Caching**: Automatically caches outputs for **5.0 seconds** to maintain responsive 60fps/snappy menu movement.
+  * **Safety Timeout**: Features a **2.0-second** execution timeout to prevent freezing or locking the TUI on network/hanging shell calls.
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and
@@ -248,6 +267,30 @@ The layout engine processes this tag with the following strict hierarchy:
 
 *Theme Indicator Syntax:* Uses the exact same bracketed syntax (e.g.,
 `indicator: "{nf:[char]:[nerd-font hex]:[emoji-glyph]}"` inside the theme file).
+
+### 6.4 Console Tag Rich Formatting
+The application includes a rich formatting parser allowing developers to use inline, nested BBCode-style tags throughout options, headers, status gutters, and prompts.
+
+#### Available Formatting Tags:
+- `[b]text[/b]` : Renders text in **bold** (`curses.A_BOLD`).
+- `[u]text[/u]` : Renders text with an **underline** (`curses.A_UNDERLINE`).
+- `[dim]text[/dim]` : Renders text with **dimmed** contrast (`curses.A_DIM`).
+- `[reverse]text[/reverse]` : Renders text in **reversed** foreground/background contrast (`curses.A_REVERSE`).
+- `[color=color_name]text[/color]` : Renders text in a custom theme color.
+
+#### Theme Colors Available:
+- `color=text` : Standard text color of the active theme.
+- `color=border` : Border frame color.
+- `color=title` : Main title header color.
+- `color=highlight` : Selected/highlighted bar colors.
+- `color=footer` : Bottom help footer text color.
+- `color=shortcut_key` : Direct action shortcut character badge color.
+- `color=accent` : Accent indicator/status badge color.
+- `color=divider` : Horizontal line divider color.
+
+#### Key Features:
+* **Nesting Support**: Tags can be nested seamlessly (e.g. `[b]bold text [color=accent]with accented[/color] highlight[/b]`).
+* **Visible Width Safety**: Centering, padding, and layout checks automatically ignore tags, ensuring pixel-perfect alignments for any styled text.
 
 ---
 

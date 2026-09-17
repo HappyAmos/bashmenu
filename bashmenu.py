@@ -29,6 +29,28 @@ from pathlib import Path
 
 import yaml
 
+
+def string_representer(dumper, data):
+    """
+    Custom YAML representer for strings to preserve double quotes
+    when single quotes are present inside, preventing PyYAML from
+    rewriting quotes into doubled single quotes (e.g., ''cmd'').
+    """
+    if "\n" in data:
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    if "'" in data:
+        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+
+
+yaml.add_representer(str, string_representer)
+for d_name in ["Dumper", "SafeDumper", "CDumper", "CSafeDumper"]:
+    try:
+        cls = getattr(yaml, d_name)
+        yaml.add_representer(str, string_representer, Dumper=cls)
+    except AttributeError:
+        pass
+
 import bashedit
 import bashmenu_ui
 
@@ -66,6 +88,83 @@ show_toggle_box = bashmenu_ui.show_toggle_box
 show_input_box = bashmenu_ui.show_input_box
 show_file_picker = bashmenu_ui.show_file_picker
 run_curses_editor = bashedit.run_curses_editor
+get_visible_len = bashmenu_ui.get_visible_len
+parse_formatting_to_segments = bashmenu_ui.parse_formatting_to_segments
+
+def is_formatting_tag(content):
+    """
+    Helper to check if bracketed content is a console formatting tag.
+    """
+    content_clean = content.strip().lower()
+    if content_clean in ["b", "/b", "u", "/u", "dim", "/dim", "reverse", "/reverse", "/color"]:
+        return True
+    return content_clean.startswith("color=") and "]" not in content_clean
+
+
+def split_label_brackets(label):
+    """
+    Identify and split standard [brackets] used for right-aligned text, while
+    safely ignoring console formatting tags like [b], [color=...], etc.
+    Uses balanced bracket character-scanning backwards from the end of the line.
+    """
+    if not isinstance(label, str):
+        label = str(label)
+        
+    text = label.strip()
+    if not text.endswith("]"):
+        return label, ""
+        
+    n = len(text)
+    brace_count = 0
+    match_idx = -1
+    
+    for idx in range(n - 1, -1, -1):
+        char = text[idx]
+        if char == "]":
+            brace_count += 1
+        elif char == "[":
+            brace_count -= 1
+            if brace_count == 0:
+                match_idx = idx
+                break
+                
+    if match_idx != -1:
+        left = text[:match_idx].rstrip()
+        right = text[match_idx:]
+        content = right[1:-1].strip()
+        if is_formatting_tag(content):
+            # It's a formatting tag, not an alignment bracket! Do not split!
+            return label, ""
+        return left, right
+        
+    return label, "" 
+
+
+def split_gutter_badges(gutter_str):
+    """
+    Split the status gutter string by pipe symbols ('|'), safely ignoring any
+    pipes that are enclosed inside curly braces (e.g. inside {command: ... | ...}).
+    """
+    badges = []
+    current_badge = []
+    brace_count = 0
+    
+    for char in gutter_str:
+        if char == "{":
+            brace_count += 1
+        elif char == "}":
+            brace_count = max(0, brace_count - 1)
+            
+        if char == "|" and brace_count == 0:
+            badges.append("".join(current_badge).strip())
+            current_badge = []
+        else:
+            current_badge.append(char)
+            
+    if current_badge:
+        badges.append("".join(current_badge).strip())
+        
+    return [b for b in badges if b]
 
 def get_primary_ip():
     """
@@ -162,10 +261,11 @@ PRIMARY_IP = get_primary_ip()
 DEFAULT_CONFIG = {
     "version": __version__,
     "theme": "dracula",
-    "example_custom_settings": {
-        "option_boolean": True,
-        "option_filepath": "{bashmenu_dir}",
-        "option_string": "A string of text",
+    "user": {
+        "example_boolean": True, 
+        "example_filepath": "{bashmenu_dir}", 
+        "example_string": "A string of text",
+        "localip": "[color=title]{command:hostname -I | awk '{print $1}'}[/color]",
     },
     "settings": {
         "check_for_updates": False,
@@ -176,7 +276,7 @@ DEFAULT_CONFIG = {
         "tabstop": 8,
         "show_menu_shortcuts": True,
         "use_nerd_fonts": False,
-        "status_gutter": "{user} | {battery} | {date_time_24}",
+        "status_gutter": "{user} | {battery} | {date_time_24_short}",
         "dns": {
             "ipv4": {
                 "primary": "192.168.4.47",
@@ -518,7 +618,7 @@ def save_config(config):
     """
     try:
         with open(CONFIG_FILE, "w") as f:
-            yaml.dump(config, f, default_flow_style=False)
+            yaml.dump(config, f, default_flow_style=False, width=float('inf'))
     except (OSError, yaml.YAMLError, TypeError, ValueError):  # Catch file access, serialization, or type formatting errors safely
         pass
 
@@ -1291,19 +1391,97 @@ def resolve_glyph(glyph_str):
     return glyph_str
 
 
-def interpolate_placeholders(text, config):
+_command_cache = {}
+
+def find_command_placeholders(text):
+    """
+    Scan string to find all {command:...} placeholders, properly handling
+    nested curly braces (e.g., awk scripts with '{print $1}').
+    """
+    placeholders = []
+    idx = 0
+    n = len(text)
+    prefix = "{command:"
+    text_lower = text.lower()
+    
+    while True:
+        start_idx = text_lower.find(prefix, idx)
+        if start_idx == -1:
+            break
+            
+        brace_count = 1
+        curr_idx = start_idx + len(prefix)
+        while curr_idx < n and brace_count > 0:
+            c = text[curr_idx]
+            if c == "{":
+                brace_count += 1
+            elif c == "}":
+                brace_count -= 1
+            curr_idx += 1
+            
+        if brace_count == 0:
+            full_match = text[start_idx:curr_idx]
+            command_content = text[start_idx + len(prefix) : curr_idx - 1]
+            placeholders.append((full_match, command_content))
+            idx = curr_idx
+        else:
+            idx = start_idx + len(prefix)
+            
+    return placeholders
+
+
+def run_cached_command(cmd_str):
+    """
+    Execute a shell command with a safety timeout and cache the output for 5.0 seconds
+    to prevent performance blocking inside the curses main loop.
+    """
+    now = time.time()
+    
+    if cmd_str in _command_cache:
+        output, ts = _command_cache[cmd_str]
+        if now - ts < 5.0:
+            return output
+            
+    try:
+        res = subprocess.run(
+            cmd_str,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2.0,
+            check=False
+        )
+        output = res.stdout.strip() if res.stdout else ""
+    except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        output = "[Cmd Error]"
+        
+    _command_cache[cmd_str] = (output, now)
+    return output
+
+
+def interpolate_placeholders(text, config, depth=0):
     """
     Interpolate dot-notation config keys and environment variables in strings.
 
     Args:
         text (str): Input string containing placeholder brackets.
         config (dict): Active configuration map for dot-notation resolution.
+        depth (int): Internal recursion depth tracking.
 
     Returns:
         str: String with resolved variable substitutions.
     """
     if not isinstance(text, str):
         return text
+
+    if depth > 3:  # Prevent infinite recursion safely
+        return text
+
+    # Resolve dynamic {command:...} placeholders first
+    for full_match, cmd_content in find_command_placeholders(text):
+        resolved_val = run_cached_command(cmd_content)
+        text = text.replace(full_match, resolved_val)
 
     templates_val = (
         get_config_value(config, "settings.templates_dir")
@@ -1330,8 +1508,12 @@ def interpolate_placeholders(text, config):
         "{user-mode}": "root" if is_root() else "user",
         "{version}": __version__,
         "{date_time_12}": time.strftime("%Y-%m-%d %I:%M:%S %p"),
+        "{date_time_12_short}": time.strftime("%Y-%m-%d %I:%M %p"),
         "{date_time_24}": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "{date_time_24_short}": time.strftime("%Y-%m-%d %H:%M"),
         "{date}": time.strftime("%Y-%m-%d"),
+        "{time_12_short}": time.strftime("%I:%M %p"),
+        "{time_24_short}": time.strftime("%H:%M"),
         "{time_12}": time.strftime("%I:%M:%S %p"),
         "{time_24}": time.strftime("%H:%M:%S"),
         "{battery}": get_battery_info(),
@@ -1455,6 +1637,10 @@ def interpolate_placeholders(text, config):
                 text = text.replace(full_match, resolved)
         except (ValueError, OverflowError, UnicodeDecodeError):  # Catch out-of-bounds numeric conversion or decoding failures safely
             pass
+
+    # If we resolved any config keys that introduced new placeholders, recurse!
+    if "{" in text and depth < 3:
+        text = interpolate_placeholders(text, config, depth + 1)
 
     return text
 
@@ -2061,12 +2247,12 @@ def main(stdscr):
         title_text = (
             f" {interpolate_placeholders(current_menu.get('title', 'Menu'), config)} "
         )
-        safe_addstr(
+        title_segments = parse_formatting_to_segments(title_text, theme["title"] | curses.A_BOLD, theme)
+        safe_addstr_segments(
             stdscr,
             1,
-            max(2, (width - len(title_text)) // 2),
-            title_text,
-            theme["title"] | curses.A_BOLD,
+            max(2, (width - get_visible_len(title_text)) // 2),
+            title_segments,
         )
 
         if height > 4:
@@ -2096,21 +2282,21 @@ def main(stdscr):
             if not isinstance(status_gutter_raw, str):
                 status_gutter_raw = "{user} | {battery} | {date_time_24}"
 
-            raw_badges = [b.strip() for b in status_gutter_raw.split("|")]
+            raw_badges = split_gutter_badges(status_gutter_raw)
             all_badges = [interpolate_placeholders(b, config) for b in raw_badges if b.strip()]
 
             avail_w_bottom = max(0, width - 4 - len(footer_left_bottom))
             avail_w_top = max(0, width - 4 - len(footer_left_top)) if height > 5 else 0
 
             candidate_all = " | ".join(all_badges)
-            if all_badges and len(candidate_all) + 2 <= avail_w_bottom:
+            if all_badges and get_visible_len(candidate_all) + 2 <= avail_w_bottom:
                 badge_str = f" {candidate_all} "
-                safe_addstr(
+                badge_segments = parse_formatting_to_segments(badge_str, theme["accent"] | curses.A_BOLD, theme)
+                safe_addstr_segments(
                     stdscr,
                     height - 2,
-                    max(2, width - len(badge_str) - 2),
-                    badge_str,
-                    theme["accent"] | curses.A_BOLD,
+                    max(2, width - get_visible_len(badge_str) - 2),
+                    badge_segments,
                 )
             elif all_badges:
                 top_badges = []
@@ -2133,21 +2319,21 @@ def main(stdscr):
                 
                 if top_badges:
                     badge_str = f" {' | '.join(top_badges)} "
-                    safe_addstr(
+                    badge_segments = parse_formatting_to_segments(badge_str, theme["accent"] | curses.A_BOLD, theme)
+                    safe_addstr_segments(
                         stdscr,
                         height - 3,
-                        max(2, width - len(badge_str) - 2),
-                        badge_str,
-                        theme["accent"] | curses.A_BOLD,
+                        max(2, width - get_visible_len(badge_str) - 2),
+                        badge_segments,
                     )
                 if bottom_badges:
                     badge_str = f" {' | '.join(bottom_badges)} "
-                    safe_addstr(
+                    badge_segments = parse_formatting_to_segments(badge_str, theme["accent"] | curses.A_BOLD, theme)
+                    safe_addstr_segments(
                         stdscr,
                         height - 2,
-                        max(2, width - len(badge_str) - 2),
-                        badge_str,
-                        theme["accent"] | curses.A_BOLD,
+                        max(2, width - get_visible_len(badge_str) - 2),
+                        badge_segments,
                     )
 
         options = current_menu.get("options", [])
@@ -2157,7 +2343,7 @@ def main(stdscr):
 
         ind = interpolate_placeholders(theme.get("indicator", ">"), config)
         prefix_active = f"{ind} " if ind else "  "
-        prefix_inactive = " " * len(prefix_active)
+        prefix_inactive = " " * get_visible_len(prefix_active)
 
         has_icons = False
         max_icon_len = 0
@@ -2208,39 +2394,34 @@ def main(stdscr):
             if option.get("set_theme") == config.get("theme"):
                 label += " (Active)"
 
-            match = re.search(r"^(.*?)\s*(\[.*\])\s*$", label)
-            if match:
-                left_part = match.group(1).strip()
-                right_part = match.group(2).strip()
-            else:
-                left_part = label
-                right_part = ""
+            left_part, right_part = split_label_brackets(label)
 
             prefix = prefix_active if idx == current_row else prefix_inactive
 
             if right_part:
-                left_avail_w = avail_w - len(right_part) - 2
+                left_avail_w = avail_w - get_visible_len(right_part) - 2
                 if left_avail_w < 15:
                     left_avail_w = avail_w
                     right_part = ""
             else:
                 left_avail_w = avail_w
 
-            if idx == current_row and len(left_part) > left_avail_w:
+            if idx == current_row and get_visible_len(left_part) > left_avail_w:
                 padded_text = left_part + (" " * left_avail_w) + left_part[:left_avail_w]
                 scroll_text = padded_text[marquee_offset : marquee_offset + left_avail_w]
                 if right_part:
-                    spaces = avail_w - len(scroll_text) - len(right_part)
+                    spaces = avail_w - get_visible_len(scroll_text) - get_visible_len(right_part)
                     disp_label = f"{scroll_text}{' ' * spaces}{right_part}"
                 else:
-                    disp_label = f"{scroll_text:<{avail_w}}"
+                    pad_spaces = max(0, avail_w - get_visible_len(scroll_text))
+                    disp_label = scroll_text + (" " * pad_spaces)
             else:
                 if right_part:
-                    if len(left_part) + 2 + len(right_part) <= avail_w:
-                        spaces = avail_w - len(left_part) - len(right_part)
+                    if get_visible_len(left_part) + 2 + get_visible_len(right_part) <= avail_w:
+                        spaces = avail_w - get_visible_len(left_part) - get_visible_len(right_part)
                         disp_label = f"{left_part}{' ' * spaces}{right_part}"
-                    elif len(left_part) + 2 < avail_w:
-                        max_right_w = avail_w - len(left_part) - 2
+                    elif get_visible_len(left_part) + 2 < avail_w:
+                        max_right_w = avail_w - get_visible_len(left_part) - 2
                         if (
                             max_right_w >= 3
                             and right_part.startswith("[")
@@ -2255,15 +2436,18 @@ def main(stdscr):
 
                         if truncated_right:
                             spaces = (
-                                avail_w - len(left_part) - len(truncated_right)
+                                avail_w - get_visible_len(left_part) - get_visible_len(truncated_right)
                             )
                             disp_label = f"{left_part}{' ' * spaces}{truncated_right}"
                         else:
-                            disp_label = f"{left_part[:avail_w]:<{avail_w}}"
+                            pad_spaces = max(0, avail_w - get_visible_len(left_part))
+                            disp_label = left_part + (" " * pad_spaces)
                     else:
-                        disp_label = f"{left_part[:avail_w]:<{avail_w}}"
+                        pad_spaces = max(0, avail_w - get_visible_len(left_part))
+                        disp_label = left_part + (" " * pad_spaces)
                 else:
-                    disp_label = f"{left_part[:avail_w]:<{avail_w}}"
+                    pad_spaces = max(0, avail_w - get_visible_len(left_part))
+                    disp_label = left_part + (" " * pad_spaces)
 
             attr = (
                 (theme["highlight"] | curses.A_BOLD)
@@ -2310,10 +2494,43 @@ def main(stdscr):
                     curr_x += len(padding)
 
             # 4. Print label (disp_label)
-            safe_addstr(stdscr, y, curr_x, disp_label, attr)
+            label_segments = parse_formatting_to_segments(disp_label, attr, theme)
+            safe_addstr_segments(stdscr, y, curr_x, label_segments)
 
         stdscr.refresh()
-        stdscr.timeout(250)
+
+        # Determine dynamic timeout rate based on active marquee or status bar requirements
+        has_marquee = False
+        if options and current_row < len(options):
+            opt = options[current_row]
+            lbl = interpolate_placeholders(opt.get("label", ""), config)
+            if opt.get("set_theme") == config.get("theme"):
+                lbl += " (Active)"
+
+            lp, rp = split_label_brackets(lbl)
+
+            law = (avail_w - len(rp) - 2) if rp else avail_w
+            if rp and law < 15:
+                law = avail_w
+
+            if len(lp) > law:
+                has_marquee = True
+
+        if has_marquee:
+            stdscr.timeout(250)
+        else:
+            status_gutter_raw = get_config_value(config, "settings.status_gutter")
+            if not isinstance(status_gutter_raw, str):
+                status_gutter_raw = ""
+            has_seconds = any(
+                sec in status_gutter_raw
+                for sec in ["{date_time_12}", "{date_time_24}", "{time_12}", "{time_24}", "{utc_seconds}"]
+            )
+            if has_seconds:
+                stdscr.timeout(1000)
+            else:
+                stdscr.timeout(5000)
+
         key = stdscr.getch()
 
         if key == -1:
@@ -2323,13 +2540,7 @@ def main(stdscr):
                 if opt.get("set_theme") == config.get("theme"):
                     lbl += " (Active)"
 
-                m = re.search(r"^(.*?)\s*(\[.*\])\s*$", lbl)
-                if m:
-                    lp = m.group(1).strip()
-                    rp = m.group(2).strip()
-                else:
-                    lp = lbl
-                    rp = ""
+                lp, rp = split_label_brackets(lbl)
 
                 if rp:
                     law = avail_w - len(rp) - 2
