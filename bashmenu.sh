@@ -13,7 +13,7 @@ VENV_ACTIVATE="${VENV_DIR}/bin/activate"
 CACHE_DIR="$HOME/.cache/bashmenu"
 
 # Define the list of tools your script requires
-REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "yq")
+REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "yq" "python3" "python3-pip" "python3-venv")
 MISSING_TOOLS=()
 
 # Setup a cache directory
@@ -192,11 +192,11 @@ fi
 # Ensure virtual environment exists and is working
 USE_VENV=false
 if [ -f "$VENV_ACTIVATE" ]; then
-    # Test if virtual environment Python works and can import yaml
-    if "${VENV_DIR}/bin/python3" -c "import yaml" >/dev/null 2>&1; then
+    # Test if virtual environment Python works and can import yaml and ruff
+    if "${VENV_DIR}/bin/python3" -c "import yaml, ruff" >/dev/null 2>&1; then
         USE_VENV=true
     else
-        echo "Virtual environment is broken or missing PyYAML. Recreating..." >&2
+        echo "Virtual environment is broken or missing PyYAML and/or Ruff. Recreating..." >&2
         rm -rf "$VENV_DIR"
     fi
 fi

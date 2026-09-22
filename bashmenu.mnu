@@ -375,12 +375,18 @@ options:
       quiet: true
       stream: true
       icon: '{nf:::}'
-    - label: Display All PCI Devices [lspci]
+    - label: Display PCI Devices and Drivers [lspci -k]
       type: command
-      action: lspci
+      action: lspci -k
       quiet: true
       stream: true
       icon: '{nf:::}'
+    - label: Kernel Information
+      type: command
+      action: uname -r
+      icon: '{nf:::}'
+      stream: true
+      quiet: true
     - label: Which [which [param]]
       type: command
       action: which {param}
