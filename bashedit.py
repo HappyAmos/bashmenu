@@ -84,7 +84,6 @@ def run_curses_editor(
 
     def push_undo():
         """Push current editor state onto undo history stack."""
-        nonlocal undo_stack, redo_stack
         undo_stack.append((
             list(lines),
             cursor_y,
@@ -348,7 +347,7 @@ def run_curses_editor(
     def action_cut():
         """Cut active line or selected text block into cutbuffer."""
         nonlocal cutbuffer, cutbuffer_is_block, last_action_was_cut, status_msg
-        nonlocal modified, cursor_y, cursor_x, mark_active, typing_group
+        nonlocal modified, cursor_y, cursor_x, typing_group
         typing_group = False
         if mark_active:
             cutbuffer = extract_selected_text()
@@ -396,7 +395,7 @@ def run_curses_editor(
     def action_paste():
         """Paste current cutbuffer contents at cursor location."""
         nonlocal last_action_was_cut, status_msg, modified, cursor_y, cursor_x
-        nonlocal mark_active, typing_group
+        nonlocal typing_group
         typing_group = False
         last_action_was_cut = False
         if not cutbuffer:

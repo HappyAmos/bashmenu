@@ -41,7 +41,7 @@ def simulate(initial_selected_rows):
     
     # Run original reload logic
     selected_rows = list(initial_selected_rows)
-    theme_new, config_new = bashmenu.reload_environment(stdscr, menu_stack, selected_rows)
+    _theme_new, _config_new = bashmenu.reload_environment(stdscr, menu_stack, selected_rows)
     
     print(f"After reload:  menu_stack len = {len(menu_stack)}, selected_rows len = {len(selected_rows)}")
     if len(menu_stack) != len(selected_rows):
@@ -55,12 +55,11 @@ simulate([1, 1]) # Highlight "Antigravity" inside "Applications"
 
 # Now let's define the fixed reload_environment logic
 def fixed_reload_environment(stdscr, menu_stack, selected_rows):
-    global THEMES, THEME_ERROR
-    config, config_err = bashmenu.load_config()
+    config, _config_err = bashmenu.load_config()
     theme = bashmenu.apply_theme(config.get("theme", "dracula"))
     stdscr.bkgd(' ', theme["text"])
 
-    main_menu, menu_err = bashmenu.load_menu()
+    main_menu, _menu_err = bashmenu.load_menu()
     bashmenu.inject_dynamic_menus(main_menu)
 
     saved_path = list(selected_rows)
