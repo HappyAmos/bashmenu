@@ -13,7 +13,7 @@ VENV_ACTIVATE="${VENV_DIR}/bin/activate"
 CACHE_DIR="$HOME/.cache/bashmenu"
 
 # Define the list of tools your script requires
-REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "yq" "python3" "python3-pip" "python3-venv")
+REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "yq" "python3" )
 MISSING_TOOLS=()
 
 # Setup a cache directory
@@ -137,6 +137,16 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
         MISSING_TOOLS+=("$tool")
     fi
 done
+
+# If pip3 is missing, add its package to the list
+if ! is_installed "pip3"; then
+    MISSING_TOOLS+=("python3-pip")
+fi
+
+# If venv is missing, add its package to the list
+if ! python3 -c "import venv" >/dev/null 2>&1; then
+    MISSING_TOOLS+=("python3-venv")
+fi
 
 # If there are missing tools, pass the entire array to the install function
 if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
