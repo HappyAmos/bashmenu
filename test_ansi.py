@@ -143,6 +143,12 @@ class TestAnsiParsing(unittest.TestCase):
         third_call = bashmenu.get_battery_info()
         self.assertEqual(third_call, first_call)
 
+    def test_scripts_placeholder_and_resolution(self):
+        """Test that {scripts} resolves properly in interpolate_placeholders."""
+        resolved = bashmenu.interpolate_placeholders("{scripts}/bsdgames.sh", {})
+        self.assertTrue(resolved.endswith("/scripts/bsdgames.sh"))
+        self.assertNotIn("{scripts}", resolved)
+
 
 if __name__ == "__main__":
     unittest.main()

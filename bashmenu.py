@@ -891,7 +891,7 @@ def inject_dynamic_menus(menu_item):
             inject_dynamic_menus(opt["submenu"])
 
 
-def run_interactive_action(stdscr, action, quiet=False):
+def run_interactive_action(stdscr, action, quiet=False, pause=False):
     """
     Temporarily suspend curses and execute shell command in terminal mode.
 
@@ -899,6 +899,7 @@ def run_interactive_action(stdscr, action, quiet=False):
         stdscr (curses.window): Main screen handle.
         action (str): Shell command string to execute.
         quiet (bool): Suppress header and footer banner messages if True.
+        pause (bool): Wait for keypress after completion if True.
     """
     curses.endwin()
     if not quiet:
@@ -909,9 +910,12 @@ def run_interactive_action(stdscr, action, quiet=False):
         if not quiet:
             print(f"\nExecution Error: {e}")
 
-    if not quiet:
+    if not quiet or pause:
         print("\n--------------------------------------------------")
-        input("Execution complete. Press [ENTER] to return to menu...")
+        try:
+            input("Execution complete. Press [ENTER] to return to menu...")
+        except (KeyboardInterrupt, EOFError):
+            pass
 
     stdscr.clear()
     stdscr.refresh()
@@ -1514,6 +1518,7 @@ def interpolate_placeholders(text, config, depth=0):
         "{bashmenu_dir}": BASHMENU_DIR,
         "{templates_dir}": templates_val,
         "{scripts_dir}": scripts_val,
+        "{scripts}": scripts_val,
         "{host}": HOSTNAME,
         "{user-mode}": "root" if is_root() else "user",
         "{version}": __version__,
@@ -2167,14 +2172,37 @@ def process_item_action(
                     )
             else:
                 if item_type == "script":
-                    script_parts = action_str.split(" ", 1)
-                    script_path = os.path.join(BASHMENU_DIR, script_parts[0])
-                    args = f" {script_parts[1]}" if len(script_parts) > 1 else ""
-                    action_str = f'"{script_path}"{args}'
+                    parts = action_str.split(" ", 1)
+                    first = parts[0]
+                    rest = parts[1] if len(parts) > 1 else ""
+
+                    if os.path.isabs(first):
+                        script_path = first
+                        action_str = f'"{script_path}" {rest}'.strip() if rest else f'"{script_path}"'
+                    elif os.path.isfile(os.path.join(BASHMENU_DIR, first)):
+                        script_path = os.path.join(BASHMENU_DIR, first)
+                        action_str = f'"{script_path}" {rest}'.strip() if rest else f'"{script_path}"'
+                    elif os.path.isfile(first):
+                        script_path = os.path.abspath(first)
+                        action_str = f'"{script_path}" {rest}'.strip() if rest else f'"{script_path}"'
+                    elif rest:
+                        rest_parts = rest.split(" ", 1)
+                        script_arg = rest_parts[0]
+                        script_arg_rest = f" {rest_parts[1]}" if len(rest_parts) > 1 else ""
+                        if not script_arg.startswith("-"):
+                            if os.path.isabs(script_arg) and os.path.isfile(script_arg):
+                                action_str = f'{first} "{script_arg}"{script_arg_rest}'.strip()
+                            elif os.path.isfile(os.path.join(BASHMENU_DIR, script_arg)):
+                                resolved_arg = os.path.join(BASHMENU_DIR, script_arg)
+                                action_str = f'{first} "{resolved_arg}"{script_arg_rest}'.strip()
+                            elif os.path.isfile(script_arg):
+                                resolved_arg = os.path.abspath(script_arg)
+                                action_str = f'{first} "{resolved_arg}"{script_arg_rest}'.strip()
 
                 if selected_item.get("interactive", False):
                     is_quiet = selected_item.get("quiet", False)
-                    run_interactive_action(stdscr, action_str, quiet=is_quiet)
+                    is_pause = selected_item.get("pause", False)
+                    run_interactive_action(stdscr, action_str, quiet=is_quiet, pause=is_pause)
                 else:
                     run_action_in_window(
                         stdscr,

@@ -104,6 +104,13 @@ options:
       action: '{scripts_dir}/bsdgames.sh'
       icon: '{nf:::}'
       interactive: true
+      quiet: true
+    - label: QBasic Gorillas
+      type: script
+      action: python3 gorillas.py
+      icon: '{nf::}'
+      interactive: true
+      quiet: true
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
@@ -369,6 +376,11 @@ options:
       stream: true
       quiet: true
       icon: '{nf:::}'
+    - label: Display Block Devices
+      type: command
+      action: lsblk
+      icon: '{nf:::}'
+      stream: true
     - label: Display CPU Information [lscpu]
       type: command
       action: lscpu
