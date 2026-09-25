@@ -2,7 +2,7 @@
 # ==============================================================================
 # SCRIPT: install_basics.sh
 # DESCRIPTION: Cross-platform basic tools installer for Termux, macOS, and
-#              various Linux distributions (Debian/Ubuntu, Fedora/RHEL, Arch).
+#              various Linux distributions (Debian/Ubuntu, Fedora/RHEL, Arch, openSUSE, Alpine).
 #              Installs each app independently so failures do not block others.
 #              Invokes custom fallback installer scripts if available.
 #              Generates a final report with status and solutions.
@@ -28,8 +28,14 @@ elif command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt"
 elif command -v dnf &> /dev/null; then
     PKG_MANAGER="dnf"
+elif command -v yum &> /dev/null; then
+    PKG_MANAGER="yum"
 elif command -v pacman &> /dev/null; then
     PKG_MANAGER="pacman"
+elif command -v zypper &> /dev/null; then
+    PKG_MANAGER="zypper"
+elif command -v apk &> /dev/null; then
+    PKG_MANAGER="apk"
 elif command -v brew &> /dev/null; then
     PKG_MANAGER="brew"
 else
@@ -44,8 +50,10 @@ run_as_root() {
     else
         if [ "$(id -u)" = 0 ]; then
             "$@"
-        else
+        elif command -v sudo &>/dev/null; then
             sudo "$@"
+        else
+            "$@"
         fi
     fi
 }
@@ -113,6 +121,12 @@ case "$PKG_MANAGER" in
     pacman)
         run_as_root pacman -Sy --noconfirm &>/dev/null || true
         ;;
+    apk)
+        run_as_root apk update &>/dev/null || true
+        ;;
+    zypper)
+        run_as_root zypper refresh &>/dev/null || true
+        ;;
 esac
 
 INSTALLED=()
@@ -147,8 +161,23 @@ for pkg in "${PACKAGES[@]}"; do
                 INSTALL_SUCCESS=true
             fi
             ;;
+        yum)
+            if run_as_root yum install -y "$pkg"; then
+                INSTALL_SUCCESS=true
+            fi
+            ;;
         pacman)
             if run_as_root pacman -S --noconfirm "$pkg"; then
+                INSTALL_SUCCESS=true
+            fi
+            ;;
+        zypper)
+            if run_as_root zypper install -y "$pkg"; then
+                INSTALL_SUCCESS=true
+            fi
+            ;;
+        apk)
+            if run_as_root apk add "$pkg"; then
                 INSTALL_SUCCESS=true
             fi
             ;;

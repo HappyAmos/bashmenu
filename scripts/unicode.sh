@@ -28,12 +28,18 @@ print_unicode_range() {
     printf "======================================================================\n\n"
     
     for ((i=start; i<=end; i++)); do
-        # Format code point to 8 hex digits for the Bash \U escape sequence
         local hex
         hex=$(printf "%08X" "$i")
         
-        # Display short code point notation and the rendered symbol
-        printf "U+%04X:\U$hex\t" "$i"
+        # Display short code point notation and the rendered symbol safely across shell versions
+        if printf "\U00000041" 2>/dev/null | grep -q "A"; then
+            printf "U+%04X:\U$hex\t" "$i"
+        elif command -v python3 &>/dev/null; then
+            symbol=$(python3 -c "import sys; sys.stdout.write(chr($i))" 2>/dev/null || true)
+            printf "U+%04X:%s\t" "$i" "$symbol"
+        else
+            printf "U+%04X:\U$hex\t" "$i"
+        fi
         
         ((c++))
         if [[ $c -eq cols ]]; then

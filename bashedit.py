@@ -58,7 +58,7 @@ def run_curses_editor(
     lines = [""]
     if abs_path and os.path.exists(abs_path):
         try:
-            with open(abs_path, "r") as f:
+            with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read().splitlines()
                 lines = content if content else [""]
         except OSError as e:  # Catch filesystem read access errors safely
@@ -183,7 +183,7 @@ def run_curses_editor(
             action_save_as()
             return
         try:
-            with open(abs_path, "w") as f:
+            with open(abs_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines) + "\n")
             modified = False
             status_msg = " [ File Saved Successfully! ] "
@@ -233,7 +233,7 @@ def run_curses_editor(
         )
         if chosen and os.path.isfile(chosen):
             try:
-                with open(chosen, "r") as f:
+                with open(chosen, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().splitlines()
                     lines = content if content else [""]
                 abs_path = os.path.abspath(chosen)
@@ -695,7 +695,7 @@ def run_curses_editor(
             save_file()
             open_external_editor()
             if abs_path and os.path.exists(abs_path):
-                with open(abs_path, "r") as f:
+                with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
                     lines = f.read().splitlines() or [""]
             cursor_y = min(cursor_y, len(lines) - 1)
             cursor_x = min(cursor_x, len(lines[cursor_y]))

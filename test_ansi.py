@@ -6,6 +6,7 @@ test_ansi.py - Unit tests for ANSI escape code parsing and color rendering in ba
 import os
 import sys
 import unittest
+from unittest import mock
 
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -90,6 +91,17 @@ class TestAnsiParsing(unittest.TestCase):
         self.assertTrue(resolved.startswith("Dims: "))
         self.assertNotIn("{window_width}", resolved)
         self.assertNotIn("{window_height}", resolved)
+
+    def test_interpolate_placeholders_window_dims_dynamic(self):
+        """Test that {window_width} updates dynamically when curses dimensions change."""
+        with mock.patch("curses.update_lines_cols", lambda: None):
+            with mock.patch("curses.COLS", 120), mock.patch("curses.LINES", 40):
+                resolved = bashmenu.interpolate_placeholders("{window_width}x{window_height}", {})
+                self.assertEqual(resolved, "120x40")
+
+            with mock.patch("curses.COLS", 160), mock.patch("curses.LINES", 50):
+                resolved = bashmenu.interpolate_placeholders("{window_width}x{window_height}", {})
+                self.assertEqual(resolved, "160x50")
 
     def test_interpolate_placeholders_new_directives(self):
         """Test that all newly added custom status gutter placeholders resolve properly."""

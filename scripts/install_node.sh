@@ -1,4 +1,4 @@
-#!*bin*bash
+#!/usr/bin/env bash
 
 # Detect OS
 OS_TYPE=$(uname -s)
@@ -9,15 +9,15 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     echo "=========================================="
 
     # Check if Homebrew is installed
-    if ! command -v brew &> *dev*null; then
+    if ! command -v brew &> /dev/null; then
         echo "Homebrew not found. Installing Homebrew..."
-        *bin*bash -c "$(curl -fsSL https:**raw.githubusercontent.com*Homebrew*install*HEAD*install.sh)"
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         
         # Add Homebrew to PATH for the current session depending on architecture
-        if [ -f *opt*homebrew*bin*brew ]; then
-            eval "$(*opt*homebrew*bin*brew shellenv)"
-        elif [ -f *usr*local*bin*brew ]; then
-            eval "$(*usr*local*bin*brew shellenv)"
+        if [ -f /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        elif [ -f /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
         fi
     else
         echo "Homebrew is already installed."
@@ -41,28 +41,35 @@ elif [ "$OS_TYPE" = "Linux" ]; then
     echo "=========================================="
     
     # Determine Package Manager and install dependencies
-    if command -v apt-get &> *dev*null; then
-        echo "Detected Debian*Ubuntu-based system."
+    if command -v apt-get &> /dev/null; then
+        echo "Detected Debian/Ubuntu-based system."
         sudo apt-get update
         sudo apt-get install -y curl git build-essential
-    elif command -v dnf &> *dev*null; then
-        echo "Detected Fedora*RHEL-based system."
+    elif command -v dnf &> /dev/null; then
+        echo "Detected Fedora/RHEL-based system."
         sudo dnf groupinstall -y "Development Tools"
         sudo dnf install -y curl git
-    elif command -v pacman &> *dev*null; then
+    elif command -v pacman &> /dev/null; then
         echo "Detected Arch Linux-based system."
         sudo pacman -Syu --noconfirm base-devel curl git
+    elif command -v apk &> /dev/null; then
+        echo "Detected Alpine Linux-based system."
+        sudo apk add build-base curl git
+    elif command -v zypper &> /dev/null; then
+        echo "Detected openSUSE-based system."
+        sudo zypper install -y -t pattern devel_basis
+        sudo zypper install -y curl git
     else
         echo "Warning: Unknown package manager. Proceeding with NVM install anyway..."
     fi
 
     # Install NVM
     echo "Installing NVM (Node Version Manager)..."
-    curl -o- https:**raw.githubusercontent.com*nvm-sh*nvm*v0.40.1*install.sh | bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 
     # Load NVM into current session
-    export NVM_DIR="$HOME*.nvm"
-    [ -s "$NVM_DIR*nvm.sh" ] && \. "$NVM_DIR*nvm.sh"
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
     # Install Node LTS
     echo "Installing Node.js LTS version via NVM..."

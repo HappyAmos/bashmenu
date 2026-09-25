@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Version: 0.0.5
-# Author:  HA Bash Menu (Debian + Apt Update Fix)
+# Version: 0.0.7
+# Author:  HA Bash Menu
 
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE}")" && pwd)"
+# Canonical symlink resolution to determine true script directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+
 BASHMENU_SCRIPT="${SCRIPT_DIR}/bashmenu.py"
 BASHMENU_SETTINGS="${SCRIPT_DIR}/bashmenu.yml"
 GLOW_INSTALLER="${SCRIPT_DIR}/scripts/install_glow.sh"
@@ -14,18 +22,22 @@ VENV_ACTIVATE="${VENV_DIR}/bin/activate"
 CACHE_DIR="$HOME/.cache/bashmenu"
 
 # Define the standard CLI tools required
-REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "yq" "python3")
+REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "python3")
 MISSING_PACKAGES=()
 GLOW_IS_MISSING=false
 
 # Setup a cache directory
 mkdir -p "$CACHE_DIR" &>/dev/null || exit 1
 
-# Function to extract a value from a YAML file using yq.
+# Function to extract a value from a YAML file using yq or python3 fallback.
 yaml_get() {
   local key="$1"
   local file="$2"
-  yq -r ".$key" "$file"
+  if command -v yq &>/dev/null; then
+      yq -r ".$key" "$file" 2>/dev/null || yq ".$key" "$file" 2>/dev/null || true
+  elif command -v python3 &>/dev/null; then
+      python3 -c "import yaml, sys; data=yaml.safe_load(open('$file')); keys='$key'.split('.'); [data := data.get(k, {}) for k in keys if isinstance(data, dict)]; print(data if not isinstance(data, dict) else '')" 2>/dev/null || true
+  fi
 }
 
 IS_TERMUX=false
@@ -48,13 +60,19 @@ elif command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt"
 elif command -v dnf &> /dev/null; then
     PKG_MANAGER="dnf"
+elif command -v yum &> /dev/null; then
+    PKG_MANAGER="yum"
 elif command -v pacman &> /dev/null; then
     PKG_MANAGER="pacman"
+elif command -v zypper &> /dev/null; then
+    PKG_MANAGER="zypper"
+elif command -v apk &> /dev/null; then
+    PKG_MANAGER="apk"
 elif command -v brew &> /dev/null; then
     PKG_MANAGER="brew"
 fi
 
-# Flag to ensure apt-get update only runs once per execution
+# Flag to ensure package manager index update only runs once per execution
 APT_UPDATED=false
 
 # Function to execute a command with root privileges if necessary.
@@ -64,8 +82,11 @@ run_as_root() {
     else
         if [ "$(id -u)" = 0 ]; then
             "$@"
-        else
+        elif command -v sudo &>/dev/null; then
             sudo "$@"
+        else
+            echo "Warning: Root privileges required but sudo is not available." >&2
+            "$@"
         fi
     fi
 }
@@ -76,14 +97,70 @@ is_installed() {
     command -v "$tool" &> /dev/null
 }
 
+# Install global 'bm' command shortcut pointing to bashmenu.sh
+install_shortcut() {
+    local shortcut_name="bm"
+    local target_dir=""
+
+    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+        target_dir="$PREFIX/bin"
+    elif [ "$(id -u)" = 0 ]; then
+        target_dir="/usr/local/bin"
+    elif [ -w "/usr/local/bin" ]; then
+        target_dir="/usr/local/bin"
+    else
+        target_dir="$HOME/.local/bin"
+    fi
+
+    mkdir -p "$target_dir" 2>/dev/null || true
+    local target_file="${target_dir}/${shortcut_name}"
+    local real_script_path="${SCRIPT_DIR}/bashmenu.sh"
+
+    echo "Installing global '$shortcut_name' shortcut pointing to: $real_script_path"
+
+    ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
+
+    if [ -L "$target_file" ] || [ -f "$target_file" ]; then
+        echo "  [✓] Successfully installed '$shortcut_name' shortcut at $target_file"
+
+        if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+            echo "  [!] Notice: $target_dir is not currently in your PATH environment variable."
+            for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+                if [ -f "$rc" ] && ! grep -q "$target_dir" "$rc"; then
+                    echo "export PATH=\"$target_dir:\$PATH\"" >> "$rc"
+                    echo "  [+] Added $target_dir to $rc"
+                fi
+            done
+        fi
+        return 0
+    else
+        echo "  [✗] Failed to create shortcut at $target_file" >&2
+        return 1
+    fi
+}
+
+# Handle standalone CLI flags
+for arg in "$@"; do
+    case "$arg" in
+        --install-shortcut|--install-bm)
+            install_shortcut
+            exit $?
+            ;;
+    esac
+done
+
 # Map binary names to their respective installation package names based on the package manager
 get_package_name() {
     local binary="$1"
     
     case "$binary" in
         "pip3")
-            if [ "$PKG_MANAGER" = "apt" ] || [ "$PKG_MANAGER" = "dnf" ]; then
+            if [ "$PKG_MANAGER" = "apt" ] || [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ] || [ "$PKG_MANAGER" = "zypper" ]; then
                 echo "python3-pip"
+            elif [ "$PKG_MANAGER" = "pacman" ] || [ "$PKG_MANAGER" = "pkg" ]; then
+                echo "python-pip"
+            elif [ "$PKG_MANAGER" = "apk" ]; then
+                echo "py3-pip"
             else
                 echo "python3"
             fi
@@ -91,10 +168,32 @@ get_package_name() {
         "venv")
             if [ "$PKG_MANAGER" = "apt" ]; then
                 echo "python3-venv"
-            elif [ "$PKG_MANAGER" = "dnf" ]; then
+            elif [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
                 echo "python3-virtualenv"
+            elif [ "$PKG_MANAGER" = "zypper" ]; then
+                echo "python3-virtualenv"
+            elif [ "$PKG_MANAGER" = "apk" ]; then
+                echo "python3"
             else
                 echo "python3"
+            fi
+            ;;
+        "python3")
+            if [ "$PKG_MANAGER" = "pacman" ]; then
+                echo "python"
+            else
+                echo "python3"
+            fi
+            ;;
+        "tput")
+            if [ "$PKG_MANAGER" = "apt" ]; then
+                echo "ncurses-bin"
+            elif [ "$PKG_MANAGER" = "pkg" ]; then
+                echo "ncurses-utils"
+            elif [ "$PKG_MANAGER" = "brew" ]; then
+                echo ""
+            else
+                echo "ncurses"
             fi
             ;;
         *)
@@ -108,7 +207,7 @@ install_apps() {
     local packages_to_install=("$@")
     
     if [ -z "$PKG_MANAGER" ] && [ ${#packages_to_install[@]} -gt 0 ]; then
-        echo "Error: Supported package manager (pkg, apt, dnf, pacman, brew) not found." >&2
+        echo "Error: Supported package manager (pkg, apt, dnf, yum, pacman, zypper, apk, brew) not found." >&2
         return 1
     fi
 
@@ -124,6 +223,7 @@ install_apps() {
     fi
 
     for pkg in "${packages_to_install[@]}"; do
+        [ -z "$pkg" ] && continue
         echo "Installing $pkg via package manager..."
         
         case "$PKG_MANAGER" in
@@ -136,8 +236,17 @@ install_apps() {
             "dnf")
                 run_as_root dnf install -y "$pkg"
                 ;;
+            "yum")
+                run_as_root yum install -y "$pkg"
+                ;;
             "pacman")
                 run_as_root pacman -S --noconfirm "$pkg"
+                ;;
+            "zypper")
+                run_as_root zypper install -y "$pkg"
+                ;;
+            "apk")
+                run_as_root apk add "$pkg"
                 ;;
             "brew")
                 brew install "$pkg"
@@ -158,7 +267,9 @@ for tool in "${REQUIRED_TOOLS[@]}"; do
             GLOW_IS_MISSING=true
         else
             pkg_name=$(get_package_name "$tool")
-            MISSING_PACKAGES+=("$pkg_name")
+            if [ -n "$pkg_name" ]; then
+                MISSING_PACKAGES+=("$pkg_name")
+            fi
         fi
     fi
 done
@@ -167,23 +278,27 @@ done
 if ! is_installed "pip3"; then
     echo "  [✗] pip3 is missing."
     pkg_name=$(get_package_name "pip3")
-    MISSING_PACKAGES+=("$pkg_name")
+    [ -n "$pkg_name" ] && MISSING_PACKAGES+=("$pkg_name")
 fi
 
 # Check Python internal venv engine status
 if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1; then
     echo "  [✗] python3 venv module is missing."
     pkg_name=$(get_package_name "venv")
-    if [[ ! " ${MISSING_PACKAGES[*]} " =~ " ${pkg_name} " ]]; then
+    if [ -n "$pkg_name" ] && [[ ! " ${MISSING_PACKAGES[*]} " =~ " ${pkg_name} " ]]; then
         MISSING_PACKAGES+=("$pkg_name")
     fi
 fi
 
 # Deduplicate items in the package manager missing list safely
 if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
-    IFS=" " read -r -a MISSING_PACKAGES <<< "$(tr ' ' '
-' <<< "${MISSING_PACKAGES[@]}" | sort -u | tr '
-' ' ')"
+    DEDUP_PACKAGES=()
+    for pkg in "${MISSING_PACKAGES[@]}"; do
+        if [ -n "$pkg" ] && [[ ! " ${DEDUP_PACKAGES[*]} " =~ " ${pkg} " ]]; then
+            DEDUP_PACKAGES+=("$pkg")
+        fi
+    done
+    MISSING_PACKAGES=("${DEDUP_PACKAGES[@]}")
 fi
 
 # Trigger installation if elements are missing
@@ -233,12 +348,24 @@ if [ ${#MISSING_PACKAGES[@]} -gt 0 ] || [ "$GLOW_IS_MISSING" = true ]; then
     fi
 fi
 
+# Check if 'bm' shortcut is missing and prompt user if interactive session
+if ! is_installed "bm"; then
+    if [ -t 0 ]; then
+        read -p "Global 'bm' command shortcut is not installed. Install it now? [y/N]: " -n 1 -r
+        echo ""
+        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+            install_shortcut
+        fi
+    fi
+fi
+
 # ==========================================================================
 # Update checking mechanism
 # ==========================================================================
-if [ -f "$BASHMENU_SETTINGS" ] && command -v yq &> /dev/null; then
+if [ -f "$BASHMENU_SETTINGS" ]; then
     UPDATES=$(yaml_get "settings.check_for_updates" "${BASHMENU_SETTINGS}")
-    if [[ "${UPDATES,,}" == "true" ]]; then
+    UPDATES_LOWER=$(echo "$UPDATES" | tr '[:upper:]' '[:lower:]')
+    if [[ "$UPDATES_LOWER" == "true" ]]; then
         if git rev-parse --is-inside-work-tree &>/dev/null; then
             git fetch -q
             CHANGES_AHEAD=$(git rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
@@ -277,7 +404,9 @@ fi
 
 USE_VENV=false
 if [ -f "$VENV_ACTIVATE" ]; then
-    if "${VENV_DIR}/bin/python3" -c "import yaml, ruff" >/dev/null 2>&1; then
+    VENV_PYTHON="${VENV_DIR}/bin/python3"
+    [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/bin/python"
+    if "$VENV_PYTHON" -c "import yaml, ruff" >/dev/null 2>&1; then
         USE_VENV=true
     else
         echo "Virtual environment is broken or missing PyYAML and/or Ruff. Recreating..." >&2
@@ -288,8 +417,10 @@ fi
 if [ "$USE_VENV" = false ]; then
     echo "Setting up virtual environment at $VENV_DIR..." >&2
     if python3 -m venv "$VENV_DIR" >/dev/null 2>&1; then
+        VENV_PIP="${VENV_DIR}/bin/pip"
+        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/bin/pip3"
         if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
-            if "${VENV_DIR}/bin/pip" install --upgrade pip >/dev/null 2>&1 &&                "${VENV_DIR}/bin/pip" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1; then
+            if "$VENV_PIP" install --upgrade pip >/dev/null 2>&1 && "$VENV_PIP" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1; then
                 USE_VENV=true
             else
                 echo "Warning: Failed to install requirements inside virtual environment." >&2

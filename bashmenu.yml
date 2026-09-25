@@ -21,4 +21,4 @@ settings:
   tabstop: 4
   templates_dir: '{bashmenu_dir}/templates'
   use_nerd_fonts: true
-theme: pacman
+theme: nord

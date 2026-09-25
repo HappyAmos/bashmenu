@@ -34,20 +34,21 @@ fi
 
 
 
-# Source the file directly into your current shell session
-# shellcheck source=/dev/null
-source /etc/os-release
+if [ -f /etc/os-release ]; then
+    # shellcheck source=/dev/null
+    source /etc/os-release
+else
+    echo "Error: /etc/os-release not found. kmscon installation is only supported on Linux systemd distributions." >&2
+    exit 1
+fi
 
-echo "Found OS: $NAME, Version: $VERSION, ID: $ID, Codename: $VERSION_CODENAME"
-#ID=$("sudo -u $SUDO_USER source /etc/os-release && echo $ID")
-#ID=$(source /etc/os-release && echo "$ID")
-#CODENAME=$("sudo -u $SUDO_USER source /etc/os-release && echo $VERSION_CODENAME")
+echo "Found OS: ${NAME:-Unknown}, Version: ${VERSION:-Unknown}, ID: ${ID:-Unknown}, Codename: ${VERSION_CODENAME:-Unknown}"
 
-if [[ "$ID" == "ubuntu" || "$ID" == "linuxmint" ]]; then
+if [[ "${ID:-}" == "ubuntu" || "${ID:-}" == "linuxmint" ]]; then
     echo "Detected Debian-based system: $ID"
     apt update
     apt install -y kmscon
-elif [[ "$ID" == "debian" && "$CODENAME" == "trixie" ]]; then
+elif [[ "${ID:-}" == "debian" && "${VERSION_CODENAME:-}" == "trixie" ]]; then
     echo "Detected Debian Trixie"
     APT_PATH="/etc/apt/sources.list.d/"
     APT_FILE="debian-backports.sources"

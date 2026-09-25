@@ -627,7 +627,7 @@ def save_config(config):
         config (dict): Configuration dictionary to serialize and save.
     """
     try:
-        with open(CONFIG_FILE, "w") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False, width=float('inf'), sort_keys=False)
     except (OSError, yaml.YAMLError, TypeError, ValueError):  # Catch file access, serialization, or type formatting errors safely
         pass
@@ -1625,14 +1625,24 @@ def interpolate_placeholders(text, config, depth=0):
 
     # Resolve {window_width} and {window_height}
     if re.search(r"\{window_width\}", text, flags=re.IGNORECASE) or re.search(r"\{window_height\}", text, flags=re.IGNORECASE):
+        if hasattr(curses, "update_lines_cols"):
+            try:
+                curses.update_lines_cols()
+            except Exception:
+                pass
+        cols, lines = None, None
         try:
             cols = curses.COLS
             lines = curses.LINES
-        except (AttributeError, NameError):  # Fall back to shutil if curses window state is uninitialized or missing
+        except (AttributeError, NameError):
+            pass
+
+        if not isinstance(cols, int) or not isinstance(lines, int) or cols <= 0 or lines <= 0:
             import shutil
             term_size = shutil.get_terminal_size()
             cols = term_size.columns
             lines = term_size.lines
+
         text = re.sub(r"\{window_width\}", str(cols), text, flags=re.IGNORECASE)
         text = re.sub(r"\{window_height\}", str(lines), text, flags=re.IGNORECASE)
 
@@ -2228,6 +2238,11 @@ def main(stdscr):
     last_menu_len = -1
 
     while True:
+        if hasattr(curses, "update_lines_cols"):
+            try:
+                curses.update_lines_cols()
+            except Exception:
+                pass
         stdscr.erase()
         height, width = stdscr.getmaxyx()
 
@@ -2382,7 +2397,10 @@ def main(stdscr):
             if option.get("type") == "divider":
                 length = option.get("length", 40)
                 if isinstance(length, str):
-                    length = interpolate_placeholders(length, config)
+                    if length.lower().strip() in ("max", "auto", "full", "100%"):
+                        length = width
+                    else:
+                        length = interpolate_placeholders(length, config)
                 try:
                     length = int(length)
                 except (ValueError, TypeError):

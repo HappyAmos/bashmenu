@@ -21,7 +21,7 @@ mkdir -p "$INSTALL_DIR" &>/dev/null
 cd "$INSTALL_DIR" &>/dev/null || exit 1
 
 # Check if the directory is empty or not. If it's not, it might already have scripts installed:
-if [ -z "$(find "$INSTALL_DIR" -maxdepth 0 -empty)" ]; then
+if [ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
     echo "Directory is NOT empty, aborting git clone."
     exit 1
 else

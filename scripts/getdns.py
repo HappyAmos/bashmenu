@@ -150,6 +150,38 @@ def get_upstream_resolv_files():
     return results
 
 
+def get_scutil_dns():
+    """Query macOS DNS configuration via scutil --dns."""
+    bin_path = shutil.which("scutil")
+    if not bin_path:
+        return None
+
+    try:
+        res = subprocess.run(
+            [bin_path, "--dns"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        if res.returncode != 0 or not res.stdout:
+            return None
+
+        servers = []
+        for line in res.stdout.splitlines():
+            line_str = line.strip()
+            if "nameserver[" in line_str and ":" in line_str:
+                parts = line_str.split(":", 1)
+                if len(parts) == 2:
+                    ip = parts[1].strip()
+                    if ip and not is_loopback(ip) and ip not in servers:
+                        servers.append(ip)
+
+        return {"macOS Config": servers} if servers else None
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, AttributeError):
+        return None
+
+
 def collect_dns_data():
     """Collect DNS servers across discovery sources into structured data."""
     results = []
@@ -175,6 +207,18 @@ def collect_dns_data():
                 results.append({
                     "source": "NetworkManager",
                     "interface": iface,
+                    "servers": unique_servers,
+                })
+
+    # Method 3: Query macOS scutil
+    scutil_data = get_scutil_dns()
+    if scutil_data:
+        for label, servers in scutil_data.items():
+            unique_servers = list(dict.fromkeys(servers))
+            if unique_servers:
+                results.append({
+                    "source": label,
+                    "interface": "N/A",
                     "servers": unique_servers,
                 })
 
