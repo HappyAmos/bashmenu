@@ -1,5 +1,7 @@
 # HA Bash Menu
 
+![](/home/andrew/github/bashmenu/assets/bashmenu.gif)
+
 A lightweight, data-driven Curses TUI (Text User Interface) menu engine
 and settings editor for Linux, configured entirely through modular YAML files.
 
@@ -36,20 +38,21 @@ as clean by shellcheck, a linux shell script validator.
 
 ## 📂 Component Directory
 
-| File/Folder | Description |
-| :--- | :---------- |
-| `bashmenu.sh` | Wrapper launcher. Auto-creates and repairs virtualenv. |
-| `bashmenu.py` | Core TUI rendering engine and main menu rendering window. |
-| `bashedit.py` | Built-in Nano-style terminal text editor engine. |
-| `menuedit.py` | Visual layout tree editor for `bashmenu.mnu` (run with `F4`). |
-| `bashmenu.yml` | Dynamic user settings store (YAML). |
-| `bashmenu.mnu` | Hierarchical menu layout options definitions list. |
-| `bashmenu.themes`| Theme palettes for 256, 16, and 8 color standard screens. |
-| `ymlcheck.py` | Command line utility to validate YAML syntax and schemas. |
-| `scripts/` | Useful scripts collection (DNS setup, glyph search, etc.). |
-| `templates/` | Sample settings block templates (aliases, autoexec). |
+| File/Folder       | Description                                                   |
+|:----------------- |:------------------------------------------------------------- |
+| `bashmenu.sh`     | Wrapper launcher. Auto-creates and repairs virtualenv.        |
+| `bashmenu.py`     | Core TUI rendering engine and main menu rendering window.     |
+| `bashedit.py`     | Built-in Nano-style terminal text editor engine.              |
+| `menuedit.py`     | Visual layout tree editor for `bashmenu.mnu` (run with `F4`). |
+| `bashmenu.yml`    | Dynamic user settings store (YAML).                           |
+| `bashmenu.mnu`    | Hierarchical menu layout options definitions list.            |
+| `bashmenu.themes` | Theme palettes for 256, 16, and 8 color standard screens.     |
+| `ymlcheck.py`     | Command line utility to validate YAML syntax and schemas.     |
+| `scripts/`        | Useful scripts collection (DNS setup, glyph search, etc.).    |
+| `templates/`      | Sample settings block templates (aliases, autoexec).          |
 
 ### local Manual Pages (Man Pages)
+
 - `bashmenu.1` : Exhaustively comprehensive man page for HA Bash Menu.
 
 ---
@@ -57,6 +60,7 @@ as clean by shellcheck, a linux shell script validator.
 ## ⚡ Quick Start
 
 Launch the menu interface directly:
+
 ```bash
 ./bashmenu.sh
 ```
@@ -75,4 +79,5 @@ full YAML schemas:
 ---
 
 ## 📜 License
+
 Distributed under the generous MIT License. See `LICENSE` for details.

@@ -28,6 +28,18 @@ def safe_isprintable(s: str) -> bool:
     return True
 
 
+def is_formatting_tag(content):
+    """
+    Helper to check if bracketed content is a console formatting tag.
+    """
+    if not isinstance(content, str):
+        return False
+    content_clean = content.strip().lower()
+    if content_clean in ["b", "/b", "u", "/u", "dim", "/dim", "reverse", "/reverse", "/color"]:
+        return True
+    return content_clean.startswith("color=") and "]" not in content_clean
+
+
 def get_visible_len(text):
     """
     Return the visible length of a string by stripping out any formatting tags [tag].
@@ -35,7 +47,13 @@ def get_visible_len(text):
     import re
     if not isinstance(text, str):
         return len(str(text))
-    clean_text = re.sub(r"\[/?([a-zA-Z_0-9=]+)\]", "", text)
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    def replace_tag(match):
+        tag = match.group(1)
+        if is_formatting_tag(tag):
+            return ""
+        return match.group(0)
+    clean_text = tag_pattern.sub(replace_tag, text)
     return len(clean_text)
 
 
@@ -43,6 +61,7 @@ def parse_formatting_to_segments(text, base_attr, theme):
     """
     Parse console bracket formatting tags [b], [u], [dim], [reverse], [color=...] and
     return a list of (text, attr) segments. Supports tag nesting.
+    Ignores bracketed text that is not a recognized formatting tag.
     """
     import re
     if not isinstance(text, str):
@@ -57,6 +76,9 @@ def parse_formatting_to_segments(text, base_attr, theme):
     last_idx = 0
     for match in tag_pattern.finditer(text):
         tag = match.group(1)
+        if not is_formatting_tag(tag):
+            continue
+
         start, end = match.span()
         
         # Append preceding text
@@ -69,16 +91,17 @@ def parse_formatting_to_segments(text, base_attr, theme):
                 current_attr = attr_stack[-1]
         else:
             new_attr = current_attr
-            if tag == "b":
+            tag_clean = tag.strip().lower()
+            if tag_clean == "b":
                 new_attr |= curses.A_BOLD
-            elif tag == "u":
+            elif tag_clean == "u":
                 new_attr |= curses.A_UNDERLINE
-            elif tag == "dim":
+            elif tag_clean == "dim":
                 new_attr |= curses.A_DIM
-            elif tag == "reverse":
+            elif tag_clean == "reverse":
                 new_attr |= curses.A_REVERSE
-            elif tag.startswith("color="):
-                color_name = tag.split("=")[1].strip()
+            elif tag_clean.startswith("color="):
+                color_name = tag.split("=", 1)[1].strip()
                 if theme and color_name in theme:
                     new_attr = (new_attr & ~curses.A_COLOR) | theme[color_name]
                     

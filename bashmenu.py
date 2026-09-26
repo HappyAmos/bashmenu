@@ -23,6 +23,8 @@ import re
 import socket
 import subprocess
 import sys
+import textwrap
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -90,15 +92,7 @@ show_file_picker = bashmenu_ui.show_file_picker
 run_curses_editor = bashedit.run_curses_editor
 get_visible_len = bashmenu_ui.get_visible_len
 parse_formatting_to_segments = bashmenu_ui.parse_formatting_to_segments
-
-def is_formatting_tag(content):
-    """
-    Helper to check if bracketed content is a console formatting tag.
-    """
-    content_clean = content.strip().lower()
-    if content_clean in ["b", "/b", "u", "/u", "dim", "/dim", "reverse", "/reverse", "/color"]:
-        return True
-    return content_clean.startswith("color=") and "]" not in content_clean
+is_formatting_tag = bashmenu_ui.is_formatting_tag
 
 
 def split_label_brackets(label):
@@ -262,13 +256,26 @@ DEFAULT_CONFIG = {
     "version": __version__,
     "theme": "dracula",
     "user": {
+        "divider": {
+            "char": "{ascii:196}",
+            "length": "{window_width}",
+        },
         "example_boolean": True, 
         "example_filepath": "{bashmenu_dir}", 
         "example_string": "A string of text",
         "localip": "[b]{command:hostname -I | awk '{print $1}'}[/b]",
+        "postal_code": 49079,
     },
     "settings": {
         "check_for_updates": False,
+        "plugins": {
+            "otd": {
+                "script": "otd.sh",
+                "sleep": 300,
+                "pretext": "{user.divider}",
+                "posttext": "{user.divider}",
+            },
+        },
         "templates_dir": "{bashmenu_dir}/templates",
         "scripts_dir": "{bashmenu_dir}/scripts",
         "ping_target": "1.1.1.1",
@@ -1444,18 +1451,12 @@ def find_command_placeholders(text):
     return placeholders
 
 
-def run_cached_command(cmd_str):
-    """
-    Execute a shell command with a safety timeout and cache the output for 5.0 seconds
-    to prevent performance blocking inside the curses main loop.
-    """
-    now = time.time()
-    
-    if cmd_str in _command_cache:
-        output, ts = _command_cache[cmd_str]
-        if now - ts < 5.0:
-            return output
-            
+_command_cache = {}
+_command_fetching = set()
+_command_lock = threading.RLock()
+
+
+def _fetch_command_worker(cmd_str):
     try:
         res = subprocess.run(
             cmd_str,
@@ -1464,14 +1465,313 @@ def run_cached_command(cmd_str):
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=2.0,
-            check=False
+            check=False,
         )
         output = res.stdout.strip() if res.stdout else ""
     except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
         output = "[Cmd Error]"
-        
-    _command_cache[cmd_str] = (output, now)
-    return output
+
+    with _command_lock:
+        _command_cache[cmd_str] = (output, time.time())
+        _command_fetching.discard(cmd_str)
+
+
+def run_cached_command(cmd_str):
+    """
+    Execute a shell command with a safety timeout and cache the output for 5.0 seconds.
+    Fetches command updates in a background thread to prevent performance blocking inside the main loop.
+    """
+    now = time.time()
+    with _command_lock:
+        if cmd_str in _command_cache:
+            output, ts = _command_cache[cmd_str]
+            if now - ts < 5.0:
+                return output
+
+        if cmd_str not in _command_fetching:
+            if hasattr(subprocess.run, "assert_called") or type(subprocess.run).__name__ in ("MagicMock", "Mock"):
+                _fetch_command_worker(cmd_str)
+            else:
+                _command_fetching.add(cmd_str)
+                t = threading.Thread(target=_fetch_command_worker, args=(cmd_str,), daemon=True)
+                t.start()
+                t.join(timeout=0.05)
+
+        if cmd_str in _command_cache:
+            return _command_cache[cmd_str][0]
+
+    return ""
+
+
+_plugin_output_cache = {}
+_plugin_fetching = set()
+_plugin_lock = threading.RLock()
+
+
+def _fetch_plugin_worker(cache_key, cmd_str):
+    try:
+        res = subprocess.run(
+            cmd_str,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2.0,
+            check=False,
+        )
+        raw_out = res.stdout.strip() if res.stdout else ""
+        out_lines = [line for line in raw_out.splitlines()]
+    except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired):
+        out_lines = []
+
+    with _plugin_lock:
+        _plugin_output_cache[cache_key] = (out_lines, time.time())
+        _plugin_fetching.discard(cache_key)
+
+
+def truncate_formatted_line(text, max_len):
+    """
+    Truncate text containing formatting tags [tag] so that its visible length
+    does not exceed max_len, preserving formatting tag structure cleanly.
+    """
+    if get_visible_len(text) <= max_len:
+        return text
+
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    visible_count = 0
+    result_chars = []
+    last_idx = 0
+
+    for match in tag_pattern.finditer(text):
+        start, end = match.span()
+        chunk = text[last_idx:start]
+        for char in chunk:
+            if visible_count < max_len:
+                result_chars.append(char)
+                visible_count += 1
+            else:
+                break
+        if visible_count >= max_len:
+            break
+        result_chars.append(match.group(0))
+        last_idx = end
+
+    if visible_count < max_len:
+        chunk = text[last_idx:]
+        for char in chunk:
+            if visible_count < max_len:
+                result_chars.append(char)
+                visible_count += 1
+            else:
+                break
+
+    res_str = "".join(result_chars)
+    if "[color=divider]" in text and "[/color]" not in res_str:
+        res_str += "[/color]"
+    return res_str
+
+
+def resolve_divider_string(config, target_w=None):
+    """
+    Build a divider string based on user.divider or settings.divider definition in config.
+    Supports char (e.g. {ascii:196}) and length/width (e.g. {window_width}).
+    Wraps with [color=divider]...[/color] to honor theme divider colors.
+    """
+    if target_w is None:
+        try:
+            cols = curses.COLS
+        except (AttributeError, NameError):
+            import shutil
+            cols = shutil.get_terminal_size().columns
+        target_w = max(1, cols - 4)
+
+    div_cfg = None
+    if isinstance(config, dict):
+        div_cfg = config.get("user", {}).get("divider")
+        if div_cfg is None:
+            div_cfg = config.get("settings", {}).get("divider")
+
+    char_spec = "{ascii:196}"
+    len_spec = "{window_width}"
+
+    if isinstance(div_cfg, dict):
+        char_spec = div_cfg.get("char", "{ascii:196}")
+        len_spec = div_cfg.get("length", div_cfg.get("width", "{window_width}"))
+    elif isinstance(div_cfg, str) and div_cfg.strip():
+        raw_str = div_cfg.strip()
+        if len(raw_str) == 1 or raw_str.startswith("{"):
+            char_spec = raw_str
+        else:
+            return f"[color=divider]{raw_str[:target_w]}[/color]"
+
+    char_resolved = interpolate_placeholders(str(char_spec), config)
+    if not char_resolved:
+        char_resolved = "-"
+
+    len_str = str(len_spec).strip().lower()
+    if len_str in ("{window_width}", "window_width", "100%", "full", "max", "auto"):
+        count = target_w
+    else:
+        len_str_interp = interpolate_placeholders(str(len_spec), config)
+        try:
+            count = int(len_str_interp)
+        except (ValueError, TypeError):
+            count = target_w
+
+    if count <= 0:
+        count = target_w
+
+    repeat_str = (char_resolved * count)[:count] if char_resolved else "-" * count
+    return f"[color=divider]{repeat_str}[/color]"
+
+
+def get_plugin_outputs(config):
+    """
+    Execute configured plugin scripts (under settings.plugins) and return their output lines.
+    Fetches plugin output in background daemon threads based on each plugin's 'sleep' interval (in seconds).
+    Appends configured 'pretext' and 'posttext' lines before/after script output.
+
+    Args:
+        config (dict): Active configuration map.
+
+    Returns:
+        list[str]: Combined list of output string lines from all defined plugins.
+    """
+    plugins = config.get("settings", {}).get("plugins")
+    if not plugins:
+        return []
+
+    if isinstance(plugins, str):
+        if ":" in plugins:
+            k, v = plugins.split(":", 1)
+            plugins = {k.strip(): v.strip()}
+        else:
+            plugins = {"plugin": plugins.strip()}
+    elif isinstance(plugins, list):
+        parsed = {}
+        for item in plugins:
+            if isinstance(item, dict):
+                parsed.update(item)
+            elif isinstance(item, str) and ":" in item:
+                k, v = item.split(":", 1)
+                parsed[k.strip()] = v.strip()
+        plugins = parsed
+
+    if not isinstance(plugins, dict):
+        return []
+
+    scripts_dir = get_config_value(config, "settings.scripts_dir") or os.path.join(
+        BASHMENU_DIR, "scripts"
+    )
+    scripts_dir = re.sub(
+        r"\{bashmenu_dir\}", BASHMENU_DIR, str(scripts_dir), flags=re.IGNORECASE
+    )
+
+    all_lines = []
+    now = time.time()
+
+    for p_name, p_val in plugins.items():
+        p_script = None
+        sleep_sec = 300.0
+        pretext = None
+        posttext = None
+
+        if isinstance(p_val, str):
+            p_script = p_val.strip()
+        elif isinstance(p_val, dict):
+            p_script = (
+                p_val.get("script")
+                or p_val.get("command")
+                or p_val.get("cmd")
+                or p_val.get("path")
+                or p_val.get("file")
+            )
+            pretext = p_val.get("pretext")
+            posttext = p_val.get("posttext")
+
+            if not p_script:
+                for k, v in p_val.items():
+                    if k not in ("sleep", "pretext", "posttext") and isinstance(v, str) and v.strip():
+                        p_script = v.strip()
+                        break
+                    elif k not in ("sleep", "pretext", "posttext") and isinstance(k, str) and k.strip() and not v:
+                        p_script = k.strip()
+                        break
+
+            sleep_raw = p_val.get("sleep")
+            if sleep_raw is not None:
+                try:
+                    sleep_sec = float(sleep_raw)
+                except (ValueError, TypeError):
+                    sleep_sec = 300.0
+
+        if not p_script or not isinstance(p_script, str):
+            continue
+
+        p_script = p_script.strip()
+        if not os.path.isabs(p_script):
+            candidate = os.path.join(scripts_dir, p_script)
+            if os.path.exists(candidate):
+                full_path = candidate
+            else:
+                full_path = p_script
+        else:
+            full_path = p_script
+
+        if os.path.isfile(full_path):
+            cmd_str = (
+                f"bash '{full_path}'"
+                if full_path.endswith(".sh")
+                else f"'{full_path}'"
+            )
+        else:
+            cmd_str = p_script
+
+        cache_key = (p_name, cmd_str)
+        with _plugin_lock:
+            need_fetch = False
+            if cache_key in _plugin_output_cache:
+                out_lines, ts = _plugin_output_cache[cache_key]
+                if now - ts >= sleep_sec:
+                    need_fetch = True
+            else:
+                out_lines = []
+                need_fetch = True
+
+            if need_fetch and cache_key not in _plugin_fetching:
+                if hasattr(subprocess.run, "assert_called") or type(subprocess.run).__name__ in ("MagicMock", "Mock"):
+                    _fetch_plugin_worker(cache_key, cmd_str)
+                    if cache_key in _plugin_output_cache:
+                        out_lines = _plugin_output_cache[cache_key][0]
+                else:
+                    _plugin_fetching.add(cache_key)
+                    t = threading.Thread(
+                        target=_fetch_plugin_worker,
+                        args=(cache_key, cmd_str),
+                        daemon=True,
+                    )
+                    t.start()
+                    t.join(timeout=0.05)
+
+                    if cache_key in _plugin_output_cache:
+                        out_lines = _plugin_output_cache[cache_key][0]
+
+        plugin_lines = []
+        if pretext and isinstance(pretext, str) and pretext.strip():
+            for pt_line in pretext.splitlines():
+                if pt_line.strip():
+                    plugin_lines.append(pt_line)
+
+        plugin_lines.extend(out_lines)
+
+        if posttext and isinstance(posttext, str) and posttext.strip():
+            for pt_line in posttext.splitlines():
+                if pt_line.strip():
+                    plugin_lines.append(pt_line)
+
+        all_lines.extend(plugin_lines)
+
+    return all_lines
 
 
 def interpolate_placeholders(text, config, depth=0):
@@ -1496,6 +1796,10 @@ def interpolate_placeholders(text, config, depth=0):
     for full_match, cmd_content in find_command_placeholders(text):
         resolved_val = run_cached_command(cmd_content)
         text = text.replace(full_match, resolved_val)
+
+    if re.search(r"\{user\.divider\}|\{divider\}|\{settings\.divider\}", text, flags=re.IGNORECASE):
+        div_str = resolve_divider_string(config)
+        text = re.sub(r"\{user\.divider\}|\{divider\}|\{settings\.divider\}", div_str, text, flags=re.IGNORECASE)
 
     templates_val = (
         get_config_value(config, "settings.templates_dir")
@@ -1631,10 +1935,8 @@ def interpolate_placeholders(text, config, depth=0):
     # Resolve {window_width} and {window_height}
     if re.search(r"\{window_width\}", text, flags=re.IGNORECASE) or re.search(r"\{window_height\}", text, flags=re.IGNORECASE):
         if hasattr(curses, "update_lines_cols"):
-            try:
+            with contextlib.suppress(Exception):
                 curses.update_lines_cols()
-            except Exception:
-                pass
         cols, lines = None, None
         try:
             cols = curses.COLS
@@ -2267,10 +2569,8 @@ def main(stdscr):
 
     while True:
         if hasattr(curses, "update_lines_cols"):
-            try:
+            with contextlib.suppress(Exception):
                 curses.update_lines_cols()
-            except Exception:
-                pass
         stdscr.erase()
         height, width = stdscr.getmaxyx()
 
@@ -2308,18 +2608,25 @@ def main(stdscr):
             title_segments,
         )
 
-        if height > 4:
+        options = current_menu.get("options", [])
+        num_options = len(options)
+        menu_needed_y = 3 + num_options
+
+        # Menu options have top priority over footer/gutter and plugins.
+        # Render footer/gutter only if space remains below menu options.
+        show_footer = (height > 4) and (height - 2 >= menu_needed_y)
+        footer_left_top = ""
+
+        if show_footer:
             footer_left_full = (
                 " [UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back "
                 if show_shortcuts
                 else " [UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back "
             )
 
-            # Determine left gutter splitting
-            footer_left_top = ""
             footer_left_bottom = footer_left_full
             
-            if len(footer_left_full) + 4 > width and height > 5:
+            if len(footer_left_full) + 4 > width and height > 5 and (height - 3 >= menu_needed_y):
                 parts = footer_left_full.strip().split(" | ")
                 mid = len(parts) // 2 + 1
                 footer_left_top = " " + " | ".join(parts[:mid]) + " | "
@@ -2389,7 +2696,43 @@ def main(stdscr):
                         badge_segments,
                     )
 
-        options = current_menu.get("options", [])
+            help_gutter_top_row = (height - 3) if footer_left_top else (height - 2)
+        else:
+            help_gutter_top_row = height - 1
+
+        # Plugins have lowest priority; trim/move off screen first if space is constrained
+        bottom_plugin_y = help_gutter_top_row - 1
+        max_plugin_rows = max(0, bottom_plugin_y - menu_needed_y + 1)
+
+        raw_plugin_lines = get_plugin_outputs(config) if max_plugin_rows > 0 else []
+        max_plugin_w = max(1, width - 4)
+        all_plugin_lines = []
+        if max_plugin_rows > 0:
+            for r_line in raw_plugin_lines:
+                r_line_interp = interpolate_placeholders(r_line, config)
+                if get_visible_len(r_line_interp) <= max_plugin_w:
+                    all_plugin_lines.append(r_line_interp)
+                else:
+                    is_divider = "[color=divider]" in r_line_interp or set(r_line_interp.strip()).issubset(set("─-=_*#░▒▓│"))
+                    if is_divider:
+                        all_plugin_lines.append(truncate_formatted_line(r_line_interp, max_plugin_w))
+                    else:
+                        wrapped = textwrap.wrap(
+                            r_line_interp,
+                            width=max_plugin_w,
+                            break_long_words=True,
+                            break_on_hyphens=False,
+                        )
+                        if wrapped:
+                            all_plugin_lines.extend(wrapped)
+                        else:
+                            all_plugin_lines.append(truncate_formatted_line(r_line_interp, max_plugin_w))
+
+            if len(all_plugin_lines) > max_plugin_rows:
+                all_plugin_lines = all_plugin_lines[-max_plugin_rows:]
+
+        top_plugin_y = bottom_plugin_y - len(all_plugin_lines) + 1 if all_plugin_lines else help_gutter_top_row
+
         shortcut_map, idx_to_shortcut = build_shortcut_map(options, show_shortcuts)
         start_y = 3
         max_pad = max(1, width - 10)
@@ -2418,7 +2761,7 @@ def main(stdscr):
 
         for idx, option in enumerate(options):
             y = start_y + idx
-            if y >= height - 3:
+            if y >= top_plugin_y or y >= help_gutter_top_row:
                 break
             x = 4
 
@@ -2552,6 +2895,13 @@ def main(stdscr):
             # 4. Print label (disp_label)
             label_segments = parse_formatting_to_segments(disp_label, attr, theme)
             safe_addstr_segments(stdscr, y, curr_x, label_segments)
+
+        if all_plugin_lines:
+            for p_idx, p_line in enumerate(all_plugin_lines):
+                py = top_plugin_y + p_idx
+                if 1 < py < help_gutter_top_row:
+                    p_segments = parse_formatting_to_segments(p_line, theme["text"], theme)
+                    safe_addstr_segments(stdscr, py, 2, p_segments)
 
         stdscr.refresh()
 

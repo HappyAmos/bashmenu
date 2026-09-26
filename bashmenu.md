@@ -115,16 +115,34 @@ The settings file stores nested key-value pairs used throughout the menu.
 Example:
 ```yaml
 theme: dracula
+user:
+  divider:
+    char: '{ascii:196}'
+    length: '{window_width}'
 settings:
   use_nerd_fonts: true
   tabstop: 4
   status_gutter: "{user} | {battery} | {date_time_24}"
+  plugins:
+    otd:
+      script: otd.sh
+      sleep: 300
+      pretext: '{user.divider}'
+      posttext: '{user.divider}'
   dns:
     ipv4:
       primary: 1.1.1.1
 ```
-Any dot-notation key (e.g., `settings.dns.ipv4.primary` or `settings.status_gutter`) can be interpolated
+Any dot-notation key (e.g., `settings.dns.ipv4.primary`, `settings.plugins.otd.sleep`, `user.divider`, or `settings.status_gutter`) can be interpolated
 inside menu titles, actions, labels, or template files using brackets.
+
+The `settings.plugins` setting specifies plugin scripts located in the configured `scripts_dir`. Each plugin can be defined as a simple script path or a dictionary with `script`, `sleep`, `pretext`, and `posttext` options:
+- `script`: Script filename or command to execute.
+- `sleep`: Plugin-specific output cache duration in seconds (setting `sleep: 0` will update live data on every frame tick).
+- `pretext`: Text or placeholder rendered immediately before the plugin script output.
+- `posttext`: Text or placeholder rendered immediately after the plugin script output.
+
+Dividers can be defined under `user.divider` (or `settings.divider`) with full specifications including `char` (e.g., `{ascii:196}` or `-`) and `length` (e.g., `{window_width}` or `40`). Using `{user.divider}` or `{divider}` in `pretext` or `posttext` expands to a styled divider line matching the active theme's configured divider color.
 
 The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
 

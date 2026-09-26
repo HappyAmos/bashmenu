@@ -105,7 +105,7 @@ options:
       icon: '{nf:::}'
       interactive: true
       quiet: true
-    - label: QBasic Gorillas
+    - label: QBasic Gorillas Clone
       type: script
       action: python3 gorillas.py
       icon: '{nf::}'
@@ -376,7 +376,7 @@ options:
       stream: true
       quiet: true
       icon: '{nf:::}'
-    - label: Display Block Devices
+    - label: Display Block Devices [lsblk]
       type: command
       action: lsblk
       icon: '{nf:::}'
@@ -393,7 +393,7 @@ options:
       quiet: true
       stream: true
       icon: '{nf:::}'
-    - label: Kernel Information
+    - label: Kernel Information [uname -r]
       type: command
       action: uname -r
       icon: '{nf:::}'
@@ -414,6 +414,50 @@ options:
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
+- label: Weather
+  submenu:
+    title: Weather
+    options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+    - label: 'This Day:'
+      type: command
+      action: '{user.this_day}'
+      icon: '{nf::#:}'
+    - label: Weather Postal Code [{user.postal_code}]
+      type: config
+      action: Enter Postal Code
+      icon: '{nf::#eef0:}'
+      interactive: false
+      stream: true
+      quiet: true
+      key: user.postal_code
+      title: Weather Location
+      prompt: 'Enter your postal code/zip code:'
+      picker: none
+    - label: Weather -> 3 Day [curl wttr.in/{user.postal_code}]
+      type: command
+      action: curl wttr.in/{user.postal_code}
+      icon: '{nf::#eef0:}'
+      stream: false
+      quiet: false
+      interactive: true
+    - label: Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]
+      type: command
+      action: curl v2.wttr.in/{user.postal_code}
+      icon: '{nf::#eef0:}'
+      interactive: true
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+    - label: Back to Main Menu
+      type: back
+      icon: '{nf::#f048:}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+  icon: "{nf::#eef0:\U0001F326\uFE0F }"
 - type: divider
   length: '{window_width}'
   char: '{ascii:196}'
