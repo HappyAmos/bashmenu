@@ -29,6 +29,12 @@ options:
       action: copilot
       interactive: true
       quiet: true
+    - label: Carbonyl [https://duckduckgo.com]
+      type: command
+      action: carbonyl https://duckduckgo.com
+      icon: '{nf::#f26b:}'
+      interactive: true
+      quiet: true
     - label: Gemini [New Session]
       icon: '{nf::#F1A0}'
       type: command
@@ -160,6 +166,11 @@ options:
       action: '{scripts_dir}/install_cheat.sh'
       stream: true
       icon: '{nf::#f02aa}'
+    - label: Install Brow6el [https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh]
+      type: command
+      action: bash -c "$(curl -fsSL https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh)"
+      icon: '{nf:::}'
+      interactive: true
     - label: Install kmscon [{scripts_dir}/install_kmscon.sh]
       type: script
       action: '{scripts_dir}/install_kmscon.sh'
