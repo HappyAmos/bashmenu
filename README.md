@@ -1,6 +1,6 @@
 # HA Bash Menu
 
-![](/home/andrew/github/bashmenu/assets/bashmenu.gif)
+![](assets/bashmenu.gif)
 
 A lightweight, data-driven Curses TUI (Text User Interface) menu engine
 and settings editor for Linux, configured entirely through modular YAML files.
