@@ -79,6 +79,9 @@ Standard and Extended ASCII viewing utility.
 .TP
 .I scripts/ncurses_colors.py
 Visual tester for ncurses color support.
+.TP
+.I scripts/otd.sh
+Fetches a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq.
 .SS Provided Templates (templates/)
 Utilized as layout sources for code generation and block injections:
 .TP
@@ -422,6 +425,48 @@ seamless interactive installs, updates, and uninstalls.
 Python script items of type "script" can set "external: false" to run inside
 bashmenu's parent process, avoiding terminal flashes. Plugins must implement
 "def main(stdscr)".
+.SS Background Footer Plugins & Plugin Creation
+HA Bash Menu features an asynchronous, background-cached plugin architecture configured under
+.I settings.plugins
+in
+.I bashmenu.yml.
+Plugin output lines are rendered in a dedicated display area above the help footer.
+.IP \(bu 2
+.B Asynchronous Execution & Caching:
+Plugin scripts run in background daemon threads with re-entrant locking to ensure network calls never lag the main TUI rendering loop. Script outputs are cached in memory for the duration specified by
+.I sleep
+(in seconds, defaulting to 300). Setting
+.I sleep: 0
+forces live execution on every frame refresh.
+.IP \(bu 2
+.B Priority Rendering:
+Menu options hold top rendering priority. The engine calculates available vertical screen space between the menu options list and help footer; if terminal height is constrained, plugin lines are automatically wrapped, truncated, or dropped so menu navigation remains unhindered.
+.IP \(bu 2
+.B Pretext & Posttext:
+Plugins support optional
+.I pretext
+and
+.I posttext
+lines (such as {user.divider}) rendered before and after script output lines.
+.PP
+.B Creating & Registering a Custom Plugin:
+To create a custom plugin, write an executable script in
+.I scripts_dir
+(e.g., scripts/my_status.sh) that outputs text to standard stdout (supporting BBCode styling tags like [b] or [color=accent]). Then register it under
+.I settings.plugins
+in
+.I bashmenu.yml:
+.RS
+.nf
+settings:
+  plugins:
+    my_status:
+      script: my_status.sh
+      sleep: 60
+      pretext: '{user.divider}'
+      posttext: '{user.divider}'
+.fi
+.RE
 .SS Multi-Platform Support & Environment Detection
 HA Bash Menu incorporates an environment detection engine in bashmenu.sh enabling graceful degradation and multi-platform compatibility without manual configuration. All files leverage universal shebangs. Cross-Platform package wrappers automatically translate dependency installs to the correct local package manager (apt, dnf, pacman, pkg, or brew), and smartly add or omit sudo depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
 .SH AUTHOR

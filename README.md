@@ -5,11 +5,10 @@
 A lightweight, data-driven Curses TUI (Text User Interface) menu engine
 and settings editor for Linux, configured entirely through modular YAML files.
 
-Extend your shell script experience with beautiful widgets, visual file choosers,
-in-process python sub-apps, and self-installing settings templates!
+Extend your shell script experience with widgets, visual file choosers,
+in-process python sub-apps, and self-installing settings templates.
 
-Contains a few personal scripts as examples, all of which have been cleared
-as clean by shellcheck, a linux shell script validator.
+Contains a few personal scripts as examples.
 
 ---
 
@@ -22,7 +21,7 @@ as clean by shellcheck, a linux shell script validator.
 - **Dynamic Prompts & Pickers**: Prompt the user on action select using `{param}`
   text modals, or `{file_picker}`/`{dir_picker}` filesystem navigators. Includes
   intelligent path-aware folder pre-loading.
-- **Adaptive Icons**: Beautiful icons mapped via `{nf:[char]:[hex]:[emoji]}`.
+- **Adaptive Icons**: Icons mapped via `{nf:[char]:[hex]:[emoji]}`.
   Toggles gracefully between Unicode Emojis, Nerd Font Glyphs, or Fallback ASCII
   characters. If disabled, icon paddings collapse for compact alignment.
 - **Dynamic Settings Injection (`type: inject_block`)**: Interactively inject
@@ -64,6 +63,8 @@ Launch the menu interface directly:
 ```bash
 ./bashmenu.sh
 ```
+
+Automatically adds a launcher script ~/.local/bin/bm and adds it to your path.
 
 ---
 

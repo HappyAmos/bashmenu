@@ -51,6 +51,9 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 - `scripts/unicode.sh`       : Interactive Unicode Block Explorer script.
 - `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
 - `scripts/ncurses_colors.py`: Visual tester for ncurses color support.
+- `scripts/otd.sh`           : Shell script fetching a random "On This Day"
+                              historical quote/event and link from
+                              today.zenquotes.io API using curl and jq.
 
 ### 2.2 Provided Templates (`templates/`)
 Used as dynamic templates for code generation, settings, or block injections:
@@ -351,3 +354,46 @@ HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabl
 - **Universal Shebangs:** All `.py` and `.sh` files leverage `#!/usr/bin/env` for maximum portability.
 - **Cross-Platform Package Wrappers:** By routing operations through wrappers like `scripts/system_update.sh`, the engine automatically translates dependency installs to the correct local package manager (`apt`, `dnf`, `pacman`, `pkg`, or `brew`), and smartly adds or omits `sudo` depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
 - **Graceful Degradation:** Features dependent on low-level system daemon frameworks (e.g., `kmscon` or `systemd-resolved` DNS modification) check for Termux/WSL and fail gracefully, rather than crashing with environment errors.
+
+### 7.4 Background Footer Plugins Architecture & Creation Guide
+
+HA Bash Menu features an asynchronous, background-cached plugin architecture for displaying live feeds, status information, or quotes directly above the help footer.
+
+#### How Background Plugins Work:
+1. **Asynchronous Daemon Execution**: Plugin scripts run in background daemon threads (`threading.Thread(daemon=True)`) with thread-safe locking (`RLock`). This ensures network requests or slow command calls never freeze or lag the main TUI rendering loop.
+2. **In-Memory Caching & Sleep Interval**: The output of each plugin script is cached in memory. The `sleep` setting (default: `300` seconds) controls how long cached output remains valid before spawning a background refresh thread. Setting `sleep: 0` forces live execution on every frame tick.
+3. **Responsive Vertical Layout Priority**: Menu navigation options hold top rendering priority. The engine calculates available screen space between the menu options list and help footer (`max_plugin_rows`). On constrained terminal windows, plugin output lines are automatically wrapped, truncated, or hidden so menu navigation remains unhindered.
+4. **Pretext & Posttext Wrapping**: Optional `pretext` and `posttext` strings can be rendered before and after script output. These support full placeholder interpolation (including `{user.divider}` or `{divider}` for horizontal rule lines).
+
+#### Creating & Registering a Custom Plugin:
+
+1. **Create the Plugin Script**:
+   Write a shell script or executable program placed in `scripts_dir` (e.g. `scripts/my_plugin.sh`):
+   ```bash
+   #!/usr/bin/env bash
+   # Example: scripts/my_plugin.sh
+   UPTIME=$(uptime -p | sed 's/up //')
+   echo -e "[b]System Uptime:[/b] [color=accent]${UPTIME}[/color]"
+   ```
+   *Note:* The script can output one or multiple lines, and may include rich BBCode formatting tags (e.g. `[b]`, `[color=accent]`) and placeholders.
+
+2. **Register in `bashmenu.yml`**:
+   Add the plugin definition under `settings.plugins` in `bashmenu.yml`:
+   ```yaml
+   settings:
+     plugins:
+       uptime_feed:
+         script: "my_plugin.sh"
+         sleep: 60
+         pretext: '{user.divider}'
+         posttext: '{user.divider}'
+   ```
+
+3. **Supported Plugin Definition Formats**:
+   - **Simple String**: `my_plugin: "my_plugin.sh"` (uses default `sleep: 300`).
+   - **Full Dictionary**:
+     - `script` (or `command`, `cmd`, `path`, `file`): Filename inside `scripts_dir`, absolute path, or shell command string.
+     - `sleep`: Cache duration in seconds (`0` for live refresh).
+     - `pretext`: Header text/divider rendered before script output.
+     - `posttext`: Footer text/divider rendered after script output.
+

@@ -97,6 +97,73 @@ is_installed() {
     command -v "$tool" &> /dev/null
 }
 
+# Function to check if man page is installed
+is_man_installed() {
+    local manpage="${1:-bashmenu}"
+    if command -v man &>/dev/null && man -w "$manpage" &>/dev/null; then
+        return 0
+    fi
+
+    local candidate_dirs=(
+        "/usr/local/share/man/man1"
+        "/usr/share/man/man1"
+        "$HOME/.local/share/man/man1"
+    )
+    [ -n "$PREFIX" ] && candidate_dirs+=("$PREFIX/share/man/man1" "$PREFIX/man/man1")
+
+    for dir in "${candidate_dirs[@]}"; do
+        if [ -f "$dir/${manpage}.1" ] || [ -L "$dir/${manpage}.1" ] || [ -f "$dir/${manpage}" ] || [ -L "$dir/${manpage}" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Install man page (bashmenu.1) into standard man directory
+install_man_page() {
+    local man_name="bashmenu.1"
+    local source_man="${SCRIPT_DIR}/${man_name}"
+    local target_dir=""
+
+    if [ ! -f "$source_man" ]; then
+        echo "  [✗] Man page source file not found at $source_man" >&2
+        return 1
+    fi
+
+    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ]; then
+        if [ -d "$PREFIX/share/man" ]; then
+            target_dir="$PREFIX/share/man/man1"
+        elif [ -d "$PREFIX/man" ]; then
+            target_dir="$PREFIX/man/man1"
+        else
+            target_dir="$PREFIX/share/man/man1"
+        fi
+    elif [ "$(id -u)" = 0 ]; then
+        target_dir="/usr/local/share/man/man1"
+    elif [ -w "/usr/local/share/man/man1" ] || [ -w "/usr/local/share/man" ]; then
+        target_dir="/usr/local/share/man/man1"
+    else
+        target_dir="$HOME/.local/share/man/man1"
+    fi
+
+    mkdir -p "$target_dir" 2>/dev/null || run_as_root mkdir -p "$target_dir"
+    local target_file="${target_dir}/${man_name}"
+
+    echo "Installing man page '$man_name' pointing to: $source_man"
+
+    ln -sf "$source_man" "$target_file" 2>/dev/null || run_as_root ln -sf "$source_man" "$target_file" || \
+    cp "$source_man" "$target_file" 2>/dev/null || run_as_root cp "$source_man" "$target_file"
+
+    if [ -L "$target_file" ] || [ -f "$target_file" ]; then
+        echo "  [✓] Successfully installed man page at $target_file"
+        return 0
+    else
+        echo "  [✗] Failed to install man page at $target_file" >&2
+        return 1
+    fi
+}
+
 # Install global 'bm' command shortcut pointing to bashmenu.sh
 install_shortcut() {
     local shortcut_name="bm"
@@ -144,6 +211,10 @@ for arg in "$@"; do
     case "$arg" in
         --install-shortcut|--install-bm)
             install_shortcut
+            exit $?
+            ;;
+        --install-man|--install-manpage)
+            install_man_page
             exit $?
             ;;
     esac
@@ -355,6 +426,17 @@ if ! is_installed "bm"; then
         echo ""
         if [[ "$REPLY" =~ ^[Yy]$ ]]; then
             install_shortcut
+        fi
+    fi
+fi
+
+# Check if man page is missing and prompt user if interactive session
+if ! is_man_installed "bashmenu"; then
+    if [ -t 0 ]; then
+        read -p "Man page 'bashmenu.1' is not installed. Install it now? [y/N]: " -n 1 -r
+        echo ""
+        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+            install_man_page
         fi
     fi
 fi
