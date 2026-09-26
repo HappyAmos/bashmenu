@@ -27,9 +27,9 @@ fi
 # URL to a reliable, clean JSON list of emojis
 NERD_URL="http://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json"
 EMOJI_URL="https://raw.githubusercontent.com/muan/unicode-emoji-json/refs/heads/main/data-by-emoji.json"
-CACHE_DIR="$HOME/.cache/bashmenu"
-NERD_CACHE="$HOME/.cache/bashmenu/glyphs.json"
-EMOJI_CACHE="$HOME/.cache/bashmenu/emoji_list.json"
+CACHE_DIR="${CACHE_DIR:-"$HOME/.cache/bashmenu"}"
+NERD_CACHE="$CACHE_DIR/glyphs.json"
+EMOJI_CACHE="$CACHE_DIR/emoji_list.json"
 
 # Create cache directory if it doesn't exist
 mkdir -p "$CACHE_DIR" &>/dev/null

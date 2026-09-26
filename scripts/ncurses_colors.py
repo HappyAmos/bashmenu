@@ -28,7 +28,7 @@ def print_tput_colors():
         sgr0_bytes = curses.tigetstr('sgr0')
         if setaf_bytes and sgr0_bytes:
             use_curses = True
-    except Exception:
+    except Exception:  # noqa: BLE001
         use_curses = False
 
     def ansi_setaf(color_id):
@@ -48,7 +48,7 @@ def print_tput_colors():
                 res = curses.tparm(setaf_bytes, color_id)
                 if res:
                     return res.decode('utf-8', errors='ignore')
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
         return ansi_setaf(color_id)
 
@@ -57,7 +57,7 @@ def print_tput_colors():
             try:
                 if sgr0_bytes:
                     return sgr0_bytes.decode('utf-8', errors='ignore')
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
         return ansi_sgr0()
 
