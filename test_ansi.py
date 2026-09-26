@@ -97,11 +97,11 @@ class TestAnsiParsing(unittest.TestCase):
         with mock.patch("curses.update_lines_cols", lambda: None):
             with mock.patch("curses.COLS", 120), mock.patch("curses.LINES", 40):
                 resolved = bashmenu.interpolate_placeholders("{window_width}x{window_height}", {})
-                self.assertEqual(resolved, "120x40")
+                self.assertEqual(resolved, "112x34")
 
             with mock.patch("curses.COLS", 160), mock.patch("curses.LINES", 50):
                 resolved = bashmenu.interpolate_placeholders("{window_width}x{window_height}", {})
-                self.assertEqual(resolved, "160x50")
+                self.assertEqual(resolved, "152x44")
 
     def test_interpolate_placeholders_new_directives(self):
         """Test that all newly added custom status gutter placeholders resolve properly."""
@@ -148,6 +148,75 @@ class TestAnsiParsing(unittest.TestCase):
         resolved = bashmenu.interpolate_placeholders("{scripts}/bsdgames.sh", {})
         self.assertTrue(resolved.endswith("/scripts/bsdgames.sh"))
         self.assertNotIn("{scripts}", resolved)
+
+    def test_cache_dir_placeholders_and_resolution(self):
+        """Test that {cache_dir}, {cache}, and {settings.cache_dir} resolve properly in interpolate_placeholders."""
+        config = {"settings": {"cache_dir": "{home}/custom_cache/bashmenu"}}
+        resolved_dir = bashmenu.interpolate_placeholders("{cache_dir}/test.txt", config)
+        resolved_cache = bashmenu.interpolate_placeholders("{cache}/test.txt", config)
+        resolved_setting = bashmenu.interpolate_placeholders("{settings.cache_dir}/test.txt", config)
+
+        expected_prefix = os.path.expanduser("~") + "/custom_cache/bashmenu"
+        self.assertTrue(resolved_dir.startswith(expected_prefix))
+        self.assertTrue(resolved_cache.startswith(expected_prefix))
+        self.assertTrue(resolved_setting.startswith(expected_prefix))
+        self.assertEqual(os.environ.get("CACHE_DIR"), expected_prefix)
+
+
+class TestNerdFontWidth(unittest.TestCase):
+    """
+    Test suite for PUA Nerd Font glyph width calculation and auto-detection.
+    """
+    def test_is_pua_glyph(self):
+        """Test detection of Private Use Area characters."""
+        self.assertTrue(bashmenu.is_pua_glyph("\uf07c"))  # Folder glyph
+        self.assertTrue(bashmenu.is_pua_glyph("\ue7f0"))  # Python glyph
+        self.assertFalse(bashmenu.is_pua_glyph("A"))
+        self.assertFalse(bashmenu.is_pua_glyph("1"))
+
+    def test_get_nerd_font_width_explicit_config(self):
+        """Test explicit nerd_font_width settings (1 vs 2)."""
+        config_1 = {"settings": {"nerd_font_width": 1}}
+        config_2 = {"settings": {"nerd_font_width": 2}}
+
+        self.assertEqual(bashmenu.get_nerd_font_width(config_1), 1)
+        self.assertEqual(bashmenu.get_nerd_font_width(config_2), 2)
+        self.assertEqual(bashmenu.get_char_width("\uf07c", config_1), 1)
+        self.assertEqual(bashmenu.get_char_width("\uf07c", config_2), 2)
+
+    def test_get_nerd_font_width_auto_kitty(self):
+        """Test auto-detection in Kitty terminal environment."""
+        config_auto = {"settings": {"nerd_font_width": "auto"}}
+        with mock.patch.dict(os.environ, {"KITTY_WINDOW_ID": "12345", "TERM": "xterm-kitty"}):
+            self.assertEqual(bashmenu.get_nerd_font_width(config_auto), 1)
+            self.assertEqual(bashmenu.get_char_width("\uf07c", config_auto), 1)
+            self.assertEqual(bashmenu.get_display_width("\uf07c Icon", config_auto), 6)
+
+    def test_get_nerd_font_width_auto_standard(self):
+        """Test auto-detection in standard terminal environment."""
+        config_auto = {"settings": {"nerd_font_width": "auto"}}
+        with mock.patch.dict(os.environ, {"KITTY_WINDOW_ID": "", "TERM": "xterm-256color"}, clear=True):
+            self.assertEqual(bashmenu.get_nerd_font_width(config_auto), 1)
+            self.assertEqual(bashmenu.get_char_width("\uf07c", config_auto), 1)
+            self.assertEqual(bashmenu.get_display_width("\uf07c Icon", config_auto), 6)
+
+    def test_shortcut_badge_display_width(self):
+        """Test that shortcut key badges like '[b]' are calculated as 3 columns wide."""
+        self.assertEqual(bashmenu.get_display_width("[b]"), 3)
+        self.assertEqual(bashmenu.get_display_width("[0]"), 3)
+
+    def test_emoji_variation_selector_display_width(self):
+        """Test display width calculations and glyph resolution for emojis with Variation Selector-16 (\uFE0F)."""
+        # East Asian Wide emojis have width 2
+        self.assertEqual(bashmenu.get_display_width("\U0001F680"), 2)
+        self.assertEqual(bashmenu.get_display_width("\U0001F310"), 2)
+        # Emojis with \uFE0F variation selector-16 calculate display width 2
+        self.assertEqual(bashmenu.resolve_glyph("\u2699\uFE0F"), "\u2699\uFE0F")
+        self.assertEqual(bashmenu.resolve_glyph("\u2139\uFE0F"), "\u2139\uFE0F")
+        self.assertEqual(bashmenu.resolve_glyph("\U0001F326\uFE0F"), "\U0001F326\uFE0F")
+        self.assertEqual(bashmenu.get_display_width("\u2699\uFE0F"), 2)
+        self.assertEqual(bashmenu.get_display_width("\u2139\uFE0F"), 2)
+        self.assertEqual(bashmenu.get_display_width("\U0001F326\uFE0F"), 2)
 
 
 if __name__ == "__main__":

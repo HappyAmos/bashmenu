@@ -87,7 +87,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 - `>` / `.` / `Tab`       : Indent item into preceding Submenu folder.
 - `<` / `,` / `Shift+Tab` : Outdent item out to Parent menu list.
 - `t`                     : Test-run selected menu item action directly.
-- `s`                     : Save changes to `bashmenu.mnu` (creates `.bak`).
+- `s`                     : Save changes to `bashmenu.mnu`.
 - `?` / `h` / `F1`         : Display comprehensive General Help modal.
 - `ESC`                   : Exit editor (prompts if unsaved changes exist).
 

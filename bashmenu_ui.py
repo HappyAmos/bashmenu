@@ -7,6 +7,16 @@ import os
 import unicodedata
 
 
+def safe_curs_set(visibility: int) -> None:
+    """
+    Safely set cursor visibility without raising curses.error if unsupported.
+    """
+    try:
+        curses.curs_set(visibility)
+    except (curses.error, Exception):  # noqa: BLE001, S110
+        pass
+
+
 def safe_isprintable(s: str) -> bool:
     """
     Returns True if the string contains only valid printable characters,
@@ -40,13 +50,130 @@ def is_formatting_tag(content):
     return content_clean.startswith("color=") and "]" not in content_clean
 
 
-def get_visible_len(text):
+def is_pua_glyph(c: str) -> bool:
     """
-    Return the visible length of a string by stripping out any formatting tags [tag].
+    Check if a character falls within Unicode Private Use Area ranges
+    where Nerd Font glyphs reside.
+    """
+    if not c or not isinstance(c, str):
+        return False
+    cp = ord(c[0])
+    return (0xE000 <= cp <= 0xF8FF) or (0xF0000 <= cp <= 0xFFFFF) or (0x100000 <= cp <= 0x10FFFD)
+
+
+def get_nerd_font_width(config=None) -> int:
+    """
+    Determine the display width for Nerd Font / PUA glyphs.
+    Supported settings: 'auto', 1, 2.
+    When 'auto', defaults to 1 column matching ncurses wcwidth.
+    """
+    mode = "auto"
+    if isinstance(config, dict):
+        settings = config.get("settings", {})
+        if isinstance(settings, dict) and "nerd_font_width" in settings:
+            mode = settings.get("nerd_font_width")
+
+    if mode is not None:
+        mode_str = str(mode).lower().strip()
+        if mode_str in ("2", "double", "wide", "two"):
+            return 2
+        elif mode_str in ("1", "single", "narrow", "one"):
+            return 1
+
+    return 1
+
+
+def is_emoji_char(c: str) -> bool:
+    """
+    Check if a character is a standard Unicode emoji symbol.
+    """
+    if not c:
+        return False
+    cp = ord(c[0])
+    return (
+        (0x1F300 <= cp <= 0x1F9FF)
+        or (0x1FA00 <= cp <= 0x1FAFF)
+        or (0x2600 <= cp <= 0x27BF)
+        or (0x2300 <= cp <= 0x23FF)
+        or (0x2B50 <= cp <= 0x2B59)
+        or (0x1F000 <= cp <= 0x1F02F)
+        or (0x1F0A0 <= cp <= 0x1F0FF)
+        or (0x1F1E6 <= cp <= 0x1F1FF)
+    )
+
+
+def get_char_width(c: str, config=None) -> int:
+    """
+    Get the display width of a single character in terminal columns.
+    """
+    if not c:
+        return 0
+
+    if 0xFE00 <= ord(c) <= 0xFE0F:
+        return 0
+
+    if is_pua_glyph(c):
+        return get_nerd_font_width(config)
+
+    if unicodedata.east_asian_width(c) in ("W", "F"):
+        return 2
+
+    return 1
+
+
+def get_display_width(s: str, config=None) -> int:
+    """
+    Calculate the visual display width of a string on screen in terminal columns,
+    accounting for wide characters, emojis, variation selectors, and Nerd Font glyph width settings.
+    """
+    if not s:
+        return 0
+    total = 0
+    i = 0
+    n = len(s)
+    while i < n:
+        c = s[i]
+        cp = ord(c)
+
+        if i + 1 < n and s[i + 1] == "\uFE0F":
+            total += 2
+            i += 2
+            continue
+
+        if 0xFE00 <= cp <= 0xFE0F:
+            i += 1
+            continue
+
+        if is_pua_glyph(c):
+            total += get_nerd_font_width(config)
+            i += 1
+            continue
+
+        if is_emoji_char(c) or unicodedata.east_asian_width(c) in ("W", "F"):
+            total += 2
+            i += 1
+            continue
+
+        if unicodedata.category(c).startswith("M"):
+            i += 1
+            continue
+
+        total += 1
+        i += 1
+
+    return total
+
+
+def get_visible_len(text, config=None) -> int:
+    """
+    Return the visible length of a string by stripping out any formatting tags [tag]
+    and calculating visual display width across terminal columns.
     """
     import re
+    if not text:
+        return 0
     if not isinstance(text, str):
-        return len(str(text))
+        text = str(text)
     tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
     def replace_tag(match):
         tag = match.group(1)
@@ -54,7 +181,7 @@ def get_visible_len(text):
             return ""
         return match.group(0)
     clean_text = tag_pattern.sub(replace_tag, text)
-    return len(clean_text)
+    return get_display_width(clean_text, config)
 
 
 def parse_formatting_to_segments(text, base_attr, theme):
@@ -116,46 +243,54 @@ def parse_formatting_to_segments(text, base_attr, theme):
     return segments
 
 
-def safe_addstr_segments(win, y, x, segments):
+def safe_addstr_segments(win, y, x=None, segments=None, config=None):
     """
-    Safely write a line composed of multiple (text, attr) segments starting at (y, x).
+    Safely write a line composed of multiple (text, attr) segments starting at (y, x),
+    or sequentially at the current cursor position if y and x are omitted/None.
     """
-    h, w = win.getmaxyx()
-    if y >= h or x >= w:
-        return
+    if segments is None and isinstance(y, list):
+        segments = y
+        config = x
+        y = None
+        x = None
 
-    current_x = x
+    if y is not None and x is not None:
+        h, w = win.getmaxyx()
+        if y >= h or x >= w:
+            return
+        try:
+            win.move(y, x)
+        except curses.error:
+            return
+
     for text, attr in segments:
-        if current_x >= w:
-            break
-        max_len = w - current_x if y < h - 1 else w - current_x - 1
-        if max_len > 0:
-            part = text[:max_len]
-            try:
-                win.addstr(y, current_x, part, attr)
-            except curses.error:
-                pass
-            current_x += len(part)
+        try:
+            win.addstr(text, attr)
+        except curses.error:
+            pass
 
 
-def safe_addstr(win, y, x, text, attr=0):
+def safe_addstr(win, y_or_text, x_or_attr=None, text_or_none=None, attr=0):
     """
     Safely write a string within window boundaries to prevent curses crashes.
-
-    Args:
-        win (curses.window): Target curses window object.
-        y (int): Row position on window.
-        x (int): Column position on window.
-        text (str): String content to render.
-        attr (int): Curses text attributes/color pairs.
+    Supports safe_addstr(win, y, x, text, attr) and safe_addstr(win, text, attr).
     """
-    h, w = win.getmaxyx()
-    if y >= h or x >= w:
-        return
-    max_len = w - x if y < h - 1 else w - x - 1
-    if max_len > 0:
+    if text_or_none is not None:
+        y, x, text = y_or_text, x_or_attr, text_or_none
+        h, w = win.getmaxyx()
+        if y >= h or x >= w:
+            return
+        max_len = w - x if y < h - 1 else w - x - 1
+        if max_len > 0:
+            try:
+                win.addstr(y, x, text[:max_len], attr)
+            except curses.error:
+                pass
+    else:
+        text = y_or_text
+        effective_attr = x_or_attr if x_or_attr is not None else 0
         try:
-            win.addstr(y, x, text[:max_len], attr)
+            win.addstr(str(text), effective_attr)
         except curses.error:
             pass
 
@@ -334,7 +469,7 @@ def show_confirm_box(stdscr, title, message, theme):
     win = curses.newwin(box_h, box_w, start_y, start_x)
     win.bkgd(' ', theme["text"])
     win.keypad(True)
-    curses.curs_set(0)
+    safe_curs_set(0)
 
     buttons = ["Yes", "No", "Cancel"]
     active_btn = 0
@@ -441,7 +576,7 @@ def show_toggle_box(stdscr, title, message, theme):
     win = curses.newwin(box_h, box_w, start_y, start_x)
     win.bkgd(' ', theme["text"])
     win.keypad(True)
-    curses.curs_set(0)
+    safe_curs_set(0)
 
     buttons = ["True", "False", "Cancel"]
     active_btn = 0
@@ -546,7 +681,7 @@ def show_input_box(
     win = curses.newwin(box_h, box_w, start_y, start_x)
     win.bkgd(' ', theme["text"])
     win.keypad(True)
-    curses.curs_set(1)
+    safe_curs_set(1)
 
     input_text = list(default_text)
     cursor_pos = len(input_text)
@@ -597,10 +732,10 @@ def show_input_box(
             continue
 
         if key == 27 or key == '\x1b':
-            curses.curs_set(0)
+            safe_curs_set(0)
             return None
         elif key in [curses.KEY_ENTER, 10, 13, '\n', '\r']:
-            curses.curs_set(0)
+            safe_curs_set(0)
             return "".join(input_text)
         elif key in [curses.KEY_BACKSPACE, 8, 127, '\x08', '\x7f', '\b']:
             if cursor_pos > 0:
@@ -664,7 +799,7 @@ def show_file_picker(
 
     cursor_idx = 0
     scroll_offset = 0
-    curses.curs_set(0)
+    safe_curs_set(0)
     initial_selection_done = False
 
     config, _ = bashmenu.load_config()

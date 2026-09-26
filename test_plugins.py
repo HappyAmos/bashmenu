@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import time
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import bashmenu
+
 
 class TestPluginSystem(unittest.TestCase):
     def setUp(self):

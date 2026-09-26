@@ -79,7 +79,7 @@ def run_curses_editor(
 
     show_line_numbers = show_help = True
 
-    curses.curs_set(1)
+    bashmenu_ui.safe_curs_set(1)
     stdscr.keypad(True)
 
     def push_undo():
@@ -173,7 +173,7 @@ def run_curses_editor(
                 save_file()
 
         restore_termios()
-        curses.curs_set(0)
+        bashmenu_ui.safe_curs_set(0)
         return True
 
     def save_file():

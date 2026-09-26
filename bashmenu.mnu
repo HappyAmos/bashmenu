@@ -18,6 +18,12 @@ options:
       action: /home/andrew/.local/bin/agy
       interactive: true
       quiet: true
+    - label: Brow6el
+      type: script
+      action: /home/andrew/github/brow6el/build/brow6el
+      icon: '{nf::#f059f:}'
+      interactive: true
+      quiet: true
     - label: Built-In Text Editor
       icon: '{nf::#f11e7}'
       type: editor
@@ -32,7 +38,7 @@ options:
     - label: Carbonyl [https://duckduckgo.com]
       type: command
       action: carbonyl https://duckduckgo.com
-      icon: '{nf::#f26b:}'
+      icon: '{nf::#f059f:}'
       interactive: true
       quiet: true
     - label: Gemini [New Session]
@@ -111,6 +117,12 @@ options:
       icon: '{nf:::}'
       interactive: true
       quiet: true
+    - label: Console Games
+      type: command
+      action: '{scripts}/games.sh'
+      icon: '{nf:::}'
+      interactive: true
+      quiet: true
     - label: QBasic Gorillas Clone
       type: script
       action: python3 gorillas.py
@@ -161,15 +173,27 @@ options:
       action: '{scripts_dir}/install_basics.sh'
       stream: true
       icon: '{nf::#ed5b}'
+    - label: Install Brow6el [https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh]
+      type: command
+      action: bash -c "$(curl -fsSL https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh)"
+      icon: '{nf::#f059f:}'
+      interactive: true
     - label: Install Cheatsheets From Private Repo [https://github.com/HappyAmos/cheat.git]
       type: script
       action: '{scripts_dir}/install_cheat.sh'
       stream: true
       icon: '{nf::#f02aa}'
-    - label: Install Brow6el [https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh]
+    - label: Install Kitty [curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin]
       type: command
-      action: bash -c "$(curl -fsSL https://tangled.org/janantos.tngl.sh/brow6el/raw/main/download_cef.sh)"
-      icon: '{nf:::}'
+      action: curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
+      icon: '{nf::#f26b:}'
+      interactive: true
+      quiet: true
+    - label: Install Games [{scripts_dir}/install_games.sh]
+      type: script
+      action: '{scripts_dir}/install_games.sh'
+      icon: '{nf::#:}'
+      external: true
       interactive: true
     - label: Install kmscon [{scripts_dir}/install_kmscon.sh]
       type: script
@@ -303,6 +327,11 @@ options:
           title: Toggle Nerd Fonts
           message: Enable colorful menu emojis and Nerd Fonts?
           icon: '{nf:::}'
+        - label: Nerd Font Display Width [{settings.nerd_font_width}]
+          type: config
+          key: settings.nerd_font_width
+          title: Configure Nerd Font Glyph Width
+          prompt: 'Enter Nerd Font character width mode (auto, 1, 2):'
         - label: Editor Tab to Spaces Mode [{settings.tab_to_spaces}]
           type: toggle
           key: settings.tab_to_spaces
@@ -468,7 +497,7 @@ options:
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
-  icon: "{nf::#eef0:\U0001F326\uFE0F }"
+  icon: "{nf::#eef0:\U0001F326\uFE0F}"
 - type: divider
   length: '{window_width}'
   char: '{ascii:196}'

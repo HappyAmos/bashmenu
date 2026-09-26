@@ -16,8 +16,8 @@ Features:
 import curses
 import math
 import random
-import time
 import sys
+import time
 
 
 def init_colors():
@@ -182,8 +182,6 @@ class GorillasGame:
         # Random wind between -15.0 and +15.0
         self.wind = round(random.uniform(-15.0, 15.0), 1)
 
-        # Place Gorilla 1 on left buildings (around 10% to 25% of width)
-        b1_idx = max(0, len(self.skyline.building_bounds) // 4)
         if self.skyline.building_bounds:
             b1 = self.skyline.building_bounds[min(1, len(self.skyline.building_bounds)-1)]
             self.p1_x = (b1[0] + b1[1]) // 2
@@ -358,17 +356,13 @@ class GorillasGame:
         sun_x = w // 2
         sun_y = 2
 
-        hit_target = None  # None, 'p1', 'p2', 'building', 'out'
-
-        prev_x, prev_y = start_x, start_y
-
         while True:
             t += dt
 
             # Position equation incorporating velocity, gravity, and wind
             # Wind adds horizontal acceleration component: 0.5 * wind * t^2
-            curr_x = int(round(start_x + (vx0 * t) + (0.5 * self.wind * (t ** 2))))
-            curr_y = int(round(start_y + (vy0 * t) + (0.5 * self.gravity * (t ** 2))))
+            curr_x = round(start_x + (vx0 * t) + (0.5 * self.wind * (t ** 2)))
+            curr_y = round(start_y + (vy0 * t) + (0.5 * self.gravity * (t ** 2)))
 
             # Check if banana is out of bounds
             if curr_x < 0 or curr_x >= w or curr_y >= h:

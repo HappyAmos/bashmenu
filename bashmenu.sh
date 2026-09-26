@@ -19,15 +19,10 @@ BASHMENU_SETTINGS="${SCRIPT_DIR}/bashmenu.yml"
 GLOW_INSTALLER="${SCRIPT_DIR}/scripts/install_glow.sh"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 VENV_ACTIVATE="${VENV_DIR}/bin/activate"
-CACHE_DIR="$HOME/.cache/bashmenu"
-
 # Define the standard CLI tools required
 REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "python3")
 MISSING_PACKAGES=()
 GLOW_IS_MISSING=false
-
-# Setup a cache directory
-mkdir -p "$CACHE_DIR" &>/dev/null || exit 1
 
 # Function to extract a value from a YAML file using yq or python3 fallback.
 yaml_get() {
@@ -39,6 +34,19 @@ yaml_get() {
       python3 -c "import yaml, sys; data=yaml.safe_load(open('$file')); keys='$key'.split('.'); [data := data.get(k, {}) for k in keys if isinstance(data, dict)]; print(data if not isinstance(data, dict) else '')" 2>/dev/null || true
   fi
 }
+
+# Resolve configurable cache directory
+RAW_CACHE_DIR=$(yaml_get "settings.cache_dir" "${BASHMENU_SETTINGS}")
+if [ -n "$RAW_CACHE_DIR" ] && [ "$RAW_CACHE_DIR" != "null" ]; then
+    CACHE_DIR="${RAW_CACHE_DIR//\{home\}/$HOME}"
+    CACHE_DIR="${CACHE_DIR//\{bashmenu_dir\}/$SCRIPT_DIR}"
+else
+    CACHE_DIR="$HOME/.cache/bashmenu"
+fi
+export CACHE_DIR
+
+# Setup a cache directory
+mkdir -p "$CACHE_DIR" &>/dev/null || exit 1
 
 IS_TERMUX=false
 IS_WSL=false

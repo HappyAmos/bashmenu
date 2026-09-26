@@ -26,7 +26,7 @@ import sys
 import textwrap
 import threading
 import time
-import unicodedata
+import traceback
 from pathlib import Path
 
 import yaml
@@ -82,6 +82,7 @@ BASH_ALIASES_PATH = str(Path.home() / ".bash_aliases")
 HOSTNAME = socket.gethostname()
 
 safe_isprintable = bashmenu_ui.safe_isprintable
+safe_curs_set = bashmenu_ui.safe_curs_set
 safe_addstr = bashmenu_ui.safe_addstr
 draw_shadow = bashmenu_ui.draw_shadow
 show_popup_message = bashmenu_ui.show_popup_message
@@ -91,7 +92,12 @@ show_input_box = bashmenu_ui.show_input_box
 show_file_picker = bashmenu_ui.show_file_picker
 run_curses_editor = bashedit.run_curses_editor
 get_visible_len = bashmenu_ui.get_visible_len
+get_char_width = bashmenu_ui.get_char_width
+get_display_width = bashmenu_ui.get_display_width
+get_nerd_font_width = bashmenu_ui.get_nerd_font_width
+is_pua_glyph = bashmenu_ui.is_pua_glyph
 parse_formatting_to_segments = bashmenu_ui.parse_formatting_to_segments
+safe_addstr_segments = bashmenu_ui.safe_addstr_segments
 is_formatting_tag = bashmenu_ui.is_formatting_tag
 
 
@@ -267,6 +273,7 @@ DEFAULT_CONFIG = {
         "postal_code": 49079,
     },
     "settings": {
+        "cache_dir": "{home}/.cache/bashmenu",
         "check_for_updates": False,
         "plugins": {
             "otd": {
@@ -283,6 +290,7 @@ DEFAULT_CONFIG = {
         "tabstop": 8,
         "show_menu_shortcuts": True,
         "use_nerd_fonts": False,
+        "nerd_font_width": "auto",
         "status_gutter": "{user} | {battery} | {date_time_24_short} | {user.localip}",
         "dns": {
             "ipv4": {
@@ -758,8 +766,10 @@ def apply_theme(theme_name):
     Returns:
         dict: Mapping of theme keys to initialized curses color pair values.
     """
-    curses.start_color()
-    curses.use_default_colors()
+    with contextlib.suppress(Exception):
+        curses.start_color()
+    with contextlib.suppress(Exception):
+        curses.use_default_colors()
     num_colors = getattr(curses, "COLORS", 8)
 
     raw_theme = (
@@ -825,7 +835,7 @@ def apply_theme(theme_name):
         effective_bg = default_bg if bg == -1 else bg
         try:
             curses.init_pair(idx, fg, effective_bg)
-        except curses.error:
+        except Exception:  # noqa: BLE001, S110
             pass
         theme_dict[key] = curses.color_pair(idx)
 
@@ -1154,36 +1164,6 @@ def process_line_to_segments(line, theme_text):
     return sanitized_segments
 
 
-def safe_addstr_segments(win, y, start_x, segments):
-    """
-    Safely write a line composed of multiple (text, attr) segments starting at (y, start_x).
-    """
-    h, w = win.getmaxyx()
-    if y >= h or start_x >= w:
-        return
-
-    current_x = start_x
-    for text, attr in segments:
-        if current_x >= w:
-            break
-
-        fit_text = []
-        for c in text:
-            char_w = get_char_width(c)
-            limit = w - 1 if y == h - 1 else w
-            if current_x + char_w > limit:
-                break
-            fit_text.append(c)
-            current_x += char_w
-
-        if fit_text:
-            try:
-                win.addstr(y, start_x, "".join(fit_text), attr)
-            except curses.error:
-                pass
-            start_x = current_x
-
-
 def run_action_in_window(stdscr, action, title, theme, stream=False):
     """
     Execute command or function and display output in scrolling popup window.
@@ -1331,36 +1311,11 @@ def run_action_in_window(stdscr, action, title, theme, stream=False):
             scroll_offset = max(0, len(output_lines) - max_visible_lines)
 
 
-def get_char_width(c):
-    """
-    Get the display width of a single character in terminal columns.
-    """
-    # Variation selectors have width 0
-    if 0xFE00 <= ord(c) <= 0xFE0F:
-        return 0
-    
-    # Use standard unicode classification:
-    # 'W' (Wide) and 'F' (Fullwidth) are 2 columns wide on standard terminals.
-    # 'A' (Ambiguous), 'Na' (Narrow), 'N' (Neutral), 'H' (Halfwidth) are 1 column.
-    w = unicodedata.east_asian_width(c)
-    if w in ("W", "F"):
-        return 2
-    return 1
-
-
-def get_display_width(s):
-    """
-    Calculate the visual display width of a string on screen,
-    ignoring variation selectors and counting non-ASCII chars as double-width.
-    """
-    if not s:
-        return 0
-    return sum(get_char_width(c) for c in s)
-
-
 def resolve_glyph(glyph_str):
     """
     Resolve hex strings starting with '#' or standard hex prefixes to their unicode characters.
+    Strips Variation Selector-16 (\uFE0F) and other variation selectors (\uFE00-\uFE0F)
+    to ensure identical 1-cell or 2-cell rendering and cursor tracking across all terminals.
     """
     if not isinstance(glyph_str, str) or not glyph_str:
         return glyph_str
@@ -1375,6 +1330,8 @@ def resolve_glyph(glyph_str):
     # List of recognized hex prefixes
     prefixes = ["U+", "u+", "0x", "0X", "\\u", "\\U", "\\"]
 
+    resolved_val = glyph_str
+
     # Try with a prefix (either directly or after stripping '#')
     for prefix in prefixes:
         if temp_str.startswith(prefix):
@@ -1382,34 +1339,38 @@ def resolve_glyph(glyph_str):
                 hex_val = temp_str[len(prefix):]
                 val = int(hex_val, 16)
                 if val <= 0x10FFFF:
-                    return chr(val)
-                return bytes.fromhex(hex_val).decode("utf-8")
+                    resolved_val = chr(val)
+                else:
+                    resolved_val = bytes.fromhex(hex_val).decode("utf-8")
+                break
             except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid characters, out-of-range codepoints, or parsing issues safely
                 pass
 
-    # If it was just prefixed by '#' but has no other prefix (e.g., '#e7f0' or '#EE9FB0')
-    if has_hash:
+    if resolved_val == glyph_str and has_hash:
         try:
             val = int(temp_str, 16)
             if val <= 0x10FFFF:
-                return chr(val)
-            return bytes.fromhex(temp_str).decode("utf-8")
+                resolved_val = chr(val)
+            else:
+                resolved_val = bytes.fromhex(temp_str).decode("utf-8")
         except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid hex or codepoint overflow safely
             pass
 
-    # Direct check if the original string starts directly with any of the prefixes
-    for prefix in prefixes:
-        if glyph_str.startswith(prefix):
-            try:
-                hex_val = glyph_str[len(prefix):]
-                val = int(hex_val, 16)
-                if val <= 0x10FFFF:
-                    return chr(val)
-                return bytes.fromhex(hex_val).decode("utf-8")
-            except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid characters, out-of-range codepoints, or parsing issues safely
-                pass
+    if resolved_val == glyph_str:
+        for prefix in prefixes:
+            if glyph_str.startswith(prefix):
+                try:
+                    hex_val = glyph_str[len(prefix):]
+                    val = int(hex_val, 16)
+                    if val <= 0x10FFFF:
+                        resolved_val = chr(val)
+                    else:
+                        resolved_val = bytes.fromhex(hex_val).decode("utf-8")
+                    break
+                except (ValueError, UnicodeDecodeError, OverflowError):  # Catch invalid characters, out-of-range codepoints, or parsing issues safely
+                    pass
 
-    return glyph_str
+    return resolved_val
 
 
 _command_cache = {}
@@ -1583,7 +1544,7 @@ def resolve_divider_string(config, target_w=None):
         except (AttributeError, NameError):
             import shutil
             cols = shutil.get_terminal_size().columns
-        target_w = max(1, cols - 4)
+        target_w = max(1, cols - 8)
 
     div_cfg = None
     if isinstance(config, dict):
@@ -1809,8 +1770,15 @@ def interpolate_placeholders(text, config, depth=0):
         get_config_value(config, "settings.scripts_dir")
         or os.path.join(BASHMENU_DIR, "scripts")
     )
+    cache_val = (
+        get_config_value(config, "settings.cache_dir")
+        or os.path.join(USER_HOME, ".cache", "bashmenu")
+    )
     templates_val = re.sub(r"\{bashmenu_dir\}", BASHMENU_DIR, str(templates_val), flags=re.IGNORECASE)
     scripts_val = re.sub(r"\{bashmenu_dir\}", BASHMENU_DIR, str(scripts_val), flags=re.IGNORECASE)
+    cache_val = re.sub(r"\{home\}", USER_HOME, str(cache_val), flags=re.IGNORECASE)
+    cache_val = re.sub(r"\{bashmenu_dir\}", BASHMENU_DIR, str(cache_val), flags=re.IGNORECASE)
+    os.environ["CACHE_DIR"] = cache_val
 
     replacements = {
         "{user}": USERNAME,
@@ -1823,6 +1791,8 @@ def interpolate_placeholders(text, config, depth=0):
         "{templates_dir}": templates_val,
         "{scripts_dir}": scripts_val,
         "{scripts}": scripts_val,
+        "{cache_dir}": cache_val,
+        "{cache}": cache_val,
         "{host}": HOSTNAME,
         "{user-mode}": "root" if is_root() else "user",
         "{version}": __version__,
@@ -1950,8 +1920,10 @@ def interpolate_placeholders(text, config, depth=0):
             cols = term_size.columns
             lines = term_size.lines
 
-        text = re.sub(r"\{window_width\}", str(cols), text, flags=re.IGNORECASE)
-        text = re.sub(r"\{window_height\}", str(lines), text, flags=re.IGNORECASE)
+        win_w = max(1, cols - 8)
+        win_h = max(1, lines - 6)
+        text = re.sub(r"\{window_width\}", str(win_w), text, flags=re.IGNORECASE)
+        text = re.sub(r"\{window_height\}", str(win_h), text, flags=re.IGNORECASE)
 
     # Resolve {ascii:decimal}
     ascii_pattern = re.compile(r"\{ascii:(\d+)\}", re.IGNORECASE)
@@ -2530,7 +2502,7 @@ def main(stdscr):
         stdscr (curses.window): Curses main window handle provided by wrapper.
     """
     # THEMES and THEME_ERROR are read here from the module scope. No global declaration is needed as they are not mutated.
-    curses.curs_set(0)
+    safe_curs_set(0)
     if hasattr(curses, "set_escdelay"):
         curses.set_escdelay(25)
 
@@ -2738,8 +2710,9 @@ def main(stdscr):
         max_pad = max(1, width - 10)
 
         ind = interpolate_placeholders(theme.get("indicator", ">"), config)
+        ind = resolve_glyph(ind)
         prefix_active = f"{ind} " if ind else "  "
-        prefix_inactive = " " * get_visible_len(prefix_active)
+        prefix_inactive = " " * get_visible_len(prefix_active, config)
 
         has_icons = False
         max_icon_len = 0
@@ -2750,13 +2723,15 @@ def main(stdscr):
                     resolved = interpolate_placeholders(opt.get("icon", ""), config)
                     resolved = resolve_glyph(resolved)
                     if resolved:
-                        icon_lens.append(get_display_width(resolved))
+                        icon_lens.append(get_display_width(resolved, config))
             if icon_lens:
                 has_icons = True
                 max_icon_len = max(icon_lens)
 
+        prefix_w = get_visible_len(prefix_active, config)
         shortcut_len = 4 if show_shortcuts else 0
         icon_part_len = (max_icon_len + 2) if has_icons else 0
+        label_x = 4 + prefix_w + shortcut_len + icon_part_len
         avail_w = max(1, max_pad - shortcut_len - icon_part_len)
 
         for idx, option in enumerate(options):
@@ -2766,27 +2741,25 @@ def main(stdscr):
             x = 4
 
             if option.get("type") == "divider":
-                length = option.get("length", 40)
+                win_w = max(1, width - 8)
+                length = option.get("length", win_w)
                 if isinstance(length, str):
-                    if length.lower().strip() in ("max", "auto", "full", "100%"):
-                        length = width
+                    if length.lower().strip() in ("max", "auto", "full", "100%", "{window_width}"):
+                        length = win_w
                     else:
                         length = interpolate_placeholders(length, config)
                 try:
                     length = int(length)
                 except (ValueError, TypeError):
-                    length = 40
+                    length = win_w
+                length = min(length, win_w)
                 char = option.get("char", "-")
                 if char:
                     char = interpolate_placeholders(char, config)
                 if not char:
                     char = "-"
                 divider_str = (char * length)[:length] if len(char) > 0 else "-" * length
-                divider_x = 4 + len(prefix_inactive)
-                max_w = width - divider_x - 4
-                if len(divider_str) > max_w:
-                    divider_str = divider_str[:max_w]
-                safe_addstr(stdscr, y, divider_x, divider_str, theme.get("divider", theme.get("border", theme["text"])))
+                safe_addstr(stdscr, y, 4, divider_str, theme.get("divider", theme.get("border", theme["text"])))
                 continue
 
             label = interpolate_placeholders(option.get("label", ""), config)
@@ -2798,29 +2771,29 @@ def main(stdscr):
             prefix = prefix_active if idx == current_row else prefix_inactive
 
             if right_part:
-                left_avail_w = avail_w - get_visible_len(right_part) - 2
+                left_avail_w = avail_w - get_visible_len(right_part, config) - 2
                 if left_avail_w < 15:
                     left_avail_w = avail_w
                     right_part = ""
             else:
                 left_avail_w = avail_w
 
-            if idx == current_row and get_visible_len(left_part) > left_avail_w:
+            if idx == current_row and get_visible_len(left_part, config) > left_avail_w:
                 padded_text = left_part + (" " * left_avail_w) + left_part[:left_avail_w]
                 scroll_text = padded_text[marquee_offset : marquee_offset + left_avail_w]
                 if right_part:
-                    spaces = avail_w - get_visible_len(scroll_text) - get_visible_len(right_part)
+                    spaces = avail_w - get_visible_len(scroll_text, config) - get_visible_len(right_part, config)
                     disp_label = f"{scroll_text}{' ' * spaces}{right_part}"
                 else:
-                    pad_spaces = max(0, avail_w - get_visible_len(scroll_text))
+                    pad_spaces = max(0, avail_w - get_visible_len(scroll_text, config))
                     disp_label = scroll_text + (" " * pad_spaces)
             else:
                 if right_part:
-                    if get_visible_len(left_part) + 2 + get_visible_len(right_part) <= avail_w:
-                        spaces = avail_w - get_visible_len(left_part) - get_visible_len(right_part)
+                    if get_visible_len(left_part, config) + 2 + get_visible_len(right_part, config) <= avail_w:
+                        spaces = avail_w - get_visible_len(left_part, config) - get_visible_len(right_part, config)
                         disp_label = f"{left_part}{' ' * spaces}{right_part}"
-                    elif get_visible_len(left_part) + 2 < avail_w:
-                        max_right_w = avail_w - get_visible_len(left_part) - 2
+                    elif get_visible_len(left_part, config) + 2 < avail_w:
+                        max_right_w = avail_w - get_visible_len(left_part, config) - 2
                         if (
                             max_right_w >= 3
                             and right_part.startswith("[")
@@ -2835,17 +2808,17 @@ def main(stdscr):
 
                         if truncated_right:
                             spaces = (
-                                avail_w - get_visible_len(left_part) - get_visible_len(truncated_right)
+                                avail_w - get_visible_len(left_part, config) - get_visible_len(truncated_right, config)
                             )
                             disp_label = f"{left_part}{' ' * spaces}{truncated_right}"
                         else:
-                            pad_spaces = max(0, avail_w - get_visible_len(left_part))
+                            pad_spaces = max(0, avail_w - get_visible_len(left_part, config))
                             disp_label = left_part + (" " * pad_spaces)
                     else:
-                        pad_spaces = max(0, avail_w - get_visible_len(left_part))
+                        pad_spaces = max(0, avail_w - get_visible_len(left_part, config))
                         disp_label = left_part + (" " * pad_spaces)
                 else:
-                    pad_spaces = max(0, avail_w - get_visible_len(left_part))
+                    pad_spaces = max(0, avail_w - get_visible_len(left_part, config))
                     disp_label = left_part + (" " * pad_spaces)
 
             attr = (
@@ -2854,11 +2827,15 @@ def main(stdscr):
                 else theme["text"]
             )
 
+            # Pre-paint exact row width with background attribute to prevent highlight gaps or spills
+            row_w = prefix_w + shortcut_len + icon_part_len + avail_w
+            safe_addstr(stdscr, y, x, " " * row_w, attr)
+
             # 1. Print prefix
             safe_addstr(stdscr, y, x, prefix, attr)
-            curr_x = x + len(prefix)
 
             # 2. Print shortcut if showing
+            shortcut_x = x + prefix_w
             if show_shortcuts:
                 shortcut_char = idx_to_shortcut.get(idx)
                 if shortcut_char:
@@ -2868,33 +2845,27 @@ def main(stdscr):
                         if idx != current_row
                         else (theme["highlight"] | curses.A_BOLD)
                     )
-                    safe_addstr(stdscr, y, curr_x, badge_str, badge_attr)
-                    curr_x += len(badge_str)
-                    safe_addstr(stdscr, y, curr_x, " ", attr)
-                    curr_x += 1
+                    safe_addstr(stdscr, y, shortcut_x, badge_str, badge_attr)
+                    safe_addstr(stdscr, y, shortcut_x + len(badge_str), " ", attr)
                 else:
-                    safe_addstr(stdscr, y, curr_x, "    ", attr)
-                    curr_x += 4
+                    safe_addstr(stdscr, y, shortcut_x, "    ", attr)
 
             # 3. Print icon if has_icons is True
             if has_icons:
+                icon_x = shortcut_x + shortcut_len
                 icon_str = option.get("icon", "")
                 icon_resolved = interpolate_placeholders(icon_str, config) if icon_str else ""
                 icon_resolved = resolve_glyph(icon_resolved)
                 if icon_resolved:
-                    safe_addstr(stdscr, y, curr_x, icon_resolved, attr)
-                    curr_x += get_display_width(icon_resolved)
-                    padding = " " * (max_icon_len - get_display_width(icon_resolved)) + "  "
-                    safe_addstr(stdscr, y, curr_x, padding, attr)
-                    curr_x += len(padding)
-                else:
-                    padding = " " * (max_icon_len + 2)
-                    safe_addstr(stdscr, y, curr_x, padding, attr)
-                    curr_x += len(padding)
+                    safe_addstr(stdscr, y, icon_x, icon_resolved, attr)
 
-            # 4. Print label (disp_label)
+            curr_x = stdscr.getyx()[1]
+            if curr_x < label_x:
+                safe_addstr(stdscr, y, curr_x, " " * (label_x - curr_x), attr)
+
+            # 4. Print label starting at fixed column label_x
             label_segments = parse_formatting_to_segments(disp_label, attr, theme)
-            safe_addstr_segments(stdscr, y, curr_x, label_segments)
+            safe_addstr_segments(stdscr, y, label_x, label_segments, config)
 
         if all_plugin_lines:
             for p_idx, p_line in enumerate(all_plugin_lines):
@@ -2915,11 +2886,11 @@ def main(stdscr):
 
             lp, rp = split_label_brackets(lbl)
 
-            law = (avail_w - len(rp) - 2) if rp else avail_w
+            law = (avail_w - get_visible_len(rp, config) - 2) if rp else avail_w
             if rp and law < 15:
                 law = avail_w
 
-            if len(lp) > law:
+            if get_visible_len(lp, config) > law:
                 has_marquee = True
 
         if has_marquee:
@@ -2949,18 +2920,18 @@ def main(stdscr):
                 lp, rp = split_label_brackets(lbl)
 
                 if rp:
-                    law = avail_w - len(rp) - 2
+                    law = avail_w - get_visible_len(rp, config) - 2
                     if law < 15:
                         law = avail_w
                 else:
                     law = avail_w
 
-                if len(lp) > law:
+                if get_visible_len(lp, config) > law:
                     if marquee_pause_ticks > 0:
                         marquee_pause_ticks -= 1
                     else:
                         marquee_offset += 1
-                        if marquee_offset >= len(lp) + law:
+                        if marquee_offset >= get_visible_len(lp, config) + law:
                             marquee_offset = 0
                             marquee_pause_ticks = 4
             continue
@@ -3064,9 +3035,16 @@ if __name__ == "__main__":
         curses.wrapper(main)
     except KeyboardInterrupt:
         pass
+    except Exception as exc:  # noqa: BLE001
+        if is_tty:
+            sys.stdout.write("\033[2J\033[H")
+        sys.stdout.write("\033[?1049l")
+        sys.stdout.flush()
+        print(f"Error starting Bashmenu: {exc}", file=sys.stderr)
+        traceback.print_exc()
+        sys.exit(1)
     finally:
         if is_tty:
             sys.stdout.write("\033[2J\033[H")
         sys.stdout.write("\033[?1049l")
         sys.stdout.flush()
-        sys.exit(0)

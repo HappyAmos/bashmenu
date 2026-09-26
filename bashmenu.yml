@@ -10,6 +10,7 @@ user:
   postal_code: 49079
   this_day: "curl 'https://today.zenquotes.io/{command:date %m}/{command:date %e}'"
 settings:
+  cache_dir: '{home}/.cache/bashmenu'
   check_for_updates: false
   dns:
     ipv4:

@@ -18,6 +18,8 @@ import textwrap
 
 import yaml
 
+import bashmenu_ui
+
 
 def string_representer(dumper, data):
     """
@@ -874,16 +876,11 @@ def wrap_detail_lines(details, prop_w):
 
 def save_menu_file(menu_data, stdscr, theme):
     """Validates syntax and saves modified menu structure to bashmenu.mnu."""
-    bak_file = bashmenu.MENU_FILE + ".bak"
     try:
-        if os.path.exists(bashmenu.MENU_FILE):
-            with open(bashmenu.MENU_FILE, "r", encoding="utf-8") as f_in, open(bak_file, "w", encoding="utf-8") as f_out:
-                f_out.write(f_in.read())
-
         with open(bashmenu.MENU_FILE, "w", encoding="utf-8") as f:
             yaml.dump(menu_data, f, default_flow_style=False, sort_keys=False, width=float('inf'))
 
-        msg = "Menu structure saved successfully to bashmenu.mnu!\nBackup written to bashmenu.mnu.bak."
+        msg = "Menu structure saved successfully to bashmenu.mnu!"
         bashmenu.show_popup_message(stdscr, "Save Successful", msg, theme)
         return True
     except (OSError, yaml.YAMLError, TypeError, ValueError) as e:  # Catch filesystem IO, serialization, or type formatting errors safely
@@ -1059,7 +1056,7 @@ def main(stdscr, target_path=None):
         stdscr: Curses main window handle.
         target_path (list[int], optional): Path of node indices to automatically select and focus on startup.
     """
-    curses.curs_set(0)
+    bashmenu_ui.safe_curs_set(0)
     if hasattr(curses, "set_escdelay"):
         curses.set_escdelay(25)
 
