@@ -262,7 +262,7 @@ def formatting_to_rich_text(
 ) -> Text:
     """
     Convert custom bracket formatting ([b], [u], [dim], [color=name]) into a Rich Text object.
-    Supports backslash escaping (\\\[tag]) and suppresses formatting inside backtick code spans/blocks.
+    Supports backslash escaping (\\\\[tag]) and suppresses formatting inside backtick code spans/blocks.
     """
     if not isinstance(text, str):
         text = str(text)

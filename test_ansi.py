@@ -288,7 +288,9 @@ class TestBashEditThemeColors(unittest.TestCase):
 
     def test_f1_help_modal_press_without_markup_error(self):
         import asyncio
+
         from textual.app import App
+
         import bashmenu
 
         class TestApp(App):
@@ -365,7 +367,9 @@ class TestMenuEditTreeSelection(unittest.TestCase):
 
     def test_menuedit_screen_focus_on_selected_item(self):
         import asyncio
+
         from textual.app import App
+
         import bashmenu
 
         class TestApp(App):
@@ -403,6 +407,82 @@ class TestMenuEditTreeSelection(unittest.TestCase):
                 self.assertEqual(type(modal_screen).__name__, "ItemEditModal")
 
         asyncio.run(run_test())
+
+    def test_item_edit_modal_execution_modes(self):
+        import menuedit
+
+        # Test Standard Terminal Mode initial detection and save
+        item_std = {"title": "Test Item", "interactive": True, "quiet": False}
+        modal_std = menuedit.ItemEditModal(item_std)
+        # Check initial index
+        self.assertEqual(modal_std.selected_mode_idx, 0) # default init before compose
+        
+        # Test saved values directly via mock/test logic
+        # Standard Terminal Mode
+        item1 = {"title": "Test Item"}
+        m1 = menuedit.ItemEditModal(item1)
+        m1.selected_mode_idx = 2
+        # Mock query_one
+        class DummyInput:
+            value = "test"
+        class DummyCheckbox:
+            value = False
+        class DummyContainer:
+            selected_mode_idx = 2
+
+        def dummy_query_one(selector, type_or_id=None):
+            if "exec_mode_container" in selector or selector == ExecModeContainer_cls:
+                c = DummyContainer()
+                c.selected_mode_idx = 2
+                return c
+            if "chk" in selector:
+                return DummyCheckbox()
+            return DummyInput()
+
+        ExecModeContainer_cls = menuedit.ExecModeContainer
+        m1.query_one = dummy_query_one
+        m1.dismiss = lambda item: None
+        m1.perform_save()
+
+        self.assertFalse(m1.item.get("stream"))
+        self.assertTrue(m1.item.get("interactive"))
+        self.assertFalse(m1.item.get("quiet"))
+
+        # Interactive Mode
+        m2 = menuedit.ItemEditModal(item1)
+        def dummy_query_one_inter(selector, type_or_id=None):
+            if "exec_mode_container" in selector or selector == ExecModeContainer_cls:
+                c = DummyContainer()
+                c.selected_mode_idx = 1
+                return c
+            if "chk" in selector:
+                return DummyCheckbox()
+            return DummyInput()
+        m2.query_one = dummy_query_one_inter
+        m2.dismiss = lambda item: None
+        m2.perform_save()
+
+        self.assertFalse(m2.item.get("stream"))
+        self.assertTrue(m2.item.get("interactive"))
+        self.assertTrue(m2.item.get("quiet"))
+
+        # Stream Mode
+        m3 = menuedit.ItemEditModal(item1)
+        def dummy_query_one_stream(selector, type_or_id=None):
+            if "exec_mode_container" in selector or selector == ExecModeContainer_cls:
+                c = DummyContainer()
+                c.selected_mode_idx = 0
+                return c
+            if "chk" in selector:
+                return DummyCheckbox()
+            return DummyInput()
+        m3.query_one = dummy_query_one_stream
+        m3.dismiss = lambda item: None
+        m3.perform_save()
+
+        self.assertTrue(m3.item.get("stream"))
+        self.assertFalse(m3.item.get("interactive"))
+        self.assertTrue(m3.item.get("quiet"))
 
 
 if __name__ == "__main__":

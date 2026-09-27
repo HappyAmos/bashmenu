@@ -311,6 +311,7 @@ class ItemEditModal(ModalScreen[dict]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
         Binding("c", "cancel", "Cancel"),
+        Binding("s", "save_changes", "Save Changes"),
         Binding("ctrl+s", "save_changes", "Save Changes"),
         Binding("f2", "save_changes", "Save Changes"),
     ]
@@ -333,7 +334,7 @@ class ItemEditModal(ModalScreen[dict]):
         tabstop_val = str(self.item.get("tabstop", 4))
         if self.item.get("stream"):
             initial_mode_idx = 0
-        elif self.item.get("interactive") or self.item.get("quiet"):
+        elif self.item.get("quiet"):
             initial_mode_idx = 1
         else:
             initial_mode_idx = 2
@@ -454,20 +455,18 @@ class ItemEditModal(ModalScreen[dict]):
             self.item["stream"] = True
             self.item["interactive"] = False
             self.item["quiet"] = True
-        elif mode_container.selected_mode_idx == 1:  # Interactive
+        elif mode_container.selected_mode_idx == 1:  # Interactive Mode
             self.item["stream"] = False
             self.item["interactive"] = True
             self.item["quiet"] = True
-        else:  # Standard Terminal
+        else:  # Standard Terminal Mode
             self.item["stream"] = False
-            self.item["interactive"] = False
+            self.item["interactive"] = True
             self.item["quiet"] = False
 
         self.item["no_formatting"] = self.query_one("#chk_no_formatting", Checkbox).value
         self.item["masked"] = self.query_one("#chk_masked", Checkbox).value
         self.item["refresh"] = self.query_one("#chk_refresh", Checkbox).value
-
-        self.dismiss(self.item)
 
         self.dismiss(self.item)
 
@@ -815,6 +814,7 @@ class MenuEditScreen(Screen):
 
         def save_cb(updated_item):
             if updated_item:
+                node.data.clear()
                 node.data.update(updated_item)
                 item_type = updated_item.get("type", "command")
                 badge = TYPE_BADGES.get(item_type, "[???]")
@@ -822,6 +822,7 @@ class MenuEditScreen(Screen):
                 node.label = f"{badge} {title}"
                 self.modified = True
                 self.update_inspector(node.data)
+                self.action_save_menu()
                 tree.refresh()
 
         self.app.push_screen(ItemEditModal(node.data), save_cb)
@@ -852,6 +853,7 @@ class MenuEditScreen(Screen):
                     parent_node.expand()
                     self.modified = True
                     self.update_inspector(final_item)
+                    self.action_save_menu()
 
             self.app.push_screen(ItemEditModal(new_item), edit_cb)
 

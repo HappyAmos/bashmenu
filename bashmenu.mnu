@@ -513,10 +513,6 @@ options:
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
-    - label: 'This Day:'
-      type: command
-      action: '{user.this_day}'
-      icon: '{nf::#:}'
     - label: Weather Postal Code [{user.postal_code}]
       type: config
       action: Enter Postal Code
@@ -535,11 +531,23 @@ options:
       stream: false
       quiet: false
       interactive: true
+      command: curl wttr.in/{user.postal_code}
+      tabstop: 4
+      no_formatting: false
+      masked: false
+      refresh: false
     - label: Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]
       type: command
       action: curl v2.wttr.in/{user.postal_code}
       icon: '{nf::#eef0:}'
       interactive: true
+      command: curl v2.wttr.in/{user.postal_code}
+      tabstop: 4
+      stream: false
+      quiet: false
+      no_formatting: false
+      masked: false
+      refresh: false
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'

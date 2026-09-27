@@ -1336,7 +1336,7 @@ def process_item_action(screen, item, config):
             raw_stream = item.get("stream", False)
             is_stream = bool(raw_stream) if isinstance(raw_stream, bool) else str(raw_stream).lower() in ["true", "1", "yes"]
             no_formatting = bool(item.get("no_formatting", False))
-            is_interactive = bool(item.get("interactive", False)) or bool(item.get("quiet", False))
+            is_quiet = bool(item.get("quiet", False))
 
             if is_stream:
                 title = item.get("title", item.get("label", "Stream Output"))
@@ -1352,10 +1352,10 @@ def process_item_action(screen, item, config):
                 )
             else:
                 with screen.app.suspend():
-                    if not is_interactive:
+                    if not is_quiet:
                         print(f"\n--- Running Command: {curr_action} ---\n")
                     subprocess.run(curr_action, shell=True, check=False)
-                    if not is_interactive:
+                    if not is_quiet:
                         print("\n--------------------------------------------------")
                         input("Execution complete. Press [ENTER] to return...")
 
