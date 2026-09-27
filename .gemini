@@ -14,3 +14,5 @@ templates directory contains templates for plugging preconfigured sections of co
 bashmenu.md is the verbose documentation for the menu system, and README.md is the Github front facing page for the project. One thing I forgot to mention is bashmenu.themes , which is
 menu definition files for different themes. When the user clicks on Main Menu -> Options & Settings -> Bashmenu Settings -> Change Theme, a dynamic menu should load that presents
 each of the defined themes. Clicking on the name of a theme should change the theme. bashmenu.yml should then be updated so that "theme:" is set to the selected theme.
+
+There is a new folder added to the project called ".tests". This folder contains a set of test files that you can use to test your work.

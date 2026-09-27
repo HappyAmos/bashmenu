@@ -61,7 +61,13 @@ def is_formatting_tag(content: str) -> bool:
         "/color",
     ]:
         return True
-    return content_clean.startswith("color=") and "]" not in content_clean
+    if content_clean.startswith("color=") and "]" not in content_clean:
+        return True
+    content_clean = content_clean.removeprefix("/")
+    with contextlib.suppress(Exception):
+        Style.parse(content_clean)
+        return True
+    return False
 
 
 def is_pua_glyph(c: str) -> bool:
@@ -175,7 +181,7 @@ def get_display_width(s: str, config=None) -> int:
     return total
 
 
-TAG_PATTERN = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+TAG_PATTERN = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
 
 
 def get_visible_len(text, config=None) -> int:
@@ -203,7 +209,7 @@ def parse_formatting_to_segments(text, base_attr=0, theme=None, no_formatting: b
         return [(text, base_attr)]
 
     code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
-    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
     segments = []
     current_attr = base_attr
     attr_stack = [current_attr]
@@ -271,7 +277,7 @@ def formatting_to_rich_text(
         return Text(text, style=default_style or Style())
 
     code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
-    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
     rich_text = Text()
 
     current_style = default_style or Style()
@@ -304,9 +310,9 @@ def formatting_to_rich_text(
         else:
             tag_clean = tag.strip().lower()
             new_style = current_style
-            if tag_clean == "b":
+            if tag_clean in ("b", "bold"):
                 new_style = new_style + Style(bold=True)
-            elif tag_clean == "u":
+            elif tag_clean in ("u", "underline"):
                 new_style = new_style + Style(underline=True)
             elif tag_clean == "dim":
                 new_style = new_style + Style(dim=True)
@@ -325,6 +331,9 @@ def formatting_to_rich_text(
                         new_style = new_style + Style(color=color_name)
                     except Exception:  # noqa: BLE001, S110
                         pass
+            else:
+                with contextlib.suppress(Exception):
+                    new_style = new_style + Style.parse(tag_clean)
 
             style_stack.append(new_style)
             current_style = new_style
@@ -494,10 +503,28 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("button_success", Style(color="white", bgcolor="green"))
     styles.setdefault("help_text", Style(color="cyan", bgcolor=bg_color))
     styles.setdefault("plugin", Style(color="cyan", bgcolor=bg_color))
+    styles.setdefault("window_close_button", Style(color="red", bold=True, bgcolor=bg_color))
     styles["indicator"] = indicator
 
     _theme_styles_cache[cache_key] = styles
     return styles
+
+
+def format_close_button_label(theme_dict: dict | None = None) -> Text:
+    """
+    Format close button label as [X] where brackets match the window border style
+    and 'X' uses the theme's window_close_button style.
+    """
+    if not isinstance(theme_dict, dict):
+        theme_dict = {}
+    border_style = theme_dict.get("border") or theme_dict.get("accent") or Style(color="blue")
+    close_style = theme_dict.get("window_close_button") or Style(color="red", bold=True)
+
+    label = Text()
+    label.append("[", style=border_style)
+    label.append("X", style=close_style)
+    label.append("]", style=border_style)
+    return label
 
 
 def parse_css_color(val) -> str | None:
@@ -651,6 +678,10 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
                 if css_fl:
                     fl.styles.color = css_fl
 
+    with contextlib.suppress(Exception):
+        btn_close = screen.query_one(".btn_close_x", Label)
+        btn_close.update(format_close_button_label(theme_dict))
+
 
 def apply_button_theme(button: Button, theme=None, button_type: str = "button_primary") -> None:
     """Apply foreground and background colors to a Textual Button based on theme dictionary."""
@@ -677,7 +708,14 @@ def load_themes_file(filepath: str | None = None) -> dict:
 
     if not filepath or not os.path.exists(filepath):
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        filepath = os.path.join(base_dir, "bashmenu.themes")
+        c1 = os.path.join(base_dir, "bashmenu.themes")
+        c2 = os.path.join(os.getcwd(), "bashmenu.themes")
+        if os.path.exists(c1):
+            filepath = c1
+        elif os.path.exists(c2):
+            filepath = c2
+        else:
+            filepath = c1
 
     if not os.path.exists(filepath):
         return {}
@@ -723,11 +761,38 @@ class MessageModalScreen(ModalScreen[None]):
         max-width: 100%;
         max-height: 100%;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
-        margin-bottom: 1;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #scroll_container {
         height: auto;
@@ -771,8 +836,9 @@ class MessageModalScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            if self.modal_title:
-                yield Label(self.modal_title, id="title")
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             with VerticalScroll(id="scroll_container"):
                 content = (
                     self.message
@@ -786,6 +852,11 @@ class MessageModalScreen(ModalScreen[None]):
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
 
     def action_close_modal(self) -> None:
         self.dismiss(None)
@@ -806,11 +877,38 @@ class ConfirmModalScreen(ModalScreen[str]):
         background: $surface;
         padding: 1 2;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
-        margin-bottom: 1;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #message {
         text-align: center;
@@ -846,8 +944,9 @@ class ConfirmModalScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            if self.modal_title:
-                yield Label(self.modal_title, id="title")
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             content = (
                 self.message
                 if isinstance(self.message, Text)
@@ -866,6 +965,11 @@ class ConfirmModalScreen(ModalScreen[str]):
             apply_button_theme(self.query_one("#btn_yes", Button), self.theme, "button_primary")
             apply_button_theme(self.query_one("#btn_no", Button), self.theme, "button_error")
             apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_yes":
@@ -900,11 +1004,38 @@ class ToggleModalScreen(ModalScreen[str]):
         background: $surface;
         padding: 1 2;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
-        margin-bottom: 1;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #message {
         text-align: center;
@@ -940,8 +1071,9 @@ class ToggleModalScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            if self.modal_title:
-                yield Label(self.modal_title, id="title")
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             content = (
                 self.message
                 if isinstance(self.message, Text)
@@ -960,6 +1092,11 @@ class ToggleModalScreen(ModalScreen[str]):
             apply_button_theme(self.query_one("#btn_true", Button), self.theme, "button_success")
             apply_button_theme(self.query_one("#btn_false", Button), self.theme, "button_error")
             apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_true":
@@ -994,11 +1131,38 @@ class InputModalScreen(ModalScreen[str]):
         background: $surface;
         padding: 1 2;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
-        margin-bottom: 1;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #prompt {
         margin-bottom: 1;
@@ -1041,8 +1205,9 @@ class InputModalScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            if self.modal_title:
-                yield Label(self.modal_title, id="title")
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             if self.prompt:
                 content = (
                     self.prompt
@@ -1066,6 +1231,11 @@ class InputModalScreen(ModalScreen[str]):
         with contextlib.suppress(Exception):
             apply_button_theme(self.query_one("#btn_ok", Button), self.theme, "button_primary")
             apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.dismiss(event.value)
@@ -1096,10 +1266,37 @@ class FilePickerModalScreen(ModalScreen[str]):
         background: $surface;
         padding: 1 2;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #path_label {
         color: $text-muted;
@@ -1147,7 +1344,9 @@ class FilePickerModalScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            yield Label(self.modal_title or "File Picker", id="title")
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "File Picker", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             yield Label(f"Path: {self.current_path}", id="path_label")
             yield OptionList(id="options_list")
             yield Label("[ENTER] Open/Select | [ESC] Cancel", id="footer")
@@ -1155,6 +1354,15 @@ class FilePickerModalScreen(ModalScreen[str]):
     def on_mount(self) -> None:
         self.load_directory()
         apply_modal_theme(self, self.theme)
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_close_x":
+            self.dismiss(None)
 
     def load_directory(self) -> None:
         self.query_one("#path_label", Label).update(f"Path: {self.current_path}")
@@ -1257,11 +1465,38 @@ class StreamOutputModalScreen(ModalScreen[None]):
         background: $surface;
         padding: 1 2;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
-        margin-bottom: 1;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #log {
         height: 1fr;
@@ -1291,7 +1526,9 @@ class StreamOutputModalScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            yield Label(f" Output: {self.modal_title} ", id="title")
+            with Horizontal(id="title_bar"):
+                yield Label(f" Output: {self.modal_title} ", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             yield RichLog(id="log", highlight=True, markup=not self.no_formatting)
             yield Label(" Executing... Please wait ", id="footer")
 
@@ -1301,6 +1538,11 @@ class StreamOutputModalScreen(ModalScreen[None]):
         apply_modal_theme(self, getattr(self, "theme", None))
         t = threading.Thread(target=self._run_command_stream, daemon=True)
         t.start()
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.action_close_modal()
 
     def _run_command_stream(self) -> None:
         try:

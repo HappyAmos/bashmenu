@@ -11,7 +11,10 @@ from unittest import mock
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import bashedit
 import bashmenu
+import bashmenu_ui
+import menuedit
 
 
 class TestAnsiParsing(unittest.TestCase):
@@ -250,7 +253,6 @@ class TestNerdFontWidth(unittest.TestCase):
         self.assertEqual(bashmenu.get_display_width("\U0001F326\uFE0F"), 2)
 
 
-import bashedit
 
 
 class TestBashEditThemeColors(unittest.TestCase):
@@ -426,7 +428,9 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         class DummyInput:
             value = "test"
         class DummyCheckbox:
-            value = False
+            def __init__(self, val=True):
+                self.value = val
+
         class DummyContainer:
             selected_mode_idx = 2
 
@@ -436,7 +440,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
                 c.selected_mode_idx = 2
                 return c
             if "chk" in selector:
-                return DummyCheckbox()
+                return DummyCheckbox(True)
             return DummyInput()
 
         ExecModeContainer_cls = menuedit.ExecModeContainer
@@ -447,6 +451,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         self.assertFalse(m1.item.get("stream"))
         self.assertTrue(m1.item.get("interactive"))
         self.assertFalse(m1.item.get("quiet"))
+        self.assertTrue(m1.item.get("alt_buffer"))
 
         # Interactive Mode
         m2 = menuedit.ItemEditModal(item1)
@@ -456,7 +461,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
                 c.selected_mode_idx = 1
                 return c
             if "chk" in selector:
-                return DummyCheckbox()
+                return DummyCheckbox(True)
             return DummyInput()
         m2.query_one = dummy_query_one_inter
         m2.dismiss = lambda item: None
@@ -465,6 +470,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         self.assertFalse(m2.item.get("stream"))
         self.assertTrue(m2.item.get("interactive"))
         self.assertTrue(m2.item.get("quiet"))
+        self.assertTrue(m2.item.get("alt_buffer"))
 
         # Stream Mode
         m3 = menuedit.ItemEditModal(item1)
@@ -474,7 +480,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
                 c.selected_mode_idx = 0
                 return c
             if "chk" in selector:
-                return DummyCheckbox()
+                return DummyCheckbox(True)
             return DummyInput()
         m3.query_one = dummy_query_one_stream
         m3.dismiss = lambda item: None
@@ -484,7 +490,436 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         self.assertFalse(m3.item.get("interactive"))
         self.assertTrue(m3.item.get("quiet"))
 
+    def test_menuedit_move_item_preserves_focus(self):
+        import menuedit
+
+        menu_data = {
+            "title": "Root Menu",
+            "options": [
+                {"title": "Item A", "type": "command"},
+                {"title": "Item B", "type": "command"},
+                {"title": "Item C", "type": "command"},
+            ],
+        }
+        screen = menuedit.MenuEditScreen(menu_file_path="/tmp/fake.mnu")
+        screen.menu_data = menu_data
+
+        class DummyTree:
+            def __init__(self):
+                self.root = type("RootNode", (), {"data": menu_data, "label": "", "expand": lambda *a, **kw: None, "parent": None})()
+                self.cursor_node = None
+                self.selected_node = None
+
+            def clear(self):
+                self.root.children = []
+
+            def focus(self):
+                pass
+
+            def select_node(self, node):
+                self.selected_node = node
+                self.cursor_node = node
+
+            def scroll_to_node(self, node):
+                pass
+
+            def refresh(self):
+                pass
+
+        dummy_tree = DummyTree()
+        dummy_tree.root.children = []
+
+        def mock_build_branch(parent_node, opts):
+            for item in opts:
+                child = type("ChildNode", (), {"data": item, "parent": parent_node, "children": [], "expand": lambda *a, **kw: None, "add": lambda l, data: None})()
+                parent_node.children.append(child)
+
+        screen.query_one = lambda selector, type_or_id=None: dummy_tree
+        screen._build_tree_branch = mock_build_branch
+        screen.call_after_refresh = lambda fn, *args: fn(*args)
+        screen._save_menu_quietly = lambda: None
+        screen.update_inspector = lambda item: None
+
+        screen.populate_tree(target_item=menu_data["options"][1])
+        self.assertEqual(dummy_tree.cursor_node.data["title"], "Item B")
+
+        # Test Indent Item B under Item A
+        dummy_tree.cursor_node = type("ChildNode", (), {"data": menu_data["options"][1], "parent": dummy_tree.root, "children": [], "expand": lambda *a, **kw: None})()
+        screen.action_indent_item()
+        self.assertEqual(screen.menu_data["options"][0]["type"], "submenu")
+        self.assertEqual(len(screen.menu_data["options"][0]["submenu"]["options"]), 1)
+        self.assertEqual(screen.menu_data["options"][0]["submenu"]["options"][0]["title"], "Item B")
+
+        # Test Outdent
+        sub_item = screen.menu_data["options"][0]["submenu"]["options"][0]
+        sub_node = type("ChildNode", (), {"data": sub_item, "parent": type("ParentNode", (), {"data": screen.menu_data["options"][0], "parent": dummy_tree.root})(), "children": []})()
+        dummy_tree.cursor_node = sub_node
+        screen.action_outdent_item()
+        self.assertEqual(len(screen.menu_data["options"]), 3)
+
+    def test_divider_handling(self):
+        import menuedit
+
+        # Test ItemEditModal save for divider
+        item_div = {"type": "divider", "char": "-", "length": "80"}
+        modal = menuedit.ItemEditModal(item_div)
+        class DummyInput:
+            def __init__(self, val):
+                self.value = val
+        def mock_query(selector, type_or_id=None):
+            if "inp_char" in selector:
+                return DummyInput("#")
+            if "inp_length" in selector:
+                return DummyInput("{window_width}")
+            return DummyInput("")
+        modal.query_one = mock_query
+        modal.dismiss = lambda item: None
+        modal.perform_save()
+
+        self.assertEqual(modal.item, {"type": "divider", "char": "#", "length": "{window_width}"})
+
+        # Test indenting under divider is disallowed
+        menu_data = {
+            "title": "Root Menu",
+            "options": [
+                {"type": "divider", "char": "-", "length": "80"},
+                {"title": "Item A", "type": "command"},
+            ],
+        }
+        screen = menuedit.MenuEditScreen(menu_file_path="/tmp/fake.mnu")
+        screen.menu_data = menu_data
+        class DummyTree:
+            def __init__(self):
+                self.root = type("RootNode", (), {"data": menu_data, "parent": None})()
+                self.cursor_node = type("ChildNode", (), {"data": menu_data["options"][1], "parent": self.root})()
+            def clear(self): pass
+            def focus(self): pass
+            def select_node(self, node): pass
+            def scroll_to_node(self, node): pass
+            def refresh(self): pass
+
+        screen.query_one = lambda selector, type_or_id=None: DummyTree()
+        screen._save_menu_quietly = lambda: None
+        screen.populate_tree = lambda **kw: None
+
+        screen.action_indent_item()
+        # Item A should NOT be indented under divider
+        self.assertEqual(screen.menu_data["options"][0]["type"], "divider")
+        self.assertEqual(len(screen.menu_data["options"]), 2)
+
+        # Test live divider preview update
+        updated_preview = []
+        class DummyPreviewBox:
+            def update(self, content):
+                updated_preview.append(content)
+
+        def mock_query_preview(*args, **kwargs):
+            selector = str(args[0]) if args else ""
+            if "inp_char" in selector:
+                return DummyInput("{ascii:196}")
+            if "inp_length" in selector:
+                return DummyInput("{window_width}")
+            if "lbl_divider_preview" in selector:
+                return DummyPreviewBox()
+            return DummyInput("")
+
+        modal_prev = menuedit.ItemEditModal({"type": "divider", "char": "{ascii:196}", "length": "{window_width}"})
+        modal_prev.query_one = mock_query_preview
+        modal_prev.update_divider_preview()
+        self.assertEqual(len(updated_preview), 1)
+        self.assertTrue(updated_preview[0].startswith("─"))
+
+        # Test inspector divider preview
+        inspector_content = []
+        class DummyInspector:
+            def update(self, content):
+                inspector_content.append(content)
+        screen.query_one = lambda *a, **kw: DummyInspector()
+        screen.update_inspector(screen.menu_data["options"][0])
+        self.assertEqual(len(inspector_content), 1)
+        self.assertIn("Preview:", inspector_content[0])
+
+        # Test ASCII lookup action
+        pushed_screens = []
+        class DummyApp:
+            def __init__(self):
+                self.config = {}
+            def push_screen(self, screen):
+                pushed_screens.append(screen)
+
+        modal_prev._app = DummyApp()
+        modal_prev.action_lookup_ascii()
+        self.assertEqual(len(pushed_screens), 1)
+        self.assertEqual(type(pushed_screens[0]).__name__, "StreamOutputModalScreen")
+
+        # Test placeholders lookup action
+        pushed_screens_ph = []
+        class DummyAppPh:
+            def __init__(self):
+                self.config = {}
+            def push_screen(self, screen):
+                pushed_screens_ph.append(screen)
+
+        modal_prev._app = DummyAppPh()
+        modal_prev.action_show_placeholders()
+        self.assertEqual(len(pushed_screens_ph), 1)
+        self.assertEqual(type(pushed_screens_ph[0]).__name__, "MessageModalScreen")
+
+
+class TestMouseSupportAndCloseButtons(unittest.TestCase):
+    """Test suite for mouse interaction handlers and top-right modal close buttons."""
+
+    def test_modal_close_buttons(self):
+        """Verify modal screens instantiate top-right btn_close_x close button."""
+        dismissed = []
+
+        class DummyModal(bashmenu_ui.MessageModalScreen):
+            def dismiss(self, result=None):
+                dismissed.append(result)
+
+        modal = DummyModal("Title", "Message")
+        btn = bashmenu_ui.Button("✖", id="btn_close_x", classes="btn_close_x")
+        class DummyEvent:
+            button = btn
+        modal.on_button_pressed(DummyEvent())
+        self.assertEqual(len(dismissed), 1)
+
+    def test_main_menu_view_mouse_click(self):
+        """Verify MainMenuView handles left-click and right-click on menu options."""
+        cfg = {"theme": "dracula"}
+        mnu = {"title": "Test", "options": [{"title": "Option 1", "type": "command"}]}
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+
+        executed_actions = []
+
+        class DummyScreen:
+            def action_select_option(self):
+                executed_actions.append("select")
+
+            def action_edit_menu(self):
+                executed_actions.append("edit")
+
+        mv._screen = DummyScreen()
+
+        class DummyClickEvent:
+            def __init__(self, y, button):
+                self.y = y
+                self.button = button
+
+        # Row 3 corresponds to Option 1
+        mv.on_click(DummyClickEvent(3, 1))
+        self.assertEqual(executed_actions, ["select"])
+
+        mv.on_click(DummyClickEvent(3, 3))
+        self.assertEqual(executed_actions, ["select", "edit"])
+
+    def test_main_menu_view_mouse_move(self):
+        """Verify MainMenuView updates current row highlight on mouse hover."""
+        cfg = {"theme": "dracula"}
+        mnu = {
+            "title": "Test",
+            "options": [
+                {"title": "Option 1", "type": "command"},
+                {"title": "Option 2", "type": "command"},
+            ],
+        }
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+        self.assertEqual(mv.current_row(), 0)
+
+        class DummyMoveEvent:
+            def __init__(self, y):
+                self.y = y
+
+        # Move mouse over Option 2 (Row 4)
+        mv.on_mouse_move(DummyMoveEvent(4))
+        self.assertEqual(mv.current_row(), 1)
+
+        # Move mouse over Option 1 (Row 3)
+        mv.on_mouse_move(DummyMoveEvent(3))
+        self.assertEqual(mv.current_row(), 0)
+
+    def test_menuedit_footer_click(self):
+        """Verify MenuEditScreen handles clicks on interactive footer labels."""
+        screen = menuedit.MenuEditScreen()
+        screen.menu_data = {"options": []}
+
+        actions_called = []
+        screen.action_add_item = lambda: actions_called.append("add")
+        screen.action_save_menu = lambda: actions_called.append("save")
+        screen.action_exit_editor = lambda: actions_called.append("exit")
+
+        class DummyWidget:
+            def __init__(self, wid):
+                self.id = wid
+
+        class DummyClickEvent:
+            def __init__(self, widget):
+                self.widget = widget
+                self.target = widget
+
+        class DummyTree:
+            def is_ancestor_of(self, w):
+                return False
+
+        screen.query_one = lambda *a, **kw: DummyTree()
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_add")))
+        self.assertIn("add", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_save")))
+        self.assertIn("save", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_exit")))
+        self.assertIn("exit", actions_called)
+
+    def test_menuedit_tree_click_no_crash(self):
+        """Verify MenuEditScreen.on_click on tree nodes focuses tree and doesn't raise AttributeError."""
+        screen = menuedit.MenuEditScreen()
+        screen.action_edit_item = lambda: None
+
+        class DummyNode:
+            def __init__(self):
+                self.data = {"type": "command", "title": "Test Item"}
+
+        focus_called = []
+        class DummyTree:
+            root = "ROOT"
+            def is_ancestor_of(self, w):
+                return True
+            def get_node_at_line(self, line):
+                return DummyNode()
+            def select_node(self, node):
+                pass
+            def focus(self):
+                focus_called.append(True)
+
+        class DummyInspector:
+            def update(self, val):
+                pass
+
+        def mock_query(selector, *args, **kwargs):
+            if selector == "#inspector_content":
+                return DummyInspector()
+            return DummyTree()
+
+        screen.query_one = mock_query
+
+        class DummyClickEvent:
+            widget = DummyTree()
+            target = DummyTree()
+            y = 1
+            button = 1
+            chain = 1
+            style = mock.Mock(meta={"line": 1})
+
+        screen.on_click(DummyClickEvent())
+        self.assertTrue(len(focus_called) > 0)
+
+    def test_bashedit_footer_click(self):
+        """Verify BashEditScreen handles clicks on interactive footer labels."""
+        screen = bashedit.BashEditScreen()
+
+        actions_called = []
+        screen.action_save_file = lambda: actions_called.append("save")
+        screen.action_open_file = lambda: actions_called.append("open")
+        screen.action_exit_editor = lambda: actions_called.append("exit")
+
+        class DummyWidget:
+            def __init__(self, wid):
+                self.id = wid
+
+        class DummyClickEvent:
+            def __init__(self, widget):
+                self.widget = widget
+                self.target = widget
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_save")))
+        self.assertIn("save", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_open")))
+        self.assertIn("open", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_exit")))
+        self.assertIn("exit", actions_called)
+
+    def test_menuedit_close_button_click(self):
+        """Verify MenuEditScreen on_click handles close button click without AttributeError."""
+        screen = menuedit.MenuEditScreen()
+        actions_called = []
+        screen.action_exit_editor = lambda: actions_called.append("exit")
+
+        class DummyWidget:
+            def __init__(self, wid):
+                self.id = wid
+                self.ancestors = []
+
+        class DummyClickEvent:
+            def __init__(self, widget):
+                self.widget = widget
+                self.target = widget
+
+        class DummyTree:
+            cursor_node = None
+
+        screen.query_one = lambda selector, *args, **kwargs: DummyTree()
+        screen.on_click(DummyClickEvent(DummyWidget("btn_close_x")))
+        self.assertIn("exit", actions_called)
+
+
+class TestWindowCloseButton(unittest.TestCase):
+    """Unit tests for themeable window close button formatting [X]."""
+
+    def test_init_theme_colors_window_close_button_fallback(self):
+        styles = bashmenu_ui.init_theme_colors("dracula")
+        self.assertIn("window_close_button", styles)
+        self.assertIsInstance(styles["window_close_button"], bashmenu_ui.Style)
+
+    def test_format_close_button_label(self):
+        theme_styles = {
+            "border": bashmenu_ui.Style(color="blue"),
+            "window_close_button": bashmenu_ui.Style(color="red", bold=True),
+        }
+        text_obj = bashmenu_ui.format_close_button_label(theme_styles)
+        self.assertEqual(str(text_obj), "[X]")
+        self.assertEqual(len(text_obj.spans), 3)
+        self.assertEqual(text_obj.spans[0].style, theme_styles["border"])
+        self.assertEqual(text_obj.spans[1].style, theme_styles["window_close_button"])
+        self.assertEqual(text_obj.spans[2].style, theme_styles["border"])
+
+    def test_all_12_themes_have_window_close_button(self):
+        raw_themes = bashmenu_ui.load_themes_file()
+        expected_themes = [
+            "dracula",
+            "nord",
+            "cyberpunk",
+            "gruvbox",
+            "qbasic",
+            "pacman",
+            "industry",
+            "matrix",
+            "monochrome",
+            "synthwave",
+            "amber_crt",
+            "hotdog_stand",
+        ]
+        for tname in expected_themes:
+            self.assertIn(tname, raw_themes, f"Theme {tname} missing in bashmenu.themes")
+            t_def = raw_themes[tname]
+            for tier in [256, 16, 8]:
+                self.assertIn(tier, t_def, f"Tier {tier} missing in theme {tname}")
+                self.assertIn(
+                    "window_close_button",
+                    t_def[tier],
+                    f"window_close_button missing in theme {tname} tier {tier}",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+
+
+
 

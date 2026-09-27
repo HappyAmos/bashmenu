@@ -65,6 +65,13 @@ options:
       interactive: true
       quiet: true
       icon: '{nf::#eeab:}'
+      command: glow -t {home}/cheat
+      tabstop: 4
+      stream: false
+      alt_buffer: true
+      no_formatting: false
+      masked: false
+      refresh: false
     - label: Midnight Commander
       icon: '{nf::#f0ab6}'
       type: script
@@ -266,6 +273,15 @@ options:
         title: Task Cancelled
         message: Ping request was cancelled by user.
       icon: '{nf::#f11ab}'
+      prompt: Start pinging target host {settings.ping_target}?
+      tabstop: 4
+      stream: false
+      interactive: true
+      quiet: false
+      alt_buffer: true
+      no_formatting: false
+      masked: false
+      refresh: false
     - label: Show Configured DNS [getdns.py]
       type: script
       action: '{scripts_dir}/getdns.py'
@@ -324,6 +340,15 @@ options:
         - label: Edit Themes File [bashmenu.themes]
           type: editor
           action: bashmenu.themes
+          file: '{bashmenu_dir}/bashmenu.themes'
+          tabstop: 4
+          stream: false
+          interactive: true
+          quiet: false
+          alt_buffer: true
+          no_formatting: false
+          masked: false
+          refresh: false
         - label: Enable Automatic Updates (git pull) [{settings.check_for_updates}]
           type: toggle
           key: settings.check_for_updates
@@ -536,6 +561,7 @@ options:
       no_formatting: false
       masked: false
       refresh: false
+      alt_buffer: true
     - label: Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]
       type: command
       action: curl v2.wttr.in/{user.postal_code}
@@ -548,6 +574,7 @@ options:
       no_formatting: false
       masked: false
       refresh: false
+      alt_buffer: true
     - type: divider
       length: '{window_width}'
       char: '{ascii:196}'
@@ -555,8 +582,8 @@ options:
       type: back
       icon: '{nf::#f048:}'
     - type: divider
-      length: '{window_width}'
       char: '{ascii:196}'
+      length: '{window_width}'
   icon: "{nf::#eef0:\U0001F326\uFE0F}"
 - type: divider
   length: '{window_width}'

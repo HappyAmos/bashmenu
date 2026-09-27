@@ -4,5 +4,6 @@ __pycache__/
 .aicontext.txt
 .gemini.yaml
 .gemini
+.agents
 *.old
 *.bak

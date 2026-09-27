@@ -999,6 +999,62 @@ class MainMenuView(Widget):
 
         return out
 
+    def on_click(self, event) -> None:
+        rendered_row = event.y - 3
+        curr_menu = self.current_menu()
+        options = curr_menu.get("options", [])
+        if not options:
+            return
+
+        total_content_rows = max(1, (self.size.height or 24) - 5)
+        raw_plugin_lines = get_plugin_outputs(self.config)
+        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines))
+
+        scroll_start = 0
+        curr_row = self.current_row()
+        if curr_row >= visible_option_rows:
+            scroll_start = curr_row - visible_option_rows + 1
+
+        if 0 <= rendered_row < visible_option_rows:
+            target_idx = scroll_start + rendered_row
+            if 0 <= target_idx < len(options):
+                opt = options[target_idx]
+                if opt.get("type") != "divider":
+                    self.set_current_row(target_idx)
+                    scr = None
+                    with contextlib.suppress(Exception):
+                        scr = self.screen
+                    if not scr:
+                        scr = getattr(self, "_screen", None)
+
+                    if event.button == 3 and scr and hasattr(scr, "action_edit_menu"):
+                        scr.action_edit_menu()
+                    elif event.button == 1 and scr and hasattr(scr, "action_select_option"):
+                        scr.action_select_option()
+
+    def on_mouse_move(self, event) -> None:
+        rendered_row = event.y - 3
+        curr_menu = self.current_menu()
+        options = curr_menu.get("options", [])
+        if not options:
+            return
+
+        total_content_rows = max(1, (self.size.height or 24) - 5)
+        raw_plugin_lines = get_plugin_outputs(self.config)
+        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines))
+
+        scroll_start = 0
+        curr_row = self.current_row()
+        if curr_row >= visible_option_rows:
+            scroll_start = curr_row - visible_option_rows + 1
+
+        if 0 <= rendered_row < visible_option_rows:
+            target_idx = scroll_start + rendered_row
+            if 0 <= target_idx < len(options):
+                opt = options[target_idx]
+                if opt.get("type") != "divider" and self.current_row() != target_idx:
+                    self.set_current_row(target_idx)
+
 
 def _get_active_title_chain(screen) -> list[str]:
     chain = []
@@ -1351,13 +1407,22 @@ def process_item_action(screen, item, config):
                     stream_cb,
                 )
             else:
+                use_alt_buffer = bool(item.get("alt_buffer", True))
                 with screen.app.suspend():
-                    if not is_quiet:
-                        print(f"\n--- Running Command: {curr_action} ---\n")
-                    subprocess.run(curr_action, shell=True, check=False)
-                    if not is_quiet:
-                        print("\n--------------------------------------------------")
-                        input("Execution complete. Press [ENTER] to return...")
+                    if use_alt_buffer:
+                        sys.stdout.write("\x1b[?1049h")
+                        sys.stdout.flush()
+                    try:
+                        if not is_quiet:
+                            print(f"\n--- Running Command: {curr_action} ---\n")
+                        subprocess.run(curr_action, shell=True, check=False)
+                        if not is_quiet:
+                            print("\n--------------------------------------------------")
+                            input("Execution complete. Press [ENTER] to return...")
+                    finally:
+                        if use_alt_buffer:
+                            sys.stdout.write("\x1b[?1049l")
+                            sys.stdout.flush()
 
                 if item.get("refresh", False):
                     screen.refresh_environment()
@@ -1411,6 +1476,12 @@ class BashMenuScreen(Screen):
             mv.set_current_row(target_idx)
             item = opts[target_idx]
             process_item_action(self, item, mv.config)
+
+    def on_mouse_scroll_down(self, event) -> None:
+        self.action_move_down()
+
+    def on_mouse_scroll_up(self, event) -> None:
+        self.action_move_up()
 
     def action_move_up(self) -> None:
         mv = self.menu_view

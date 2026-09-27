@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 """
 bashedit.py - Built-in Nano-style text editor implemented in Textual.
 """
 
+import contextlib
 import os
 import re
 import sys
@@ -10,6 +12,7 @@ from typing import ClassVar
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.containers import Horizontal
 from textual.events import Key
 from textual.screen import Screen
 from textual.widget import Widget
@@ -450,13 +453,39 @@ class BashEditScreen(Screen):
         layout: vertical;
         background: $surface;
     }
-    #editor_header {
+    #editor_header_bar {
         dock: top;
         height: 1;
+        width: 100%;
         background: $accent;
         color: $text;
+    }
+    #editor_header {
+        width: 1fr;
         text-align: center;
         text-style: bold;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #editor_status {
         dock: bottom;
@@ -466,10 +495,18 @@ class BashEditScreen(Screen):
     }
     #editor_legend {
         dock: bottom;
-        height: 2;
+        height: 1;
         background: $surface;
         color: $accent;
-        text-align: center;
+        align: center middle;
+    }
+    .footer_item {
+        padding: 0 1;
+        color: $accent;
+    }
+    .footer_item:hover {
+        text-style: underline;
+        color: $text;
     }
     #editor_divider {
         dock: bottom;
@@ -576,7 +613,9 @@ class BashEditScreen(Screen):
 
     def compose(self) -> ComposeResult:
         file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
-        yield Label(f"  BashEdit - {file_name}  ", id="editor_header")
+        with Horizontal(id="editor_header_bar"):
+            yield Label(f"  BashEdit - {file_name}  ", id="editor_header")
+            yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
         yield EditorWidget(
             lines=self.initial_lines,
             show_whitespace=self.show_whitespace,
@@ -587,14 +626,53 @@ class BashEditScreen(Screen):
             id="editor_widget",
         )
         yield Label("─" * 300, id="editor_divider")
-        yield Label(
-            "^O Save  ^R Open  ^W Search  ^K Cut  Alt+6 Copy  ^U Paste  ^^ Mark  ^P Space  ^N Lineno  F1 Help  ^X Exit",
-            id="editor_legend",
-        )
+        with Horizontal(id="editor_legend"):
+            yield Label("^O Save", id="lbl_save", classes="footer_item", markup=False)
+            yield Label("^R Open", id="lbl_open", classes="footer_item", markup=False)
+            yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
+            yield Label("^K Cut", id="lbl_cut", classes="footer_item", markup=False)
+            yield Label("Alt+6 Copy", id="lbl_copy", classes="footer_item", markup=False)
+            yield Label("^U Paste", id="lbl_paste", classes="footer_item", markup=False)
+            yield Label("^^ Mark", id="lbl_mark", classes="footer_item", markup=False)
+            yield Label("^P Space", id="lbl_space", classes="footer_item", markup=False)
+            yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
+            yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
+            yield Label("^X Exit", id="lbl_exit", classes="footer_item", markup=False)
         yield Label("  Line 1/1, Col 1  ", id="editor_status")
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if not widget:
+            return
+        lbl_id = getattr(widget, "id", None)
+        if lbl_id == "lbl_save":
+            self.action_save_file()
+        elif lbl_id == "lbl_open":
+            self.action_open_file()
+        elif lbl_id == "lbl_search":
+            self.action_search_text()
+        elif lbl_id == "lbl_cut":
+            self.action_cut_line()
+        elif lbl_id == "lbl_copy":
+            self.action_copy_selection()
+        elif lbl_id == "lbl_paste":
+            self.action_paste_buffer()
+        elif lbl_id == "lbl_mark":
+            self.action_toggle_mark()
+        elif lbl_id == "lbl_space":
+            self.action_toggle_whitespace()
+        elif lbl_id == "lbl_lineno":
+            self.action_toggle_lineno()
+        elif lbl_id == "lbl_help":
+            self.action_help_manual()
+        elif lbl_id in ("lbl_exit", "btn_close_x"):
+            self.action_exit_editor()
 
     def on_mount(self) -> None:
         self.query_one("#editor_widget", EditorWidget).focus()
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
         divider_style = self.theme_styles.get("divider") or self.theme_styles.get("border") or self.theme_styles.get("accent")
         if divider_style and divider_style.color and divider_style.color.name:
             css_div = bashmenu_ui.parse_css_color(divider_style.color.name)
