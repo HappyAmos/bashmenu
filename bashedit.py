@@ -1,15 +1,495 @@
 """
-bashedit.py - A standalone curses text editor module.
+bashedit.py - Built-in Nano-style text editor implemented in Textual.
 """
 
-import curses
 import os
-import shlex
-import subprocess
 import sys
-import termios
+
+from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.events import Key
+from textual.screen import Screen
+from textual.widget import Widget
+from textual.widgets import Label
 
 import bashmenu_ui
+
+
+class EditorWidget(Widget):
+    """Custom line-oriented text editor widget displaying code buffer and cursor."""
+
+    DEFAULT_CSS = """
+    EditorWidget {
+        width: 100%;
+        height: 1fr;
+        background: $surface;
+        color: $text;
+    }
+    """
+
+    def __init__(
+        self,
+        lines=None,
+        show_line_numbers=True,
+        show_whitespace=False,
+        tab_to_spaces=True,
+        tabstop=8,
+        theme=None,
+    ):
+        super().__init__()
+        self.lines = list(lines) if lines else [""]
+        self.cursor_y = 0
+        self.cursor_x = 0
+        self.scroll_y = 0
+        self.scroll_x = 0
+        self.show_line_numbers = show_line_numbers
+        self.show_whitespace = show_whitespace
+        self.tab_to_spaces = tab_to_spaces
+        self.tabstop = tabstop
+        self.theme = theme or {}
+
+        self.mark_active = False
+        self.mark_y = 0
+        self.mark_x = 0
+
+        self.cutbuffer = []
+        self.undo_stack = []
+        self.redo_stack = []
+        self.MAX_HISTORY = 100
+        self.modified = False
+
+    def render(self) -> Text:
+        """Render visible text lines with selection, line numbers, and cursor."""
+        out = Text()
+        height = self.size.height or 20
+        width = self.size.width or 80
+
+        lineno_width = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
+
+        for row_idx in range(height):
+            line_num = self.scroll_y + row_idx
+            if line_num >= len(self.lines):
+                out.append("~\n", style="dim cyan")
+                continue
+
+            line_text = self.lines[line_num]
+
+            if self.show_line_numbers:
+                num_str = f"{line_num + 1:>{lineno_width - 1}} "
+                out.append(num_str, style="dim white")
+
+            # Format line content with optional whitespace rendering
+            disp_text = line_text
+            if self.show_whitespace:
+                disp_text = disp_text.replace(" ", "·").replace("\t", "➔" + " " * (self.tabstop - 1))
+
+            content_width = max(1, width - lineno_width)
+            visible_segment = disp_text[self.scroll_x : self.scroll_x + content_width]
+
+            # Render line text with selection / cursor
+            line_rich = Text(visible_segment)
+
+            # Highlight current line cursor position
+            if line_num == self.cursor_y:
+                rel_cursor_x = self.cursor_x - self.scroll_x
+                if 0 <= rel_cursor_x <= len(line_rich):
+                    if rel_cursor_x < len(line_rich):
+                        line_rich.stylize("reverse bold", rel_cursor_x, rel_cursor_x + 1)
+                    else:
+                        line_rich.append(" ", style="reverse bold")
+
+            out.append_text(line_rich)
+            out.append("\n")
+
+        return out
+
+    def push_undo(self):
+        self.undo_stack.append(
+            (list(self.lines), self.cursor_y, self.cursor_x, self.mark_active, self.mark_y, self.mark_x)
+        )
+        if len(self.undo_stack) > self.MAX_HISTORY:
+            self.undo_stack.pop(0)
+        self.redo_stack.clear()
+
+    def undo(self) -> str:
+        if not self.undo_stack:
+            return "Nothing to undo"
+        self.redo_stack.append(
+            (list(self.lines), self.cursor_y, self.cursor_x, self.mark_active, self.mark_y, self.mark_x)
+        )
+        prev_lines, self.cursor_y, self.cursor_x, self.mark_active, self.mark_y, self.mark_x = self.undo_stack.pop()
+        self.lines = list(prev_lines)
+        self.modified = True
+        self.refresh()
+        return "Undo"
+
+    def redo(self) -> str:
+        if not self.redo_stack:
+            return "Nothing to redo"
+        self.undo_stack.append(
+            (list(self.lines), self.cursor_y, self.cursor_x, self.mark_active, self.mark_y, self.mark_x)
+        )
+        next_lines, self.cursor_y, self.cursor_x, self.mark_active, self.mark_y, self.mark_x = self.redo_stack.pop()
+        self.lines = list(next_lines)
+        self.modified = True
+        self.refresh()
+        return "Redo"
+
+    def clamp_cursor(self):
+        self.cursor_y = max(0, min(self.cursor_y, len(self.lines) - 1))
+        current_line_len = len(self.lines[self.cursor_y])
+        self.cursor_x = max(0, min(self.cursor_x, current_line_len))
+
+        # Adjust viewport scroll position
+        height = max(1, self.size.height or 20)
+        width = max(1, self.size.width or 80)
+
+        if self.cursor_y < self.scroll_y:
+            self.scroll_y = self.cursor_y
+        elif self.cursor_y >= self.scroll_y + height:
+            self.scroll_y = self.cursor_y - height + 1
+
+        lineno_w = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
+        visible_w = max(10, width - lineno_w)
+
+        if self.cursor_x < self.scroll_x:
+            self.scroll_x = self.cursor_x
+        elif self.cursor_x >= self.scroll_x + visible_w:
+            self.scroll_x = self.cursor_x - visible_w + 1
+
+    def insert_char(self, char: str):
+        self.push_undo()
+        line = self.lines[self.cursor_y]
+        self.lines[self.cursor_y] = line[: self.cursor_x] + char + line[self.cursor_x :]
+        self.cursor_x += len(char)
+        self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+
+    def insert_newline(self):
+        self.push_undo()
+        line = self.lines[self.cursor_y]
+        left_part = line[: self.cursor_x]
+        right_part = line[self.cursor_x :]
+        self.lines[self.cursor_y] = left_part
+        self.lines.insert(self.cursor_y + 1, right_part)
+        self.cursor_y += 1
+        self.cursor_x = 0
+        self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+
+    def backspace(self):
+        self.push_undo()
+        if self.cursor_x > 0:
+            line = self.lines[self.cursor_y]
+            self.lines[self.cursor_y] = line[: self.cursor_x - 1] + line[self.cursor_x :]
+            self.cursor_x -= 1
+            self.modified = True
+        elif self.cursor_y > 0:
+            prev_line = self.lines[self.cursor_y - 1]
+            curr_line = self.lines[self.cursor_y]
+            self.cursor_x = len(prev_line)
+            self.lines[self.cursor_y - 1] = prev_line + curr_line
+            self.lines.pop(self.cursor_y)
+            self.cursor_y -= 1
+            self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+
+    def delete_char(self):
+        self.push_undo()
+        line = self.lines[self.cursor_y]
+        if self.cursor_x < len(line):
+            self.lines[self.cursor_y] = line[: self.cursor_x] + line[self.cursor_x + 1 :]
+            self.modified = True
+        elif self.cursor_y < len(self.lines) - 1:
+            next_line = self.lines.pop(self.cursor_y + 1)
+            self.lines[self.cursor_y] += next_line
+            self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+
+    def cut_line(self) -> str:
+        self.push_undo()
+        if len(self.lines) > 1:
+            removed = self.lines.pop(self.cursor_y)
+            self.cutbuffer = [removed]
+        else:
+            self.cutbuffer = [self.lines[0]]
+            self.lines[0] = ""
+        self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+        return "Line Cut"
+
+    def paste_buffer(self) -> str:
+        if not self.cutbuffer:
+            return "Buffer empty"
+        self.push_undo()
+        for idx, text in enumerate(self.cutbuffer):
+            self.lines.insert(self.cursor_y + idx, text)
+        self.cursor_y += len(self.cutbuffer)
+        self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+        return "Pasted"
+
+
+class BashEditScreen(Screen):
+    """Full screen Nano-style text editor."""
+
+    DEFAULT_CSS = """
+    BashEditScreen {
+        layout: vertical;
+        background: $surface;
+    }
+    #editor_header {
+        dock: top;
+        height: 1;
+        background: $accent;
+        color: $text-primary;
+        text-align: center;
+        text-style: bold;
+    }
+    #editor_status {
+        dock: bottom;
+        height: 1;
+        background: $primary-dark;
+        color: $text-muted;
+    }
+    #editor_legend {
+        dock: bottom;
+        height: 2;
+        background: $surface-darken-1;
+        color: $accent;
+        text-align: center;
+    }
+    """
+
+    BINDINGS = [
+        Binding("ctrl+o", "save_file", "WriteOut"),
+        Binding("ctrl+x", "exit_editor", "Exit"),
+        Binding("ctrl+w", "search_text", "WhereIs"),
+        Binding("ctrl+k", "cut_line", "Cut"),
+        Binding("ctrl+u", "paste_buffer", "Paste"),
+        Binding("ctrl+z", "undo", "Undo"),
+        Binding("ctrl+y", "redo", "Redo"),
+        Binding("ctrl+n", "toggle_lineno", "Line Numbers"),
+        Binding("ctrl+c", "show_pos", "Cur Pos"),
+        Binding("up", "move_up", "Up", show=False),
+        Binding("down", "move_down", "Down", show=False),
+        Binding("left", "move_left", "Left", show=False),
+        Binding("right", "move_right", "Right", show=False),
+        Binding("home", "move_home", "Home", show=False),
+        Binding("end", "move_end", "End", show=False),
+    ]
+
+    def __init__(
+        self,
+        file_path: str = None,
+        theme: dict = None,
+        show_whitespace: bool = False,
+        tab_to_spaces: bool = True,
+        tabstop: int = 8,
+    ):
+        super().__init__()
+        self.file_path = file_path
+        self.theme = theme or {}
+        self.show_whitespace = show_whitespace
+        self.tab_to_spaces = tab_to_spaces
+        self.tabstop = tabstop
+
+        lines = [""]
+        if self.file_path and os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read().splitlines()
+                    lines = content if content else [""]
+            except Exception as e:
+                lines = [f"# Error reading file: {e}"]
+
+        self.initial_lines = lines
+
+    def compose(self) -> ComposeResult:
+        file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
+        yield Label(f"  BashEdit - {file_name}  ", id="editor_header")
+        yield EditorWidget(
+            lines=self.initial_lines,
+            show_whitespace=self.show_whitespace,
+            tab_to_spaces=self.tab_to_spaces,
+            tabstop=self.tabstop,
+            theme=self.theme,
+            id="editor_widget",
+        )
+        yield Label(
+            "^O WriteOut  ^W Where Is  ^K Cut Line  ^U Paste  ^Z Undo  ^X Exit",
+            id="editor_legend",
+        )
+        yield Label("  Line 1/1, Col 1  ", id="editor_status")
+
+    def update_status(self, msg: str = None):
+        ed = self.query_one("#editor_widget", EditorWidget)
+        pos_info = f"Line {ed.cursor_y + 1}/{len(ed.lines)}, Col {ed.cursor_x + 1}"
+        mod = " *" if ed.modified else ""
+        text = f"  {pos_info}{mod} | {msg}  " if msg else f"  {pos_info}{mod}  "
+        self.query_one("#editor_status", Label).update(text)
+
+    def on_key(self, event: Key) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+
+        if event.key == "up":
+            ed.cursor_y = max(0, ed.cursor_y - 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+        elif event.key == "down":
+            ed.cursor_y = min(len(ed.lines) - 1, ed.cursor_y + 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+        elif event.key == "left":
+            ed.cursor_x = max(0, ed.cursor_x - 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+        elif event.key == "right":
+            ed.cursor_x = min(len(ed.lines[ed.cursor_y]), ed.cursor_x + 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+        elif event.key == "home":
+            ed.cursor_x = 0
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+        elif event.key == "end":
+            ed.cursor_x = len(ed.lines[ed.cursor_y])
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+        elif event.key == "enter":
+            ed.insert_newline()
+            self.update_status()
+        elif event.key in ["backspace", "ctrl+h"]:
+            ed.backspace()
+            self.update_status()
+        elif event.key == "delete":
+            ed.delete_char()
+            self.update_status()
+        elif event.key == "tab":
+            indent = " " * ed.tabstop if ed.tab_to_spaces else "\t"
+            ed.insert_char(indent)
+            self.update_status()
+        elif len(event.character or "") == 1 and event.character.isprintable():
+            ed.insert_char(event.character)
+            self.update_status()
+
+    def action_save_file(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        if not self.file_path:
+
+            def save_cb(path):
+                if path:
+                    self.file_path = path
+                    self.action_save_file()
+
+            self.app.push_screen(
+                bashmenu_ui.InputModalScreen("Save File As", "Enter file path:"),
+                save_cb,
+            )
+            return
+
+        try:
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(ed.lines))
+            ed.modified = False
+            self.update_status("Wrote file successfully")
+        except Exception as e:
+            self.update_status(f"Error saving file: {e}")
+
+    def action_exit_editor(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        if ed.modified:
+
+            def confirm_cb(res):
+                if res == "yes":
+                    self.action_save_file()
+                    self.dismiss(True)
+                elif res == "no":
+                    self.dismiss(False)
+
+            self.app.push_screen(
+                bashmenu_ui.ConfirmModalScreen(
+                    "Save Modified File?", "File has unsaved changes. Save before exiting?"
+                ),
+                confirm_cb,
+            )
+        else:
+            self.dismiss(False)
+
+    def action_cut_line(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        msg = ed.cut_line()
+        self.update_status(msg)
+
+    def action_paste_buffer(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        msg = ed.paste_buffer()
+        self.update_status(msg)
+
+    def action_undo(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        msg = ed.undo()
+        self.update_status(msg)
+
+    def action_redo(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        msg = ed.redo()
+        self.update_status(msg)
+
+    def action_toggle_lineno(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        ed.show_line_numbers = not ed.show_line_numbers
+        ed.refresh()
+        self.update_status("Toggled Line Numbers")
+
+    def action_show_pos(self) -> None:
+        self.update_status()
+
+    def action_search_text(self) -> None:
+        def search_cb(query):
+            if not query:
+                return
+            ed = self.query_one("#editor_widget", EditorWidget)
+            for idx, line in enumerate(ed.lines[ed.cursor_y :], start=ed.cursor_y):
+                c_idx = line.find(query)
+                if c_idx != -1:
+                    ed.cursor_y = idx
+                    ed.cursor_x = c_idx
+                    ed.clamp_cursor()
+                    ed.refresh()
+                    self.update_status(f"Found '{query}'")
+                    return
+            self.update_status(f"'{query}' not found")
+
+        self.app.push_screen(
+            bashmenu_ui.InputModalScreen("Search Text", "Enter search query:"),
+            search_cb,
+        )
+
+
+class BashEditApp(App):
+    """Standalone App launcher for BashEdit."""
+
+    def __init__(self, file_path: str = None, **kwargs):
+        super().__init__()
+        self.file_path = file_path
+        self.kwargs = kwargs
+
+    def on_mount(self) -> None:
+        self.push_screen(BashEditScreen(file_path=self.file_path, **self.kwargs))
 
 
 def run_curses_editor(
@@ -20,870 +500,18 @@ def run_curses_editor(
     tab_to_spaces=True,
     tabstop=8,
 ):
-    """
-    Launch full-screen curses text editor with Nano-style shortcuts.
+    """Compatibility runner for launching BashEdit in Textual."""
+    app = BashEditApp(
+        file_path=file_path,
+        theme=theme,
+        show_whitespace=show_whitespace,
+        tab_to_spaces=tab_to_spaces,
+        tabstop=tabstop,
+    )
+    app.run()
 
-    Args:
-        stdscr (curses.window): Main screen window handle.
-        file_path (str | None): Path of target file to create or edit.
-        theme (dict): Active theme color attribute map.
-        show_whitespace (bool): Toggle rendering of space/tab glyphs.
-        tab_to_spaces (bool): If True, convert Tab key presses to spaces.
-        tabstop (int): Number of spaces per tab indentation.
-    """
-    import bashmenu
 
-    if file_path:
-        expanded_path = os.path.expanduser(file_path)
-        abs_path = (
-            os.path.abspath(expanded_path)
-            if os.path.isabs(expanded_path)
-            else os.path.abspath(os.path.join(bashmenu.BASHMENU_DIR, expanded_path))
-        )
-        rel_name = os.path.basename(abs_path)
-    else:
-        abs_path = ""
-        rel_name = "Untitled"
-
-    fd = sys.stdin.fileno()
-    old_settings = None
-    try:
-        old_settings = termios.tcgetattr(fd)
-        new_settings = termios.tcgetattr(fd)
-        new_settings[0] &= ~termios.IXON
-        termios.tcsetattr(fd, termios.TCSANOW, new_settings)
-    except (termios.error, AttributeError):  # Catch termios configuration or parameter access failures safely
-        pass
-
-    lines = [""]
-    if abs_path and os.path.exists(abs_path):
-        try:
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read().splitlines()
-                lines = content if content else [""]
-        except OSError as e:  # Catch filesystem read access errors safely
-            lines = [f"# Error opening file: {e}"]
-
-    cursor_y = cursor_x = scroll_y = scroll_x = 0
-    modified = False
-    status_msg = ""
-
-    cutbuffer = []
-    cutbuffer_is_block = last_action_was_cut = mark_active = False
-    mark_y = mark_x = 0
-
-    undo_stack = []
-    redo_stack = []
-    MAX_HISTORY = 100
-    typing_group = False
-
-    show_line_numbers = show_help = True
-
-    bashmenu_ui.safe_curs_set(1)
-    stdscr.keypad(True)
-
-    def push_undo():
-        """Push current editor state onto undo history stack."""
-        undo_stack.append((
-            list(lines),
-            cursor_y,
-            cursor_x,
-            mark_active,
-            mark_y,
-            mark_x,
-        ))
-        if len(undo_stack) > MAX_HISTORY:
-            undo_stack.pop(0)
-        redo_stack.clear()
-
-    def action_undo():
-        """Revert editor to previous state from undo history stack."""
-        nonlocal cursor_y, cursor_x, mark_active, mark_y, mark_x, lines
-        nonlocal modified, status_msg, typing_group
-        typing_group = False
-        if not undo_stack:
-            status_msg = " [ Nothing to undo ] "
-            return
-        redo_stack.append((
-            list(lines),
-            cursor_y,
-            cursor_x,
-            mark_active,
-            mark_y,
-            mark_x,
-        ))
-        prev_lines, cursor_y, cursor_x, mark_active, mark_y, mark_x = (
-            undo_stack.pop()
-        )
-        lines = list(prev_lines)
-        modified = True
-        status_msg = " [ Undo ] "
-
-    def action_redo():
-        """Reapply previously undone changes from redo history stack."""
-        nonlocal cursor_y, cursor_x, mark_active, mark_y, mark_x, lines
-        nonlocal modified, status_msg, typing_group
-        typing_group = False
-        if not redo_stack:
-            status_msg = " [ Nothing to redo ] "
-            return
-        undo_stack.append((
-            list(lines),
-            cursor_y,
-            cursor_x,
-            mark_active,
-            mark_y,
-            mark_x,
-        ))
-        next_lines, cursor_y, cursor_x, mark_active, mark_y, mark_x = (
-            redo_stack.pop()
-        )
-        lines = list(next_lines)
-        modified = True
-        status_msg = " [ Redo ] "
-
-    def restore_termios():
-        """Restore initial terminal attributes prior to editor launch."""
-        if old_settings:
-            try:
-                termios.tcsetattr(fd, termios.TCSANOW, old_settings)
-            except (termios.error, AttributeError):  # Catch termios restoration failures safely
-                pass
-
-    def action_exit():
-        """Exit editor, prompting for confirmation if modified."""
-        nonlocal typing_group, mark_active, status_msg
-        typing_group = False
-        if mark_active:
-            mark_active = False
-            status_msg = " [ Mark Cancelled ] "
-            return False
-        if modified:
-            confirm = bashmenu_ui.show_confirm_box(
-                stdscr,
-                "Unsaved Changes",
-                f"File '{rel_name}' has unsaved changes.\n"
-                f"Do you want to save before closing?",
-                theme,
-            )
-            if confirm is None:
-                status_msg = " [ Exit Cancelled ] "
-                return False
-            elif confirm == "yes":
-                save_file()
-
-        restore_termios()
-        bashmenu_ui.safe_curs_set(0)
-        return True
-
-    def save_file():
-        """Save current buffer contents to disk."""
-        nonlocal modified, status_msg
-        if not abs_path:
-            action_save_as()
-            return
-        try:
-            with open(abs_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-            modified = False
-            status_msg = " [ File Saved Successfully! ] "
-        except OSError as e:  # Catch filesystem write access errors safely
-            status_msg = f" [ Save Error: {e} ] "
-
-    def action_save_as():
-        """Prompt user for destination path and save buffer."""
-        nonlocal abs_path, rel_name
-        default_p = abs_path if abs_path else "untitled.txt"
-        new_path = bashmenu_ui.show_input_box(
-            stdscr, "Save As", "Enter destination path:", default_p, theme
-        )
-        if new_path and new_path.strip():
-            expanded = os.path.expanduser(new_path.strip())
-            abs_path = (
-                os.path.abspath(expanded)
-                if os.path.isabs(expanded)
-                else os.path.abspath(os.path.join(bashmenu.BASHMENU_DIR, expanded))
-            )
-            rel_name = os.path.basename(abs_path)
-            save_file()
-
-    def action_open():
-        """Prompt user for a file to open into the editor."""
-        nonlocal lines, cursor_y, cursor_x, scroll_y, scroll_x
-        nonlocal abs_path, rel_name, modified, status_msg, typing_group
-        if modified:
-            confirm = bashmenu_ui.show_confirm_box(
-                stdscr,
-                "Unsaved Changes",
-                f"File '{rel_name}' has unsaved changes.\n"
-                f"Save before opening another file?",
-                theme,
-            )
-            if confirm is None:
-                status_msg = " [ Open Cancelled ] "
-                return
-            elif confirm == "yes":
-                save_file()
-                if modified:
-                    return
-
-        start_d = os.path.dirname(abs_path) if abs_path else bashmenu.USER_HOME
-        chosen = bashmenu_ui.show_file_picker(
-            stdscr, "Open File", start_dir=start_d, mode="file", theme=theme
-        )
-        if chosen and os.path.isfile(chosen):
-            try:
-                with open(chosen, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read().splitlines()
-                    lines = content if content else [""]
-                abs_path = os.path.abspath(chosen)
-                rel_name = os.path.basename(abs_path)
-                cursor_y = cursor_x = scroll_y = scroll_x = 0
-                modified = False
-                undo_stack.clear()
-                redo_stack.clear()
-                typing_group = False
-                status_msg = f" [ Opened '{rel_name}' ] "
-            except OSError as e:  # Catch filesystem read access errors safely
-                status_msg = f" [ Open Error: {e} ] "
-
-    def action_new():
-        """Clear buffer and reset editor for a new document."""
-        nonlocal lines, cursor_y, cursor_x, scroll_y, scroll_x
-        nonlocal abs_path, rel_name, modified, status_msg, typing_group
-        if modified:
-            confirm = bashmenu_ui.show_confirm_box(
-                stdscr,
-                "Unsaved Changes",
-                f"File '{rel_name}' has unsaved changes.\n"
-                f"Save before creating a new document?",
-                theme,
-            )
-            if confirm is None:
-                status_msg = " [ New Document Cancelled ] "
-                return
-            elif confirm == "yes":
-                save_file()
-                if modified:
-                    return
-
-        lines = [""]
-        abs_path = ""
-        rel_name = "Untitled"
-        cursor_y = cursor_x = scroll_y = scroll_x = 0
-        modified = False
-        undo_stack.clear()
-        redo_stack.clear()
-        typing_group = False
-        status_msg = " [ New Document Created ] "
-
-    def open_external_editor():
-        """Suspend curses interface and spawn external editor ($EDITOR)."""
-        if not abs_path:
-            action_save_as()
-            if not abs_path:
-                return
-        restore_termios()
-        curses.endwin()
-        editor_bin = os.environ.get("EDITOR", "nano")
-        print(f"\n--- Launching {editor_bin} for '{rel_name}' ---\n")
-        try:
-            cmd = shlex.split(editor_bin) + [abs_path]
-            subprocess.run(cmd, check=False)
-        except (OSError, subprocess.SubprocessError) as e:  # Catch binary invocation or process execution failures safely
-            print(f"Error starting editor '{editor_bin}': {e}")
-            input("Press [ENTER] to continue...")
-        stdscr.clear()
-        stdscr.refresh()
-        try:
-                termios.tcsetattr(fd, termios.TCSANOW, new_settings)
-        except (termios.error, AttributeError):  # Catch termios configuration or attribute access failures safely
-            pass
-
-    def get_selection_range():
-        """Calculate sorted start and end coordinates of selection."""
-        if not mark_active:
-            return None
-        return (
-            ((cursor_y, cursor_x), (mark_y, mark_x))
-            if (cursor_y, cursor_x) < (mark_y, mark_x)
-            else ((mark_y, mark_x), (cursor_y, cursor_x))
-        )
-
-    def extract_selected_text():
-        """Extract lines or substrings bounded by active selection mark."""
-        rng = get_selection_range()
-        if not rng:
-            return []
-        (sy, sx), (ey, ex) = rng
-        if sy == ey:
-            return [lines[sy][sx:ex]]
-        res = [lines[sy][sx:]]
-        for y in range(sy + 1, ey):
-            res.append(lines[y])
-        res.append(lines[ey][:ex])
-        return res
-
-    def delete_selected_text():
-        """Remove text currently highlighted by selection bounds."""
-        nonlocal cursor_y, cursor_x, mark_active, modified, typing_group
-        rng = get_selection_range()
-        if not rng:
-            return
-        typing_group = False
-        push_undo()
-        (sy, sx), (ey, ex) = rng
-        if sy == ey:
-            lines[sy] = lines[sy][:sx] + lines[sy][ex:]
-        else:
-            lines[sy] = lines[sy][:sx] + lines[ey][ex:]
-            del lines[sy + 1 : ey + 1]
-        cursor_y, cursor_x = sy, sx
-        mark_active = False
-        modified = True
-        if not lines:
-            lines.append("")
-
-    def action_cut():
-        """Cut active line or selected text block into cutbuffer."""
-        nonlocal cutbuffer, cutbuffer_is_block, last_action_was_cut, status_msg
-        nonlocal modified, cursor_y, cursor_x, typing_group
-        typing_group = False
-        if mark_active:
-            cutbuffer = extract_selected_text()
-            cutbuffer_is_block = True
-            delete_selected_text()
-            last_action_was_cut = False
-            status_msg = f" [ Cut {len(cutbuffer)} line selection ] "
-        else:
-            push_undo()
-            if last_action_was_cut and not cutbuffer_is_block:
-                cutbuffer.append(lines[cursor_y])
-            else:
-                cutbuffer = [lines[cursor_y]]
-                cutbuffer_is_block = False
-
-            if len(lines) > 1:
-                lines.pop(cursor_y)
-                if cursor_y >= len(lines):
-                    cursor_y = len(lines) - 1
-                cursor_x = min(cursor_x, len(lines[cursor_y]))
-            else:
-                lines[0] = ""
-                cursor_x = 0
-            modified = True
-            last_action_was_cut = True
-            plural = "s" if len(cutbuffer) > 1 else ""
-            status_msg = f" [ Cut {len(cutbuffer)} line{plural} ] "
-
-    def action_copy():
-        """Copy active line or selection block into cutbuffer."""
-        nonlocal cutbuffer, cutbuffer_is_block, last_action_was_cut
-        nonlocal status_msg, mark_active, typing_group
-        typing_group = False
-        if mark_active:
-            cutbuffer = extract_selected_text()
-            cutbuffer_is_block = True
-            mark_active = False
-            status_msg = f" [ Copied {len(cutbuffer)} line selection ] "
-        else:
-            cutbuffer = [lines[cursor_y]]
-            cutbuffer_is_block = False
-            status_msg = f" [ Copied Line {cursor_y + 1} ] "
-        last_action_was_cut = False
-
-    def action_paste():
-        """Paste current cutbuffer contents at cursor location."""
-        nonlocal last_action_was_cut, status_msg, modified, cursor_y, cursor_x
-        nonlocal typing_group
-        typing_group = False
-        last_action_was_cut = False
-        if not cutbuffer:
-            status_msg = " [ Cutbuffer is empty ] "
-            return
-
-        if mark_active:
-            delete_selected_text()
-        else:
-            push_undo()
-
-        if cutbuffer_is_block:
-            if len(cutbuffer) == 1:
-                # Single-line block paste: insert text directly at cursor position
-                lines[cursor_y] = (
-                    lines[cursor_y][:cursor_x]
-                    + cutbuffer[0]
-                    + lines[cursor_y][cursor_x:]
-                )
-                cursor_x += len(cutbuffer[0])
-            else:
-                # Multi-line block paste: split current line, insert middle lines, and append the tail
-                tail = lines[cursor_y][cursor_x:]
-                lines[cursor_y] = lines[cursor_y][:cursor_x] + cutbuffer[0]
-                for idx, mid in enumerate(cutbuffer[1:-1]):
-                    lines.insert(cursor_y + 1 + idx, mid)
-                last_idx = cursor_y + len(cutbuffer) - 1
-                lines.insert(last_idx, cutbuffer[-1] + tail)
-                cursor_y = last_idx
-                cursor_x = len(cutbuffer[-1])
-        else:
-            # Full-line paste: insert entire lines directly below or at cursor line
-            for idx, l in enumerate(cutbuffer):
-                lines.insert(cursor_y + idx, l)
-            cursor_y += len(cutbuffer)
-            cursor_x = 0
-        modified = True
-        plural = "s" if len(cutbuffer) > 1 else ""
-        status_msg = f" [ Pasted {len(cutbuffer)} line{plural} ] "
-
-    while True:
-        height, width = stdscr.getmaxyx()
-        use_help = show_help and height >= 14
-        view_h = max(3, height - 1 - 1 - (2 if use_help else 0) - 1)
-        gutter_w = 7 if show_line_numbers else 0
-        view_w = max(10, width - 2 - gutter_w)
-
-        if cursor_y < scroll_y:
-            scroll_y = cursor_y
-        elif cursor_y >= scroll_y + view_h:
-            scroll_y = cursor_y - view_h + 1
-
-        if cursor_x < scroll_x:
-            scroll_x = cursor_x
-        elif cursor_x >= scroll_x + view_w:
-            scroll_x = cursor_x - view_w + 1
-
-        stdscr.erase()
-        stdscr.attron(theme["border"])
-        stdscr.border(0)
-        stdscr.attroff(theme["border"])
-
-        mod_tag = " *" if modified else ""
-        ws_tag = " [WS]" if show_whitespace else ""
-        header = f" Editing: {rel_name}{mod_tag}{ws_tag} "
-        bashmenu_ui.safe_addstr(
-            stdscr,
-            0,
-            max(2, (width - len(header)) // 2),
-            header,
-            theme["title"] | curses.A_BOLD,
-        )
-
-        rng = get_selection_range()
-
-        for i in range(view_h):
-            line_idx = scroll_y + i
-            if line_idx >= len(lines):
-                break
-
-            line_text = lines[line_idx]
-            row_screen_y = i + 1
-
-            if show_line_numbers:
-                gutter_attr = (
-                    (theme["accent"] | curses.A_BOLD)
-                    if line_idx == cursor_y
-                    else theme["gutter"]
-                )
-                bashmenu_ui.safe_addstr(
-                    stdscr,
-                    row_screen_y,
-                    1,
-                    f"{line_idx + 1:4d} │ ",
-                    gutter_attr,
-                )
-
-            text_start_x = 1 + gutter_w
-            visible_text = line_text[scroll_x : scroll_x + view_w]
-            tab_glyph = "→" + (" " * (max(1, tabstop) - 1))
-            disp_text = (
-                visible_text.replace(" ", "·").replace("\t", tab_glyph)
-                if show_whitespace
-                else visible_text.replace("\t", " " * max(1, tabstop))
-            )
-
-            if not rng:
-                bashmenu_ui.safe_addstr(
-                    stdscr, row_screen_y, text_start_x, disp_text, theme["text"]
-                )
-            else:
-                (sy, sx), (ey, ex) = rng
-                if line_idx < sy or line_idx > ey:
-                    bashmenu_ui.safe_addstr(
-                        stdscr,
-                        row_screen_y,
-                        text_start_x,
-                        disp_text,
-                        theme["text"],
-                    )
-                else:
-                    sel_start = sx if line_idx == sy else 0
-                    sel_end = ex if line_idx == ey else len(line_text) + 1
-                    if sy == ey:
-                        sel_start, sel_end = sx, ex
-
-                    line_len = len(disp_text)
-                    for col_idx in range(line_len):
-                        actual_col = scroll_x + col_idx
-                        char_attr = (
-                            theme["selection"]
-                            if (sel_start <= actual_col < sel_end)
-                            else theme["text"]
-                        )
-                        bashmenu_ui.safe_addstr(
-                            stdscr,
-                            row_screen_y,
-                            text_start_x + col_idx,
-                            disp_text[col_idx],
-                            char_attr,
-                        )
-
-        status_y = 1 + view_h
-        bashmenu_ui.safe_addstr(
-            stdscr, status_y, 1, " " * (width - 2), theme["status_bar"]
-        )
-        disp_msg = status_msg if status_msg else f" Editing: {rel_name}"
-        bashmenu_ui.safe_addstr(
-            stdscr,
-            status_y,
-            2,
-            disp_msg[: max(10, width - 28)],
-            theme["status_bar"] | curses.A_BOLD,
-        )
-
-        mark_badge = "[MARK] " if mark_active else ""
-        pos_str = (
-            f" {mark_badge}Ln {cursor_y + 1}/{len(lines)}, Col {cursor_x + 1} "
-        )
-        bashmenu_ui.safe_addstr(
-            stdscr,
-            status_y,
-            max(2, width - len(pos_str) - 2),
-            pos_str,
-            theme["shortcut_key"] | curses.A_BOLD,
-        )
-
-        if use_help:
-            shortcuts_r1 = [
-                ("^G", "Get Help"),
-                ("^O", "WriteOut"),
-                ("^R", "Read File"),
-                ("^N", "New Doc"),
-                ("^K", "Cut"),
-                ("^U", "Paste"),
-                ("^C", "Location"),
-                ("M-6", "Copy"),
-            ]
-            shortcuts_r2 = [
-                ("^X", "Exit"),
-                ("^S", "SaveAs"),
-                ("M-U", "Undo"),
-                ("M-E", "Redo"),
-                ("M-A", "Mark"),
-                ("M-N", "LineNo"),
-                ("M-P", "ShowWS"),
-                ("F2", "ExtEdit"),
-            ]
-
-            # Clear both lines first with theme's standard background
-            bashmenu_ui.safe_addstr(stdscr, status_y + 1, 1, " " * (width - 2), theme["text"])
-            bashmenu_ui.safe_addstr(stdscr, status_y + 2, 1, " " * (width - 2), theme["text"])
-
-            num_cols_total = max(len(shortcuts_r1), len(shortcuts_r2))
-            col_widths = []
-            for col in range(num_cols_total):
-                w1 = len(shortcuts_r1[col][0]) + 1 + len(shortcuts_r1[col][1]) if col < len(shortcuts_r1) else 0
-                w2 = len(shortcuts_r2[col][0]) + 1 + len(shortcuts_r2[col][1]) if col < len(shortcuts_r2) else 0
-                col_widths.append(max(w1, w2))
-
-            usable_w = max(1, width - 4)
-            C = num_cols_total
-            while C > 1:
-                required_w = sum(col_widths[:C])
-                if required_w + (C - 1) <= usable_w:
-                    break
-                C -= 1
-
-            col_x = []
-            if C > 1:
-                required_w = sum(col_widths[:C])
-                gap = (usable_w - required_w) / (C - 1)
-                current_x = 2.0
-                for col in range(C):
-                    col_x.append(int(current_x))
-                    current_x += col_widths[col] + gap
-            else:
-                col_x = [2]
-
-            for col in range(C):
-                x = col_x[col]
-                if col < len(shortcuts_r1):
-                    badge, label = shortcuts_r1[col]
-                    if x + len(badge) + 1 + len(label) <= width - 2:
-                        bashmenu_ui.safe_addstr(
-                            stdscr,
-                            status_y + 1,
-                            x,
-                            badge,
-                            theme["shortcut_key"] | curses.A_BOLD,
-                        )
-                        bashmenu_ui.safe_addstr(
-                            stdscr,
-                            status_y + 1,
-                            x + len(badge) + 1,
-                            label,
-                            theme["shortcut_label"],
-                        )
-                if col < len(shortcuts_r2):
-                    badge, label = shortcuts_r2[col]
-                    if x + len(badge) + 1 + len(label) <= width - 2:
-                        bashmenu_ui.safe_addstr(
-                            stdscr,
-                            status_y + 2,
-                            x,
-                            badge,
-                            theme["shortcut_key"] | curses.A_BOLD,
-                        )
-                        bashmenu_ui.safe_addstr(
-                            stdscr,
-                            status_y + 2,
-                            x + len(badge) + 1,
-                            label,
-                            theme["shortcut_label"],
-                        )
-
-        screen_y = (cursor_y - scroll_y) + 1
-        screen_x = (cursor_x - scroll_x) + 1 + gutter_w
-        try:
-            curses.curs_set(1)
-        except curses.error:
-            pass
-        stdscr.move(
-            min(view_h, max(1, screen_y)),
-            min(width - 2, max(1 + gutter_w, screen_x)),
-        )
-        stdscr.refresh()
-
-        key = stdscr.getch()
-        status_msg = ""
-
-        if key == 24:  # ^X: Exit
-            if action_exit():
-                break
-        elif key in [15, curses.KEY_F3]:  # ^O, F3: WriteOut / Save
-            save_file()
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [18, curses.KEY_F5, curses.KEY_F7]:  # ^R, F5, F7: Read File / Open
-            action_open()
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [19, curses.KEY_F6]:  # ^S, F6: Save As
-            action_save_as()
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [14, curses.KEY_F4]:  # ^N, F4: New Document
-            action_new()
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [7, curses.KEY_F1]:  # ^G, F1: Get Help / Toggle Help Bar
-            show_help = not show_help
-            status_msg = f" [ Help bar {'enabled' if show_help else 'disabled'} ] "
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [curses.KEY_F2]:  # F2: External $EDITOR
-            save_file()
-            open_external_editor()
-            if abs_path and os.path.exists(abs_path):
-                with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines() or [""]
-            cursor_y = min(cursor_y, len(lines) - 1)
-            cursor_x = min(cursor_x, len(lines[cursor_y]))
-            last_action_was_cut = False
-            typing_group = False
-            undo_stack.clear()
-            redo_stack.clear()
-        elif key == 26:
-            action_undo()
-            last_action_was_cut = False
-        elif key == 25:
-            action_redo()
-            last_action_was_cut = False
-        elif key in [11, curses.KEY_F8]:  # ^K, F8: Cut
-            action_cut()
-        elif key in [21, 22, curses.KEY_F9]:  # ^U, ^V, F9: Paste / Uncut
-            action_paste()
-        elif key == 30:  # ^^ / Ctrl+^: Toggle Mark
-            typing_group = False
-            if mark_active:
-                mark_active = False
-                status_msg = " [ Mark Unset ] "
-            else:
-                mark_active = True
-                mark_y, mark_x = cursor_y, cursor_x
-                status_msg = " [ Mark Set ] "
-            last_action_was_cut = False
-        elif key == 3:  # ^C: Position info or Copy if mark active
-            if mark_active:
-                action_copy()
-            else:
-                pct = int((cursor_y + 1) / max(1, len(lines)) * 100)
-                status_msg = f" [ Line {cursor_y + 1}/{len(lines)} ({pct}%), Col {cursor_x + 1} ] "
-            last_action_was_cut = False
-        elif key in [9, ord('\t')]:
-            typing_group = False
-            if mark_active:
-                delete_selected_text()
-            else:
-                push_undo()
-
-            insert_str = (" " * max(1, tabstop)) if tab_to_spaces else "\t"
-            lines[cursor_y] = (
-                lines[cursor_y][:cursor_x]
-                + insert_str
-                + lines[cursor_y][cursor_x:]
-            )
-            cursor_x += len(insert_str)
-            modified = True
-            last_action_was_cut = False
-        elif key == 27:
-            stdscr.timeout(50)
-            next_k = stdscr.getch()
-            stdscr.timeout(-1)
-
-            if next_k != -1:
-                if next_k in [ord('n'), ord('N')]:
-                    show_line_numbers = not show_line_numbers
-                    status_msg = f" [ Line numbers {'enabled' if show_line_numbers else 'disabled'} ] "
-                elif next_k in [ord('p'), ord('P'), ord('w'), ord('W')]:
-                    show_whitespace = not show_whitespace
-                    status_msg = f" [ Whitespace display {'enabled' if show_whitespace else 'disabled'} ] "
-                elif next_k in [ord('u'), ord('U')]:
-                    action_undo()
-                elif next_k in [ord('e'), ord('E')]:
-                    action_redo()
-                elif next_k == ord('6'):
-                    action_copy()
-                elif next_k in [ord('a'), ord('A')]:
-                    typing_group = False
-                    mark_active = not mark_active
-                    mark_y, mark_x = cursor_y, cursor_x
-                    status_msg = f" [ Mark {'Set' if mark_active else 'Unset'} ] "
-                elif next_k in [ord('g'), ord('G'), ord('h'), ord('H')]:
-                    show_help = not show_help
-                    status_msg = f" [ Help bar {'enabled' if show_help else 'disabled'} ] "
-                last_action_was_cut = False
-            else:
-                if action_exit():
-                    break
-                last_action_was_cut = False
-        elif key == curses.KEY_UP and cursor_y > 0:
-            cursor_y -= 1
-            cursor_x = min(cursor_x, len(lines[cursor_y]))
-            last_action_was_cut = False
-            typing_group = False
-        elif key == curses.KEY_DOWN and cursor_y < len(lines) - 1:
-            cursor_y += 1
-            cursor_x = min(cursor_x, len(lines[cursor_y]))
-            last_action_was_cut = False
-            typing_group = False
-        elif key == curses.KEY_LEFT:
-            if cursor_x > 0:
-                cursor_x -= 1
-            elif cursor_y > 0:
-                cursor_y -= 1
-                cursor_x = len(lines[cursor_y])
-            last_action_was_cut = False
-            typing_group = False
-        elif key == curses.KEY_RIGHT:
-            if cursor_x < len(lines[cursor_y]):
-                cursor_x += 1
-            elif cursor_y < len(lines) - 1:
-                cursor_y += 1
-                cursor_x = 0
-            last_action_was_cut = False
-            typing_group = False
-        elif key == curses.KEY_PPAGE:
-            cursor_y = max(0, cursor_y - view_h)
-            cursor_x = min(cursor_x, len(lines[cursor_y]))
-            last_action_was_cut = False
-            typing_group = False
-        elif key == curses.KEY_NPAGE:
-            cursor_y = min(len(lines) - 1, cursor_y + view_h)
-            cursor_x = min(cursor_x, len(lines[cursor_y]))
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [curses.KEY_HOME, 1]:
-            cursor_x = 0
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [curses.KEY_END, 5]:
-            cursor_x = len(lines[cursor_y])
-            last_action_was_cut = False
-            typing_group = False
-        elif key in [curses.KEY_BACKSPACE, 8, 127]:
-            if mark_active:
-                delete_selected_text()
-            elif cursor_x > 0:
-                if not typing_group:
-                    push_undo()
-                    typing_group = True
-                lines[cursor_y] = (
-                    lines[cursor_y][: cursor_x - 1] + lines[cursor_y][cursor_x:]
-                )
-                cursor_x -= 1
-                modified = True
-            elif cursor_y > 0:
-                typing_group = False
-                push_undo()
-                prev_len = len(lines[cursor_y - 1])
-                lines[cursor_y - 1] += lines[cursor_y]
-                lines.pop(cursor_y)
-                cursor_y -= 1
-                cursor_x = prev_len
-                modified = True
-            last_action_was_cut = False
-        elif key == curses.KEY_DC:
-            if mark_active:
-                delete_selected_text()
-            elif cursor_x < len(lines[cursor_y]):
-                if not typing_group:
-                    push_undo()
-                    typing_group = True
-                lines[cursor_y] = (
-                    lines[cursor_y][:cursor_x] + lines[cursor_y][cursor_x + 1 :]
-                )
-                modified = True
-            elif cursor_y < len(lines) - 1:
-                typing_group = False
-                push_undo()
-                lines[cursor_y] += lines[cursor_y + 1]
-                lines.pop(cursor_y + 1)
-                modified = True
-            last_action_was_cut = False
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            typing_group = False
-            if mark_active:
-                delete_selected_text()
-            else:
-                push_undo()
-            remainder = lines[cursor_y][cursor_x:]
-            lines[cursor_y] = lines[cursor_y][:cursor_x]
-            lines.insert(cursor_y + 1, remainder)
-            cursor_y += 1
-            cursor_x = 0
-            modified = True
-            last_action_was_cut = False
-        elif 32 <= key <= 126:
-            if mark_active:
-                typing_group = False
-                delete_selected_text()
-            elif not typing_group or key == 32:
-                push_undo()
-                typing_group = key != 32
-            lines[cursor_y] = (
-                lines[cursor_y][:cursor_x] + chr(key) + lines[cursor_y][cursor_x:]
-            )
-            cursor_x += 1
-            modified = True
-            last_action_was_cut = False
+if __name__ == "__main__":
+    target = sys.argv[1] if len(sys.argv) > 1 else None
+    app = BashEditApp(file_path=target)
+    app.run()

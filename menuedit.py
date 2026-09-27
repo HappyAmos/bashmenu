@@ -1,92 +1,25 @@
 #!/usr/bin/env python3
 """
-menuedit.py - Interactive Visual Menu Editor for HA Bash Menu (bashmenu.mnu)
-
-Provides a keyboard-navigable tree interface to add, modify, reorder, delete,
-preview, test, and validate menu items in bashmenu.mnu. Imports shared UI
-dialogs, themes, and configuration utilities directly from bashmenu.py.
+menuedit.py - Interactive Visual Menu Editor for HA Bash Menu (bashmenu.mnu) implemented in Textual.
 """
+
 __version__ = "0.0.1"
 __author__ = "HappyAmos"
 
-import curses
 import os
-import shutil
-import subprocess
 import sys
-import textwrap
+from typing import ClassVar
 
 import yaml
-
-import bashmenu_ui
-
-
-def string_representer(dumper, data):
-    """
-    Custom YAML representer for strings to preserve double quotes
-    when single quotes are present inside, preventing PyYAML from
-    rewriting quotes into doubled single quotes (e.g., ''cmd'').
-    """
-    if "\n" in data:
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-    if "'" in data:
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
-
-
-yaml.add_representer(str, string_representer)
-for d_name in ["Dumper", "SafeDumper", "CDumper", "CSafeDumper"]:
-    try:
-        cls = getattr(yaml, d_name)
-        yaml.add_representer(str, string_representer, Dumper=cls)
-    except AttributeError:
-        pass
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASHMENU_DIR = SCRIPT_DIR
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
-
-def get_clipboard_tool():
-    """Detect available system clipboard tools."""
-    if shutil.which("xclip"):
-        return "xclip"
-    if shutil.which("xsel"):
-        return "xsel"
-    return None
-
-CLIPBOARD_TOOL = get_clipboard_tool()
-
-def copy_to_clipboard(text):
-    """Copies string text to system clipboard using the detected tool."""
-    if not CLIPBOARD_TOOL:
-        return False
-    try:
-        if CLIPBOARD_TOOL == "xclip":
-            subprocess.run(
-                ["xclip", "-selection", "clipboard"],
-                input=text,
-                text=True,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            return True
-        elif CLIPBOARD_TOOL == "xsel":
-            subprocess.run(
-                ["xsel", "--clipboard", "--input"],
-                input=text,
-                text=True,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            return True
-    except (OSError, subprocess.SubprocessError):  # Catch system execution or process errors safely
-        pass
-    return False
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen, Screen
+from textual.widgets import Button, Input, Label, OptionList, Tree
+from textual.widgets.option_list import Option
 
 import bashmenu
+import bashmenu_ui
 
 TYPE_BADGES = {
     "root_menu": "[MNU]",
@@ -98,8 +31,6 @@ TYPE_BADGES = {
     "editor": "[EDT]",
     "confirm": "[CNF]",
     "message": "[MSG]",
-    "popup": "[MSG]",
-    "info": "[MSG]",
     "python": "[PY ]",
     "inject_block": "[INJ]",
     "theme_selector": "[THM]",
@@ -125,1198 +56,383 @@ ITEM_TYPES = [
     ("divider", "Visual Divider Line (aesthetic separator)"),
 ]
 
-def find_parent_options(menu_data, target_list):
-    """
-    Finds the options list and index of the submenu item that owns target_list.
-    Returns (parent_options_list, parent_item_index) or (None, None).
-    """
-    def _search(opts):
-        for idx, item in enumerate(opts):
-            if isinstance(item, dict) and "submenu" in item:
-                sub_opts = item["submenu"].get("options")
-                if sub_opts is target_list:
-                    return opts, idx
-                if isinstance(sub_opts, list):
-                    res = _search(sub_opts)
-                    if res[0] is not None:
-                        return res
-        return None, None
 
-    root_opts = menu_data.get("options", [])
-    if root_opts is target_list:
-        return None, None
-    return _search(root_opts)
+class ItemTypePickerModal(ModalScreen[str]):
+    """Modal dialog to select type when adding a new item."""
 
-def _build_option_nodes(options_list, depth=1, expanded_map=None):
-    """Helper to recursively convert options lists into tree nodes."""
-    nodes = []
-    if expanded_map is None:
-        expanded_map = {}
-
-    for idx, item in enumerate(options_list):
-        if not isinstance(item, dict):
-            continue
-
-        item_id = id(item)
-        is_expanded = expanded_map.get(item_id, True)
-        has_children = "submenu" in item or item.get("type") == "confirm"
-
-        node = {
-            "item": item,
-            "parent_list": options_list,
-            "index": idx,
-            "depth": depth,
-            "expanded": is_expanded,
-            "has_children": has_children,
-            "id": item_id,
-        }
-        nodes.append(node)
-
-        if is_expanded:
-            if "submenu" in item and isinstance(item.get("submenu"), dict):
-                sub_opts = item["submenu"].setdefault("options", [])
-                nodes.extend(_build_option_nodes(sub_opts, depth + 1, expanded_map))
-
-            if item.get("type") == "confirm":
-                if "on_yes" in item and isinstance(item["on_yes"], dict):
-                    nodes.append({
-                        "item": item["on_yes"],
-                        "parent_list": None,
-                        "key_in_parent": ("on_yes", item),
-                        "index": 0,
-                        "depth": depth + 1,
-                        "expanded": False,
-                        "has_children": False,
-                        "id": id(item["on_yes"]),
-                        "prefix": "[YES] ",
-                    })
-                if "on_no" in item and isinstance(item["on_no"], dict):
-                    nodes.append({
-                        "item": item["on_no"],
-                        "parent_list": None,
-                        "key_in_parent": ("on_no", item),
-                        "index": 0,
-                        "depth": depth + 1,
-                        "expanded": False,
-                        "has_children": False,
-                        "id": id(item["on_no"]),
-                        "prefix": "[NO]  ",
-                    })
-    return nodes
-
-def build_tree_nodes(menu_data, expanded_map=None):
-    """Flattens root menu dictionary and children into list of node mappings."""
-    if expanded_map is None:
-        expanded_map = {}
-
-    root_id = id(menu_data)
-    is_expanded = expanded_map.get(root_id, True)
-
-    root_node = {
-        "item": {
-            "label": f"Menu Title: {menu_data.get('title', 'Main Menu')}",
-            "type": "root_menu",
-        },
-        "root_data": menu_data,
-        "parent_list": None,
-        "index": 0,
-        "depth": 0,
-        "expanded": is_expanded,
-        "has_children": bool(menu_data.get("options")),
-        "id": root_id,
+    DEFAULT_CSS = """
+    ItemTypePickerModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
     }
+    #dialog {
+        width: 70;
+        height: 20;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    #option_list {
+        height: 13;
+        border: solid $accent;
+    }
+    #footer {
+        text-align: center;
+        margin-top: 1;
+        color: $text-muted;
+    }
+    """
 
-    nodes = [root_node]
-    if is_expanded:
-        options_list = menu_data.setdefault("options", [])
-        nodes.extend(_build_option_nodes(options_list, depth=1, expanded_map=expanded_map))
+    BINDINGS: ClassVar[list[Binding]] = [Binding("escape", "cancel", "Cancel")]
 
-    return nodes
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label("Select Item Type", id="title")
+            yield OptionList(id="option_list")
+            yield Label("[ENTER] Select | [ESC] Cancel", id="footer")
 
-def select_item_type(stdscr, theme):
-    """Displays a modal chooser for selecting a menu item type."""
-    height, width = stdscr.getmaxyx()
-    box_h = len(ITEM_TYPES) + 4
-    box_w = min(width - 4, 62)
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
+    def on_mount(self) -> None:
+        opts = self.query_one("#option_list", OptionList)
+        for type_key, desc in ITEM_TYPES:
+            badge = TYPE_BADGES.get(type_key, "[???]")
+            opts.add_option(Option(f"{badge} {type_key:<15} - {desc}"))
 
-    bashmenu.draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        idx = event.option_index
+        if 0 <= idx < len(ITEM_TYPES):
+            self.dismiss(ITEM_TYPES[idx][0])
+        else:
+            self.dismiss(None)
 
-    curr_idx = 0
-    type_marquee_offset = 0
-    type_marquee_pause_ticks = 4
-    last_idx = -1
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
-    while True:
-        if curr_idx != last_idx:
-            type_marquee_offset = 0
-            type_marquee_pause_ticks = 4
-            last_idx = curr_idx
 
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
+class ItemEditModal(ModalScreen[dict]):
+    """Modal dialog to edit properties of a menu item."""
 
-        title = " Select Item Type "
-        bashmenu.safe_addstr(win, 0, (box_w - len(title)) // 2, title, theme["title"] | curses.A_BOLD)
+    DEFAULT_CSS = """
+    ItemEditModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 75;
+        height: 22;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    .field_label {
+        color: $accent;
+        margin-top: 1;
+    }
+    Input {
+        margin-bottom: 1;
+    }
+    #buttons {
+        align: center middle;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    """
 
-        for idx, (type_key, desc) in enumerate(ITEM_TYPES):
-            badge = TYPE_BADGES.get(type_key, "[   ]")
-            avail_w = box_w - 28
+    BINDINGS: ClassVar[list[Binding]] = [Binding("escape", "cancel", "Cancel")]
 
-            if idx == curr_idx:
-                attr = theme["highlight"] | curses.A_BOLD
-                if len(desc) > avail_w:
-                    desc_padded = desc + "   " + desc[:avail_w]
-                    sliced_desc = desc_padded[type_marquee_offset : type_marquee_offset + avail_w]
-                    sliced_desc = f"{sliced_desc:<{avail_w}}"
-                else:
-                    sliced_desc = f"{desc:<{avail_w}}"
+    def __init__(self, item: dict):
+        super().__init__()
+        self.item = item.copy()
+
+    def compose(self) -> ComposeResult:
+        item_type = self.item.get("type", "command")
+        title_val = self.item.get("title", self.item.get("label", ""))
+
+        with Vertical(id="dialog"):
+            yield Label(f"Edit {item_type.upper()} Item", id="title")
+
+            yield Label("Title / Label:", classes="field_label")
+            yield Input(value=str(title_val), id="inp_title")
+
+            if item_type == "command":
+                yield Label("Command:", classes="field_label")
+                yield Input(value=str(self.item.get("command", "")), id="inp_action")
+            elif item_type == "script":
+                yield Label("Script Path:", classes="field_label")
+                yield Input(value=str(self.item.get("script", "")), id="inp_action")
+            elif item_type == "editor":
+                yield Label("File Path:", classes="field_label")
+                yield Input(value=str(self.item.get("file", "")), id="inp_action")
+            elif item_type == "message":
+                yield Label("Message Text:", classes="field_label")
+                yield Input(value=str(self.item.get("message", "")), id="inp_action")
+            elif item_type == "python":
+                yield Label("Python Routine:", classes="field_label")
+                yield Input(value=str(self.item.get("python", "")), id="inp_action")
+            elif item_type == "toggle":
+                yield Label("Config Key:", classes="field_label")
+                yield Input(value=str(self.item.get("key", "")), id="inp_action")
             else:
-                attr = theme["text"]
-                if len(desc) > avail_w:
-                    sliced_desc = f"{desc[:avail_w-3]}..."
-                else:
-                    sliced_desc = f"{desc:<{avail_w}}"
+                yield Label("Action / Target:", classes="field_label")
+                yield Input(value=str(self.item.get("action", "")), id="inp_action")
 
-            label_str = f" {badge} {type_key:<15} {sliced_desc}"
-            bashmenu.safe_addstr(win, 2 + idx, 2, label_str, attr)
+            with Horizontal(id="buttons"):
+                yield Button("Save", variant="primary", id="btn_save")
+                yield Button("Cancel", variant="default", id="btn_cancel")
 
-        footer = " [UP/DN]: Navigate | [ENTER]: Select | [ESC]: Cancel "
-        bashmenu.safe_addstr(win, box_h - 1, max(2, (box_w - len(footer)) // 2), footer, theme["footer"])
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_save":
+            item_type = self.item.get("type", "command")
+            new_title = self.query_one("#inp_title", Input).value.strip()
+            new_action = self.query_one("#inp_action", Input).value.strip()
 
-        win.refresh()
-        win.timeout(250)
-        key = win.getch()
+            self.item["title"] = new_title
 
-        if key == -1:
-            active_desc = ITEM_TYPES[curr_idx][1]
-            avail_w = box_w - 28
-            if len(active_desc) > avail_w:
-                if type_marquee_pause_ticks > 0:
-                    type_marquee_pause_ticks -= 1
-                else:
-                    type_marquee_offset += 1
-                    if type_marquee_offset >= len(active_desc) + 3:
-                        type_marquee_offset = 0
-                        type_marquee_pause_ticks = 4
-            continue
+            if item_type == "command":
+                self.item["command"] = new_action
+            elif item_type == "script":
+                self.item["script"] = new_action
+            elif item_type == "editor":
+                self.item["file"] = new_action
+            elif item_type == "message":
+                self.item["message"] = new_action
+            elif item_type == "python":
+                self.item["python"] = new_action
+            elif item_type == "toggle":
+                self.item["key"] = new_action
+            else:
+                self.item["action"] = new_action
 
-        if key == 27:
-            win.timeout(-1)
-            return None
-        elif key in [curses.KEY_UP, ord('k')] and curr_idx > 0:
-            curr_idx -= 1
-        elif key in [curses.KEY_DOWN, ord('j')] and curr_idx < len(ITEM_TYPES) - 1:
-            curr_idx += 1
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            win.timeout(-1)
-            return ITEM_TYPES[curr_idx][0]
+            self.dismiss(self.item)
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
-def select_script_action(stdscr, curr_val, config, theme):
-    """Chooser modal for script action with option to browse or enter manually."""
-    presets = [
-        ("[PICK]", "Browse Local Directory (File Picker)..."),
-        ("{file_picker}", "Prompt File Picker upon execution"),
-        ("{file_picker_new}", "Prompt File Picker (w/ File Creation)"),
-        ("{dir_picker}", "Prompt Directory Picker upon execution"),
-        ("{dir_picker_new}", "Prompt Directory Picker (w/ Dir Creation)"),
-        ("{param}", "Prompt Modal Input text box upon execution"),
-        ("[EDIT]", "Manual Command Entry (Custom script/args)..."),
+class MenuEditScreen(Screen):
+    """Visual Menu Tree Editor Screen in Textual."""
+
+    DEFAULT_CSS = """
+    MenuEditScreen {
+        layout: vertical;
+        background: $surface;
+    }
+    #header {
+        dock: top;
+        height: 1;
+        background: $accent;
+        color: $text-primary;
+        text-align: center;
+        text-style: bold;
+    }
+    #footer {
+        dock: bottom;
+        height: 2;
+        background: $surface-darken-1;
+        color: $accent;
+        text-align: center;
+    }
+    #tree {
+        height: 1fr;
+        border: solid $accent;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("a", "add_item", "Add Item"),
+        Binding("e", "edit_item", "Edit Item"),
+        Binding("enter", "edit_item", "Edit Item"),
+        Binding("d", "delete_item", "Delete Item"),
+        Binding("m", "move_down", "Move Down"),
+        Binding("M", "move_up", "Move Up"),
+        Binding("pipe", "indent_item", "Indent"),
+        Binding("less", "outdent_item", "Outdent"),
+        Binding("s", "save_menu", "Save Menu"),
+        Binding("ctrl+s", "save_menu", "Save Menu"),
+        Binding("escape", "exit_editor", "Exit"),
+        Binding("q", "exit_editor", "Exit"),
     ]
 
-    height, width = stdscr.getmaxyx()
-    box_h = len(presets) + 4
-    box_w = min(width - 4, 66)
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
-
-    bashmenu.draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
-
-    curr_idx = 0
-    while True:
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
-
-        title = " Select Script Action Input Method "
-        bashmenu.safe_addstr(win, 0, (box_w - len(title)) // 2, title, theme["title"] | curses.A_BOLD)
-
-        for idx, (var_key, desc) in enumerate(presets):
-            attr = (theme["highlight"] | curses.A_BOLD) if idx == curr_idx else theme["text"]
-            disp = f" {var_key:<12} {desc[:box_w - 16]}"
-            bashmenu.safe_addstr(win, 2 + idx, 2, disp, attr)
-
-        footer = " [UP/DN]: Navigate | [ENTER]: Select | [ESC]: Cancel "
-        bashmenu.safe_addstr(win, box_h - 1, max(2, (box_w - len(footer)) // 2), footer, theme["footer"])
-
-        win.refresh()
-        key = win.getch()
-
-        if key == 27:
-            return None
-        elif key in [curses.KEY_UP, ord('k')] and curr_idx > 0:
-            curr_idx -= 1
-        elif key in [curses.KEY_DOWN, ord('j')] and curr_idx < len(presets) - 1:
-            curr_idx += 1
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            selected_key, _ = presets[curr_idx]
-            if selected_key == "[PICK]":
-                scripts_dir = (
-                    bashmenu.get_config_value(config, "settings.scripts_dir")
-                    or (config.get("scripts", "scripts") if config else "scripts")
-                )
-                scripts_dir = bashmenu.interpolate_placeholders(scripts_dir, config)
-                if not os.path.isabs(scripts_dir):
-                    scripts_dir = os.path.abspath(os.path.join(SCRIPT_DIR, scripts_dir))
-                return bashmenu.show_file_picker(stdscr, "Select Script File", start_dir=scripts_dir, mode="file", default_val=curr_val, theme=theme, allow_new=True)
-            elif selected_key == "[EDIT]":
-                return bashmenu.show_input_box(stdscr, "Script Action", "Script filename or command line:", curr_val, theme)
-
-
-def select_editor_target(stdscr, curr_val, item_type, selected_key, config, theme):
-    """Chooser modal for editor target path or built-in file variable."""
-    presets = [
-        ("[PICK]", "Browse Filesystem (File Picker)..."),
-        ("{file_picker}", "Prompt File Picker upon execution"),
-        ("{file_picker_new}", "Prompt File Picker (w/ File Creation)"),
-        ("{dir_picker}", "Prompt Directory Picker upon execution"),
-        ("{dir_picker_new}", "Prompt Directory Picker (w/ Dir Creation)"),
-        ("{param}", "Prompt Modal Input text box upon execution"),
-        ("[EDIT]", "Manual Text Entry (Custom Path / Placeholder)..."),
-    ]
-
-    height, width = stdscr.getmaxyx()
-    box_h = len(presets) + 4
-    box_w = min(width - 4, 66)
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
-
-    bashmenu.draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
-
-    curr_idx = 0
-    while True:
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
-
-        title = " Select Target File / Directive "
-        bashmenu.safe_addstr(win, 0, (box_w - len(title)) // 2, title, theme["title"] | curses.A_BOLD)
-
-        for idx, (var_key, desc) in enumerate(presets):
-            attr = (theme["highlight"] | curses.A_BOLD) if idx == curr_idx else theme["text"]
-            disp = f" {var_key:<12} {desc[:box_w - 16]}"
-            bashmenu.safe_addstr(win, 2 + idx, 2, disp, attr)
-
-        footer = " [UP/DN]: Navigate | [ENTER]: Select | [ESC]: Cancel "
-        bashmenu.safe_addstr(win, box_h - 1, max(2, (box_w - len(footer)) // 2), footer, theme["footer"])
-
-        win.refresh()
-        key = win.getch()
-
-        if key == 27:
-            return None
-        elif key in [curses.KEY_UP, ord('k')] and curr_idx > 0:
-            curr_idx -= 1
-        elif key in [curses.KEY_DOWN, ord('j')] and curr_idx < len(presets) - 1:
-            curr_idx += 1
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            selected_key_opt, _ = presets[curr_idx]
-            if selected_key_opt == "[PICK]":
-                start_dir = "~"
-                if item_type == "inject_block":
-                    templates_dir = (
-                        bashmenu.get_config_value(config, "settings.templates_dir")
-                        or (config.get("templates", "templates") if config else "templates")
-                    )
-                    templates_dir = bashmenu.interpolate_placeholders(templates_dir, config)
-                    if not os.path.isabs(templates_dir):
-                        templates_dir = os.path.abspath(os.path.join(SCRIPT_DIR, templates_dir))
-                    start_dir = templates_dir
-                return bashmenu.show_file_picker(stdscr, "Select Target File", start_dir=start_dir, mode="file", default_val=curr_val, theme=theme, allow_new=True)
-            elif selected_key_opt == "[EDIT]":
-                return bashmenu.show_input_box(stdscr, "Target File Path", "File path or placeholder:", curr_val, theme)
-            else:
-                return selected_key_opt
-
-
-def show_directives_help(stdscr, theme):
-    """
-    Display an interactive scrolling help dialog about directives and
-    placeholders.
-    """
-    help_text = (
-        "HA PROPERTY INSPECTOR GENERAL HELP\n"
-        "==================================\n\n"
-        "Welcome to the Property Inspector. Use this screen to configure specific\n"
-        "options for the selected menu item.\n\n"
-        "1. PROPERTY INSPECTOR HOTKEYS\n"
-        "-----------------------------\n"
-        " - UP / DOWN (or k / j) : Navigate through the list of attributes.\n"
-        " - ENTER                : Edit or toggle the highlighted attribute.\n"
-        " - Y                    : Copy the current field's value to clipboard\n"
-        "                          (requires xclip or xsel system utility).\n"
-        " - ESC                  : Close the Property Inspector and save changes.\n\n"
-        "2. DYNAMIC INPUT DIRECTIVES (Prompts on execution)\n"
-        "--------------------------------------------------\n"
-        " You can insert any of these directives into 'action', 'template', or\n"
-        " 'target' paths to prompt the user dynamically upon selection:\n\n"
-        " - {param}         : Prompts the user for a single-line text string using\n"
-        "                     a modal input box, and replaces it with that value.\n"
-        " - {file_picker}   : Opens a visual file chooser dialog and replaces it\n"
-        "                     with the absolute path of the selected file.\n"
-        " - {file_picker_new}: Opens a visual file chooser allowing creation of\n"
-        "                     new files, and replaces it with the absolute path.\n"
-        " - {dir_picker}    : Opens a visual directory chooser dialog and replaces\n"
-        "                     it with the absolute path of the selected folder.\n"
-        " - {dir_picker_new}: Opens a visual directory chooser allowing creation of\n"
-        "                     new folders, and replaces it with the absolute path.\n\n"
-        " * PRO TIP (Starting Directories):\n"
-        "   If you precede a picker placeholder with a directory path, like:\n"
-        "     '{templates_dir}/{file_picker}' or '~/projects/{dir_picker}'\n"
-        "   the visual chooser will automatically start inside that folder!\n\n"
-        "3. SYSTEM & PATH PLACEHOLDERS (Auto-interpolated)\n"
-        "--------------------------------------------------\n"
-        " - {user} / {username} : Current system username.\n"
-        " - {home}              : User's home directory path.\n"
-        " - {bashmenu_dir}      : Application root directory path.\n"
-        " - {templates_dir}     : Templates directory path.\n"
-        " - {scripts_dir}       : Scripts directory path.\n"
-        " - {bash_aliases}      : Path to ~/.bash_aliases.\n"
-        " - {bashrc}            : Path to ~/.bashrc.\n"
-        " - {vimrc}             : Path to ~/.vimrc.\n"
-        " - {window_width}      : Current window width in characters.\n"
-        " - {window_height}     : Current window height in characters.\n"
-        " - {ascii:decimal}     : Resolves CP437 decimal code to character\n"
-        "                         (e.g., {ascii:168} resolves to ¿).\n\n"
-        "4. ADAPTIVE NERD FONTS & EMOJIS\n"
-        "--------------------------------\n"
-        " Syntax: {nf:[char]:[nerd-font hex]:[emoji-glyph]}\n"
-        " Evaluated with the following precedence on launch:\n"
-        "  - 1. Emojis    : Displays [emoji-glyph] if Unicode is supported.\n"
-        "  - 2. Nerd Fonts: Displays [nerd-font hex] (e.g. #f0a4) if Unicode is\n"
-        "                   supported and settings.use_nerd_fonts is enabled.\n"
-        "  - 3. Fallback  : Displays plain text [char] if above are disabled\n"
-        "                   or missing.\n"
-        "  - 4. Collapsed : Returns \"\" if all are missing, collapsing the column.\n\n"
-        "5. CONFIGURATION SETTINGS\n"
-        "-------------------------\n"
-        " - {settings.key}      : Look up any nested YAML config key from the\n"
-        "                        bashmenu.yml file (e.g. {settings.ping_target}).\n"
-    )
-    bashmenu.show_popup_message(stdscr, "Property Inspector Help", help_text, theme)
-
-
-def edit_item_properties(stdscr, item_dict, config, theme, redraw_bg=None):
-    """Interactive property inspector modal for editing an item's keys."""
-    was_modified = False
-    while True:
-        item_type = item_dict.get("type")
-        if "submenu" in item_dict:
-            item_type = "submenu"
-
-        if item_type == "divider":
-            fields = [
-                ("length", "Divider Length", str(item_dict.get("length", 40))),
-                ("char", "Divider Character(s)", str(item_dict.get("char", "-")))
-            ]
-        else:
-            # Populate icon with default scaffolding if empty/null/missing
-            icon_val = item_dict.get("icon")
-            if icon_val is None or (isinstance(icon_val, str) and not icon_val.strip()):
-                item_dict["icon"] = "{nf::#:}"
-
-            fields = [
-                ("label", "Display Label", str(item_dict.get("label", ""))),
-                ("icon", "Nerd Font Icon / Emoji", str(item_dict.get("icon", "")))
-            ]
-
-        if item_type == "submenu":
-            sub_title = item_dict.get("submenu", {}).get("title", "")
-            fields.append(("submenu.title", "Submenu Header Title", str(sub_title)))
-        elif item_type in ["command", "script", "python"]:
-            fields.append(("action", "Command / Script Action", str(item_dict.get("action", ""))))
-            if item_type == "script":
-                fields.append(("external", "Run in separate process (true/false)", str(item_dict.get("external", True))))
-            fields.append(("stream", "Stream Output (true/false)", str(item_dict.get("stream", False))))
-            fields.append(("interactive", "Interactive Console Mode", str(item_dict.get("interactive", False))))
-            fields.append(("user_mode", "User Privilege Mode (user/root)", str(item_dict.get("user_mode", "user"))))
-            fields.append(("quiet", "Quiet Mode (suppress headers)", str(item_dict.get("quiet", False))))
-            fields.append(("refresh", "Reload Menu On Return", str(item_dict.get("refresh", False))))
-        elif item_type == "config":
-            fields.append(("key", "YAML Setting Key (dot notation)", str(item_dict.get("key", ""))))
-            fields.append(("title", "Input Popup Title", str(item_dict.get("title", ""))))
-            fields.append(("prompt", "Input Prompt Text", str(item_dict.get("prompt", ""))))
-            fields.append(("picker", "Picker Type (none/file/dir)", str(item_dict.get("picker", "none"))))
-            if item_dict.get("picker") in ["file", "dir"]:
-                fields.append(("allow_new", "Allow Creating New Files/Folders", str(item_dict.get("allow_new", False))))
-            fields.append(("start_dir", "Picker Starting Directory", str(item_dict.get("start_dir", "~"))))
-            fields.append(("masked", "Mask Typed Password Input", str(item_dict.get("masked", False))))
-        elif item_type in ["toggle", "config_toggle"]:
-            fields.append(("key", "YAML Setting Key (dot notation)", str(item_dict.get("key", ""))))
-            fields.append(("title", "Toggle Popup Title", str(item_dict.get("title", ""))))
-            fields.append(("message", "Toggle Message Text", str(item_dict.get("message", item_dict.get("prompt", "")))))
-        elif item_type == "editor":
-            fields.append(("action", "Target File Path (empty for new)", str(item_dict.get("action", ""))))
-            fields.append(("show_whitespace", "Show Whitespace (true/false)", str(item_dict.get("show_whitespace", False))))
-            fields.append(("tab_to_spaces", "Convert Tab to Spaces", str(item_dict.get("tab_to_spaces", True))))
-            fields.append(("tabstop", "Tabstop Width (spaces)", str(item_dict.get("tabstop", 8))))
-        elif item_type == "inject_block":
-            fields.append(("template", "Template File Path", str(item_dict.get("template", ""))))
-            fields.append(("target", "Target File Path", str(item_dict.get("target", ""))))
-            fields.append(("block_id", "Inject Block Unique ID", str(item_dict.get("block_id", ""))))
-            fields.append(("refresh", "Reload Menu On Return", str(item_dict.get("refresh", False))))
-        elif item_type == "confirm":
-            fields.append(("title", "Confirmation Box Title", str(item_dict.get("title", ""))))
-            fields.append(("message", "Confirmation Prompt Message", str(item_dict.get("message", ""))))
-        elif item_type in ["message", "popup", "info"]:
-            fields.append(("title", "Message Box Title", str(item_dict.get("title", ""))))
-            fields.append(("message", "Message Text Body", str(item_dict.get("message", ""))))
-
-        fields.append(("[TYPE]", "Change Item Type", f"Current: {item_type}"))
-        fields.append(("[DONE]", "Save & Close Inspector", ""))
-
-        height, width = stdscr.getmaxyx()
-        box_h = min(height - 2, len(fields) + 5)
-        box_w = min(width - 4, 75)
-        start_y = (height - box_h) // 2
-        start_x = (width - box_w) // 2
-
-        bashmenu.draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
-        win = curses.newwin(box_h, box_w, start_y, start_x)
-        win.bkgd(' ', theme["text"])
-        win.keypad(True)
-
-        curr_field = 0
-        prop_marquee_offset = 0
-        prop_marquee_pause_ticks = 4
-        last_field = -1
-        copied_feedback_ticks = 0
-
-        while True:
-            if curr_field != last_field:
-                prop_marquee_offset = 0
-                prop_marquee_pause_ticks = 4
-                last_field = curr_field
-
-            win.erase()
-            win.attron(theme["border"])
-            win.border(0)
-            win.attroff(theme["border"])
-
-            badge = TYPE_BADGES.get(item_type, "[   ]")
-            title_str = f" Property Inspector: {badge} {item_type} "
-            bashmenu.safe_addstr(win, 0, (box_w - len(title_str)) // 2, title_str, theme["title"] | curses.A_BOLD)
-
-            for idx, (f_key, f_name, f_val) in enumerate(fields):
-                y = 2 + idx
-                if y >= box_h - 2:
-                    break
-
-                attr = (theme["highlight"] | curses.A_BOLD) if idx == curr_field else theme["text"]
-                val_avail_w = box_w - 35
-                if idx == curr_field and not f_key.startswith("[") and len(f_val) > val_avail_w:
-                    padded_text = f_val + (" " * val_avail_w) + f_val[:val_avail_w]
-                    scroll_text = padded_text[prop_marquee_offset : prop_marquee_offset + val_avail_w]
-                    disp = f" {f_name:<28} : {scroll_text}"
-                elif f_key.startswith("["):
-                    disp = f" {f_name:<28} {f_val}"
-                else:
-                    disp = f" {f_name:<28} : {f_val[:val_avail_w]}"
-                bashmenu.safe_addstr(win, y, 2, disp, attr)
-
-            if copied_feedback_ticks > 0:
-                footer = " [ Copied to Clipboard! ] "
-            else:
-                footer = " [?]: Help "
-            bashmenu.safe_addstr(win, box_h - 1, max(2, (box_w - len(footer)) // 2), footer, theme["footer"])
-
-            win.refresh()
-            win.timeout(250)
-            key = win.getch()
-
-            if key != -1 and key not in [ord('y'), ord('Y')]:
-                copied_feedback_ticks = 0
-
-            if key == -1:
-                if copied_feedback_ticks > 0:
-                    copied_feedback_ticks -= 1
-                if fields and curr_field < len(fields):
-                    fk, _fn, fv = fields[curr_field]
-                    val_avail_w = box_w - 35
-                    if not fk.startswith("[") and len(fv) > val_avail_w:
-                        if prop_marquee_pause_ticks > 0:
-                            prop_marquee_pause_ticks -= 1
-                        else:
-                            prop_marquee_offset += 1
-                            if prop_marquee_offset >= len(fv) + val_avail_w:
-                                prop_marquee_offset = 0
-                                prop_marquee_pause_ticks = 4
-                continue
-
-            if key == 27:
-                return was_modified
-            elif key in [ord('?'), ord('h'), curses.KEY_F1]:
-                win.timeout(-1)
-                show_directives_help(stdscr, theme)
-                stdscr.clear()
-                stdscr.refresh()
-                if redraw_bg:
-                    redraw_bg()
-                break
-            elif CLIPBOARD_TOOL and key in [ord('y'), ord('Y')]:
-                if fields and curr_field < len(fields):
-                    selected_key, field_label, curr_val = fields[curr_field]
-                    if not selected_key.startswith("[") and copy_to_clipboard(curr_val):
-                        copied_feedback_ticks = 4
-                continue
-            elif key in [curses.KEY_UP, ord('k')] and curr_field > 0:
-                curr_field -= 1
-            elif key in [curses.KEY_DOWN, ord('j')] and curr_field < len(fields) - 1:
-                curr_field += 1
-            elif key in [curses.KEY_ENTER, 10, 13]:
-                selected_key, field_label, curr_val = fields[curr_field]
-
-                if selected_key == "[DONE]":
-                    return was_modified
-                elif selected_key == "[TYPE]":
-                    win.timeout(-1)
-                    new_t = select_item_type(stdscr, theme)
-                    stdscr.clear()
-                    stdscr.refresh()
-                    if redraw_bg:
-                        redraw_bg()
-                    if new_t and new_t != item_type:
-                        item_dict["type"] = new_t
-                        if new_t == "submenu":
-                            item_dict.pop("type", None)
-                            item_dict.setdefault("submenu", {"title": item_dict.get("label", "Submenu"), "options": []})
-                        elif new_t == "divider":
-                            item_dict.setdefault("length", 40)
-                            item_dict.setdefault("char", "-")
-                        was_modified = True
-                    break
-                elif selected_key == "submenu.title":
-                    win.timeout(-1)
-                    new_val = bashmenu.show_input_box(stdscr, "Edit Submenu Title", "Submenu Header:", curr_val, theme)
-                    stdscr.clear()
-                    stdscr.refresh()
-                    if redraw_bg:
-                        redraw_bg()
-                    if new_val is not None:
-                        new_val_str = new_val.strip()
-                        if item_dict.get("submenu", {}).get("title", "") != new_val_str:
-                            item_dict.setdefault("submenu", {})["title"] = new_val_str
-                            was_modified = True
-                    break
-                elif selected_key in ["stream", "interactive", "masked", "show_whitespace", "tab_to_spaces", "quiet", "refresh", "external", "allow_new"]:
-                    bool_val = curr_val.lower() == "true"
-                    item_dict[selected_key] = not bool_val
-                    was_modified = True
-                    break
-                elif selected_key in ["picker", "user_mode"]:
-                    if selected_key == "picker":
-                        opts = ["none", "file", "dir"]
-                    else:
-                        opts = ["user", "root"]
-                    next_idx = (opts.index(curr_val) + 1) % len(opts) if curr_val in opts else 0
-                    item_dict[selected_key] = opts[next_idx]
-                    was_modified = True
-                    break
-                elif selected_key == "action" and item_type == "script":
-                    win.timeout(-1)
-                    chosen = select_script_action(stdscr, curr_val, config, theme)
-                    stdscr.clear()
-                    stdscr.refresh()
-                    if redraw_bg:
-                        redraw_bg()
-                    if chosen is not None and chosen != curr_val:
-                        item_dict[selected_key] = chosen
-                        was_modified = True
-                    break
-                elif (
-                    (selected_key == "action" and item_type == "editor")
-                    or (selected_key in ["template", "target"] and item_type == "inject_block")
-                ):
-                    win.timeout(-1)
-                    chosen = select_editor_target(stdscr, curr_val, item_type, selected_key, config, theme)
-                    stdscr.clear()
-                    stdscr.refresh()
-                    if redraw_bg:
-                        redraw_bg()
-                    if chosen is not None and chosen != curr_val:
-                        item_dict[selected_key] = chosen
-                        was_modified = True
-                    break
-                else:
-                    win.timeout(-1)
-                    new_val = bashmenu.show_input_box(stdscr, f"Edit {field_label}", f"{field_label}:", curr_val, theme)
-                    stdscr.clear()
-                    stdscr.refresh()
-                    if redraw_bg:
-                        redraw_bg()
-                    if new_val is not None:
-                        val_str = new_val.strip()
-                        if val_str.isdigit():
-                            val_str = int(val_str)
-                        elif val_str.lower() in ["true", "false"]:
-                            val_str = val_str.lower() == "true"
-                        if item_dict.get(selected_key) != val_str:
-                            item_dict[selected_key] = val_str
-                            was_modified = True
-                    break
-
-def create_default_item(item_type):
-    """Constructs default directive mapping for a newly added menu item."""
-    if item_type == "submenu":
-        return {
-            "label": "New Submenu",
-            "submenu": {"title": "New Submenu Options", "options": []}
-        }
-    elif item_type == "command":
-        return {"label": "New Command", "type": "command", "action": "echo Hello"}
-    elif item_type == "script":
-        return {"label": "New Script", "type": "script", "action": "script.sh"}
-    elif item_type == "config":
-        return {
-            "label": "New Config Setting",
-            "type": "config",
-            "key": "settings.new_key",
-            "title": "Edit Setting",
-            "prompt": "Enter value:"
-        }
-    elif item_type == "toggle":
-        return {
-            "label": "Toggle Setting",
-            "type": "toggle",
-            "key": "settings.new_key",
-            "title": "Toggle Option",
-            "message": "Enable option?"
-        }
-    elif item_type == "editor":
-        return {"label": "Edit File", "type": "editor", "action": "file.txt", "show_whitespace": True}
-    elif item_type == "confirm":
-        return {
-            "label": "New Confirmation Task",
-            "type": "confirm",
-            "title": "Confirm Task",
-            "message": "Proceed with operation?",
-            "on_yes": {"label": "Yes Action", "type": "message", "title": "Confirmed", "message": "Task executed."},
-            "on_no": {"label": "No Action", "type": "message", "title": "Cancelled", "message": "Task aborted."}
-        }
-    elif item_type == "message":
-        return {"label": "Show Message", "type": "message", "title": "Notice", "message": "Information text."}
-    elif item_type == "python":
-        return {"label": "Configure Autoexec", "type": "python", "action": "configure_autoexec"}
-    elif item_type == "inject_block":
-        return {
-            "label": "Inject Code Block",
-            "type": "inject_block",
-            "template": "templates/block.tmpl",
-            "target": "~/.bashrc",
-            "block_id": "new_block_id",
-            "refresh": False
-        }
-    elif item_type == "theme_selector":
-        return {"label": "Change Color Theme", "type": "theme_selector"}
-    elif item_type == "back":
-        return {"label": "Back to Main Menu", "type": "back"}
-    elif item_type == "exit":
-        return {"label": "Exit Utility", "type": "exit"}
-    elif item_type == "divider":
-        return {
-            "type": "divider",
-            "length": 40,
-            "char": "-"
-        }
-    return {"label": "New Option"}
-
-def wrap_detail_lines(details, prop_w):
-    """
-    Wraps detail lines so that they fit within prop_w.
-    If a line contains a colon, the value part is wrapped and indented to align with the colon.
-    """
-    wrapped_details = []
-    for det in details:
-        if ":" in det:
-            colon_idx = det.index(":")
-            prefix = det[:colon_idx + 2]
-            value = det[colon_idx + 2:]
-            
-            avail_w = prop_w - len(prefix)
-            if avail_w < 10:
-                avail_w = prop_w
-                prefix = ""
-            
-            wrapped_vals = textwrap.wrap(value, width=avail_w, break_long_words=True, break_on_hyphens=True)
-            if not wrapped_vals:
-                wrapped_details.append(prefix)
-            else:
-                wrapped_details.append(prefix + wrapped_vals[0])
-                indent_spaces = " " * len(prefix)
-                for val_part in wrapped_vals[1:]:
-                    wrapped_details.append(indent_spaces + val_part)
-        else:
-            wrapped_details.extend(textwrap.wrap(det, width=prop_w, break_long_words=True, break_on_hyphens=True))
-    return wrapped_details
-
-def save_menu_file(menu_data, stdscr, theme):
-    """Validates syntax and saves modified menu structure to bashmenu.mnu."""
-    try:
-        with open(bashmenu.MENU_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(menu_data, f, default_flow_style=False, sort_keys=False, width=float('inf'))
-
-        msg = "Menu structure saved successfully to bashmenu.mnu!"
-        bashmenu.show_popup_message(stdscr, "Save Successful", msg, theme)
-        return True
-    except (OSError, yaml.YAMLError, TypeError, ValueError) as e:  # Catch filesystem IO, serialization, or type formatting errors safely
-        bashmenu.show_popup_message(stdscr, "Save Error", f"Error writing file:\n{e}", theme)
-        return False
-
-
-def draw_menu_editor(
-    stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
-):
-    """
-    Draw the complete visual menu editor tree, inspectors, and footer on stdscr.
-    """
-    stdscr.erase()
-    height, width = stdscr.getmaxyx()
-
-    stdscr.attron(theme["border"])
-    stdscr.border(0)
-    stdscr.attroff(theme["border"])
-
-    mod_tag = " *" if modified else ""
-    header = f" HA Bash Menu - Visual Menu Editor (menuedit.py){mod_tag} "
-    bashmenu.safe_addstr(stdscr, 1, max(2, (width - len(header)) // 2), header, theme["title"] | curses.A_BOLD)
-
-    nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
-    selected_idx = max(0, min(selected_idx, len(nodes) - 1))
-    if not nodes:
-        stdscr.refresh()
-        return
-
-    curr_node = nodes[selected_idx]
-
-    tree_w = max(32, int(width * 0.48))
-    if tree_w >= width - 4:
-        tree_w = max(10, width - 15)
-    prop_w = max(1, width - tree_w - 3)
-
-    max_visible = height - 5
-    scroll_top = max(0, selected_idx - (max_visible // 2))
-
-    for i in range(max_visible):
-        node_idx = scroll_top + i
-        if node_idx >= len(nodes):
-            break
-
-        nd = nodes[node_idx]
-        y = 3 + i
-        item = nd["item"]
-
-        item_type = item.get("type", "submenu" if "submenu" in item else "option")
-        badge = TYPE_BADGES.get(item_type, "[OPT]")
-
-        fold = " "
-        if nd["has_children"]:
-            fold = "▼" if nd["expanded"] else "▶"
-
-        indent = "  " * nd["depth"]
-        label = item.get("label", "Untitled")
-        if item_type == "divider":
-            label = f"Divider: {item.get('char', '-')} x {item.get('length', 40)}"
-        pfx = nd.get("prefix", "")
-
-        pfx_len = len(indent) + len(fold) + 1 + len(badge) + 1 + len(pfx)
-        label_avail_w = max(1, tree_w - 4 - pfx_len)
-
-        if node_idx == selected_idx and len(label) > label_avail_w:
-            padded_text = label + (" " * label_avail_w) + label[:label_avail_w]
-            scroll_text = padded_text[marquee_offset : marquee_offset + label_avail_w]
-            line_str = f"{indent}{fold} {badge} {pfx}{scroll_text}"
-        else:
-            line_str = f"{indent}{fold} {badge} {pfx}{label}"
-
-        line_padded = f"{line_str:<{tree_w - 4}}"[:tree_w - 4]
-
-        attr = (theme["highlight"] | curses.A_BOLD) if node_idx == selected_idx else theme["text"]
-        bashmenu.safe_addstr(stdscr, y, 2, line_padded, attr)
-
-    for y in range(3, height - 2):
-        bashmenu.safe_addstr(stdscr, y, tree_w, "│", theme["border"])
-
-    prop_x = tree_w + 2
-    bashmenu.safe_addstr(stdscr, 3, prop_x, " Node Inspector & Details ", theme["accent"] | curses.A_BOLD)
-
-    curr_item = curr_node["item"]
-    curr_type = curr_item.get("type", "submenu" if "submenu" in curr_item else "option")
-
-    if curr_type == "root_menu":
-        details = [
-            f"Title : {curr_node['root_data'].get('title', '')}",
-            "Type  : Main Menu Root",
-            f"Count : {len(curr_node['root_data'].get('options', []))} top-level options",
-        ]
-    else:
-        if curr_type == "divider":
-            details = [
-                f"Type  : {curr_type}",
-            ]
-            for k in ["length", "char"]:
-                if k in curr_item:
-                    details.append(f"{k:<10}: {curr_item[k]}")
-        else:
-            details = [
-                f"Label : {curr_item.get('label', '')}",
-                f"Type  : {curr_type}",
-            ]
-            for k in ["icon", "action", "key", "title", "prompt", "user_mode", "stream", "interactive", "show_whitespace", "tabstop", "quiet", "refresh"]:
-                if k in curr_item:
-                    details.append(f"{k:<10}: {curr_item[k]}")
-
-    wrapped_details = wrap_detail_lines(details, prop_w)
-
-    for idx, det in enumerate(wrapped_details[:height - 8]):
-        bashmenu.safe_addstr(stdscr, 5 + idx, prop_x, det[:prop_w], theme["text"])
-
-    # Calculate dynamic state flags for current node
-    is_root = curr_type == "root_menu"
-    pl = curr_node.get("parent_list")
-    idx_in_parent = curr_node.get("index")
-
-    can_move_up = pl is not None and idx_in_parent is not None and idx_in_parent > 0
-    can_move_dn = pl is not None and idx_in_parent is not None and idx_in_parent < len(pl) - 1
-
-    can_indent = False
-    if not is_root and pl and idx_in_parent is not None and idx_in_parent > 0:
-        prev_item = pl[idx_in_parent - 1]
-        if isinstance(prev_item, dict) and "submenu" in prev_item:
-            can_indent = True
-
-    can_outdent = False
-    if not is_root and pl and idx_in_parent is not None:
-        parent_opts, _ = find_parent_options(menu_data, pl)
-        if parent_opts is not None:
-            can_outdent = True
-
-    # Construct dynamic footer keyboard shortcut string
-    footer_parts = ["[a]: Add", "[e/ENTER]: Edit"]
-    if not is_root:
-        footer_parts.append("[d]: Del")
-
-    if can_move_up and can_move_dn:
-        footer_parts.append("[m/M]: Move")
-    elif can_move_dn:
-        footer_parts.append("[m]: Move Dn")
-    elif can_move_up:
-        footer_parts.append("[M]: Move Up")
-
-    if can_outdent and can_indent:
-        footer_parts.append("[</>]: Out/In")
-    elif can_outdent:
-        footer_parts.append("[<]: Outdent")
-    elif can_indent:
-        footer_parts.append("[>]: Indent")
-
-    if not is_root:
-        footer_parts.append("[t]: Test")
-
-    footer_parts.extend(["[s]: Save", "[ESC]: Exit"])
-    footer = " " + " | ".join(footer_parts) + " "
-
-    bashmenu.safe_addstr(stdscr, height - 2, max(2, (width - len(footer)) // 2), footer, theme["footer"])
-
-    stdscr.refresh()
-
-
-def main(stdscr, target_path=None):
-    """
-    Main curses execution loop for the visual menu editor.
-    
-    Initializes the UI, loads the menu structure, and handles user input
-    for navigating the tree and invoking the property inspector.
-    
-    Args:
-        stdscr: Curses main window handle.
-        target_path (list[int], optional): Path of node indices to automatically select and focus on startup.
-    """
-    bashmenu_ui.safe_curs_set(0)
-    if hasattr(curses, "set_escdelay"):
-        curses.set_escdelay(25)
-
-    stdscr.keypad(True)
-    config, _ = bashmenu.load_config()
-    theme = bashmenu.apply_theme(config.get("theme", "dracula"))
-    stdscr.bkgd(' ', theme["text"])
-
-    raw_menu, err = bashmenu.load_menu()
-    if err or not raw_menu:
-        bashmenu.show_popup_message(stdscr, "Menu Load Error", f"Could not load menu file:\n{err}", theme)
-        return
-
-    menu_data = raw_menu
-    expanded_map = {}
-    selected_idx = 0
-    modified = False
-
-    # Trace and expand parent submenus to expose the target item
-    resolved_item = None
-    if target_path:
-        curr_opts = menu_data.get("options", [])
-        for depth, row_idx in enumerate(target_path):
-            if 0 <= row_idx < len(curr_opts):
-                resolved_item = curr_opts[row_idx]
-                if depth < len(target_path) - 1:
-                    expanded_map[id(resolved_item)] = True
-                    if isinstance(resolved_item, dict) and "submenu" in resolved_item:
-                        curr_opts = resolved_item["submenu"].get("options", [])
-
-    marquee_offset = 0
-    marquee_pause_ticks = 4
-    last_idx = -1
-
-    while True:
-        if selected_idx != last_idx:
-            marquee_offset = 0
-            marquee_pause_ticks = 4
-            last_idx = selected_idx
-
-        # If we have a target item, find its visible index in nodes
-        if resolved_item:
-            nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
-            for idx, nd in enumerate(nodes):
-                if nd["item"] is resolved_item:
-                    selected_idx = idx
-                    break
-            resolved_item = None
-            last_idx = selected_idx
-
-        draw_menu_editor(
-            stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
+    def __init__(self, menu_file_path: str | None = None):
+        super().__init__()
+        self.menu_file_path = menu_file_path or bashmenu.MENU_FILE
+        self.menu_data, _ = bashmenu.load_yaml_file(self.menu_file_path)
+        self.modified = False
+
+    def compose(self) -> ComposeResult:
+        yield Label(f"  Visual Menu Editor - {os.path.basename(self.menu_file_path)}  ", id="header")
+        yield Tree("Root Menu", id="tree")
+        yield Label(
+            " [a]: Add | [e/ENTER]: Edit | [d]: Delete | [m/M]: Reorder | [|/<]: Indent/Outdent | [s]: Save | [ESC]: Exit ",
+            id="footer",
         )
 
-        _height, width = stdscr.getmaxyx()
-        nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
-        selected_idx = max(0, min(selected_idx, len(nodes) - 1))
-        curr_node = nodes[selected_idx]
-        tree_w = max(32, int(width * 0.48))
-        if tree_w >= width - 4:
-            tree_w = max(10, width - 15)
+    def on_mount(self) -> None:
+        self.populate_tree()
 
-        # Calculate dynamic state flags for current node to support move/indent/outdent
-        curr_item = curr_node["item"]
-        curr_type = curr_item.get("type", "submenu" if "submenu" in curr_item else "option")
-        is_root = curr_type == "root_menu"
-        pl = curr_node.get("parent_list")
-        idx_in_parent = curr_node.get("index")
+    def populate_tree(self) -> None:
+        tree = self.query_one("#tree", Tree)
+        tree.clear()
+        tree.root.data = self.menu_data
+        root_title = self.menu_data.get("title", "Root Menu")
+        tree.root.label = f"[MNU] {root_title}"
 
-        can_move_up = pl is not None and idx_in_parent is not None and idx_in_parent > 0
-        can_move_dn = pl is not None and idx_in_parent is not None and idx_in_parent < len(pl) - 1
+        opts = self.menu_data.get("options", [])
+        self._build_tree_branch(tree.root, opts)
+        tree.root.expand()
 
-        can_indent = False
-        if not is_root and pl and idx_in_parent is not None and idx_in_parent > 0:
-            prev_item = pl[idx_in_parent - 1]
-            if isinstance(prev_item, dict) and "submenu" in prev_item:
-                can_indent = True
+    def _build_tree_branch(self, parent_node, options_list):
+        for item in options_list:
+            if not isinstance(item, dict):
+                continue
+            item_type = item.get("type", "command")
+            title = item.get("title", item.get("label", item.get("divider", "Divider")))
+            badge = TYPE_BADGES.get(item_type, "[???]")
 
-        can_outdent = False
-        if not is_root and pl and idx_in_parent is not None:
-            parent_opts, _ = find_parent_options(menu_data, pl)
-            if parent_opts is not None:
-                can_outdent = True
+            node_label = f"{badge} {title}"
+            node = parent_node.add(node_label, data=item)
 
-        stdscr.timeout(250)
-        key = stdscr.getch()
+            if item_type == "submenu" or "submenu" in item:
+                sub_opts = item.get("submenu", {}).get("options", [])
+                self._build_tree_branch(node, sub_opts)
+                node.expand()
 
-        if key == -1:
-            if nodes and selected_idx < len(nodes):
-                nd = nodes[selected_idx]
-                item = nd["item"]
-                label = item.get("label", "Untitled")
-                indent = "  " * nd["depth"]
-                fold = "▼" if nd["expanded"] else "▶" if nd["has_children"] else " "
-                badge = TYPE_BADGES.get(item.get("type", "submenu" if "submenu" in item else "option"), "[OPT]")
-                pfx = nd.get("prefix", "")
-                pfx_len = len(indent) + len(fold) + 1 + len(badge) + 1 + len(pfx)
-                law = max(1, tree_w - 4 - pfx_len)
-                if len(label) > law:
-                    if marquee_pause_ticks > 0:
-                        marquee_pause_ticks -= 1
-                    else:
-                        marquee_offset += 1
-                        if marquee_offset >= len(label) + law:
-                            marquee_offset = 0
-                            marquee_pause_ticks = 4
-            continue
+    def action_edit_item(self) -> None:
+        tree = self.query_one("#tree", Tree)
+        node = tree.cursor_node
+        if not node or not node.data or node == tree.root:
+            return
 
-        if key in [curses.KEY_UP, ord('k')]:
-            if selected_idx > 0:
-                selected_idx -= 1
-        elif key in [curses.KEY_DOWN, ord('j')]:
-            if selected_idx < len(nodes) - 1:
-                selected_idx += 1
-        elif key in [ord(' '), curses.KEY_RIGHT] and curr_node["has_children"]:
-            expanded_map[curr_node["id"]] = not curr_node["expanded"]
-        elif key in [curses.KEY_ENTER, 10, 13, ord('e')]:
-            stdscr.timeout(-1)
-            if curr_node["item"].get("type") == "root_menu":
-                curr_title = curr_node["root_data"].get("title", "")
-                new_title = bashmenu.show_input_box(stdscr, "Edit Main Menu Title", "Main Menu Header Title:", curr_title, theme)
-                if new_title is not None and new_title.strip() != curr_title:
-                    curr_node["root_data"]["title"] = new_title.strip()
-                    modified = True
-            else:
-                def redraw_bg(selected_idx=selected_idx, modified=modified, marquee_offset=marquee_offset):
-                    draw_menu_editor(
-                        stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
+        def save_cb(updated_item):
+            if updated_item:
+                node.data.update(updated_item)
+                item_type = updated_item.get("type", "command")
+                badge = TYPE_BADGES.get(item_type, "[???]")
+                title = updated_item.get("title", updated_item.get("label", ""))
+                node.label = f"{badge} {title}"
+                self.modified = True
+                tree.refresh()
+
+        self.app.push_screen(ItemEditModal(node.data), save_cb)
+
+    def action_add_item(self) -> None:
+        tree = self.query_one("#tree", Tree)
+        parent_node = tree.cursor_node or tree.root
+
+        def type_cb(selected_type):
+            if not selected_type:
+                return
+
+            new_item = {"type": selected_type, "title": f"New {selected_type}"}
+            if selected_type == "submenu":
+                new_item["submenu"] = {"title": "New Submenu", "options": []}
+
+            def edit_cb(final_item):
+                if final_item:
+                    # Append to parent list
+                    parent_data = parent_node.data
+                    if isinstance(parent_data, dict):
+                        if "submenu" in parent_data:
+                            parent_data.setdefault("submenu", {}).setdefault("options", []).append(final_item)
+                        else:
+                            parent_data.setdefault("options", []).append(final_item)
+
+                    badge = TYPE_BADGES.get(selected_type, "[???]")
+                    parent_node.add(f"{badge} {final_item['title']}", data=final_item)
+                    parent_node.expand()
+                    self.modified = True
+
+            self.app.push_screen(ItemEditModal(new_item), edit_cb)
+
+        self.app.push_screen(ItemTypePickerModal(), type_cb)
+
+    def action_delete_item(self) -> None:
+        tree = self.query_one("#tree", Tree)
+        node = tree.cursor_node
+        if not node or not node.data or node == tree.root:
+            return
+
+        def confirm_cb(res):
+            if res == "yes":
+                parent = node.parent
+                if parent and isinstance(parent.data, dict):
+                    opts = (
+                        parent.data.get("submenu", {}).get("options")
+                        if "submenu" in parent.data
+                        else parent.data.get("options")
                     )
-                if edit_item_properties(stdscr, curr_node["item"], config, theme, redraw_bg=redraw_bg):
-                    modified = True
-        elif key == ord('E'):
-            stdscr.timeout(-1)
-            if curr_node["item"].get("type") == "root_menu":
-                target_dict = curr_node["root_data"]
-            else:
-                target_dict = curr_node["item"]
+                    if isinstance(opts, list) and node.data in opts:
+                        opts.remove(node.data)
+                        node.remove()
+                        self.modified = True
 
-            raw_str = yaml.dump(target_dict, default_flow_style=False, sort_keys=False, width=float('inf'))
-            tmp_path = os.path.join(SCRIPT_DIR, ".tmp_node.yml")
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                f.write(raw_str)
+        self.app.push_screen(
+            bashmenu_ui.ConfirmModalScreen("Delete Item", "Are you sure you want to delete this menu item?"),
+            confirm_cb,
+        )
 
-            bashmenu.run_curses_editor(stdscr, tmp_path, theme, show_whitespace=True)
-            try:
-                with open(tmp_path, "r", encoding="utf-8") as f:
-                    parsed = yaml.safe_load(f)
-                    if isinstance(parsed, dict) and parsed != target_dict:
-                        target_dict.clear()
-                        target_dict.update(parsed)
-                        modified = True
-            except (OSError, yaml.YAMLError) as ex:  # Catch filesystem reads or YAML structure parse errors safely
-                bashmenu.show_popup_message(stdscr, "YAML Error", f"Invalid YAML structure:\n{ex}", theme)
-            finally:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-        elif key in [ord('a'), curses.KEY_IC]:
-            stdscr.timeout(-1)
-            sel_type = select_item_type(stdscr, theme)
-            if sel_type:
-                new_item = create_default_item(sel_type)
-                if curr_node["item"].get("type") == "root_menu":
-                    opts = curr_node["root_data"].setdefault("options", [])
-                    opts.insert(0, new_item)
-                else:
-                    parent_lst = curr_node["parent_list"]
-                    if parent_lst is not None:
-                        parent_lst.insert(curr_node["index"] + 1, new_item)
-                    else:
-                        menu_data.setdefault("options", []).append(new_item)
+    def action_save_menu(self) -> None:
+        try:
+            with open(self.menu_file_path, "w", encoding="utf-8") as f:
+                yaml.dump(self.menu_data, f, sort_keys=False, default_flow_style=False)
+            self.modified = False
+            self.app.push_screen(bashmenu_ui.MessageModalScreen("Save Menu", "Menu saved successfully to disk."))
+        except Exception as e:
+            self.app.push_screen(bashmenu_ui.MessageModalScreen("Error", f"Failed to save menu:\n{e}"))
 
-                def redraw_bg(selected_idx=selected_idx, modified=modified, marquee_offset=marquee_offset):
-                    draw_menu_editor(
-                        stdscr, menu_data, selected_idx, expanded_map, theme, modified, marquee_offset
-                    )
-                edit_item_properties(stdscr, new_item, config, theme, redraw_bg=redraw_bg)
-                modified = True
-        elif key in [ord('d'), curses.KEY_DC]:
-            if curr_node["item"].get("type") == "root_menu":
-                stdscr.timeout(-1)
-                bashmenu.show_popup_message(stdscr, "Notice", "Main Menu Root node cannot be deleted.", theme)
-            else:
-                lbl = curr_node["item"].get("label", "Selected Item")
-                stdscr.timeout(-1)
-                res = bashmenu.show_confirm_box(stdscr, "Delete Item", f"Delete menu item '{lbl}'?", theme)
+    def action_exit_editor(self) -> None:
+        if self.modified:
+
+            def confirm_cb(res):
                 if res == "yes":
-                    pl = curr_node["parent_list"]
-                    if pl is not None and curr_node["index"] < len(pl):
-                        pl.pop(curr_node["index"])
-                    elif curr_node.get("key_in_parent"):
-                        k, parent_dict = curr_node["key_in_parent"]
-                        parent_dict.pop(k, None)
-                    modified = True
-        elif key == ord('m') and can_move_dn:
-            idx = curr_node["index"]
-            item_ref = pl[idx]
-            pl[idx], pl[idx + 1] = pl[idx + 1], pl[idx]
-            # Dynamic tracking: Find the item's new index in the reconstructed tree nodes
-            new_nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
-            for new_idx, n in enumerate(new_nodes):
-                if n["item"] is item_ref:
-                    selected_idx = new_idx
-                    break
-            modified = True
-        elif key == ord('M') and can_move_up:
-            idx = curr_node["index"]
-            item_ref = pl[idx]
-            pl[idx], pl[idx - 1] = pl[idx - 1], pl[idx]
-            # Dynamic tracking: Find the item's new index in the reconstructed tree nodes
-            new_nodes = build_tree_nodes(menu_data, expanded_map=expanded_map)
-            for new_idx, n in enumerate(new_nodes):
-                if n["item"] is item_ref:
-                    selected_idx = new_idx
-                    break
-            modified = True
-        elif key in [ord('>'), ord('.'), 9] and can_indent:
-            prev_item = pl[idx_in_parent - 1]
-            sub_opts = prev_item["submenu"].setdefault("options", [])
-            item = pl.pop(idx_in_parent)
-            sub_opts.append(item)
-            expanded_map[id(prev_item)] = True
-            modified = True
-        elif key in [ord('<'), ord(','), curses.KEY_BTAB] and can_outdent:
-            parent_opts, parent_idx = find_parent_options(menu_data, pl)
-            if parent_opts is not None and parent_idx is not None:
-                item = pl.pop(idx_in_parent)
-                parent_opts.insert(parent_idx + 1, item)
-                modified = True
-        elif key == ord('t'):
-            if curr_node["item"].get("type") != "root_menu":
-                stdscr.timeout(-1)
-                bashmenu.process_item_action(curr_node["item"], stdscr, config, theme, [], [0])
-        elif key in [ord('s'), 19]:
-            stdscr.timeout(-1)
-            if save_menu_file(menu_data, stdscr, theme):
-                modified = False
-        elif key == 27:
-            if modified:
-                stdscr.timeout(-1)
-                res = bashmenu.show_confirm_box(stdscr, "Unsaved Changes", "Save changes to bashmenu.mnu before exiting?", theme)
-                if res == "yes":
-                    save_menu_file(menu_data, stdscr, theme)
-                    break
+                    self.action_save_menu()
+                    self.dismiss(True)
                 elif res == "no":
-                    break
-            else:
-                break
+                    self.dismiss(False)
+
+            self.app.push_screen(
+                bashmenu_ui.ConfirmModalScreen(
+                    "Unsaved Changes", "You have unsaved changes in the menu. Save before exiting?"
+                ),
+                confirm_cb,
+            )
+        else:
+            self.dismiss(False)
+
+
+class MenuEditApp(App):
+    """App launcher for Visual Menu Editor."""
+
+    def __init__(self, menu_file_path: str | None = None):
+        super().__init__()
+        self.menu_file_path = menu_file_path
+
+    def on_mount(self) -> None:
+        self.push_screen(MenuEditScreen(menu_file_path=self.menu_file_path))
+
+
+def run_curses_menuedit(stdscr, menu_file=None, theme=None):
+    """Compatibility runner for launching MenuEdit in Textual."""
+    app = MenuEditApp(menu_file_path=menu_file)
+    app.run()
+
 
 if __name__ == "__main__":
-    is_tty = os.environ.get("TERM") == "linux" or not os.isatty(sys.stdout.fileno())
-    sys.stdout.write("\033[?1049h")
-    sys.stdout.flush()
-
-    try:
-        curses.wrapper(main)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        if is_tty:
-            sys.stdout.write("\033[2J\033[H")
-        sys.stdout.write("\033[?1049l")
-        sys.stdout.flush()
-        sys.exit(0)
+    target = sys.argv[1] if len(sys.argv) > 1 else None
+    app = MenuEditApp(menu_file_path=target)
+    app.run()

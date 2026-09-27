@@ -1,165 +1,78 @@
 #!/usr/bin/env python3
 """
-GORILLAS.PY - Classic QBasic Gorillas rewritten as a pure Python Curses TUI Game.
-
-Features:
-- Pure curses TUI (No external GUI/Pygame dependencies).
-- Customizable Player Names, Target Score, and Gravity.
-- Randomly generated procedural city skyline with illuminated windows.
-- Dynamic wind indicator and physics calculations.
-- Authentic Gorilla arm-raising throw animations and explosions.
-- Destructible buildings / crater terrain damage.
-- Sun in the sky that gets surprised when a banana passes close by.
-- Supports any terminal size (80x24 or larger).
+gorillas.py - Classic QBasic Gorillas rewritten as a Textual TUI Game.
 """
 
-import curses
 import math
 import random
-import sys
-import time
+from typing import ClassVar
 
-
-def init_colors():
-    curses.start_color()
-    curses.use_default_colors()
-
-    # Define color pairs safely
-    if curses.has_colors():
-        curses.init_pair(1, curses.COLOR_CYAN, -1)       # Sky / Title
-        curses.init_pair(2, curses.COLOR_BLUE, -1)       # Building type 1
-        curses.init_pair(3, curses.COLOR_YELLOW, -1)     # Lit windows / Sun
-        curses.init_pair(4, curses.COLOR_BLACK, -1)      # Dark windows
-        curses.init_pair(5, curses.COLOR_GREEN, -1)      # Gorilla P1
-        curses.init_pair(6, curses.COLOR_MAGENTA, -1)    # Gorilla P2
-        curses.init_pair(7, curses.COLOR_YELLOW, -1)     # Banana
-        curses.init_pair(8, curses.COLOR_RED, -1)        # Explosions
-        curses.init_pair(9, curses.COLOR_CYAN, -1)       # Building type 2
-        curses.init_pair(10, curses.COLOR_WHITE, -1)     # Text / Borders
+from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal
+from textual.screen import Screen
+from textual.widget import Widget
+from textual.widgets import Button, Input, Label
 
 
 class CitySkyline:
     def __init__(self, width, height):
-        self.width = width
-        self.height = height
-        self.skyline = [0] * width  # Building height at each x column
-        self.building_colors = [0] * width
-        self.grid = [[' ' for _ in range(width)] for _ in range(height)]
-        self.color_grid = [[0 for _ in range(width)] for _ in range(height)]
-        self.building_bounds = []  # List of (start_x, end_x, height)
+        self.width = max(60, width)
+        self.height = max(20, height)
+        self.skyline = [0] * self.width
+        self.grid = [[" " for _ in range(self.width)] for _ in range(self.height)]
+        self.color_grid = [["blue" for _ in range(self.width)] for _ in range(self.height)]
+        self.building_bounds = []
         self.generate()
 
     def generate(self):
-        min_b_width = 6
-        max_b_width = 12
-        min_b_height = int(self.height * 0.25)
-        max_b_height = int(self.height * 0.65)
-
         curr_x = 2
-        color_choices = [curses.COLOR_BLUE, curses.COLOR_CYAN, curses.COLOR_MAGENTA, curses.COLOR_GREEN]
+        colors = ["blue", "cyan", "magenta", "green"]
 
-        while curr_x < self.width - 4:
-            b_width = random.randint(min_b_width, max_b_width)
-            if curr_x + b_width >= self.width - 2:
-                b_width = self.width - 2 - curr_x
-            if b_width < 4:
-                b_width = self.width - 2 - curr_x
+        while curr_x < self.width - 8:
+            b_width = random.randint(6, 12)
+            b_height = random.randint(int(self.height * 0.25), int(self.height * 0.65))
+            end_x = min(curr_x + b_width, self.width - 2)
+            color = random.choice(colors)
 
-            b_height = random.randint(min_b_height, max_b_height)
-            color_idx = random.choice(color_choices)
+            self.building_bounds.append((curr_x, end_x, b_height))
 
-            self.building_bounds.append((curr_x, curr_x + b_width - 1, b_height))
-
-            for x in range(curr_x, curr_x + b_width):
+            for x in range(curr_x, end_x):
                 self.skyline[x] = b_height
-                self.building_colors[x] = color_idx
-                for y in range(self.height - b_height, self.height - 1):
-                    # Windows pattern
-                    if (y % 2 == 0) and (x % 3 == 1) and y < self.height - 2:
-                        is_lit = random.random() < 0.6
-                        self.grid[y][x] = '░' if is_lit else ' '
-                        self.color_grid[y][x] = 3 if is_lit else color_idx
-                    else:
-                        self.grid[y][x] = '█'
-                        self.color_grid[y][x] = color_idx
+                for y in range(self.height - b_height, self.height):
+                    self.grid[y][x] = "█"
+                    self.color_grid[y][x] = color
 
-            curr_x += b_width
+                # Lit windows
+                for y in range(self.height - b_height + 2, self.height - 2, 2):
+                    if (x - curr_x) % 2 == 1 and random.random() > 0.4:
+                        self.grid[y][x] = "░"
+                        self.color_grid[y][x] = "yellow"
 
-    def explode_impact(self, impact_x, impact_y, radius=2):
-        """Destroys building blocks around impact coordinates."""
-        for y in range(impact_y - radius, impact_y + radius + 1):
-            for x in range(impact_x - radius, impact_x + radius + 1):
-                if 0 <= x < self.width and 0 <= y < self.height - 1:
-                    dist = math.hypot(x - impact_x, y - impact_y)
-                    if dist <= radius:
-                        self.grid[y][x] = ' '
-                        self.color_grid[y][x] = 0
+            curr_x = end_x + 1
 
-    def is_solid(self, x, y):
-        if 0 <= x < self.width and 0 <= y < self.height - 1:
-            return self.grid[y][x] != ' '
-        return False
+    def make_crater(self, cx, cy, radius=2):
+        for y in range(max(0, cy - radius), min(self.height, cy + radius + 1)):
+            for x in range(max(0, cx - radius), min(self.width, cx + radius + 1)):
+                if math.hypot(x - cx, y - cy) <= radius:
+                    self.grid[y][x] = " "
+                    self.color_grid[y][x] = "black"
 
 
-def prompt_string(stdscr, y, x, prompt_text, default_val=""):
-    curses.echo()
-    curses.curs_set(1)
-    stdscr.addstr(y, x, f"{prompt_text} [{default_val}]: ")
-    stdscr.refresh()
-    inp = stdscr.getstr(y, x + len(prompt_text) + len(default_val) + 5, 20).decode('utf-8').strip()
-    curses.noecho()
-    curses.curs_set(0)
-    return inp if inp else default_val
+class GorillasCanvas(Widget):
+    """Canvas widget rendering city, sun, gorillas, and throwing trajectories."""
 
+    DEFAULT_CSS = """
+    GorillasCanvas {
+        width: 100%;
+        height: 1fr;
+        background: black;
+    }
+    """
 
-def prompt_float(stdscr, y, x, prompt_text, default_val):
-    val_str = prompt_string(stdscr, y, x, prompt_text, str(default_val))
-    try:
-        return float(val_str)
-    except ValueError:
-        return default_val
-
-
-def prompt_int(stdscr, y, x, prompt_text, default_val):
-    val_str = prompt_string(stdscr, y, x, prompt_text, str(default_val))
-    try:
-        return int(val_str)
-    except ValueError:
-        return default_val
-
-
-def show_title_screen(stdscr):
-    stdscr.clear()
-    h, w = stdscr.getmaxyx()
-
-    title_lines = [
-        "   ____   ____  ____   ___  ____    ____     _     ____  ",
-        "  / ___| / __ \\|  _ \\ |_ _| |  _ \\  / ___|   / \\   / ___| ",
-        " | |  _ | |  | | |_) | | |  | |_) | \\___ \\  / _ \\  \\___ \\ ",
-        " | |_| || |__| |  _ <  | |  |  _ <   ___) |/ ___ \\  ___) |",
-        "  \\____| \\____/|_| \\_\\|___| |_| \\_\\ |____//_/   \\_\\|____/ ",
-        "                                                           ",
-        "         QBasic Gorillas - Python TUI Edition              "
-    ]
-
-    start_y = max(1, (h - 20) // 2)
-    for i, line in enumerate(title_lines):
-        x = max(0, (w - len(line)) // 2)
-        stdscr.addstr(start_y + i, x, line, curses.color_pair(1) | curses.A_BOLD)
-
-    y_pos = start_y + len(title_lines) + 2
-
-    p1 = prompt_string(stdscr, y_pos, max(2, (w - 40) // 2), "Name of Player 1", "Player 1")
-    p2 = prompt_string(stdscr, y_pos + 2, max(2, (w - 40) // 2), "Name of Player 2", "Player 2")
-    pts = prompt_int(stdscr, y_pos + 4, max(2, (w - 40) // 2), "Play to how many total points", 3)
-    gravity = prompt_float(stdscr, y_pos + 6, max(2, (w - 40) // 2), "Gravity in m/s^2", 9.8)
-
-    return p1, p2, pts, gravity
-
-
-class GorillasGame:
-    def __init__(self, stdscr, p1_name, p2_name, target_points, gravity):
-        self.stdscr = stdscr
+    def __init__(self, p1_name="Player 1", p2_name="Player 2", target_points=3, gravity=9.8):
+        super().__init__()
         self.p1_name = p1_name
         self.p2_name = p2_name
         self.target_points = target_points
@@ -167,343 +80,251 @@ class GorillasGame:
 
         self.p1_score = 0
         self.p2_score = 0
-        self.current_player = 1  # 1 or 2
+        self.current_player = 1
 
-        self.wind = 0.0
         self.skyline = None
         self.p1_x = 0
         self.p1_y = 0
         self.p2_x = 0
         self.p2_y = 0
 
+        self.wind = 0.0
+        self.banana_pos = None
+        self.surprised_sun = False
+        self.status_msg = ""
+        self.p1_pose = "normal"
+        self.p2_pose = "normal"
+
     def new_round(self):
-        h, w = self.stdscr.getmaxyx()
+        w = self.size.width or 80
+        h = self.size.height or 24
         self.skyline = CitySkyline(w, h)
-        # Random wind between -15.0 and +15.0
         self.wind = round(random.uniform(-15.0, 15.0), 1)
 
         if self.skyline.building_bounds:
-            b1 = self.skyline.building_bounds[min(1, len(self.skyline.building_bounds)-1)]
+            b1 = self.skyline.building_bounds[min(1, len(self.skyline.building_bounds) - 1)]
             self.p1_x = (b1[0] + b1[1]) // 2
             self.p1_y = h - b1[2] - 3
 
-        # Place Gorilla 2 on right buildings (around 75% to 90% of width)
-        if self.skyline.building_bounds:
             b2_idx = max(0, len(self.skyline.building_bounds) - 2)
             b2 = self.skyline.building_bounds[b2_idx]
             self.p2_x = (b2[0] + b2[1]) // 2
             self.p2_y = h - b2[2] - 3
 
-    def draw_gorilla(self, x, y, player_num, pose="normal"):
-        color = curses.color_pair(5) if player_num == 1 else curses.color_pair(6)
-        color = color | curses.A_BOLD
+        self.p1_pose = "normal"
+        self.p2_pose = "normal"
+        self.status_msg = f"{self.p1_name if self.current_player == 1 else self.p2_name}'s turn!"
+        self.refresh()
 
-        if pose == "normal":
-            sprite = [
-                " o ",
-                "/|\\",
-                "/ \\"
-            ]
-        elif pose == "throw_left":
-            sprite = [
-                "\\o ",
-                " |\\",
-                "/ \\"
-            ]
-        elif pose == "throw_right":
-            sprite = [
-                " o/",
-                "/| ",
-                "/ \\"
-            ]
-        elif pose == "cheer":
-            sprite = [
-                "\\o/",
-                " | ",
-                "/ \\"
-            ]
-        elif pose == "dead":
-            sprite = [
-                "\\x/",
-                " | ",
-                "/ \\"
-            ]
+    def render(self) -> Text:
+        w = self.size.width or 80
+        h = self.size.height or 24
 
-        for dy, line in enumerate(sprite):
-            draw_y = y + dy
-            draw_x = x - 1
-            if 0 <= draw_y < self.skyline.height and 0 <= draw_x < self.skyline.width - 3:
-                try:
-                    self.stdscr.addstr(draw_y, draw_x, line, color)
-                except curses.error:
-                    pass
+        if not self.skyline or self.skyline.width != w or self.skyline.height != h:
+            self.new_round()
 
-    def draw_sun(self, surprised=False):
-        h, w = self.stdscr.getmaxyx()
-        sun_x = w // 2
-        sun_y = 2
+        out = Text()
 
-        sun_face = "(o.o)" if surprised else "(^_^)"
-        color = curses.color_pair(3) | curses.A_BOLD
+        # Build composite grid buffer
+        buf = [[" " for _ in range(w)] for _ in range(h)]
+        colors = [["white" for _ in range(w)] for _ in range(h)]
 
-        sun_art = [
-            "  \\ | /  ",
-            f"--{sun_face}--",
-            "  / | \\  "
-        ]
-
-        for dy, line in enumerate(sun_art):
-            draw_y = sun_y + dy - 1
-            draw_x = sun_x - len(line) // 2
-            if 0 <= draw_y < h and 0 <= draw_x < w - len(line):
-                try:
-                    self.stdscr.addstr(draw_y, draw_x, line, color)
-                except curses.error:
-                    pass
-
-    def draw_scene(self, surprised_sun=False):
-        self.stdscr.clear()
-        h, w = self.stdscr.getmaxyx()
-
-        # 1. Draw Skyline & Buildings
-        for y in range(h - 1):
+        # Copy skyline grid
+        for y in range(h):
             for x in range(w):
-                ch = self.skyline.grid[y][x]
-                if ch != ' ':
-                    c_idx = self.skyline.color_grid[y][x]
-                    color = curses.color_pair(c_idx)
-                    try:
-                        self.stdscr.addch(y, x, ch, color)
-                    except curses.error:
-                        pass
+                if y < self.skyline.height and x < self.skyline.width:
+                    buf[y][x] = self.skyline.grid[y][x]
+                    colors[y][x] = self.skyline.color_grid[y][x]
 
-        # 2. Draw Sun
-        self.draw_sun(surprised=surprised_sun)
-
-        # 3. Draw Gorillas
-        self.draw_gorilla(self.p1_x, self.p1_y, 1, "normal")
-        self.draw_gorilla(self.p2_x, self.p2_y, 2, "normal")
-
-        # 4. Draw Header / Scoreboard
-        score_str = f" {self.p1_name}: {self.p1_score}   |   {self.p2_name}: {self.p2_score} "
-        try:
-            self.stdscr.addstr(0, max(0, (w - len(score_str)) // 2), score_str, curses.color_pair(10) | curses.A_REVERSE)
-        except curses.error:
-            pass
-
-        # 5. Draw Wind Indicator at Bottom
-        wind_dir = "---->" if self.wind > 0 else ("<----" if self.wind < 0 else "0")
-        wind_str = f" Wind: {wind_dir} {abs(self.wind):.1f} "
-        try:
-            self.stdscr.addstr(h - 1, max(0, (w - len(wind_str)) // 2), wind_str, curses.color_pair(10) | curses.A_BOLD)
-        except curses.error:
-            pass
-
-        self.stdscr.refresh()
-
-    def get_shot_parameters(self, player_num):
-        h, w = self.stdscr.getmaxyx()
-        player_name = self.p1_name if player_num == 1 else self.p2_name
-        prompt_y = h - 2
-        prompt_x = 2 if player_num == 1 else max(2, w - 40)
-
-        # Clear prompt area
-        try:
-            self.stdscr.addstr(prompt_y, 0, " " * (w - 1))
-        except curses.error:
-            pass
-
-        angle = prompt_float(self.stdscr, prompt_y, prompt_x, f"{player_name} Angle (0-360)", 45.0)
-        velocity = prompt_float(self.stdscr, prompt_y, prompt_x, f"{player_name} Velocity (1-200)", 60.0)
-
-        return angle, velocity
-
-    def animate_shot(self, player_num, angle, velocity):
-        h, w = self.stdscr.getmaxyx()
-
-        # Starting position of banana
-        start_x = self.p1_x if player_num == 1 else self.p2_x
-        start_y = self.p1_y - 1
-
-        # Animate throwing pose
-        throw_pose = "throw_right" if player_num == 1 else "throw_left"
-        self.draw_scene()
-        self.draw_gorilla(start_x, self.p1_y, player_num, throw_pose)
-        self.stdscr.refresh()
-        time.sleep(0.2)
-
-        # Revert gorilla back to normal
-        self.draw_scene()
-
-        # Physics Setup
-        # Convert angle to radians
-        # For Player 1 (facing right), 0 is right, 90 is up
-        # For Player 2 (facing left), 0 is left (180 deg in standard polar), 90 is up
-        if player_num == 1:
-            rad = math.radians(angle)
-            vx0 = velocity * math.cos(rad)
-            vy0 = -velocity * math.sin(rad)  # Upward is negative Y in curses
-        else:
-            rad = math.radians(angle)
-            vx0 = -velocity * math.cos(rad)
-            vy0 = -velocity * math.sin(rad)
-
-        t = 0.0
-        dt = 0.08
-        banana_chars = ["/", "-", "\\", "|"]
-        b_idx = 0
-
+        # Render Sun at top center
         sun_x = w // 2
-        sun_y = 2
+        sun_face = "(o.o)" if self.surprised_sun else "(^_^)"
+        if sun_x - 3 >= 0 and sun_x + 3 < w and h > 3:
+            sun_str = f"\\ {sun_face} /"
+            for idx, ch in enumerate(sun_str):
+                if 0 <= sun_x - 3 + idx < w:
+                    buf[1][sun_x - 3 + idx] = ch
+                    colors[1][sun_x - 3 + idx] = "yellow"
+
+        # Render Gorillas
+        def draw_gorilla_sprite(gx, gy, player_num, pose):
+            c = "green" if player_num == 1 else "magenta"
+            sprite = [" o ", "/|\\", "/ \\"]
+            if pose == "throw":
+                sprite = [" o/", "/| ", "/ \\"]
+            elif pose == "cheer":
+                sprite = ["\\o/", " | ", "/ \\"]
+            elif pose == "dead":
+                sprite = ["\\x/", " | ", "/ \\"]
+
+            for dy, line in enumerate(sprite):
+                for dx, ch in enumerate(line):
+                    py, px = gy + dy, gx - 1 + dx
+                    if 0 <= py < h and 0 <= px < w:
+                        buf[py][px] = ch
+                        colors[py][px] = c
+
+        draw_gorilla_sprite(self.p1_x, self.p1_y, 1, self.p1_pose)
+        draw_gorilla_sprite(self.p2_x, self.p2_y, 2, self.p2_pose)
+
+        # Render Banana projectile
+        if self.banana_pos:
+            bx, by = int(self.banana_pos[0]), int(self.banana_pos[1])
+            if 0 <= by < h and 0 <= bx < w:
+                buf[by][bx] = "🍌"
+                colors[by][bx] = "yellow"
+
+        # Construct final Rich Text output
+        for y in range(h):
+            for x in range(w):
+                out.append(buf[y][x], style=colors[y][x])
+            out.append("\n")
+
+        return out
+
+    def throw_banana(self, angle: float, velocity: float):
+        """Perform physics trajectory calculation and animation."""
+        rad = math.radians(angle)
+        is_p1 = self.current_player == 1
+
+        if is_p1:
+            start_x = self.p1_x
+            start_y = self.p1_y - 1
+            self.p1_pose = "throw"
+            vx = velocity * math.cos(rad)
+            vy = -velocity * math.sin(rad)
+        else:
+            start_x = self.p2_x
+            start_y = self.p2_y - 1
+            self.p2_pose = "throw"
+            vx = -velocity * math.cos(rad)
+            vy = -velocity * math.sin(rad)
+
+        x, y = float(start_x), float(start_y)
+        t = 0.0
+        dt = 0.15
+        w = self.size.width or 80
+        h = self.size.height or 24
 
         while True:
             t += dt
+            x += (vx + self.wind) * dt
+            y += vy * dt + 0.5 * self.gravity * (t**2)
 
-            # Position equation incorporating velocity, gravity, and wind
-            # Wind adds horizontal acceleration component: 0.5 * wind * t^2
-            curr_x = round(start_x + (vx0 * t) + (0.5 * self.wind * (t ** 2)))
-            curr_y = round(start_y + (vy0 * t) + (0.5 * self.gravity * (t ** 2)))
+            ix, iy = int(x), int(y)
+            self.banana_pos = (x, y)
 
-            # Check if banana is out of bounds
-            if curr_x < 0 or curr_x >= w or curr_y >= h:
-                hit_target = 'out'
+            # Check close to sun
+            if abs(ix - w // 2) <= 4 and iy <= 3:
+                self.surprised_sun = True
+
+            self.refresh()
+
+            # Check bounds
+            if ix < 0 or ix >= w or iy >= h:
+                self.status_msg = "Missed into the ocean!"
                 break
 
-            # Check closeness to Sun
-            dist_to_sun = math.hypot(curr_x - sun_x, curr_y - sun_y)
-            surprised_sun = dist_to_sun < 6
-
-            # Redraw scene frame
-            self.draw_scene(surprised_sun=surprised_sun)
-
-            # Draw trajectory path trace or banana character
-            if 0 <= curr_y < h and 0 <= curr_x < w:
-                banana_char = banana_chars[b_idx % len(banana_chars)]
-                b_idx += 1
-                try:
-                    self.stdscr.addch(curr_y, curr_x, banana_char, curses.color_pair(7) | curses.A_BOLD)
-                except curses.error:
-                    pass
-                self.stdscr.refresh()
-
-            # Collision Check with Gorillas
-            if abs(curr_x - self.p1_x) <= 1 and abs(curr_y - (self.p1_y + 1)) <= 1:
-                hit_target = 'p1'
-                break
-            if abs(curr_x - self.p2_x) <= 1 and abs(curr_y - (self.p2_y + 1)) <= 1:
-                hit_target = 'p2'
+            # Check hit player 1
+            if abs(ix - self.p1_x) <= 1 and abs(iy - self.p1_y) <= 2:
+                self.p1_pose = "dead"
+                self.p2_score += 1
+                self.p2_pose = "cheer"
+                self.status_msg = f"HIT! {self.p2_name} scores!"
                 break
 
-            # Collision Check with Building Terrain
-            if self.skyline.is_solid(curr_x, curr_y):
-                hit_target = 'building'
+            # Check hit player 2
+            if abs(ix - self.p2_x) <= 1 and abs(iy - self.p2_y) <= 2:
+                self.p2_pose = "dead"
+                self.p1_score += 1
+                self.p1_pose = "cheer"
+                self.status_msg = f"HIT! {self.p1_name} scores!"
                 break
 
-            time.sleep(0.04)
+            # Check hit building
+            if 0 <= iy < h and 0 <= ix < w and self.skyline.grid[iy][ix] != " ":
+                self.skyline.make_crater(ix, iy, 2)
+                self.status_msg = "Explosion! Building hit!"
+                break
 
-        # Handle Collision Impact
-        if hit_target in ('p1', 'p2', 'building'):
-            self.animate_explosion(curr_x, curr_y, is_gorilla=(hit_target in ('p1', 'p2')))
-            if hit_target == 'building':
-                self.skyline.explode_impact(curr_x, curr_y, radius=2)
+        self.banana_pos = None
+        self.surprised_sun = False
+        self.current_player = 2 if is_p1 else 1
+        self.refresh()
 
-        return hit_target
 
-    def animate_explosion(self, cx, cy, is_gorilla=False):
-        h, w = self.stdscr.getmaxyx()
-        radii = [1, 2, 3, 2, 1] if not is_gorilla else [1, 2, 3, 4, 3, 2, 1]
-        exp_chars = ['*', 'O', '@', '#', '%']
+class GorillasScreen(Screen):
+    """Gorillas game screen."""
 
-        for r in radii:
-            self.draw_scene()
-            color = curses.color_pair(8) | curses.A_BOLD
-            for dy in range(-r, r + 1):
-                for dx in range(-r, r + 1):
-                    if math.hypot(dx, dy) <= r:
-                        ex, ey = cx + dx, cy + dy
-                        if 0 <= ex < w and 0 <= ey < h - 1:
-                            ch = random.choice(exp_chars)
-                            try:
-                                self.stdscr.addch(ey, ex, ch, color)
-                            except curses.error:
-                                pass
-            self.stdscr.refresh()
-            time.sleep(0.06)
+    DEFAULT_CSS = """
+    GorillasScreen {
+        layout: vertical;
+        background: black;
+    }
+    #header_bar {
+        dock: top;
+        height: 1;
+        background: blue;
+        color: yellow;
+        text-align: center;
+        text-style: bold;
+    }
+    #controls_bar {
+        dock: bottom;
+        height: 3;
+        background: surface-darken-1;
+    }
+    .input_box {
+        width: 15;
+        margin: 0 1;
+    }
+    """
 
-    def play(self):
-        while self.p1_score < self.target_points and self.p2_score < self.target_points:
-            self.new_round()
+    BINDINGS: ClassVar[list[Binding]] = [Binding("escape", "exit_game", "Exit")]
 
-            round_over = False
-            while not round_over:
-                self.draw_scene()
-                angle, velocity = self.get_shot_parameters(self.current_player)
+    def compose(self) -> ComposeResult:
+        yield Label("  QBASIC GORILLAS - TEXTUAL EDITION  ", id="header_bar")
+        yield GorillasCanvas(id="canvas")
+        with Horizontal(id="controls_bar"):
+            yield Label(" Angle: ")
+            yield Input(value="45", id="inp_angle", classes="input_box")
+            yield Label(" Velocity: ")
+            yield Input(value="60", id="inp_velocity", classes="input_box")
+            yield Button("Throw!", variant="success", id="btn_throw")
 
-                hit_result = self.animate_shot(self.current_player, angle, velocity)
+    def on_mount(self) -> None:
+        self.update_header()
 
-                if hit_result == 'p1':
-                    self.p2_score += 1
-                    self.draw_scene()
-                    self.draw_gorilla(self.p1_x, self.p1_y, 1, "dead")
-                    self.draw_gorilla(self.p2_x, self.p2_y, 2, "cheer")
-                    self.stdscr.refresh()
-                    time.sleep(2.0)
-                    round_over = True
-                elif hit_result == 'p2':
-                    self.p1_score += 1
-                    self.draw_scene()
-                    self.draw_gorilla(self.p1_x, self.p1_y, 1, "cheer")
-                    self.draw_gorilla(self.p2_x, self.p2_y, 2, "dead")
-                    self.stdscr.refresh()
-                    time.sleep(2.0)
-                    round_over = True
-                else:
-                    # Switch turn
-                    self.current_player = 2 if self.current_player == 1 else 1
+    def update_header(self) -> None:
+        canvas = self.query_one("#canvas", GorillasCanvas)
+        wind_dir = ">>" if canvas.wind > 0 else "<<"
+        text = f" {canvas.p1_name}: {canvas.p1_score} | {canvas.p2_name}: {canvas.p2_score} | Wind: {canvas.wind:.1f} {wind_dir} | {canvas.status_msg} "
+        self.query_one("#header_bar", Label).update(text)
 
-        # Game Winner Screen
-        self.show_winner_screen()
-
-    def show_winner_screen(self):
-        self.stdscr.clear()
-        h, w = self.stdscr.getmaxyx()
-
-        winner = self.p1_name if self.p1_score >= self.target_points else self.p2_name
-        winner_color = curses.color_pair(5 if self.p1_score >= self.target_points else 6) | curses.A_BOLD
-
-        lines = [
-            "🏆 GAME OVER! 🏆",
-            "",
-            f"   {winner} WINS THE GAME!   ",
-            "",
-            f"Final Score: {self.p1_name} {self.p1_score} - {self.p2_score} {self.p2_name}",
-            "",
-            "Press any key to exit..."
-        ]
-
-        start_y = max(1, (h - len(lines)) // 2)
-        for i, line in enumerate(lines):
-            x = max(0, (w - len(line)) // 2)
-            attr = winner_color if "WINS" in line else (curses.color_pair(10) | curses.A_BOLD)
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_throw":
             try:
-                self.stdscr.addstr(start_y + i, x, line, attr)
-            except curses.error:
+                angle = float(self.query_one("#inp_angle", Input).value)
+                vel = float(self.query_one("#inp_velocity", Input).value)
+                canvas = self.query_one("#canvas", GorillasCanvas)
+                canvas.throw_banana(angle, vel)
+                self.update_header()
+            except ValueError:
                 pass
 
-        self.stdscr.refresh()
-        self.stdscr.getch()
+    def action_exit_game(self) -> None:
+        self.dismiss(None)
 
 
-def main(stdscr):
-    init_colors()
-    p1, p2, target_pts, gravity = show_title_screen(stdscr)
+class GorillasApp(App):
+    def on_mount(self) -> None:
+        self.push_screen(GorillasScreen())
 
-    game = GorillasGame(stdscr, p1, p2, target_pts, gravity)
-    game.play()
+
+def main(stdscr=None):
+    app = GorillasApp()
+    app.run()
 
 
 if __name__ == "__main__":
-    try:
-        curses.wrapper(main)
-    except KeyboardInterrupt:
-        sys.exit(0)
+    main()

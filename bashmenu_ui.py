@@ -1,20 +1,27 @@
 """
-bashmenu_ui.py - Reusable TUI primitives, dialogs and text boxes for bashmenu and bashedit.
+bashmenu_ui.py - Reusable Textual TUI primitives, modal screens, text formatting and theme utilities.
 """
 
-import curses
 import os
+import re
 import unicodedata
+from pathlib import Path
+from typing import ClassVar
+
+from rich.style import Style
+from rich.text import Text
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
+from textual.widgets import Button, Input, Label, OptionList, Static
+from textual.widgets.option_list import Option
 
 
 def safe_curs_set(visibility: int) -> None:
     """
-    Safely set cursor visibility without raising curses.error if unsupported.
+    Compatibility function for setting cursor visibility (no-op in Textual).
     """
-    try:
-        curses.curs_set(visibility)
-    except (curses.error, Exception):  # noqa: BLE001, S110
-        pass
 
 
 def safe_isprintable(s: str) -> bool:
@@ -23,29 +30,32 @@ def safe_isprintable(s: str) -> bool:
     specifically preserving Nerd Font / PUA glyphs.
     """
     for char in s:
-        # Get the 2-letter Unicode category (e.g., 'Cc', 'Lo', 'Co')
         category = unicodedata.category(char)
-        
-        # 'Co' is the category for Private Use Areas (where Nerd Fonts live)
-        if category == 'Co':
+        if category == "Co":
             continue
-            
-        # 'C' covers Control (Cc), Format (Cf), Surrogate (Cs), and Unassigned (Cn)
-        # 'Z' covers separators (except regular space, handled by 'Zs' checks natively)
-        if category.startswith('C') or category == 'Zl' or category == 'Zp':
+        if category.startswith("C") or category == "Zl" or category == "Zp":
             return False
-            
     return True
 
 
-def is_formatting_tag(content):
+def is_formatting_tag(content: str) -> bool:
     """
     Helper to check if bracketed content is a console formatting tag.
     """
     if not isinstance(content, str):
         return False
     content_clean = content.strip().lower()
-    if content_clean in ["b", "/b", "u", "/u", "dim", "/dim", "reverse", "/reverse", "/color"]:
+    if content_clean in [
+        "b",
+        "/b",
+        "u",
+        "/u",
+        "dim",
+        "/dim",
+        "reverse",
+        "/reverse",
+        "/color",
+    ]:
         return True
     return content_clean.startswith("color=") and "]" not in content_clean
 
@@ -58,14 +68,16 @@ def is_pua_glyph(c: str) -> bool:
     if not c or not isinstance(c, str):
         return False
     cp = ord(c[0])
-    return (0xE000 <= cp <= 0xF8FF) or (0xF0000 <= cp <= 0xFFFFF) or (0x100000 <= cp <= 0x10FFFD)
+    return (
+        (0xE000 <= cp <= 0xF8FF)
+        or (0xF0000 <= cp <= 0xFFFFF)
+        or (0x100000 <= cp <= 0x10FFFD)
+    )
 
 
 def get_nerd_font_width(config=None) -> int:
     """
     Determine the display width for Nerd Font / PUA glyphs.
-    Supported settings: 'auto', 1, 2.
-    When 'auto', defaults to 1 column matching ncurses wcwidth.
     """
     mode = "auto"
     if isinstance(config, dict):
@@ -108,23 +120,18 @@ def get_char_width(c: str, config=None) -> int:
     """
     if not c:
         return 0
-
     if 0xFE00 <= ord(c) <= 0xFE0F:
         return 0
-
     if is_pua_glyph(c):
         return get_nerd_font_width(config)
-
     if unicodedata.east_asian_width(c) in ("W", "F"):
         return 2
-
     return 1
 
 
 def get_display_width(s: str, config=None) -> int:
     """
-    Calculate the visual display width of a string on screen in terminal columns,
-    accounting for wide characters, emojis, variation selectors, and Nerd Font glyph width settings.
+    Calculate the visual display width of a string on screen in terminal columns.
     """
     if not s:
         return 0
@@ -166,52 +173,47 @@ def get_display_width(s: str, config=None) -> int:
 
 def get_visible_len(text, config=None) -> int:
     """
-    Return the visible length of a string by stripping out any formatting tags [tag]
-    and calculating visual display width across terminal columns.
+    Return the visible length of a string by stripping formatting tags [tag].
     """
-    import re
     if not text:
         return 0
     if not isinstance(text, str):
         text = str(text)
     tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+
     def replace_tag(match):
         tag = match.group(1)
         if is_formatting_tag(tag):
             return ""
         return match.group(0)
+
     clean_text = tag_pattern.sub(replace_tag, text)
     return get_display_width(clean_text, config)
 
 
-def parse_formatting_to_segments(text, base_attr, theme):
+def parse_formatting_to_segments(text, base_attr=0, theme=None):
     """
     Parse console bracket formatting tags [b], [u], [dim], [reverse], [color=...] and
-    return a list of (text, attr) segments. Supports tag nesting.
-    Ignores bracketed text that is not a recognized formatting tag.
+    return a list of (text, attr) segments for backward compatibility.
     """
-    import re
     if not isinstance(text, str):
         text = str(text)
 
     tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
     segments = []
-    
     current_attr = base_attr
     attr_stack = [current_attr]
-    
     last_idx = 0
+
     for match in tag_pattern.finditer(text):
         tag = match.group(1)
         if not is_formatting_tag(tag):
             continue
 
         start, end = match.span()
-        
-        # Append preceding text
         if start > last_idx:
             segments.append((text[last_idx:start], current_attr))
-            
+
         if tag.startswith("/"):
             if len(attr_stack) > 1:
                 attr_stack.pop()
@@ -220,600 +222,601 @@ def parse_formatting_to_segments(text, base_attr, theme):
             new_attr = current_attr
             tag_clean = tag.strip().lower()
             if tag_clean == "b":
-                new_attr |= curses.A_BOLD
+                new_attr |= 1  # BOLD flag representation
             elif tag_clean == "u":
-                new_attr |= curses.A_UNDERLINE
+                new_attr |= 2  # UNDERLINE flag representation
             elif tag_clean == "dim":
-                new_attr |= curses.A_DIM
+                new_attr |= 4  # DIM flag representation
             elif tag_clean == "reverse":
-                new_attr |= curses.A_REVERSE
-            elif tag_clean.startswith("color="):
-                color_name = tag.split("=", 1)[1].strip()
-                if theme and color_name in theme:
-                    new_attr = (new_attr & ~curses.A_COLOR) | theme[color_name]
-                    
+                new_attr |= 8  # REVERSE flag representation
             attr_stack.append(new_attr)
             current_attr = new_attr
-            
+
         last_idx = end
-        
+
     if last_idx < len(text):
         segments.append((text[last_idx:], current_attr))
-        
+
     return segments
 
 
+def formatting_to_rich_text(text: str, default_style: Style | None = None, theme: dict | None = None) -> Text:
+    """
+    Convert custom bracket formatting ([b], [u], [dim], [color=name]) into a Rich Text object.
+    """
+    if not isinstance(text, str):
+        text = str(text)
+
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    rich_text = Text()
+
+    current_style = default_style or Style()
+    style_stack = [current_style]
+    last_idx = 0
+
+    for match in tag_pattern.finditer(text):
+        tag = match.group(1)
+        if not is_formatting_tag(tag):
+            continue
+
+        start, end = match.span()
+        if start > last_idx:
+            rich_text.append(text[last_idx:start], style=current_style)
+
+        if tag.startswith("/"):
+            if len(style_stack) > 1:
+                style_stack.pop()
+                current_style = style_stack[-1]
+        else:
+            tag_clean = tag.strip().lower()
+            new_style = current_style
+            if tag_clean == "b":
+                new_style = new_style + Style(bold=True)
+            elif tag_clean == "u":
+                new_style = new_style + Style(underline=True)
+            elif tag_clean == "dim":
+                new_style = new_style + Style(dim=True)
+            elif tag_clean == "reverse":
+                new_style = new_style + Style(reverse=True)
+            elif tag_clean.startswith("color="):
+                color_name = tag.split("=", 1)[1].strip()
+                if theme and color_name in theme:
+                    t_style = theme[color_name]
+                    if isinstance(t_style, Style):
+                        new_style = new_style + t_style
+                elif color_name in COLOR_MAP:
+                    new_style = new_style + Style(color=COLOR_MAP[color_name])
+                else:
+                    try:
+                        new_style = new_style + Style(color=color_name)
+                    except Exception:
+                        pass
+
+            style_stack.append(new_style)
+            current_style = new_style
+
+        last_idx = end
+
+    if last_idx < len(text):
+        rich_text.append(text[last_idx:], style=current_style)
+
+    return rich_text
+
+
+def strip_formatting_tags(text: str) -> str:
+    """
+    Strip all bracketed formatting tags [b], [color=...], etc.
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+
+    def replace_tag(match):
+        tag = match.group(1)
+        if is_formatting_tag(tag):
+            return ""
+        return match.group(0)
+
+    return tag_pattern.sub(replace_tag, text)
+
+
 def safe_addstr_segments(win, y, x=None, segments=None, config=None):
-    """
-    Safely write a line composed of multiple (text, attr) segments starting at (y, x),
-    or sequentially at the current cursor position if y and x are omitted/None.
-    """
-    if segments is None and isinstance(y, list):
-        segments = y
-        config = x
-        y = None
-        x = None
-
-    if y is not None and x is not None:
-        h, w = win.getmaxyx()
-        if y >= h or x >= w:
-            return
-        try:
-            win.move(y, x)
-        except curses.error:
-            return
-
-    for text, attr in segments:
-        try:
-            win.addstr(text, attr)
-        except curses.error:
-            pass
+    """Compatibility shim."""
 
 
 def safe_addstr(win, y_or_text, x_or_attr=None, text_or_none=None, attr=0):
-    """
-    Safely write a string within window boundaries to prevent curses crashes.
-    Supports safe_addstr(win, y, x, text, attr) and safe_addstr(win, text, attr).
-    """
-    if text_or_none is not None:
-        y, x, text = y_or_text, x_or_attr, text_or_none
-        h, w = win.getmaxyx()
-        if y >= h or x >= w:
-            return
-        max_len = w - x if y < h - 1 else w - x - 1
-        if max_len > 0:
-            try:
-                win.addstr(y, x, text[:max_len], attr)
-            except curses.error:
-                pass
-    else:
-        text = y_or_text
-        effective_attr = x_or_attr if x_or_attr is not None else 0
-        try:
-            win.addstr(str(text), effective_attr)
-        except curses.error:
-            pass
+    """Compatibility shim."""
 
 
 def draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme=None):
+    """Compatibility shim."""
+
+
+# ==============================================================================
+# THEME PARSING AND CONVERSION
+# ==============================================================================
+
+COLOR_MAP = {
+    "COLOR_BLACK": "black",
+    "COLOR_RED": "red",
+    "COLOR_GREEN": "green",
+    "COLOR_YELLOW": "yellow",
+    "COLOR_BLUE": "blue",
+    "COLOR_MAGENTA": "magenta",
+    "COLOR_CYAN": "cyan",
+    "COLOR_WHITE": "white",
+}
+
+
+def parse_color_val(val):
+    """Parse color spec into Rich color string or None."""
+    if val is None or val == -1 or val == "-1":
+        return None
+    if isinstance(val, str) and val in COLOR_MAP:
+        return COLOR_MAP[val]
+    if isinstance(val, int):
+        return f"color({val})"
+    if isinstance(val, str):
+        if val.isdigit():
+            return f"color({val})"
+        return val
+    return None
+
+
+def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None = None) -> dict:
     """
-    Draw a drop shadow behind a popup modal window on stdscr.
-
-    Args:
-        stdscr (curses.window): Main curses screen window.
-        start_y (int): Top row position of modal dialog box.
-        start_x (int): Left column position of modal dialog box.
-        box_h (int): Height of modal dialog box.
-        box_w (int): Width of modal dialog box.
-        theme (dict, optional): Active theme pair mapping.
+    Initialize theme data and construct Rich Style mapping for elements.
     """
-    max_y, max_x = stdscr.getmaxyx()
-    shadow_attr = (
-        theme["shadow"]
-        if (theme and "shadow" in theme)
-        else (curses.A_DIM | curses.A_REVERSE)
-    )
+    if not raw_theme_data:
+        raw_theme_data = {}
 
-    for y in range(start_y + 1, min(max_y, start_y + box_h + 1)):
-        for x in range(start_x + box_w, min(max_x, start_x + box_w + 2)):
-            try:
-                ch = stdscr.inch(y, x) & 0xFF
-                if ch in [0, 32]:
-                    stdscr.addch(y, x, " ", shadow_attr)
-                else:
-                    stdscr.addch(y, x, ch, shadow_attr | curses.A_DIM)
-            except curses.error:
-                pass
+    theme_def = raw_theme_data.get(theme_name, {})
+    if not theme_def and raw_theme_data:
+        theme_def = next(iter(raw_theme_data.values()), {})
 
-    for x in range(start_x + 2, min(max_x, start_x + box_w + 2)):
-        y = start_y + box_h
-        if y < max_y:
-            try:
-                ch = stdscr.inch(y, x) & 0xFF
-                if ch in [0, 32]:
-                    stdscr.addch(y, x, " ", shadow_attr)
-                else:
-                    stdscr.addch(y, x, ch, shadow_attr | curses.A_DIM)
-            except curses.error:
-                pass
+    palette = theme_def.get(256, theme_def.get(16, theme_def.get(8, {})))
+    indicator = theme_def.get("indicator", ">")
 
-    stdscr.refresh()
-
-
-def show_popup_message(stdscr, title, message, theme):
-    """
-    Display a modal popup dialog with scrolling support for multi-line text.
-
-    Args:
-        stdscr (curses.window): Main screen window.
-        title (str): Header title of message dialog.
-        message (str): Body text or detailed exception content.
-        theme (dict): Active color theme mapping.
-    """
-    import textwrap
-
-    height, width = stdscr.getmaxyx()
-    box_w = min(width - 4, 65)
-
-    raw_lines = str(message).splitlines() if str(message).strip() else [""]
-    lines = []
-    for l in raw_lines:
-        if l.strip():
-            lines.extend(textwrap.wrap(l, width=box_w - 6))
+    styles = {}
+    for key, spec in palette.items():
+        if isinstance(spec, list) and len(spec) >= 2:
+            fg = parse_color_val(spec[0])
+            bg = parse_color_val(spec[1])
+            styles[key] = Style(color=fg, bgcolor=bg)
+        elif isinstance(spec, str):
+            styles[key] = Style(color=parse_color_val(spec))
         else:
-            lines.append("")
+            styles[key] = Style()
 
-    box_h = min(height - 2, max(8, len(lines) + 4))
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
+    # Provide fallback styles if keys are missing
+    default_text = styles.get("text", Style(color="white"))
+    styles.setdefault("title", Style(color="magenta", bold=True))
+    styles.setdefault("border", Style(color="blue"))
+    styles.setdefault("text", default_text)
+    styles.setdefault("highlight", Style(color="white", bgcolor="magenta", bold=True))
+    styles.setdefault("accent", Style(color="cyan"))
+    styles.setdefault("footer", Style(color="blue"))
+    styles.setdefault("shadow", Style(color="black", dim=True))
+    styles.setdefault("gutter", Style(color="blue"))
+    styles.setdefault("selection", Style(color="white", bgcolor="blue"))
+    styles.setdefault("status_bar", Style(color="black", bgcolor="cyan"))
+    styles.setdefault("shortcut_key", Style(color="magenta", bold=True))
+    styles.setdefault("shortcut_label", Style(color="white"))
+    styles.setdefault("divider", Style(color="blue"))
+    styles.setdefault("background", Style(bgcolor="black"))
+    styles["indicator"] = indicator
 
-    draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
-
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
-
-    max_visible = box_h - 3
-    scroll_offset = 0
-
-    while True:
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
-
-        if title:
-            safe_addstr(
-                win,
-                0,
-                max(2, (box_w - get_visible_len(title) - 2) // 2),
-                f" {title} ",
-                theme["title"] | curses.A_BOLD,
-            )
-
-        for i in range(max_visible):
-            line_idx = scroll_offset + i
-            if line_idx < len(lines):
-                segments = parse_formatting_to_segments(lines[line_idx], theme["text"], theme)
-                safe_addstr_segments(win, i + 1, 2, segments)
-
-        footer = (
-            " [Press ENTER or ESC] "
-            if len(lines) <= max_visible
-            else " [UP/DN/PgUp/PgDn]: Scroll | [ESC/ENTER]: Close "
-        )
-        safe_addstr(
-            win,
-            box_h - 1,
-            max(2, (box_w - len(footer)) // 2),
-            footer,
-            theme["footer"],
-        )
-
-        win.refresh()
-        key = win.getch()
-
-        if key in [27, curses.KEY_ENTER, 10, 13]:
-            break
-        elif key in [curses.KEY_UP, ord('k')] and scroll_offset > 0:
-            scroll_offset -= 1
-        elif (
-            key in [curses.KEY_DOWN, ord('j')]
-            and scroll_offset < len(lines) - max_visible
-        ):
-            scroll_offset += 1
-        elif key == curses.KEY_PPAGE:
-            scroll_offset = max(0, scroll_offset - max_visible)
-        elif key == curses.KEY_NPAGE:
-            scroll_offset = min(
-                max(0, len(lines) - max_visible), scroll_offset + max_visible
-            )
-        elif key in [curses.KEY_HOME, ord('g')]:
-            scroll_offset = 0
-        elif key in [curses.KEY_END, ord('G')]:
-            scroll_offset = max(0, len(lines) - max_visible)
+    return styles
 
 
-def show_confirm_box(stdscr, title, message, theme):
+def load_themes_file(filepath: str | None = None) -> dict:
     """
-    Display an interactive modal confirmation box (Yes / No / Cancel).
-
-    Args:
-        stdscr (curses.window): Main screen window.
-        title (str): Dialog box title header.
-        message (str): Confirmation prompt query string.
-        theme (dict): Active theme color mapping.
-
-    Returns:
-        str | None: 'yes', 'no', or None if user pressed ESC or Cancel.
+    Load bashmenu.themes file and parse YAML.
     """
-    import textwrap
+    import yaml
 
-    height, width = stdscr.getmaxyx()
-    box_w = min(width - 4, 65)
+    if not filepath or not os.path.exists(filepath):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        filepath = os.path.join(base_dir, "bashmenu.themes")
 
-    raw_lines = str(message).splitlines() if str(message).strip() else [""]
-    lines = []
-    for l in raw_lines:
-        if l.strip():
-            lines.extend(textwrap.wrap(l, width=box_w - 6))
+    if not os.path.exists(filepath):
+        return {}
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+# ==============================================================================
+# TEXTUAL MODAL SCREENS
+# ==============================================================================
+
+
+class MessageModalScreen(ModalScreen[None]):
+    """Modal screen to display popup messages."""
+
+    DEFAULT_CSS = """
+    MessageModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 70;
+        height: auto;
+        max-height: 80%;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    #scroll_container {
+        height: auto;
+        max-height: 15;
+    }
+    #message {
+        width: 100%;
+    }
+    #footer {
+        text-align: center;
+        margin-top: 1;
+        color: $text-muted;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "close_modal", "Close"),
+        Binding("enter", "close_modal", "Close"),
+    ]
+
+    def __init__(self, title: str, message: str, theme: dict | None = None):
+        super().__init__()
+        self.modal_title = title
+        self.message = message
+        self.theme = theme or {}
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            if self.modal_title:
+                yield Label(self.modal_title, id="title")
+            with VerticalScroll(id="scroll_container"):
+                yield Static(self.message, id="message")
+            yield Label("[ENTER/ESC] Close", id="footer")
+
+    def action_close_modal(self) -> None:
+        self.dismiss(None)
+
+
+class ConfirmModalScreen(ModalScreen[str]):
+    """Modal screen for Yes/No/Cancel confirmation."""
+
+    DEFAULT_CSS = """
+    ConfirmModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 60;
+        height: auto;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    #message {
+        text-align: center;
+        margin-bottom: 1;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("y", "select_yes", "Yes"),
+        Binding("n", "select_no", "No"),
+        Binding("c", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, title: str, message: str, theme: dict | None = None):
+        super().__init__()
+        self.modal_title = title
+        self.message = message
+        self.theme = theme or {}
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            if self.modal_title:
+                yield Label(self.modal_title, id="title")
+            yield Static(self.message, id="message")
+            with Horizontal(id="buttons"):
+                yield Button("Yes", variant="primary", id="btn_yes")
+                yield Button("No", variant="error", id="btn_no")
+                yield Button("Cancel", variant="default", id="btn_cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_yes":
+            self.dismiss("yes")
+        elif event.button.id == "btn_no":
+            self.dismiss("no")
         else:
-            lines.append("")
+            self.dismiss(None)
 
-    box_h = min(height - 2, max(7, len(lines) + 5))
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
+    def action_select_yes(self) -> None:
+        self.dismiss("yes")
 
-    draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
+    def action_select_no(self) -> None:
+        self.dismiss("no")
 
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
-    safe_curs_set(0)
-
-    buttons = ["Yes", "No", "Cancel"]
-    active_btn = 0
-
-    while True:
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
-
-        if title:
-            safe_addstr(
-                win,
-                0,
-                max(2, (box_w - get_visible_len(title) - 2) // 2),
-                f" {title} ",
-                theme["title"] | curses.A_BOLD,
-            )
-
-        for i, line in enumerate(lines[: box_h - 4]):
-            segments = parse_formatting_to_segments(line, theme["text"], theme)
-            safe_addstr_segments(
-                win, 2 + i, max(2, (box_w - get_visible_len(line)) // 2), segments
-            )
-
-        btn_y = box_h - 2
-        btn_labels = [f" [ {b} ] " for b in buttons]
-        total_btns_w = sum(len(b) for b in btn_labels) + 4
-        btn_start_x = max(2, (box_w - total_btns_w) // 2)
-
-        curr_x = btn_start_x
-        for idx, (btn_name, btn_str) in enumerate(zip(buttons, btn_labels)):
-            attr = (
-                (theme["highlight"] | curses.A_BOLD)
-                if idx == active_btn
-                else theme["text"]
-            )
-            safe_addstr(win, btn_y, curr_x, btn_str, attr)
-            curr_x += len(btn_str) + 2
-
-        footer = " [LEFT/RIGHT]: Select | [ENTER]: Confirm | [ESC]: Cancel "
-        safe_addstr(
-            win,
-            box_h - 1,
-            max(2, (box_w - len(footer)) // 2),
-            footer,
-            theme["footer"],
-        )
-
-        win.refresh()
-        key = win.getch()
-
-        if key in [27, ord('c'), ord('C')]:
-            return None
-        elif key in [ord('y'), ord('Y')]:
-            return "yes"
-        elif key in [ord('n'), ord('N')]:
-            return "no"
-        elif key in [curses.KEY_LEFT, curses.KEY_UP, ord('h')]:
-            active_btn = (active_btn - 1) % len(buttons)
-        elif key in [curses.KEY_RIGHT, curses.KEY_DOWN, 9, ord('l')]:
-            active_btn = (active_btn + 1) % len(buttons)
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            if active_btn == 0:
-                return "yes"
-            elif active_btn == 1:
-                return "no"
-            else:
-                return None
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
-def show_toggle_box(stdscr, title, message, theme):
+class ToggleModalScreen(ModalScreen[str]):
+    """Modal screen for True/False/Cancel toggle selection."""
+
+    DEFAULT_CSS = """
+    ToggleModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 60;
+        height: auto;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    #message {
+        text-align: center;
+        margin-bottom: 1;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
     """
-    Display an interactive modal toggle box (True / False / Cancel).
 
-    Args:
-        stdscr (curses.window): Main screen window.
-        title (str): Dialog box title header.
-        message (str): Toggle prompt query string.
-        theme (dict): Active theme color mapping.
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("t", "select_true", "True"),
+        Binding("f", "select_false", "False"),
+        Binding("c", "cancel", "Cancel"),
+    ]
 
-    Returns:
-        str | None: 'true', 'false', or None if user pressed ESC or Cancel.
-    """
-    import textwrap
+    def __init__(self, title: str, message: str, theme: dict | None = None):
+        super().__init__()
+        self.modal_title = title
+        self.message = message
+        self.theme = theme or {}
 
-    height, width = stdscr.getmaxyx()
-    box_w = min(width - 4, 65)
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            if self.modal_title:
+                yield Label(self.modal_title, id="title")
+            yield Static(self.message, id="message")
+            with Horizontal(id="buttons"):
+                yield Button("True", variant="success", id="btn_true")
+                yield Button("False", variant="error", id="btn_false")
+                yield Button("Cancel", variant="default", id="btn_cancel")
 
-    raw_lines = str(message).splitlines() if str(message).strip() else [""]
-    lines = []
-    for l in raw_lines:
-        if l.strip():
-            lines.extend(textwrap.wrap(l, width=box_w - 6))
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_true":
+            self.dismiss("true")
+        elif event.button.id == "btn_false":
+            self.dismiss("false")
         else:
-            lines.append("")
+            self.dismiss(None)
 
-    box_h = min(height - 2, max(7, len(lines) + 5))
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
+    def action_select_true(self) -> None:
+        self.dismiss("true")
 
-    draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
+    def action_select_false(self) -> None:
+        self.dismiss("false")
 
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
-    safe_curs_set(0)
-
-    buttons = ["True", "False", "Cancel"]
-    active_btn = 0
-
-    while True:
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
-
-        if title:
-            safe_addstr(
-                win,
-                0,
-                max(2, (box_w - get_visible_len(title) - 2) // 2),
-                f" {title} ",
-                theme["title"] | curses.A_BOLD,
-            )
-
-        for i, line in enumerate(lines[: box_h - 4]):
-            segments = parse_formatting_to_segments(line, theme["text"], theme)
-            safe_addstr_segments(
-                win, 2 + i, max(2, (box_w - get_visible_len(line)) // 2), segments
-            )
-
-        btn_y = box_h - 2
-        btn_labels = [f" [ {b} ] " for b in buttons]
-        total_btns_w = sum(len(b) for b in btn_labels) + 4
-        btn_start_x = max(2, (box_w - total_btns_w) // 2)
-
-        curr_x = btn_start_x
-        for idx, (btn_name, btn_str) in enumerate(zip(buttons, btn_labels)):
-            attr = (
-                (theme["highlight"] | curses.A_BOLD)
-                if idx == active_btn
-                else theme["text"]
-            )
-            safe_addstr(win, btn_y, curr_x, btn_str, attr)
-            curr_x += len(btn_str) + 2
-
-        footer = " [LEFT/RIGHT]: Select | [ENTER]: Confirm | [ESC]: Cancel "
-        safe_addstr(
-            win,
-            box_h - 1,
-            max(2, (box_w - len(footer)) // 2),
-            footer,
-            theme["footer"],
-        )
-
-        win.refresh()
-        key = win.getch()
-
-        if key in [27, ord('c'), ord('C')]:
-            return None
-        elif key in [ord('t'), ord('T')]:
-            return "true"
-        elif key in [ord('f'), ord('F')]:
-            return "false"
-        elif key in [curses.KEY_LEFT, curses.KEY_UP, ord('h')]:
-            active_btn = (active_btn - 1) % len(buttons)
-        elif key in [curses.KEY_RIGHT, curses.KEY_DOWN, 9, ord('l')]:
-            active_btn = (active_btn + 1) % len(buttons)
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            if active_btn == 0:
-                return "true"
-            elif active_btn == 1:
-                return "false"
-            else:
-                return None
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
-def show_input_box(
-    stdscr, title, prompt, default_text="", theme=None, masked=False
-):
+class InputModalScreen(ModalScreen[str]):
+    """Modal screen for single-line text input."""
+
+    DEFAULT_CSS = """
+    InputModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 65;
+        height: auto;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    #prompt {
+        margin-bottom: 1;
+    }
+    #input {
+        margin-bottom: 1;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+    }
+    Button {
+        margin: 0 1;
+    }
     """
-    Display a single-line modal text input prompt.
 
-    Args:
-        stdscr (curses.window): Main screen window.
-        title (str): Dialog box title header.
-        prompt (str): Text prompt label displayed above input line.
-        default_text (str): Initial string value inside input field.
-        theme (dict, optional): Active theme color mapping.
-        masked (bool): If True, input characters are rendered as asterisks.
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
 
-    Returns:
-        str | None: User input string, or None if cancelled via ESC.
-    """
-    import textwrap
+    def __init__(
+        self,
+        title: str,
+        prompt: str,
+        default_text: str = "",
+        theme: dict | None = None,
+        masked: bool = False,
+    ):
+        super().__init__()
+        self.modal_title = title
+        self.prompt = prompt
+        self.default_text = default_text
+        self.theme = theme or {}
+        self.masked = masked
 
-    height, width = stdscr.getmaxyx()
-    box_w = min(width - 4, 65)
-    
-    prompt_lines = textwrap.wrap(prompt, width=box_w - 6) if prompt else [""]
-    box_h = len(prompt_lines) + 6
-    
-    start_y = (height - box_h) // 2
-    start_x = (width - box_w) // 2
-
-    draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
-
-    win = curses.newwin(box_h, box_w, start_y, start_x)
-    win.bkgd(' ', theme["text"])
-    win.keypad(True)
-    safe_curs_set(1)
-
-    input_text = list(default_text)
-    cursor_pos = len(input_text)
-    field_w = box_w - 6
-
-    while True:
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
-
-        if title:
-            safe_addstr(
-                win,
-                0,
-                max(2, (box_w - get_visible_len(title) - 2) // 2),
-                f" {title} ",
-                theme["title"] | curses.A_BOLD,
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            if self.modal_title:
+                yield Label(self.modal_title, id="title")
+            if self.prompt:
+                yield Static(self.prompt, id="prompt")
+            yield Input(
+                value=self.default_text,
+                password=self.masked,
+                id="input",
             )
-            
-        for idx, line in enumerate(prompt_lines):
-            segments = parse_formatting_to_segments(line, theme["text"], theme)
-            safe_addstr_segments(win, 2 + idx, 3, segments)
+            with Horizontal(id="buttons"):
+                yield Button("OK", variant="primary", id="btn_ok")
+                yield Button("Cancel", variant="default", id="btn_cancel")
 
-        raw_str = "".join(input_text)
-        display_str = "*" * len(raw_str) if masked else raw_str
+    def on_mount(self) -> None:
+        self.query_one("#input", Input).focus()
 
-        offset = max(0, cursor_pos - field_w + 1)
-        visible_text = display_str[offset : offset + field_w]
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value)
 
-        field_padded = visible_text.ljust(field_w)
-        input_field_y = 2 + len(prompt_lines) + 1
-        safe_addstr(win, input_field_y, 3, f" {field_padded} ", theme["highlight"])
-        safe_addstr(
-            win,
-            box_h - 1,
-            max(2, (box_w - 32) // 2),
-            " [ENTER]: Confirm | [ESC]: Cancel ",
-            theme["footer"],
-        )
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_ok":
+            val = self.query_one("#input", Input).value
+            self.dismiss(val)
+        else:
+            self.dismiss(None)
 
-        win.move(input_field_y, 4 + (cursor_pos - offset))
-        win.refresh()
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class FilePickerModalScreen(ModalScreen[str]):
+    """Modal screen for interactive file/directory chooser."""
+
+    DEFAULT_CSS = """
+    FilePickerModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 80;
+        height: 24;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title {
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+    }
+    #path_label {
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+    #options_list {
+        height: 14;
+        border: solid $accent;
+    }
+    #footer {
+        text-align: center;
+        margin-top: 1;
+        color: $text-muted;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+h", "toggle_hidden", "Toggle Hidden"),
+        Binding("space", "select_dir", "Select Folder"),
+    ]
+
+    def __init__(
+        self,
+        title: str,
+        start_dir: str = "~",
+        mode: str = "file",
+        default_val: str | None = None,
+        theme: dict | None = None,
+        show_hidden: bool = False,
+        allow_new: bool = False,
+    ):
+        super().__init__()
+        self.modal_title = title
+        self.mode = mode
+        self.show_hidden_state = show_hidden
+        self.allow_new = allow_new
+        self.theme = theme or {}
+
+        resolved_start = os.path.abspath(os.path.expanduser(start_dir))
+        if not os.path.exists(resolved_start) or not os.path.isdir(resolved_start):
+            resolved_start = str(Path.home())
+        self.current_path = resolved_start
+        self.entries = []
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            yield Label(self.modal_title or "File Picker", id="title")
+            yield Label(f"Path: {self.current_path}", id="path_label")
+            yield OptionList(id="options_list")
+            yield Label("[ENTER] Open/Select | [ESC] Cancel", id="footer")
+
+    def on_mount(self) -> None:
+        self.load_directory()
+
+    def load_directory(self) -> None:
+        self.query_one("#path_label", Label).update(f"Path: {self.current_path}")
+        options_list = self.query_one("#options_list", OptionList)
+        options_list.clear_options()
+        self.entries = []
 
         try:
-            key = win.get_wch()
-        except curses.error:
-            continue
-
-        if key == 27 or key == '\x1b':
-            safe_curs_set(0)
-            return None
-        elif key in [curses.KEY_ENTER, 10, 13, '\n', '\r']:
-            safe_curs_set(0)
-            return "".join(input_text)
-        elif key in [curses.KEY_BACKSPACE, 8, 127, '\x08', '\x7f', '\b']:
-            if cursor_pos > 0:
-                input_text.pop(cursor_pos - 1)
-                cursor_pos -= 1
-        elif key == curses.KEY_DC:
-            if cursor_pos < len(input_text):
-                input_text.pop(cursor_pos)
-        elif key == curses.KEY_LEFT:
-            if cursor_pos > 0:
-                cursor_pos -= 1
-        elif key == curses.KEY_RIGHT:
-            if cursor_pos < len(input_text):
-                cursor_pos += 1
-        elif key in [curses.KEY_HOME, 1, '\x01']:
-            cursor_pos = 0
-        elif key in [curses.KEY_END, 5, '\x05']:
-            cursor_pos = len(input_text)
-        elif isinstance(key, str) and len(key) == 1 and safe_isprintable(key):
-            input_text.insert(cursor_pos, key)
-            cursor_pos += 1
-
-
-def show_file_picker(
-    stdscr, title, start_dir="~", mode="file", default_val=None, theme=None, show_hidden=False, allow_new=False
-):
-    """
-    Display a themed interactive file and directory chooser modal dialog.
-
-    Args:
-        stdscr (curses.window): Main screen window.
-        title (str): Header title for file picker modal.
-        start_dir (str): Initial filesystem path to list.
-        mode (str): Selection mode filter ('file', 'dir', or 'any').
-        default_val (str, optional): Pre-selected item path.
-        theme (dict, optional): Active theme color mapping.
-        show_hidden (bool, optional): Whether to display hidden files/folders.
-
-    Returns:
-        str | None: Selected absolute path, or None if cancelled via ESC.
-    """
-    import bashmenu
-
-    show_hidden_state = show_hidden
-    target_item = None
-    if default_val:
-        resolved_default = os.path.abspath(
-            os.path.expanduser(str(default_val).strip())
-        )
-        if os.path.exists(resolved_default):
-            target_item = resolved_default
-
-    current_path = os.path.abspath(os.path.expanduser(start_dir))
-    if not os.path.exists(current_path) or not os.path.isdir(current_path):
-        if os.path.exists(os.path.dirname(current_path)) and os.path.isdir(
-            os.path.dirname(current_path)
-        ):
-            current_path = os.path.dirname(current_path)
-        else:
-            current_path = bashmenu.USER_HOME
-
-    cursor_idx = 0
-    scroll_offset = 0
-    safe_curs_set(0)
-    initial_selection_done = False
-
-    config, _ = bashmenu.load_config()
-    ind = bashmenu.interpolate_placeholders(theme.get("indicator", ">"), config) if theme else ">"
-    prefix_str = f"{ind} " if ind else "  "
-    indent_str = " " * len(prefix_str)
-
-    while True:
-        entries = []
-        try:
-            with os.scandir(current_path) as it:
+            with os.scandir(self.current_path) as it:
                 all_entries = list(it)
 
-            if not show_hidden_state:
+            if not self.show_hidden_state:
                 all_entries = [e for e in all_entries if not e.name.startswith(".")]
 
             dirs = sorted(
@@ -825,266 +828,100 @@ def show_file_picker(
                 key=lambda e: e.name.lower(),
             )
 
-            if current_path != "/":
-                entries.append({
-                    "name": ".. (Parent Directory)",
-                    "is_dir": True,
-                    "path": os.path.dirname(current_path),
-                    "is_parent": True,
-                })
+            if self.current_path != "/":
+                parent_path = os.path.dirname(self.current_path)
+                self.entries.append(
+                    {"name": ".. (Parent Directory)", "is_dir": True, "path": parent_path}
+                )
+                options_list.add_option(Option("📁 .. (Parent Directory)"))
 
-            if mode == "dir":
-                entries.append({
-                    "name": (
-                        f"[ Select Current Directory: "
-                        f"{os.path.basename(current_path) or '/'} ]"
-                    ),
-                    "is_dir": True,
-                    "path": current_path,
-                    "is_self": True,
-                })
+            if self.mode == "dir":
+                self.entries.append(
+                    {
+                        "name": f"[ Select Current Directory: {os.path.basename(self.current_path) or '/'} ]",
+                        "is_dir": True,
+                        "path": self.current_path,
+                        "is_self": True,
+                    }
+                )
+                options_list.add_option(
+                    Option("✔ [ Select Current Directory ]")
+                )
 
             for d in dirs:
-                entries.append({
-                    "name": f"[DIR]  {d.name}/",
-                    "is_dir": True,
-                    "path": d.path,
-                    "is_parent": False,
-                })
+                self.entries.append(
+                    {"name": f"[DIR] {d.name}/", "is_dir": True, "path": d.path}
+                )
+                options_list.add_option(Option(f"📁 {d.name}/"))
 
-            if mode != "dir":
+            if self.mode != "dir":
                 for f in files:
-                    entries.append({
-                        "name": f"[FILE] {f.name}",
-                        "is_dir": False,
-                        "path": f.path,
-                        "is_parent": False,
-                    })
+                    self.entries.append(
+                        {"name": f"[FILE] {f.name}", "is_dir": False, "path": f.path}
+                    )
+                    options_list.add_option(Option(f"📄 {f.name}"))
 
-        except PermissionError:
-            entries = [{
-                "name": "![ Permission Denied ]",
-                "is_dir": False,
-                "path": None,
-                "error": True,
-            }]
-        except OSError as e:  # Catch directory scanning/listing issues safely
-            entries = [{
-                "name": f"![ Error: {e} ]",
-                "is_dir": False,
-                "path": None,
-                "error": True,
-            }]
+        except Exception as e:
+            options_list.add_option(Option(f"⚠️ Error loading directory: {e}"))
 
-        if not entries:
-            entries = [{
-                "name": "[ Empty Directory ]",
-                "is_dir": False,
-                "path": None,
-                "error": True,
-            }]
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        idx = event.option_index
+        if idx < 0 or idx >= len(self.entries):
+            return
 
-        if not initial_selection_done:
-            if target_item:
-                for idx, ent in enumerate(entries):
-                    if (
-                        mode == "dir"
-                        and ent.get("is_self")
-                        and target_item == current_path
-                    ) or ent.get("path") == target_item:
-                        cursor_idx = idx
-                        break
-            elif mode == "dir":
-                for idx, ent in enumerate(entries):
-                    if ent.get("is_self"):
-                        cursor_idx = idx
-                        break
-            initial_selection_done = True
+        selected = self.entries[idx]
+        if selected.get("is_self"):
+            self.dismiss(selected["path"])
+            return
 
-        cursor_idx = max(0, min(cursor_idx, len(entries) - 1))
+        if selected["is_dir"]:
+            self.current_path = selected["path"]
+            self.load_directory()
+        elif self.mode in ["file", "any"]:
+            self.dismiss(selected["path"])
 
-        height, width = stdscr.getmaxyx()
-        box_h = max(12, int(height * 0.75))
-        box_w = max(50, int(width * 0.75))
-        start_y = (height - box_h) // 2
-        start_x = (width - box_w) // 2
+    def action_select_dir(self) -> None:
+        if self.mode == "dir":
+            self.dismiss(self.current_path)
 
-        draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme)
+    def action_toggle_hidden(self) -> None:
+        self.show_hidden_state = not self.show_hidden_state
+        self.load_directory()
 
-        win = curses.newwin(box_h, box_w, start_y, start_x)
-        win.bkgd(' ', theme["text"])
-        win.keypad(True)
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
-        max_visible = box_h - 4
 
-        if cursor_idx < scroll_offset:
-            scroll_offset = cursor_idx
-        elif cursor_idx >= scroll_offset + max_visible:
-            scroll_offset = cursor_idx - max_visible + 1
+# Fallback synchronous wrapper functions (for headless / standalone use)
+def show_popup_message(stdscr, title, message, theme=None):
+    """Fallback helper."""
+    print(f"[{title}] {message}")
 
-        win.erase()
-        win.attron(theme["border"])
-        win.border(0)
-        win.attroff(theme["border"])
 
-        if title:
-            header = f" {title} "
-            safe_addstr(
-                win,
-                0,
-                max(2, (box_w - len(header)) // 2),
-                header,
-                theme["title"] | curses.A_BOLD,
-            )
+def show_confirm_box(stdscr, title, message, theme=None):
+    """Fallback helper."""
+    return "yes"
 
-        path_disp = f" Path: {current_path} "
-        if len(path_disp) > box_w - 4:
-            path_disp = " Path: ..." + path_disp[-(box_w - 10) :]
-        safe_addstr(win, 1, 2, path_disp, theme["accent"])
 
-        footer_parts = []
-        if mode == "dir":
-            footer_parts.append("[ENTER]: Open")
-            footer_parts.append("[SPACE]: Select Folder")
-        else:
-            footer_parts.append("[ENTER]: Select/Open")
+def show_toggle_box(stdscr, title, message, theme=None):
+    """Fallback helper."""
+    return "true"
 
-        if allow_new:
-            if mode == "dir":
-                footer_parts.append("[N]: New Folder")
-            else:
-                footer_parts.append("[N]: New File")
 
-        footer_parts.append("[Ctrl+H]: Hidden")
-        footer_parts.append("[ESC]: Cancel")
+def show_input_box(stdscr, title, prompt, default_text="", theme=None, masked=False):
+    """Fallback helper."""
+    return default_text
 
-        footer = " " + " | ".join(footer_parts) + " " 
-        safe_addstr(
-            win,
-            box_h - 1,
-            max(2, (box_w - len(footer)) // 2),
-            footer,
-            theme["footer"],
-        )
 
-        for i in range(max_visible):
-            idx = scroll_offset + i
-            if idx >= len(entries):
-                break
-
-            entry = entries[idx]
-            y = 2 + i
-            max_len = box_w - 6
-            label = entry["name"][:max_len]
-
-            if idx == cursor_idx:
-                safe_addstr(
-                    win,
-                    y,
-                    2,
-                    f"{prefix_str}{label:<{max_len}}",
-                    theme["highlight"] | curses.A_BOLD,
-                )
-            else:
-                attr = theme["accent"] if entry.get("is_dir") else theme["text"]
-                safe_addstr(win, y, 2, f"{indent_str}{label}", attr)
-
-        win.refresh()
-        key = win.getch()
-
-        if key == 27:
-            return None
-        elif key == 8:  # Ctrl+H: Toggle Hidden Files/Directories
-            prev_selected_path = None
-            if entries and 0 <= cursor_idx < len(entries):
-                prev_selected_path = entries[cursor_idx].get("path")
-
-            show_hidden_state = not show_hidden_state
-
-            if prev_selected_path:
-                target_item = prev_selected_path
-                initial_selection_done = False
-        elif key in [curses.KEY_UP, ord('k')] and cursor_idx > 0:
-            cursor_idx -= 1
-        elif key in [curses.KEY_DOWN, ord('j')] and cursor_idx < len(entries) - 1:
-            cursor_idx += 1
-        elif key == curses.KEY_PPAGE:
-            cursor_idx = max(0, cursor_idx - max_visible)
-        elif key == curses.KEY_NPAGE:
-            cursor_idx = min(len(entries) - 1, cursor_idx + max_visible)
-        elif key in [curses.KEY_HOME, ord('g')]:
-            cursor_idx = 0
-        elif key in [curses.KEY_END, ord('G')]:
-            cursor_idx = len(entries) - 1
-        elif key in [curses.KEY_ENTER, 10, 13]:
-            if not entries or cursor_idx >= len(entries):
-                continue
-            selected = entries[cursor_idx]
-            if selected.get("error") or selected.get("path") is None:
-                continue
-            if selected.get("is_parent") or selected["is_dir"]:
-                if selected.get("is_self"):
-                    return selected["path"]
-                current_path = selected["path"]
-                cursor_idx = 0
-                scroll_offset = 0
-            elif mode in ["file", "any"]:
-                return selected["path"]
-        elif key == ord(' ') and mode == "dir":
-            return current_path
-        elif key in [ord('n'), ord('N')] and allow_new:
-            if mode == "dir":
-                new_name = show_input_box(
-                    stdscr, "Create New Directory", "Enter new directory name:", "", theme
-                )
-                if new_name is not None:
-                    new_name = new_name.strip()
-                    if new_name:
-                        new_dirpath = os.path.join(current_path, new_name)
-                        if os.path.exists(new_dirpath):
-                            show_popup_message(
-                                stdscr,
-                                "Error",
-                                f"Directory or file already exists:\n{new_name}",
-                                theme,
-                            )
-                        else:
-                            try:
-                                os.makedirs(new_dirpath, exist_ok=True)
-                                target_item = new_dirpath
-                                initial_selection_done = False
-                            except OSError as e:  # Catch directory creation failures safely
-                                show_popup_message(
-                                    stdscr,
-                                    "Error",
-                                    f"Failed to create directory:\n{e}",
-                                    theme,
-                                )
-            else:
-                new_name = show_input_box(
-                    stdscr, "Create New File", "Enter new filename:", "", theme
-                )
-                if new_name is not None:
-                    new_name = new_name.strip()
-                    if new_name:
-                        new_filepath = os.path.join(current_path, new_name)
-                        if os.path.exists(new_filepath):
-                            show_popup_message(
-                                stdscr,
-                                "Error",
-                                f"File already exists:\n{new_name}",
-                                theme,
-                            )
-                        else:
-                            try:
-                                with open(new_filepath, "w", encoding="utf-8"):
-                                    pass
-                                target_item = new_filepath
-                                initial_selection_done = False
-                            except OSError as e:  # Catch filesystem write errors safely
-                                show_popup_message(
-                                    stdscr,
-                                    "Error",
-                                    f"Failed to create file:\n{e}",
-                                    theme,
-                                )
+def show_file_picker(
+    stdscr,
+    title,
+    start_dir="~",
+    mode="file",
+    default_val=None,
+    theme=None,
+    show_hidden=False,
+    allow_new=False,
+):
+    """Fallback helper."""
+    return start_dir

@@ -13,7 +13,7 @@ options:
       length: '{window_width}'
       char: '{ascii:196}'
     - label: Antigravity
-      icon: '{nf:#EE9FB0:}'
+      icon: "{nf::#EE9FB0:\U0001F680}"
       type: script
       action: /home/andrew/.local/bin/agy
       interactive: true
