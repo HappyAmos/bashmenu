@@ -174,9 +174,10 @@ a main `options` list. Each option dictionary supports several attributes:
 - `template`  : Source template path for dynamic block injection.
 - `target`    : Destination path for dynamic block injection.
 - `block_id`  : Unique tag for dynamic block boundary markers.
-- `quiet`     : `true`|`false` (suppresses headers and prompts for tools).
-- `stream`    : `true`|`false` (real-time streamed command output window).
-- `interactive`: `true`|`false` (suspends curses for command line tools).
+- `stream`    : `true`|`false` (Execution Mode: real-time streamed command output window inside TUI).
+- `interactive`: `true`|`false` (Execution Mode: suspends TUI for full-screen TTY tools without header/footer prompts).
+- `quiet`     : `true`|`false` (Execution Mode: suppresses command headers and press-ENTER prompts).
+- `no_formatting`: `true`|`false` (disables BBCode rich formatting parser for raw plain text display).
 - `external`  : `true`|`false` (runs scripts in separate shell or process).
 - `user_mode` : `"root"`|`"user"` (defines execution privilege levels).
 - `key`       : YAML dot-notation settings key path in `bashmenu.yml`.

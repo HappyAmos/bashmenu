@@ -120,6 +120,110 @@ class ItemTypePickerModal(ModalScreen[str]):
         self.dismiss(None)
 
 
+class ExecModeContainer(Vertical):
+    """Focusable container for 3-way Execution Mode selector."""
+
+    DEFAULT_CSS = """
+    ExecModeContainer {
+        height: 5;
+        border: solid $accent;
+        margin-bottom: 1;
+        padding: 0;
+    }
+    ExecModeContainer:focus {
+        border: double $accent;
+        background: $surface-lighten-1;
+    }
+    .mode_row {
+        height: 1;
+        width: 100%;
+        layout: horizontal;
+        padding: 0 1;
+    }
+    .mode_row:hover {
+        background: $boost;
+    }
+    .mode_row.selected {
+        background: $accent-darken-1;
+        color: $text;
+    }
+    .mode_indicator {
+        width: 2;
+        color: $accent;
+    }
+    .mode_row.selected .mode_indicator {
+        color: $text;
+    }
+    .mode_emoji {
+        width: 4;
+    }
+    .mode_text {
+        width: 1fr;
+    }
+    """
+
+    can_focus = True
+
+    def __init__(self, selected_mode_idx: int = 0, **kwargs):
+        super().__init__(**kwargs)
+        self.selected_mode_idx = selected_mode_idx
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="mode_row_0", classes="mode_row"):
+            yield Label("● ", classes="mode_indicator", id="ind_0")
+            yield Label("📡", classes="mode_emoji")
+            yield Label("Streaming Mode (stream=true, live TUI modal output)", classes="mode_text")
+        with Horizontal(id="mode_row_1", classes="mode_row"):
+            yield Label("○ ", classes="mode_indicator", id="ind_1")
+            yield Label("🖥️", classes="mode_emoji")
+            yield Label("Interactive Mode (interactive=true, full-screen TTY tool)", classes="mode_text")
+        with Horizontal(id="mode_row_2", classes="mode_row"):
+            yield Label("○ ", classes="mode_indicator", id="ind_2")
+            yield Label("📄", classes="mode_emoji")
+            yield Label("Standard Terminal Mode (quiet=false, header & pause prompt)", classes="mode_text")
+
+    def on_mount(self) -> None:
+        self.set_selected_mode(self.selected_mode_idx)
+
+    def set_selected_mode(self, idx: int) -> None:
+        self.selected_mode_idx = idx % 3
+        for i in range(3):
+            with contextlib.suppress(Exception):
+                row = self.query_one(f"#mode_row_{i}", Horizontal)
+                ind = self.query_one(f"#ind_{i}", Label)
+                if i == self.selected_mode_idx:
+                    row.add_class("selected")
+                    ind.update("● ")
+                else:
+                    row.remove_class("selected")
+                    ind.update("○ ")
+
+    def on_click(self, event) -> None:
+        self.focus()
+        target = getattr(event, "target", None) or getattr(event, "widget", None)
+        if target:
+            for i in range(3):
+                with contextlib.suppress(Exception):
+                    row = self.query_one(f"#mode_row_{i}", Horizontal)
+                    if target == row or row.is_ancestor_of(target):
+                        self.set_selected_mode(i)
+                        break
+
+    def on_key(self, event) -> None:
+        if event.key in ["up", "k"]:
+            self.set_selected_mode((self.selected_mode_idx - 1) % 3)
+            event.stop()
+        elif event.key in ["down", "j"]:
+            self.set_selected_mode((self.selected_mode_idx + 1) % 3)
+            event.stop()
+        elif event.key in ["1", "2", "3"]:
+            self.set_selected_mode(int(event.key) - 1)
+            event.stop()
+        elif event.key in ["space"]:
+            self.set_selected_mode((self.selected_mode_idx + 1) % 3)
+            event.stop()
+
+
 class ItemEditModal(ModalScreen[dict]):
     """Modal dialog to edit comprehensive properties of a menu item."""
 
@@ -131,7 +235,7 @@ class ItemEditModal(ModalScreen[dict]):
     #dialog {
         width: 86;
         height: 85%;
-        max-height: 32;
+        max-height: 34;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -214,6 +318,7 @@ class ItemEditModal(ModalScreen[dict]):
     def __init__(self, item: dict):
         super().__init__()
         self.item = item.copy()
+        self.selected_mode_idx = 0
 
     def compose(self) -> ComposeResult:
         item_type = self.item.get("type", "command" if "command" in self.item else "submenu" if "submenu" in self.item else "unknown")
@@ -226,6 +331,12 @@ class ItemEditModal(ModalScreen[dict]):
         block_id_val = self.item.get("block_id", "")
         start_dir_val = self.item.get("start_dir", "")
         tabstop_val = str(self.item.get("tabstop", 4))
+        if self.item.get("stream"):
+            initial_mode_idx = 0
+        elif self.item.get("interactive") or self.item.get("quiet"):
+            initial_mode_idx = 1
+        else:
+            initial_mode_idx = 2
 
         with Vertical(id="dialog"):
             yield Label(f"Edit Properties [{item_type.upper()}]", id="title")
@@ -266,13 +377,12 @@ class ItemEditModal(ModalScreen[dict]):
                 yield Label("Tabstop:", classes="field_label")
                 yield Input(value=str(tabstop_val), id="inp_tabstop")
 
+                yield Label("Execution Mode:", classes="field_label")
+                yield ExecModeContainer(selected_mode_idx=initial_mode_idx, id="exec_mode_container")
+
                 yield Label("Flags & Execution Options:", classes="field_label")
-                yield Checkbox("Stream Output (stream=true)", value=bool(self.item.get("stream", False)), id="chk_stream")
                 yield Checkbox("Disable Formatting (no_formatting=true)", value=bool(self.item.get("no_formatting", False)), id="chk_no_formatting")
-                yield Checkbox("Quiet Execution (quiet=true)", value=bool(self.item.get("quiet", False)), id="chk_quiet")
-                yield Checkbox("Interactive Mode (interactive=true)", value=bool(self.item.get("interactive", False)), id="chk_interactive")
                 yield Checkbox("Mask Input (masked=true)", value=bool(self.item.get("masked", False)), id="chk_masked")
-                yield Checkbox("Show Whitespace (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_whitespace")
                 yield Checkbox("Refresh Environment (refresh=true)", value=bool(self.item.get("refresh", False)), id="chk_refresh")
 
             with Horizontal(id="buttons"):
@@ -339,13 +449,25 @@ class ItemEditModal(ModalScreen[dict]):
         if new_tabstop.isdigit():
             self.item["tabstop"] = int(new_tabstop)
 
-        self.item["stream"] = self.query_one("#chk_stream", Checkbox).value
+        mode_container = self.query_one("#exec_mode_container", ExecModeContainer)
+        if mode_container.selected_mode_idx == 0:  # Streaming
+            self.item["stream"] = True
+            self.item["interactive"] = False
+            self.item["quiet"] = True
+        elif mode_container.selected_mode_idx == 1:  # Interactive
+            self.item["stream"] = False
+            self.item["interactive"] = True
+            self.item["quiet"] = True
+        else:  # Standard Terminal
+            self.item["stream"] = False
+            self.item["interactive"] = False
+            self.item["quiet"] = False
+
         self.item["no_formatting"] = self.query_one("#chk_no_formatting", Checkbox).value
-        self.item["quiet"] = self.query_one("#chk_quiet", Checkbox).value
-        self.item["interactive"] = self.query_one("#chk_interactive", Checkbox).value
         self.item["masked"] = self.query_one("#chk_masked", Checkbox).value
-        self.item["show_whitespace"] = self.query_one("#chk_whitespace", Checkbox).value
         self.item["refresh"] = self.query_one("#chk_refresh", Checkbox).value
+
+        self.dismiss(self.item)
 
         self.dismiss(self.item)
 
