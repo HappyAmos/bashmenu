@@ -80,7 +80,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 ### 3.2 Visual Menu Editor (`menuedit.py`)
 - `a` / `Ins`             : Insert new menu option node.
-- `e` / `ENTER`           : Edit selected node properties or menu header.
+- `e` / `ENTER`           : Edit selected node properties or menu header (opens `ItemEditModal`).
 - `E`                     : Open raw YAML snippet in editor for selected node.
 - `d` / `Del`             : Delete selected option node (with confirm box).
 - `m` / `M`               : Move selected node down (`m`) or up (`M`).
@@ -89,7 +89,9 @@ Used as dynamic templates for code generation, settings, or block injections:
 - `t`                     : Test-run selected menu item action directly.
 - `s`                     : Save changes to `bashmenu.mnu`.
 - `?` / `h` / `F1`         : Display comprehensive General Help modal.
-- `ESC`                   : Exit editor (prompts if unsaved changes exist).
+- `ESC` / `C`             : Exit editor or cancel dialogs (prompts if unsaved changes exist).
+
+*Note on Menu Focus Synchronization:* When launching `menuedit.py` from `bashmenu.py` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu.py`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. Property inspector binary switches match window background styling (`Switch:focus { background: transparent; }`), and the help text footer clearly displays `[ESC / C] Cancel`.
 
 ### 3.3 Built-in Text Editor (`bashedit.py`)
 - `Ctrl+X`                : Exit editor (prompts save if modified).
@@ -187,6 +189,29 @@ a main `options` list. Each option dictionary supports several attributes:
 - `on_yes`    : Nested action executed when "Yes" is selected.
 - `on_no`     : Nested action executed when "No" is selected.
 - `message`   : Body text prompt string for toggle or confirmation popups.
+
+### 4.3 Color Themes Specification (`bashmenu.themes`)
+Color themes configure the visual palette for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (`dracula`, `nord`, `cyberpunk`, `gruvbox`, `qbasic`, `pacman`, `industry`, `matrix`, `monochrome`, `synthwave`, `amber_crt`, `hotdog_stand`) for `256`, `16`, and `8` color modes using single-line compact lists `[fg, bg]`.
+
+Supported Theme Elements:
+- `background`     : Window background color (`COLOR_BLACK`, int index `0-255`, or `-1`).
+- `title`          : Top window title header text color.
+- `border`         : Outer frame and panel border line color.
+- `text`           : Regular menu item text color.
+- `highlight`      : Active selection bar text and background colors.
+- `accent`         : Accent highlights, path labels, and prompt titles.
+- `footer`         : Help footer line color.
+- `help_text`      : Dedicated help text color in the bottom gutter and modal footers.
+- `plugin`         : Dedicated text color for background plugin output feeds.
+- `gutter`         : Status gutter text color.
+- `selection`      : Text selection highlight color.
+- `status_bar`     : Status bar header/footer color.
+- `shortcut_key`   : Direct selection shortcut hotkey character badge color.
+- `shortcut_label` : Direct selection shortcut hotkey label color.
+- `divider`        : Horizontal divider line color.
+- `button_primary`, `button_error`, `button_cancel`, `button_success` : Modal dialog action button colors.
+
+*Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 
 ---
 
@@ -304,7 +329,9 @@ The application includes a rich formatting parser allowing developers to use inl
 - `color=border` : Border frame color.
 - `color=title` : Main title header color.
 - `color=highlight` : Selected/highlighted bar colors.
-- `color=footer` : Bottom help footer text color.
+- `color=footer` : Help footer line color.
+- `color=help_text` : Dedicated help text color in bottom gutter and modal footers.
+- `color=plugin` : Background plugin feed output text color.
 - `color=shortcut_key` : Direct action shortcut character badge color.
 - `color=accent` : Accent indicator/status badge color.
 - `color=divider` : Horizontal line divider color.
@@ -312,6 +339,9 @@ The application includes a rich formatting parser allowing developers to use inl
 #### Key Features:
 * **Nesting Support**: Tags can be nested seamlessly (e.g. `[b]bold text [color=accent]with accented[/color] highlight[/b]`).
 * **Visible Width Safety**: Centering, padding, and layout checks automatically ignore tags, ensuring pixel-perfect alignments for any styled text.
+* **Code Block & Backtick Tag Suppression**: Formatting tags inside inline code backticks `` `[b]code[/b]` `` and fenced code blocks ```` ```[color=red]code[/color]``` ```` are automatically suppressed and displayed literally as plain text.
+* **Backslash Tag Escaping**: Preceding a tag bracket with a backslash `\[tag]` (e.g., `\[b]` or `\[/b]`) escapes the formatting parser, rendering the literal bracketed tag text.
+* **`no_formatting` Directive / Flag**: Dialog screens and formatting conversion utilities accept an optional `no_formatting: bool = False` parameter to disable tag processing entirely when displaying raw unformatted text.
 
 ---
 

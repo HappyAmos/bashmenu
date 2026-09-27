@@ -123,7 +123,7 @@ When returning from editors, or scripts with refresh: true, the engine traces an
 Insert new menu option node.
 .TP
 .B e, ENTER
-Edit node properties or submenu header title.
+Edit node properties or submenu header title (opens ItemEditModal).
 .TP
 .B E
 Open raw YAML snippet editor for the selected node.
@@ -146,8 +146,12 @@ Save changes to bashmenu.mnu.
 .B ?, h, F1
 Display comprehensive Property Inspector General Help screen.
 .TP
-.B ESC
-Exit editor (prompts to save if modifications exist).
+.B ESC, C
+Exit editor or cancel dialogs (prompts to save if modifications exist).
+
+.PP
+.B Menu Focus Synchronization:
+When launching menuedit.py from bashmenu.py (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu.py, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. Property inspector binary switches match window background styling (Switch:focus { background: transparent; }), and the help text footer explicitly displays [ESC / C] Cancel.
 .SS Built-in Text Editor (bashedit.py)
 The application features a built-in, Nano-style text editor for editing files.
 .TP
@@ -415,7 +419,25 @@ Renders dimmed contrast text (using curses.A_DIM).
 Renders reversed contrast text (using curses.A_REVERSE).
 .TP
 .B [color=color_name]text[/color]
-Renders custom theme-colored text. Available color names include: text, border, title, highlight, footer, shortcut_key, accent, and divider.
+Renders custom theme-colored text. Available color names include: text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, and divider.
+.PP
+.B Formatting Rules & Feature Flags:
+.IP \(bu 2
+.B Code Block & Backtick Suppression:
+Formatting tags within code backticks (`[b]code[/b]`) or fenced code blocks are automatically suppressed and rendered literally.
+.IP \(bu 2
+.B Backslash Tag Escaping:
+Preceding a tag bracket with a backslash (e.g. \\\[b] or \\\[/b]) escapes the parser, outputting literal bracketed tag text.
+.IP \(bu 2
+.B no_formatting Directive:
+Modals and text formatting conversion utilities accept an optional no_formatting parameter to disable tag processing entirely.
+.SS Color Themes Specification (bashmenu.themes)
+Color themes configure the visual color scheme for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (dracula, nord, cyberpunk, gruvbox, qbasic, pacman, industry, matrix, monochrome, synthwave, amber_crt, hotdog_stand) for 256, 16, and 8 color modes using single-line compact lists [fg, bg].
+.PP
+Supported Theme Elements: background, title, border, text, highlight, accent, footer, help_text (configures help text in bottom gutter and modal footers), plugin (configures text color of background plugin feeds), gutter, selection, status_bar, shortcut_key, shortcut_label, divider, button_primary, button_error, button_cancel, and button_success.
+.PP
+.B Formatting Rule for Editor Compatibility:
+Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

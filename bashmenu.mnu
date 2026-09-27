@@ -13,11 +13,17 @@ options:
       length: '{window_width}'
       char: '{ascii:196}'
     - label: Antigravity
-      icon: "{nf::#EE9FB0:\U0001F680}"
+      icon: '{nf::#eb44:}'
       type: script
       action: /home/andrew/.local/bin/agy
       interactive: true
       quiet: true
+      script: /home/andrew/.local/bin/agy
+      tabstop: 4
+      stream: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Brow6el
       type: script
       action: /home/andrew/github/brow6el/build/brow6el
@@ -168,7 +174,8 @@ options:
       block_id: bash_aliases
       refresh: false
       icon: '{nf::#eeb6}'
-    - label: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq yq]
+    - label: Install Basics [vim mc htop glow gum curl wget git shellcheck shfmt jq
+        yq]
       type: script
       action: '{scripts_dir}/install_basics.sh'
       stream: true
@@ -183,7 +190,8 @@ options:
       action: '{scripts_dir}/install_cheat.sh'
       stream: true
       icon: '{nf::#f02aa}'
-    - label: Install Kitty [curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin]
+    - label: Install Kitty [curl -L https://sw.kovidgoyal.net/kitty/installer.sh |
+        sh /dev/stdin]
       type: command
       action: curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
       icon: '{nf::#f26b:}'
@@ -229,7 +237,8 @@ options:
       char: '{ascii:196}'
     - label: Configure DNS servers [dnsconfig.sh]
       type: script
-      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary} {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
+      action: '{scripts_dir}/dnsconfig.sh {settings.dns.ipv4.primary} {settings.dns.ipv4.secondary}
+        {settings.dns.ipv6.primary} {settings.dns.ipv6.secondary}'
       stream: true
       icon: '{nf::#f0b8c}'
     - label: Configure Ping Target [{settings.ping_target}]
@@ -346,7 +355,9 @@ options:
           type: config
           key: settings.status_gutter
           title: Configure Status Gutter
-          prompt: 'Enter status gutter format. Available options: {user}, {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
+          prompt: 'Enter status gutter format. Available options: {user}, {battery},
+            {date}, {date_time_24}, {date_time_24_short}, {date_time_12}, {date_time_12_short},
+            {host}, {user-mode}, {version}, {utc_seconds}'
           icon: '{nf:::}'
         - label: Visual Menu Editor [menuedit.py]
           type: script
@@ -406,33 +417,74 @@ options:
       type: command
       action: df -h
       icon: '{nf:::}'
+      command: df -h
+      tabstop: 4
+      stream: true
+      quiet: false
+      interactive: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Check RAM Usage [free -h]
       type: command
       action: free -h
       icon: '{nf:::}'
+      command: free -h
+      tabstop: 4
+      stream: true
+      quiet: false
+      interactive: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Check USB Controller [lsusb -vt]
       type: command
       action: lsusb -vt
       stream: true
-      quiet: true
+      quiet: false
       icon: '{nf:::}'
+      command: lsusb -vt
+      tabstop: 4
+      interactive: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Display Block Devices [lsblk]
       type: command
       action: lsblk
       icon: '{nf:::}'
       stream: true
+      command: lsblk
+      tabstop: 4
+      quiet: false
+      interactive: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Display CPU Information [lscpu]
       type: command
       action: lscpu
-      quiet: true
+      quiet: false
       stream: true
       icon: '{nf:::}'
+      command: lscpu
+      tabstop: 4
+      interactive: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Display PCI Devices and Drivers [lspci -k]
       type: command
       action: lspci -k
-      quiet: true
+      quiet: false
       stream: true
       icon: '{nf:::}'
+      command: lspci -k
+      tabstop: 4
+      interactive: false
+      masked: false
+      show_whitespace: false
+      refresh: false
     - label: Kernel Information [uname -r]
       type: command
       action: uname -r

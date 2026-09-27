@@ -8,6 +8,7 @@ import bashmenu
 class TestPluginSystem(unittest.TestCase):
     def setUp(self):
         bashmenu._plugin_output_cache.clear()
+        bashmenu._plugin_fetching.clear()
 
     def test_config_plugin_resolution_and_custom_sleep(self):
         config = {

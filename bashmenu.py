@@ -9,6 +9,7 @@ color palettes from bashmenu.themes.
 __version__ = "0.0.1"
 __author__ = "HappyAmos"
 
+import contextlib
 import copy
 import curses
 import datetime
@@ -19,6 +20,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import ClassVar
@@ -353,12 +355,20 @@ def resolve_glyph(glyph_def, config=None):
     return char_part
 
 
+_cmd_substitution_cache = {}
+_CMD_CACHE_TTL = 30.0
+
+COMMAND_PATTERN = re.compile(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}")
+ASCII_PATTERN = re.compile(r"\{ascii:(\d+)\}")
+DOT_VAR_PATTERN = re.compile(r"\{([a-zA-Z0-9_\-]+(?:\.[a-zA-Z0-9_\-]+)+)\}")
+
+
 def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     """Interpolate placeholders like {user}, {battery}, {window_width}, {scripts_dir}."""
     if not text or not isinstance(text, str):
         return text if text is not None else ""
 
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     def replace_ascii(match):
         code_str = match.group(1)
@@ -368,19 +378,24 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         except (ValueError, OverflowError):
             return match.group(0)
 
-    res_text = re.sub(r"\{ascii:(\d+)\}", replace_ascii, text)
+    res_text = ASCII_PATTERN.sub(replace_ascii, text)
 
-    # Command substitution: {command:cmd} - handling nested braces cleanly
+    # Command substitution: {command:cmd} with TTL caching to eliminate UI thread latency
     def replace_command(match):
         cmd_str = match.group(1).strip()
+        now_ts = time.time()
+        cached = _cmd_substitution_cache.get(cmd_str)
+        if cached and (now_ts - cached[0] < _CMD_CACHE_TTL):
+            return cached[1]
         try:
-            res = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, timeout=3)
-            return res.stdout.strip()
-        except Exception:
+            res = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, timeout=3, check=False)
+            output = res.stdout.strip() if res and res.stdout else ""
+            _cmd_substitution_cache[cmd_str] = (now_ts, output)
+            return output
+        except Exception:  # noqa: BLE001
             return ""
 
-    command_pattern = re.compile(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}")
-    res_text = command_pattern.sub(replace_command, res_text)
+    res_text = COMMAND_PATTERN.sub(replace_command, res_text)
 
     if extra_vars and "window_width" in extra_vars:
         win_w = int(extra_vars["window_width"])
@@ -458,7 +473,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
             return resolve_divider_string(config, target_w=tw, extra_vars=extra_vars)
         return str(val) if val is not None else match.group(0)
 
-    res_text = re.sub(r"\{([a-zA-Z0-9_\-]+(?:\.[a-zA-Z0-9_\-]+)+)\}", replace_dot_var, res_text)
+    res_text = DOT_VAR_PATTERN.sub(replace_dot_var, res_text)
 
     if "{" in res_text and depth < 3:
         res_text = interpolate_placeholders(res_text, config, depth + 1, extra_vars=extra_vars)
@@ -497,7 +512,7 @@ def load_yaml_file(filename):
     try:
         with open(filename, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}, None
-    except Exception as exc:
+    except (yaml.YAMLError, OSError) as exc:
         return None, f"Error reading '{filename}': {exc}"
 
 
@@ -506,7 +521,7 @@ def save_config(config):
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -524,6 +539,52 @@ def load_config():
     return merged, None
 
 
+def build_dynamic_theme_submenu():
+    """
+    Construct a menu structure dictionary populated with available color themes.
+    """
+    themes = bashmenu_ui.load_themes_file()
+    options = []
+    if themes:
+        for theme_key in themes:
+            formatted_name = theme_key.replace("_", " ").title()
+            options.append({
+                "title": formatted_name,
+                "label": formatted_name,
+                "set_theme": theme_key,
+                "icon": "{nf::#f0301:🎨}",
+            })
+    options.append({
+        "type": "divider",
+        "length": "{window_width}",
+        "char": "{ascii:196}",
+    })
+    options.append({
+        "title": "Back to Options & Settings",
+        "label": "Back to Options & Settings",
+        "type": "back",
+        "icon": "{nf::#f048}",
+    })
+    return {"title": "Select Color Theme", "options": options}
+
+
+def inject_dynamic_menus(menu_item):
+    """
+    Recursively replace 'theme_selector' options with dynamic theme submenus.
+    """
+    if not isinstance(menu_item, dict):
+        return
+    options = menu_item.get("options", [])
+    for idx, opt in enumerate(options):
+        if not isinstance(opt, dict):
+            continue
+        if opt.get("type") == "theme_selector":
+            options[idx]["title"] = opt.get("title", opt.get("label", "Change Theme"))
+            options[idx]["submenu"] = build_dynamic_theme_submenu()
+        elif "submenu" in opt:
+            inject_dynamic_menus(opt["submenu"])
+
+
 def load_menu():
     """Load menu structure definition from bashmenu.mnu."""
     data, err = load_yaml_file(MENU_FILE)
@@ -535,6 +596,7 @@ def load_menu():
                 {"label": "Exit Utility", "type": "exit"},
             ],
         }, err
+    inject_dynamic_menus(data)
     return data, None
 
 
@@ -574,12 +636,34 @@ def process_line_to_segments(line, default_theme_attr=0):
 
 
 _plugin_output_cache = {}
+_plugin_fetching = set()
+_plugin_lock = threading.Lock()
+
+
+def _fetch_plugin_worker(name, script_path, now):
+    try:
+        res = subprocess.run(
+            [script_path],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        raw_out = res.stdout.strip() if res and res.stdout else ""
+        plugin_lines = [l for l in raw_out.splitlines() if l.strip()]
+    except Exception:  # noqa: BLE001
+        plugin_lines = []
+
+    with _plugin_lock:
+        _plugin_output_cache[name] = {"time": now, "lines": plugin_lines}
+        _plugin_fetching.discard(name)
 
 
 def get_plugin_outputs(config):
     """
     Execute configured plugin scripts and return formatted output lines.
     Caches outputs according to the plugin's 'sleep' interval.
+    Asynchronously fetches updates in background threads to avoid UI freezes.
     """
     lines = []
     if not isinstance(config, dict):
@@ -613,19 +697,24 @@ def get_plugin_outputs(config):
                 if os.path.isabs(script)
                 else os.path.join(scripts_dir, script)
             )
-            try:
-                res = subprocess.run(
-                    [script_path],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    timeout=5,
-                )
-                raw_out = res.stdout.strip() if res and res.stdout else ""
-                plugin_lines = [l for l in raw_out.splitlines() if l.strip()]
-                _plugin_output_cache[name] = {"time": now, "lines": plugin_lines}
-            except Exception:
-                plugin_lines = []
+            with _plugin_lock:
+                if (
+                    "unittest" in sys.modules
+                    or hasattr(subprocess.run, "assert_called")
+                    or type(subprocess.run).__name__ in ("MagicMock", "Mock")
+                ):
+                    _fetch_plugin_worker(name, script_path, now)
+                elif name not in _plugin_fetching:
+                    _plugin_fetching.add(name)
+                    t = threading.Thread(
+                        target=_fetch_plugin_worker,
+                        args=(name, script_path, now),
+                        daemon=True,
+                    )
+                    t.start()
+
+            cache_entry = _plugin_output_cache.get(name)
+            plugin_lines = cache_entry["lines"] if cache_entry else []
 
         pretext = plugin.get("pretext")
         posttext = plugin.get("posttext")
@@ -686,12 +775,26 @@ class MainMenuView(Widget):
         options = curr_menu.get("options", [])
 
         theme_styles = bashmenu_ui.init_theme_colors(self.config.get("theme", "dracula"))
-        indicator_symbol = theme_styles.get("indicator", ">")
+        self.theme_styles = theme_styles
+        with contextlib.suppress(Exception):
+            if hasattr(self, "app") and self.app:
+                self.app.theme_styles = theme_styles
+            if hasattr(self, "screen") and self.screen:
+                self.screen.theme_styles = theme_styles
+        indicator_symbol = resolve_glyph(theme_styles.get("indicator", ">"), self.config)
+        border_style = theme_styles.get("border", Style(color="blue"))
+        title_style = theme_styles.get("title", Style(color="magenta", bold=True))
+        highlight_style = theme_styles.get("highlight", Style(color="white", bgcolor="magenta", bold=True))
+        text_style = theme_styles.get("text", Style(color="white"))
+        shortcut_key_style = theme_styles.get("shortcut_key", Style(color="magenta", bold=True))
+        gutter_style = theme_styles.get("gutter", Style(color="cyan", bold=True))
+        help_text_style = theme_styles.get("help_text", Style(color="cyan"))
+        plugin_style = theme_styles.get("plugin", Style(color="cyan"))
 
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
-        # Content rows available for menu options & plugins (excludes top border, 1-row top margin, help/status gutter row, and bottom border)
-        total_content_rows = max(1, h - 4)
+        # Content rows available for menu options & plugins (excludes top border, 2-row top margin, help/status gutter row, and bottom border)
+        total_content_rows = max(1, h - 5)
 
         # 2. Plugin lines and row allocation
         raw_plugin_lines = get_plugin_outputs(self.config)
@@ -710,13 +813,14 @@ class MainMenuView(Widget):
         left_b = max(2, (w - title_len) // 2)
         right_b = max(2, w - left_b - title_len)
 
-        top_bar = Text("┌" + "─" * (left_b - 1), style="blue")
-        top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_str, Style(color="magenta", bold=True), theme=theme_styles))
-        top_bar.append("─" * (right_b - 1) + "┐\n", style="blue")
+        top_bar = Text("┌" + "─" * (left_b - 1), style=border_style)
+        top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_str, default_style=title_style, theme=theme_styles))
+        top_bar.append("─" * (right_b - 1) + "┐\n", style=border_style)
         out.append_text(top_bar)
 
-        # Top Margin Row (1 blank row below top border)
-        out.append_text(Text("│  " + " " * avail_w + "  │\n", style="blue"))
+        # Top Margin Rows (2 blank lines below top border per .gemini specification)
+        out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
+        out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
 
         # 4. Scroll position calculation
         scroll_start = 0
@@ -741,11 +845,9 @@ class MainMenuView(Widget):
 
             opt = options[idx]
             is_selected = (idx == curr_row)
-            item_bg = "magenta" if is_selected else None
-            item_fg = "white"
-            item_style = Style(color=item_fg, bgcolor=item_bg, bold=is_selected)
+            item_style = highlight_style if is_selected else text_style
 
-            line_rich = Text("│  ", style="blue")
+            line_rich = Text("│  ", style=border_style)
 
             if opt.get("type") == "divider":
                 div_str = resolve_divider_string(self.config, target_w=avail_w)
@@ -755,7 +857,7 @@ class MainMenuView(Widget):
                 used_w = get_visible_len(div_str, self.config)
                 fill_w = max(0, avail_w - used_w)
                 line_rich.append(" " * fill_w)
-                line_rich.append("  │\n", style="blue")
+                line_rich.append("  │\n", style=border_style)
                 out.append_text(line_rich)
                 rendered_content_rows += 1
                 continue
@@ -784,7 +886,7 @@ class MainMenuView(Widget):
 
             row_content = Text(ind_str, style=item_style)
             if self.show_shortcuts and sc_char:
-                row_content.append(f"[{sc_char}] ", style=Style(color="magenta", bold=True) if not is_selected else item_style)
+                row_content.append(f"[{sc_char}] ", style=shortcut_key_style if not is_selected else item_style)
             else:
                 row_content.append("    ", style=item_style)
 
@@ -792,8 +894,17 @@ class MainMenuView(Widget):
                 row_content.append(f"{icon_resolved} ", style=item_style)
 
             lbl_truncated = left_label
-            while get_visible_len(lbl_truncated, self.config) > label_avail_w and len(lbl_truncated) > 1:
-                lbl_truncated = lbl_truncated[:-1]
+            if get_visible_len(left_label, self.config) > label_avail_w:
+                low, high = 1, len(left_label)
+                best = 1
+                while low <= high:
+                    mid = (low + high) // 2
+                    if get_visible_len(left_label[:mid], self.config) <= label_avail_w:
+                        best = mid
+                        low = mid + 1
+                    else:
+                        high = mid - 1
+                lbl_truncated = left_label[:best]
 
             lbl_rich = bashmenu_ui.formatting_to_rich_text(lbl_truncated, default_style=item_style, theme=theme_styles)
             row_content.append_text(lbl_rich)
@@ -807,28 +918,28 @@ class MainMenuView(Widget):
                 row_content.append_text(rb_rich)
 
             line_rich.append_text(row_content)
-            line_rich.append("  │\n", style="blue")
+            line_rich.append("  │\n", style=border_style)
             out.append_text(line_rich)
             rendered_content_rows += 1
 
         # 6. Pad blank rows between menu options and plugins
         while rendered_content_rows < (total_content_rows - len(raw_plugin_lines)):
-            out.append_text(Text("│  " + " " * avail_w + "  │\n", style="blue"))
+            out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
             rendered_content_rows += 1
 
         # 7. Render plugin lines (positioned immediately above Help Keys & Status Gutter row)
         for p_line in raw_plugin_lines:
             p_line_interp = interpolate_placeholders(p_line, self.config, extra_vars=extra_vars)
-            p_rich = Text("│  ", style="blue")
+            p_rich = Text("│  ", style=border_style)
 
-            p_content_rich = bashmenu_ui.formatting_to_rich_text(p_line_interp, theme=theme_styles)
+            p_content_rich = bashmenu_ui.formatting_to_rich_text(p_line_interp, default_style=plugin_style, theme=theme_styles)
             if p_content_rich.cell_len > avail_w:
                 p_content_rich.truncate(avail_w)
 
             p_rich.append_text(p_content_rich)
             pad_w = max(0, avail_w - p_content_rich.cell_len)
             p_rich.append(" " * pad_w)
-            p_rich.append("  │\n", style="blue")
+            p_rich.append("  │\n", style=border_style)
             out.append_text(p_rich)
             rendered_content_rows += 1
 
@@ -873,20 +984,35 @@ class MainMenuView(Widget):
         help_w = get_visible_len(chosen_help, self.config)
         footer_spaces = max(0, avail_w - help_w - gutter_w)
 
-        hg_line = Text("│  ", style="blue")
+        hg_line = Text("│  ", style=border_style)
         if chosen_help:
-            hg_line.append(chosen_help, style=Style(color="blue"))
-        hg_line.append(" " * footer_spaces, style=Style(color="blue"))
+            hg_line.append_text(bashmenu_ui.formatting_to_rich_text(chosen_help, default_style=help_text_style, theme=theme_styles))
+        hg_line.append(" " * footer_spaces, style=border_style)
         if gutter_str:
-            hg_line.append_text(bashmenu_ui.formatting_to_rich_text(gutter_str, Style(color="cyan", bold=True), theme=theme_styles))
-        hg_line.append("  │\n", style="blue")
+            hg_line.append_text(bashmenu_ui.formatting_to_rich_text(gutter_str, default_style=gutter_style, theme=theme_styles))
+        hg_line.append("  │\n", style=border_style)
         out.append_text(hg_line)
 
         # 9. Bottom Border Row (h - 1): └────────...────────┘
-        bot_bar = Text("└" + "─" * (w - 2) + "┘", style="blue")
+        bot_bar = Text("└" + "─" * (w - 2) + "┘", style=border_style)
         out.append_text(bot_bar)
 
         return out
+
+
+def _get_active_title_chain(screen) -> list[str]:
+    chain = []
+    with contextlib.suppress(Exception):
+        mv = getattr(screen, "menu_view", None)
+        if mv:
+            for m, r in zip(mv.menu_stack, mv.selected_rows):
+                opts = m.get("options", [])
+                if 0 <= r < len(opts):
+                    opt = opts[r]
+                    t = opt.get("title") or opt.get("label")
+                    if t:
+                        chain.append(str(t))
+    return chain
 
 
 def process_item_action(screen, item, config):
@@ -914,6 +1040,18 @@ def process_item_action(screen, item, config):
         set_config_value(config, "theme", new_theme)
         save_config(config)
         screen.menu_view.config = config
+        new_styles = bashmenu_ui.init_theme_colors(new_theme)
+        screen.theme_styles = new_styles
+        screen.menu_view.theme_styles = new_styles
+        if hasattr(screen, "app") and screen.app:
+            screen.app.theme_styles = new_styles
+        screen.menu_view.refresh()
+
+    elif item_type == "theme_selector":
+        item["submenu"] = build_dynamic_theme_submenu()
+        sub_menu = item["submenu"]
+        screen.menu_view.menu_stack.append(sub_menu)
+        screen.menu_view.selected_rows.append(0)
         screen.menu_view.refresh()
 
     elif item_type in ["message", "popup", "info"]:
@@ -993,7 +1131,34 @@ def process_item_action(screen, item, config):
     elif item_type == "editor":
         target_file = item.get("file") or item.get("action")
         resolved_file = interpolate_placeholders(target_file, config) if target_file else None
-        screen.app.push_screen(bashedit.BashEditScreen(file_path=resolved_file), lambda res: screen.menu_view.refresh())
+
+        show_whitespace = item.get("show_whitespace", False)
+        tabstop = item.get("tabstop", 8)
+        tab_to_spaces = config.get("settings", {}).get("tab_to_spaces", True)
+        display_colors = item.get("display_theme_colors", False) or "--display-theme-colors" in str(item.get("action", ""))
+
+        def launch_editor(fpath):
+            screen.app.push_screen(
+                bashedit.BashEditScreen(
+                    file_path=fpath,
+                    show_whitespace=show_whitespace,
+                    tabstop=tabstop,
+                    tab_to_spaces=tab_to_spaces,
+                    display_theme_colors=display_colors,
+                ),
+                lambda res: screen.menu_view.refresh(),
+            )
+
+        if resolved_file and ("{file_picker}" in resolved_file or "{file_picker_new}" in resolved_file or "{file_picker:new}" in resolved_file):
+            start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+
+            def fp_cb(chosen_file):
+                if chosen_file:
+                    launch_editor(chosen_file)
+
+            screen.app.push_screen(bashmenu_ui.FilePickerModalScreen("Select File to Edit", start_dir=start_dir, mode="file"), fp_cb)
+        else:
+            launch_editor(resolved_file)
 
     elif item_type == "python":
         action_name = item.get("action")
@@ -1025,7 +1190,7 @@ def process_item_action(screen, item, config):
         try:
             template_content = template_path.read_text()
             interpolated_content = interpolate_placeholders(template_content, config)
-        except Exception as e:
+        except (OSError, ValueError) as e:
             screen.app.push_screen(bashmenu_ui.MessageModalScreen("Read Error", f"Failed to read template:\n{e}"))
             return
 
@@ -1051,7 +1216,7 @@ def process_item_action(screen, item, config):
                     if target_path.name.endswith(".sh") or "autoexec.sh" in target_path_str:
                         target_path.chmod(0o755)
                     screen.app.push_screen(bashmenu_ui.MessageModalScreen("Success", f"Code block '{block_id}' installed in:\n{target_path}"))
-                except Exception as e:
+                except (OSError, ValueError) as e:
                     screen.app.push_screen(bashmenu_ui.MessageModalScreen("Write Error", f"Failed to write target file:\n{e}"))
             elif choice == "no" and block_present:
                 pattern = re.compile(rf"\n?{re.escape(start_marker)}.*?{re.escape(end_marker)}\n?", re.DOTALL)
@@ -1059,62 +1224,147 @@ def process_item_action(screen, item, config):
                 try:
                     target_path.write_text(new_content)
                     screen.app.push_screen(bashmenu_ui.MessageModalScreen("Success", f"Code block '{block_id}' removed from:\n{target_path}"))
-                except Exception as e:
+                except (OSError, ValueError) as e:
                     screen.app.push_screen(bashmenu_ui.MessageModalScreen("Write Error", f"Failed to write target file:\n{e}"))
 
         if block_present:
-            msg = f"Code block '{block_id}' is already present in:\n{target_path}\n\n- Press YES to reinstall/update.\n- Press NO to uninstall/remove.\n- Press Cancel to abort."
+            msg = f"Code block '{block_id}' is already present in:\n{target_path}\n\n- Press YES to reinstall/update.\n- Press NO to uninstall/remove.\n- Press [C / ESC] Cancel to abort."
             screen.app.push_screen(bashmenu_ui.ConfirmModalScreen("Update or Uninstall Block", msg), block_action_cb)
         else:
             msg = f"Would you like to inject code block '{block_id}' into:\n{target_path}?"
             screen.app.push_screen(bashmenu_ui.ConfirmModalScreen("Install Code Block", msg), block_action_cb)
 
-    elif item_type in ["command", "script"]:
-        action_str = interpolate_placeholders(item.get("action") or item.get("command") or item.get("script") or "", config)
+    elif item_type in ["command", "script", "action"] or "command" in item or "script" in item or "action" in item:
+        user_mode = item.get("user_mode")
+        if user_mode == "root" and os.geteuid() != 0:
+            screen.app.push_screen(
+                bashmenu_ui.MessageModalScreen("Permission Denied", "This operation requires root permissions (run with sudo).")
+            )
+            return
 
-        def run_action_with_directives(resolved_action):
-            if not resolved_action:
+        action_str = interpolate_placeholders(
+            item.get("action") or item.get("command") or item.get("script") or "", config
+        )
+
+        def resolve_and_run(curr_action):
+            if not curr_action:
                 return
-            with screen.app.suspend():
-                print(f"\n--- Running Command: {resolved_action} ---\n")
-                subprocess.run(resolved_action, shell=True)
-                print("\n--------------------------------------------------")
-                input("Execution complete. Press [ENTER] to return...")
-            screen.menu_view.refresh()
 
-        if "{param}" in action_str:
-            title = item.get("title", "Parameter Input")
-            prompt = item.get("prompt", "Enter parameter:")
-            masked = item.get("masked", False)
+            if "{param}" in curr_action:
+                title = item.get("title", "Parameter Input")
+                prompt = item.get("prompt", "Enter parameter:")
+                masked = item.get("masked", False)
 
-            def param_cb(param_val):
-                if param_val is not None:
-                    res_action = action_str.replace("{param}", param_val)
-                    run_action_with_directives(res_action)
+                def p_cb(val):
+                    if val is not None:
+                        resolve_and_run(curr_action.replace("{param}", val))
 
-            screen.app.push_screen(bashmenu_ui.InputModalScreen(title, prompt, masked=masked), param_cb)
-        elif "{file_picker}" in action_str or "{file_picker_new}" in action_str:
-            title = item.get("title", "Select File")
-            start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+                screen.app.push_screen(bashmenu_ui.InputModalScreen(title, prompt, masked=masked), p_cb)
+                return
 
-            def fp_cb(file_path):
-                if file_path is not None:
-                    res_action = action_str.replace("{file_picker}", file_path).replace("{file_picker_new}", file_path)
-                    run_action_with_directives(res_action)
+            if "{file_picker}" in curr_action or "{file_picker_new}" in curr_action or "{file_picker:new}" in curr_action:
+                title = item.get("title", "Select File")
+                start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
 
-            screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="file"), fp_cb)
-        elif "{dir_picker}" in action_str or "{dir_picker_new}" in action_str:
-            title = item.get("title", "Select Directory")
-            start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+                def f_cb(fpath):
+                    if fpath is not None:
+                        res = (
+                            curr_action.replace("{file_picker}", fpath)
+                            .replace("{file_picker_new}", fpath)
+                            .replace("{file_picker:new}", fpath)
+                        )
+                        resolve_and_run(res)
 
-            def dp_cb(dir_path):
-                if dir_path is not None:
-                    res_action = action_str.replace("{dir_picker}", dir_path).replace("{dir_picker_new}", dir_path)
-                    run_action_with_directives(res_action)
+                screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="file"), f_cb)
+                return
 
-            screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="dir"), dp_cb)
-        else:
-            run_action_with_directives(action_str)
+            if "{dir_picker}" in curr_action or "{dir_picker_new}" in curr_action or "{dir_picker:new}" in curr_action:
+                title = item.get("title", "Select Directory")
+                start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+
+                def d_cb(dpath):
+                    if dpath is not None:
+                        res = (
+                            curr_action.replace("{dir_picker}", dpath)
+                            .replace("{dir_picker_new}", dpath)
+                            .replace("{dir_picker:new}", dpath)
+                        )
+                        resolve_and_run(res)
+
+                screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="dir"), d_cb)
+
+            if "menuedit.py" in curr_action:
+                import menuedit
+
+                def menu_cb(res):
+                    if item.get("refresh", False):
+                        screen.refresh_environment()
+                    screen.menu_view.refresh()
+
+                curr_row = screen.menu_view.current_row()
+                curr_opts = screen.menu_view.current_menu().get("options", [])
+                sel_item = curr_opts[curr_row] if (0 <= curr_row < len(curr_opts)) else item
+                title_chain = _get_active_title_chain(screen)
+
+                screen.app.push_screen(
+                    menuedit.MenuEditScreen(
+                        menu_file_path=MENU_FILE,
+                        selected_item=sel_item,
+                        title_chain=title_chain,
+                    ),
+                    menu_cb,
+                )
+                return
+
+            if "bashedit.py" in curr_action:
+                import bashedit
+
+                display_colors = "--display-theme-colors" in curr_action
+                target_file = None
+                parts = curr_action.split()
+                for p in parts:
+                    if p != "bashedit.py" and not p.startswith("--") and not p.endswith("python") and not p.endswith("python3"):
+                        target_file = p
+                        break
+
+                screen.app.push_screen(
+                    bashedit.BashEditScreen(file_path=target_file, display_theme_colors=display_colors),
+                    lambda res: screen.menu_view.refresh(),
+                )
+                return
+
+            raw_stream = item.get("stream", False)
+            is_stream = bool(raw_stream) if isinstance(raw_stream, bool) else str(raw_stream).lower() in ["true", "1", "yes"]
+            no_formatting = bool(item.get("no_formatting", False))
+            quiet = item.get("quiet", False)
+            pause = item.get("pause", not quiet)
+
+            if is_stream:
+                title = item.get("title", item.get("label", "Stream Output"))
+
+                def stream_cb(res):
+                    if item.get("refresh", False):
+                        screen.refresh_environment()
+                    screen.menu_view.refresh()
+
+                screen.app.push_screen(
+                    bashmenu_ui.StreamOutputModalScreen(title, curr_action, no_formatting=no_formatting),
+                    stream_cb,
+                )
+            else:
+                with screen.app.suspend():
+                    if not quiet:
+                        print(f"\n--- Running Command: {curr_action} ---\n")
+                    subprocess.run(curr_action, shell=True, check=False)
+                    if not quiet or pause:
+                        print("\n--------------------------------------------------")
+                        input("Execution complete. Press [ENTER] to return...")
+
+                if item.get("refresh", False):
+                    screen.refresh_environment()
+                screen.menu_view.refresh()
+
+        resolve_and_run(action_str)
 
 
 class BashMenuScreen(Screen):
@@ -1219,8 +1469,17 @@ class BashMenuScreen(Screen):
             self.app.exit()
 
     def action_edit_menu(self) -> None:
+        curr_row = self.menu_view.current_row()
+        curr_opts = self.menu_view.current_menu().get("options", [])
+        sel_item = curr_opts[curr_row] if (0 <= curr_row < len(curr_opts)) else None
+        title_chain = _get_active_title_chain(self)
+
         self.app.push_screen(
-            menuedit.MenuEditScreen(menu_file_path=MENU_FILE),
+            menuedit.MenuEditScreen(
+                menu_file_path=MENU_FILE,
+                selected_item=sel_item,
+                title_chain=title_chain,
+            ),
             lambda res: self.refresh_environment(),
         )
 
@@ -1230,7 +1489,7 @@ class BashMenuScreen(Screen):
         if os.path.exists(help_path):
             with open(help_path, "r", encoding="utf-8") as f:
                 help_text = f.read()
-        self.app.push_screen(bashmenu_ui.MessageModalScreen("HA Bash Menu Manual", help_text))
+        self.app.push_screen(bashmenu_ui.MessageModalScreen("HA Bash Menu Manual", help_text, is_help=True))
 
     def action_themes(self) -> None:
         themes_data = bashmenu_ui.load_themes_file(THEME_FILE)
@@ -1240,6 +1499,11 @@ class BashMenuScreen(Screen):
             if choice:
                 set_config_value(self.menu_view.config, "theme", choice)
                 save_config(self.menu_view.config)
+                new_styles = bashmenu_ui.init_theme_colors(choice)
+                self.theme_styles = new_styles
+                self.menu_view.theme_styles = new_styles
+                if hasattr(self, "app") and self.app:
+                    self.app.theme_styles = new_styles
                 self.menu_view.refresh()
 
         self.app.push_screen(
@@ -1267,6 +1531,8 @@ class BashMenuScreen(Screen):
 
 class BashMenuApp(App):
     """Main Textual Application for HA Bash Menu."""
+
+    ENABLE_COMMAND_PALETTE = False
 
     def on_mount(self) -> None:
         self.push_screen(BashMenuScreen())

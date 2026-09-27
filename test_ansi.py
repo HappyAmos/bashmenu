@@ -149,6 +149,37 @@ class TestAnsiParsing(unittest.TestCase):
         self.assertTrue(resolved.endswith("/scripts/bsdgames.sh"))
         self.assertNotIn("{scripts}", resolved)
 
+    def test_formatting_escaping_and_code_spans(self):
+        """Test backslash escaping, code block/span tag suppression, and no_formatting flag."""
+        from bashmenu_ui import formatting_to_rich_text, strip_formatting_tags
+
+        # Escaped tag test
+        escaped_text = r"Use \[b]bold\[/b] tag"
+        rt_escaped = formatting_to_rich_text(escaped_text)
+        self.assertEqual(rt_escaped.plain, "Use [b]bold[/b] tag")
+
+        # Code span tag suppression test
+        code_span_text = "Look at `[b]code[/b]` and [b]bold[/b]"
+        rt_code = formatting_to_rich_text(code_span_text)
+        self.assertEqual(rt_code.plain, "Look at `[b]code[/b]` and bold")
+
+        # Code block tag suppression test
+        code_block_text = "```\n[color=red]red[/color]\n```"
+        rt_block = formatting_to_rich_text(code_block_text)
+        self.assertEqual(rt_block.plain, "```\n[color=red]red[/color]\n```")
+
+        # no_formatting flag test
+        no_fmt_text = "[b]hello[/b] [color=blue]world[/color]"
+        rt_no_fmt = formatting_to_rich_text(no_fmt_text, no_formatting=True)
+        self.assertEqual(rt_no_fmt.plain, "[b]hello[/b] [color=blue]world[/color]")
+
+        # strip_formatting_tags tests
+        stripped = strip_formatting_tags(r"\[b]literal\[/b] and `[u]code[/u]` and [dim]dim[/dim]")
+        self.assertEqual(stripped, "[b]literal[/b] and `[u]code[/u]` and dim")
+
+        stripped_no_fmt = strip_formatting_tags("[b]bold[/b]", no_formatting=True)
+        self.assertEqual(stripped_no_fmt, "[b]bold[/b]")
+
     def test_cache_dir_placeholders_and_resolution(self):
         """Test that {cache_dir}, {cache}, and {settings.cache_dir} resolve properly in interpolate_placeholders."""
         config = {"settings": {"cache_dir": "{home}/custom_cache/bashmenu"}}
@@ -219,5 +250,161 @@ class TestNerdFontWidth(unittest.TestCase):
         self.assertEqual(bashmenu.get_display_width("\U0001F326\uFE0F"), 2)
 
 
+import bashedit
+
+
+class TestBashEditThemeColors(unittest.TestCase):
+    """Test suite for bashedit --display-theme-colors feature."""
+
+    def test_get_line_color_spans(self):
+        ed = bashedit.EditorWidget(display_theme_colors=True)
+        spans = ed.get_line_color_spans("title: [201, -1]")
+        self.assertEqual(len(spans), 2)
+        start, end, style = spans[0]
+        self.assertEqual(start, 8)
+        self.assertEqual(end, 11)
+        self.assertEqual(style.color.name, "#ff00ff")
+
+    def test_get_line_color_spans_tokens(self):
+        ed = bashedit.EditorWidget(display_theme_colors=True)
+        spans = ed.get_line_color_spans("background: [COLOR_BLACK, -1]")
+        self.assertEqual(len(spans), 2)
+        _start, _end, style = spans[0]
+        self.assertIn(style.color.name, ["#000000", "black"])
+
+    def test_outside_brackets_ignored(self):
+        ed = bashedit.EditorWidget(display_theme_colors=True)
+        spans = ed.get_line_color_spans("background: COLOR_BLACK")
+        self.assertEqual(len(spans), 0)
+        spans_256 = ed.get_line_color_spans("256:")
+        self.assertEqual(len(spans_256), 0)
+
+    def test_help_manual_and_view_colors_flag(self):
+        screen_with_flag = bashedit.BashEditScreen(display_theme_colors=True)
+        self.assertTrue(screen_with_flag.display_theme_colors_flag)
+
+        screen_without_flag = bashedit.BashEditScreen(display_theme_colors=False)
+        self.assertFalse(screen_without_flag.display_theme_colors_flag)
+
+    def test_f1_help_modal_press_without_markup_error(self):
+        import asyncio
+        from textual.app import App
+        import bashmenu
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(bashmenu.BashMenuScreen())
+
+        async def run_test():
+            app = TestApp()
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                await pilot.press("f1")
+                await pilot.pause(0.2)
+                self.assertEqual(type(app.screen).__name__, "MessageModalScreen")
+
+        asyncio.run(run_test())
+
+
+class TestThemeProperties(unittest.TestCase):
+    """Test suite for help_text and plugin theme properties."""
+
+    def test_init_theme_colors_includes_help_text_and_plugin(self):
+        import bashmenu_ui
+        styles = bashmenu_ui.init_theme_colors("dracula")
+        self.assertIn("help_text", styles)
+        self.assertIsNotNone(styles["help_text"])
+        self.assertIn("plugin", styles)
+        self.assertIsNotNone(styles["plugin"])
+
+    def test_all_themes_have_help_text_and_plugin_properties(self):
+        import bashmenu_ui
+        themes_data = bashmenu_ui.load_themes_file()
+        self.assertTrue(len(themes_data) > 0)
+        for theme_name, theme_def in themes_data.items():
+            for mode in (256, 16, 8):
+                if mode in theme_def:
+                    self.assertIn("help_text", theme_def[mode], f"Theme {theme_name} mode {mode} missing help_text")
+                    self.assertIn("plugin", theme_def[mode], f"Theme {theme_name} mode {mode} missing plugin")
+
+
+class TestMenuEditTreeSelection(unittest.TestCase):
+    def test_get_active_title_chain_and_node_matching(self):
+        import bashmenu
+        import menuedit
+
+        fake_screen = type("FakeScreen", (), {})()
+        fake_mv = type("FakeMenuView", (), {})()
+        fake_mv.menu_stack = [
+            {"options": [{"label": "System Information", "type": "submenu"}]},
+            {"options": [{"label": "Display CPU Information [lscpu]", "type": "command"}]},
+        ]
+        fake_mv.selected_rows = [0, 0]
+        fake_screen.menu_view = fake_mv
+
+        chain = bashmenu._get_active_title_chain(fake_screen)
+        self.assertEqual(chain, ["System Information", "Display CPU Information [lscpu]"])
+
+        scr = menuedit.MenuEditScreen(title_chain=chain)
+        mock_root = type("MockNode", (), {})()
+        mock_root.data = {"title": "Root"}
+
+        mock_child1 = type("MockNode", (), {})()
+        mock_child1.data = {"label": "System Information"}
+        mock_child1.children = []
+
+        mock_child2 = type("MockNode", (), {})()
+        mock_child2.data = {"label": "Display CPU Information [lscpu]"}
+        mock_child2.children = []
+
+        mock_root.children = [mock_child1]
+        mock_child1.children = [mock_child2]
+
+        matched = scr._find_node_by_chain(mock_root, chain)
+        self.assertEqual(matched, mock_child2)
+
+    def test_menuedit_screen_focus_on_selected_item(self):
+        import asyncio
+        from textual.app import App
+        import bashmenu
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(bashmenu.BashMenuScreen())
+
+        async def run_test():
+            app = TestApp()
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                screen = app.screen
+                mv = screen.menu_view
+                opts = mv.current_menu()["options"]
+                sys_info_idx = next(i for i, o in enumerate(opts) if "System Information" in str(o.get("label")))
+                mv.set_current_row(sys_info_idx)
+                screen.action_select_option()
+                await pilot.pause(0.05)
+
+                curr_opts = app.screen.menu_view.current_menu()["options"]
+                cpu_idx = next(i for i, o in enumerate(curr_opts) if "Display CPU Information" in str(o.get("label")))
+                app.screen.menu_view.set_current_row(cpu_idx)
+
+                await pilot.press("f4")
+                await pilot.pause(0.2)
+
+                editor_screen = app.screen
+                tree = editor_screen.query_one("#tree")
+                self.assertIsNotNone(tree.cursor_node)
+                data_title = tree.cursor_node.data.get("title") or tree.cursor_node.data.get("label")
+                self.assertIn("Display CPU Information", str(data_title))
+
+                await pilot.press("e")
+                await pilot.pause(0.1)
+                modal_screen = app.screen
+                self.assertEqual(type(modal_screen).__name__, "ItemEditModal")
+
+        asyncio.run(run_test())
+
+
 if __name__ == "__main__":
     unittest.main()
+

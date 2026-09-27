@@ -8,4 +8,9 @@ bashmenu.yml. bashmenu.py is the menu system, bashedit.py is the menu editor, an
 itself is defined in bashmenu.mnu .  The menu file and configuration file are Yaml files. There are multiple test files created by you in the project directory that may need to be
 updated. We have recently transferred from an ncurses based menu system to using the Python Texual framework. The menu system is written in Python and the menu file is written in Yaml.
 There are also many Bash shell scripts. Importantly, the script bashmenu.sh is the main script. Bashmenu.sh is a wrapper around bashmenu.py. Bashmenu.sh is not part of the menu system, but
-sets up the environment and calls bashmenu.py. The wrapper ensures that that prerequisites are installed, and that the Python venv system is setup and activated.
+sets up the environment and calls bashmenu.py. The wrapper ensures that that prerequisites are installed, and that the Python venv system is setup and activated. In addition to the listed
+project files, there are two directories scripts/ and templates/. The scripts directory contains various scripts to extend the menu system, wrappers for launchers, plugins, etc. The 
+templates directory contains templates for plugging preconfigured sections of code into rc files such as .bashrc, .vimrc, etc. bashmenu.1 is the man page for the menu system, 
+bashmenu.md is the verbose documentation for the menu system, and README.md is the Github front facing page for the project. One thing I forgot to mention is bashmenu.themes , which is
+menu definition files for different themes. When the user clicks on Main Menu -> Options & Settings -> Bashmenu Settings -> Change Theme, a dynamic menu should load that presents
+each of the defined themes. Clicking on the name of a theme should change the theme. bashmenu.yml should then be updated so that "theme:" is set to the selected theme.

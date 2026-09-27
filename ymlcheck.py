@@ -16,10 +16,13 @@ from typing import Any
 
 import yaml
 
-# Standard 16-color curses constants valid in 16/8 color depth modes
 VALID_16_COLORS = {
     "COLOR_BLACK", "COLOR_RED", "COLOR_GREEN", "COLOR_YELLOW",
-    "COLOR_BLUE", "COLOR_MAGENTA", "COLOR_CYAN", "COLOR_WHITE"
+    "COLOR_BLUE", "COLOR_MAGENTA", "COLOR_CYAN", "COLOR_WHITE",
+    "COLOR_GREY", "COLOR_GRAY", "COLOR_BRIGHT_BLACK", "COLOR_BRIGHT_RED",
+    "COLOR_BRIGHT_GREEN", "COLOR_BRIGHT_YELLOW", "COLOR_BRIGHT_BLUE",
+    "COLOR_BRIGHT_MAGENTA", "COLOR_BRIGHT_CYAN", "COLOR_BRIGHT_WHITE",
+    "COLOR_ORANGE", "COLOR_PURPLE", "COLOR_PINK", "COLOR_BROWN"
 }
 
 # Recognized color depth palette section keys
