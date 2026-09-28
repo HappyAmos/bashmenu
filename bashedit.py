@@ -6,6 +6,7 @@ bashedit.py - Built-in Nano-style text editor implemented in Textual.
 import contextlib
 import os
 import re
+import subprocess
 import sys
 from typing import ClassVar
 
@@ -371,6 +372,7 @@ class EditorWidget(Widget):
         if not sel:
             line = self.lines[self.cursor_y]
             self.cutbuffer = [line]
+            set_system_clipboard(line)
             self.mark_active = False
             self.refresh()
             return "Line Copied"
@@ -392,6 +394,8 @@ class EditorWidget(Widget):
                 cut.append(end_segment)
             self.cutbuffer = cut
 
+        copied_str = "\n".join(self.cutbuffer)
+        set_system_clipboard(copied_str)
         self.mark_active = False
         self.refresh()
         return "Selection Copied"
@@ -425,10 +429,6 @@ class EditorWidget(Widget):
                 del self.lines[sy + 1 : ey + 1]
             self.mark_active = False
             self.cursor_y, self.cursor_x = sy, min(sx, len(self.lines[min(sy, len(self.lines) - 1)]))
-            self.modified = True
-            self.clamp_cursor()
-            self.refresh()
-            return "Selection Cut"
         else:
             if len(self.lines) > 1:
                 removed = self.lines.pop(self.cursor_y)
@@ -436,12 +436,39 @@ class EditorWidget(Widget):
             else:
                 self.cutbuffer = [self.lines[0]]
                 self.lines[0] = ""
+        copied_str = "\n".join(self.cutbuffer)
+        set_system_clipboard(copied_str)
+        self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+        return "Selection Cut" if sel else "Line Cut"
+
+    def paste_buffer(self) -> str:
+        clip = get_system_clipboard()
+        if clip is not None and clip != "":
+            clip_lines = clip.splitlines()
+            if not clip_lines:
+                clip_lines = [""]
+            self.push_undo()
+            if len(clip_lines) == 1:
+                line = self.lines[self.cursor_y]
+                self.lines[self.cursor_y] = line[: self.cursor_x] + clip_lines[0] + line[self.cursor_x :]
+                self.cursor_x += len(clip_lines[0])
+            else:
+                curr_line = self.lines[self.cursor_y]
+                prefix = curr_line[: self.cursor_x]
+                suffix = curr_line[self.cursor_x :]
+                self.lines[self.cursor_y] = prefix + clip_lines[0]
+                for idx, c_line in enumerate(clip_lines[1:], start=1):
+                    self.lines.insert(self.cursor_y + idx, c_line)
+                self.cursor_y += len(clip_lines) - 1
+                self.lines[self.cursor_y] += suffix
+                self.cursor_x = len(self.lines[self.cursor_y]) - len(suffix)
             self.modified = True
             self.clamp_cursor()
             self.refresh()
-            return "Line Cut"
+            return "Pasted"
 
-    def paste_buffer(self) -> str:
         if not self.cutbuffer:
             return "Buffer empty"
         self.push_undo()
@@ -452,6 +479,33 @@ class EditorWidget(Widget):
         self.clamp_cursor()
         self.refresh()
         return "Pasted"
+
+
+def get_system_clipboard() -> str | None:
+    """Read plain text from system clipboard using xclip, xsel, or wl-paste."""
+    for cmd in [["xclip", "-selection", "clipboard", "-o"], ["xsel", "--clipboard", "--output"], ["wl-paste"]]:
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=1, check=False)
+            if res.returncode == 0 and res.stdout is not None:
+                return res.stdout
+        except Exception:  # noqa: BLE001, S110
+            pass
+    return None
+
+
+def set_system_clipboard(text: str) -> bool:
+    """Copy text to system clipboard using xclip, xsel, or wl-copy."""
+    if text is None:
+        return False
+    for cmd in [["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"], ["wl-copy"]]:
+        try:
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            p.communicate(input=text.encode("utf-8"), timeout=1)
+            if p.returncode == 0:
+                return True
+        except Exception:  # noqa: BLE001, S110
+            pass
+    return False
 
 
 class EditorTab:
@@ -598,11 +652,10 @@ class BashEditScreen(Screen):
         Binding("f8", "cut_line", "Cut", show=False),
         Binding("ctrl+u", "paste_buffer", "Paste"),
         Binding("ctrl+v", "paste_buffer", "Paste", show=False),
+        Binding("ctrl+shift+v", "paste_buffer", "Paste", show=False),
         Binding("f9", "paste_buffer", "Paste", show=False),
         Binding("ctrl+w", "search_text", "WhereIs"),
         Binding("ctrl+x", "exit_editor", "Exit"),
-        Binding("escape", "exit_editor", "Exit", show=False),
-        Binding("esc", "exit_editor", "Exit", show=False),
         Binding("alt+1", "toggle_whitespace", "Whitespace"),
         Binding("meta+1", "toggle_whitespace", "Whitespace", show=False),
         Binding("m-1", "toggle_whitespace", "Whitespace", show=False),
@@ -612,6 +665,7 @@ class BashEditScreen(Screen):
         Binding("ctrl+6", "toggle_mark", "Mark"),
         Binding("alt+a", "toggle_mark", "Mark", show=False),
         Binding("ctrl+c", "copy_selection", "Copy", show=False),
+        Binding("ctrl+shift+c", "copy_selection", "Copy", show=False),
         Binding("alt+6", "copy_selection", "Copy", show=False),
         Binding("§", "copy_selection", "Copy", show=False),
         Binding("alt+c", "copy_selection", "Copy", show=False),
@@ -1191,9 +1245,34 @@ class BashEditScreen(Screen):
             self.action_show_placeholders()
             return
 
+        if key_lower in ["ctrl+c", "ctrl+shift+c", "ctrl_c", "ctrl_shift_c"] or char_lower in ["\x03"]:
+            event.prevent_default()
+            event.stop()
+            self.action_copy_selection()
+            return
+
+        if key_lower in ["ctrl+v", "ctrl+shift+v", "ctrl_v", "ctrl_shift_v"] or char_lower in ["\x16"]:
+            event.prevent_default()
+            event.stop()
+            self.action_paste_buffer()
+            return
+
+        if key_lower in ["ctrl+k", "ctrl+shift+k"] or char_lower in ["\x0b"]:
+            event.prevent_default()
+            event.stop()
+            self.action_cut_line()
+            return
+
+        if key_lower in ["ctrl+u", "ctrl+shift+u"] or char_lower in ["\x15"]:
+            event.prevent_default()
+            event.stop()
+            self.action_paste_buffer()
+            return
+
         # Ignore modifier combinations, function keys & action shortcut keys so Textual bindings process them as actions
         if (
-            event.character in ["§", "\u00a7"]
+            event.character in ["§", "\u00a7", "\x03", "\x16", "\x0b", "\x15"]
+            or (event.character and ord(event.character[0]) < 32)
             or event.key.startswith("ctrl+")
             or event.key.startswith("alt+")
             or event.key.startswith("meta+")
@@ -1214,6 +1293,9 @@ class BashEditScreen(Screen):
                 "meta+6",
                 "alt+c",
                 "ctrl+c",
+                "ctrl+v",
+                "ctrl+shift+c",
+                "ctrl+shift+v",
                 "rs",
                 "§",
                 "section",

@@ -1,5 +1,5 @@
 version: 0.0.1
-theme: dracula
+theme: monochrome
 user:
   divider:
     char: '{ascii:196}'
@@ -12,7 +12,17 @@ user:
 settings:
   cache_dir: '{home}/.cache/bashmenu'
   check_for_updates: false
-  plugins: {}
+  plugins:
+    otd:
+      script: otd.sh
+      sleep: 300
+      pretext: '{user.divider}'
+      posttext: '{user.divider}'
+    weather:
+      script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
+      sleep: 300
+      pretext: ''
+      posttext: '{user.divider}'
   templates_dir: '{bashmenu_dir}/templates'
   scripts_dir: '{bashmenu_dir}/scripts'
   ping_target: 1.1.1.1

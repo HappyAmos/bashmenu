@@ -3,6 +3,7 @@ bashmenu_ui.py - Reusable Textual TUI primitives, modal screens, text formatting
 """
 
 import contextlib
+import ctypes
 import os
 import re
 import subprocess
@@ -196,17 +197,33 @@ def is_emoji_char(c: str) -> bool:
     )
 
 
+try:
+    _libc = ctypes.CDLL(None)
+    _c_wcwidth = _libc.wcwidth
+    _c_wcwidth.argtypes = [ctypes.c_wchar]
+    _c_wcwidth.restype = ctypes.c_int
+except Exception:  # noqa: BLE001
+    _c_wcwidth = None
+
+
 def get_char_width(c: str, config=None) -> int:
     """
     Get the display width of a single character in terminal columns.
     """
     if not c:
         return 0
-    if 0xFE00 <= ord(c) <= 0xFE0F:
+    cp = ord(c[0])
+    if 0xFE00 <= cp <= 0xFE0F:
         return 0
-    if is_pua_glyph(c):
+    if is_pua_glyph(c[0]):
         return get_nerd_font_width(config)
-    if unicodedata.east_asian_width(c) in ("W", "F"):
+    if 0x2500 <= cp <= 0x259F:
+        return 1
+    if _c_wcwidth is not None:
+        w = _c_wcwidth(c[0])
+        if w >= 0:
+            return w
+    if is_emoji_char(c[0]) or unicodedata.east_asian_width(c[0]) in ("W", "F"):
         return 2
     return 1
 
@@ -217,17 +234,14 @@ def get_display_width(s: str, config=None) -> int:
     """
     if not s:
         return 0
+    if not isinstance(s, str):
+        s = str(s)
     total = 0
     i = 0
     n = len(s)
     while i < n:
         c = s[i]
         cp = ord(c)
-
-        if i + 1 < n and s[i + 1] == "\uFE0F":
-            total += 2
-            i += 2
-            continue
 
         if 0xFE00 <= cp <= 0xFE0F:
             i += 1
@@ -238,7 +252,12 @@ def get_display_width(s: str, config=None) -> int:
             i += 1
             continue
 
-        if is_emoji_char(c) or unicodedata.east_asian_width(c) in ("W", "F"):
+        if 0x2500 <= cp <= 0x259F:
+            total += 1
+            i += 1
+            continue
+
+        if is_emoji_char(c) or unicodedata.east_asian_width(c) in ("W", "F") or (0x1F300 <= cp <= 0x1FAFF):
             total += 2
             i += 1
             continue
@@ -247,7 +266,12 @@ def get_display_width(s: str, config=None) -> int:
             i += 1
             continue
 
-        total += 1
+        if _c_wcwidth is not None:
+            w = _c_wcwidth(c)
+            if w >= 0:
+                total += w
+                i += 1
+                continue
         i += 1
 
     return total
@@ -352,7 +376,15 @@ def formatting_to_rich_text(
     tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
     rich_text = Text()
 
-    current_style = default_style or Style()
+    if isinstance(default_style, str):
+        try:
+            current_style = Style.parse(default_style)
+        except Exception:  # noqa: BLE001
+            current_style = Style()
+    elif isinstance(default_style, Style):
+        current_style = default_style
+    else:
+        current_style = Style()
     style_stack = [current_style]
     last_idx = 0
 

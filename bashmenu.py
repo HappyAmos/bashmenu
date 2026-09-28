@@ -246,7 +246,7 @@ DEFAULT_CONFIG = {
         "tab_to_spaces": True,
         "tabstop": 8,
         "show_menu_shortcuts": True,
-        "use_nerd_fonts": False,
+        "use_nerd_fonts": True,
         "nerd_font_width": "auto",
         "status_gutter": "{user} | {battery} | {date_time_24_short} | {user.localip}",
     },
@@ -518,8 +518,13 @@ def load_yaml_file(filename):
         return None, f"Error reading '{filename}': {exc}"
 
 
+_config_has_load_error = False
+
+
 def save_config(config):
     """Persist current configuration to bashmenu.yml."""
+    if _config_has_load_error:
+        return
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
@@ -529,14 +534,18 @@ def save_config(config):
 
 def load_config():
     """Load configuration settings from bashmenu.yml."""
+    global _config_has_load_error
     if not os.path.exists(CONFIG_FILE):
+        _config_has_load_error = False
         save_config(DEFAULT_CONFIG)
         return copy.deepcopy(DEFAULT_CONFIG), None
 
     data, err = load_yaml_file(CONFIG_FILE)
     if err:
+        _config_has_load_error = True
         return copy.deepcopy(DEFAULT_CONFIG), err
 
+    _config_has_load_error = False
     merged = deep_merge(copy.deepcopy(DEFAULT_CONFIG), data)
     return merged, None
 
@@ -642,15 +651,25 @@ _plugin_fetching = set()
 _plugin_lock = threading.Lock()
 
 
-def _fetch_plugin_worker(name, script_path, now):
+def _fetch_plugin_worker(name, script_cmd, now):
     try:
-        res = subprocess.run(
-            [script_path],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=5,
-        )
+        if os.path.exists(script_cmd) and os.path.isfile(script_cmd):
+            res = subprocess.run(
+                [script_cmd],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+        else:
+            res = subprocess.run(
+                script_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
         raw_out = res.stdout.strip() if res and res.stdout else ""
         plugin_lines = [l for l in raw_out.splitlines() if l.strip()]
     except Exception:  # noqa: BLE001
@@ -684,21 +703,23 @@ def get_plugin_outputs(config):
     for name, plugin in plugins.items():
         if not isinstance(plugin, dict):
             continue
-        script = plugin.get("script")
-        if not script:
+        script_raw = plugin.get("script")
+        if not script_raw:
             continue
 
+        script = interpolate_placeholders(str(script_raw), config)
         sleep_time = plugin.get("sleep", 300)
         cache_entry = _plugin_output_cache.get(name)
 
         if cache_entry and (now - cache_entry["time"] < sleep_time) and sleep_time > 0:
             plugin_lines = cache_entry["lines"]
         else:
-            script_path = (
-                os.path.abspath(os.path.expanduser(script))
-                if os.path.isabs(script)
-                else os.path.join(scripts_dir, script)
-            )
+            if os.path.isabs(script):
+                script_path = script
+            else:
+                candidate = os.path.join(scripts_dir, script)
+                script_path = candidate if os.path.exists(candidate) else script
+
             with _plugin_lock:
                 if (
                     "unittest" in sys.modules
@@ -936,11 +957,13 @@ class MainMenuView(Widget):
             p_rich = Text("│  ", style=border_style)
 
             p_content_rich = bashmenu_ui.formatting_to_rich_text(p_line_interp, default_style=plugin_style, theme=theme_styles)
-            if p_content_rich.cell_len > avail_w:
+            content_w = get_visible_len(p_line_interp, self.config)
+            if content_w > avail_w:
                 p_content_rich.truncate(avail_w)
+                content_w = avail_w
 
             p_rich.append_text(p_content_rich)
-            pad_w = max(0, avail_w - p_content_rich.cell_len)
+            pad_w = max(0, avail_w - content_w)
             p_rich.append(" " * pad_w)
             p_rich.append("  │\n", style=border_style)
             out.append_text(p_rich)
