@@ -70,6 +70,78 @@ def is_formatting_tag(content: str) -> bool:
     return False
 
 
+PLACEHOLDER_SECTIONS = [
+    (
+        "System & Path Placeholders",
+        [
+            ("{user}", "Current logged-in username"),
+            ("{host}", "System hostname"),
+            ("{home}", "User home directory path (~ / /home/username)"),
+            ("{bashmenu_dir}", "Application root directory"),
+            ("{scripts_dir}", "Scripts directory path"),
+            ("{templates_dir}", "Templates directory path"),
+            ("{cache_dir}", "Cache directory path"),
+        ],
+    ),
+    (
+        "System Status & Network",
+        [
+            ("{battery}", "Current battery capacity percentage"),
+            ("{localip}", "Primary outbound IPv4 address"),
+            ("{user-mode}", "Privilege level (User or Root)"),
+            ("{version}", "BashMenu application version"),
+        ],
+    ),
+    (
+        "Date & Time Placeholders",
+        [
+            ("{date_time_12}", "Timestamp 12-hr format (YYYY-MM-DD HH:MM:SS AM/PM)"),
+            ("{date_time_12_short}", "Timestamp 12-hr short format (YYYY-MM-DD HH:MM AM/PM)"),
+            ("{date_time_24}", "Timestamp 24-hr format (YYYY-MM-DD HH:MM:SS)"),
+            ("{date_time_24_short}", "Timestamp 24-hr short format (YYYY-MM-DD HH:MM)"),
+            ("{date}", "Current date (YYYY-MM-DD)"),
+            ("{time_12}", "Current time 12-hr format"),
+            ("{time_12_short}", "Current time 12-hr short format"),
+            ("{time_24}", "Current time 24-hr format"),
+            ("{time_24_short}", "Current time 24-hr short format"),
+            ("{utc_seconds}", "UTC Unix epoch timestamp in seconds"),
+        ],
+    ),
+    (
+        "Terminal Layout Directives",
+        [
+            ("{window_width}", "Inner terminal window column width"),
+            ("{window_height}", "Inner terminal window line height"),
+        ],
+    ),
+    (
+        "Special Encodings & Dynamic Macros",
+        [
+            ("{ascii:<code_num>}", "CP437 ASCII character byte (e.g. {ascii:196} -> ─)"),
+            ("{command:<cmd>}", "Executes shell command and inserts output"),
+            ("{nf:<char>:<hex>:<emoji>}", "Adaptive Nerd Font / Unicode / Emoji glyph"),
+            ("{<key.path>}", "Refers to nested key in bashmenu.yml (e.g. {user.postal_code})"),
+        ],
+    ),
+]
+
+
+def format_placeholder_help_text(col1_width: int = 28) -> str:
+    """Format placeholder help entries into two aligned columns."""
+    lines = []
+    for title, items in PLACEHOLDER_SECTIONS:
+        if lines:
+            lines.append("")
+        lines.append(f"[bold magenta]── {title} ──[/bold magenta]")
+        for ph, desc in items:
+            padded_ph = f"{ph:<{col1_width}}"
+            lines.append(f"[bold white]{padded_ph}[/bold white] │ {desc}")
+    return "\n".join(lines)
+
+
+PLACEHOLDER_HELP_TEXT = format_placeholder_help_text(28)
+
+
 def is_pua_glyph(c: str) -> bool:
     """
     Check if a character falls within Unicode Private Use Area ranges

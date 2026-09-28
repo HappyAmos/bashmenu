@@ -450,7 +450,9 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{date_time_24_short}": now.strftime("%Y-%m-%d %H:%M"),
         "{date}": now.strftime("%Y-%m-%d"),
         "{time_12}": now.strftime("%I:%M:%S %p"),
+        "{time_12_short}": now.strftime("%I:%M %p"),
         "{time_24}": now.strftime("%H:%M:%S"),
+        "{time_24_short}": now.strftime("%H:%M"),
         "{utc_seconds}": str(int(now.timestamp())),
         "{user-mode}": "Root" if os.geteuid() == 0 else "User",
         "{version}": __version__,
@@ -719,11 +721,12 @@ def get_plugin_outputs(config):
         pretext = plugin.get("pretext")
         posttext = plugin.get("posttext")
 
-        if pretext:
-            lines.append(pretext)
-        lines.extend(plugin_lines)
-        if posttext:
-            lines.append(posttext)
+        if plugin_lines:
+            if pretext:
+                lines.append(pretext)
+            lines.extend(plugin_lines)
+            if posttext:
+                lines.append(posttext)
 
     return lines
 
@@ -1197,6 +1200,7 @@ def process_item_action(screen, item, config):
             screen.app.push_screen(
                 bashedit.BashEditScreen(
                     file_path=fpath,
+                    theme=getattr(screen.app, "theme_styles", None),
                     show_whitespace=show_whitespace,
                     tabstop=tabstop,
                     tab_to_spaces=tab_to_spaces,
@@ -1367,6 +1371,7 @@ def process_item_action(screen, item, config):
                         menu_file_path=MENU_FILE,
                         selected_item=sel_item,
                         title_chain=title_chain,
+                        theme=getattr(screen.app, "theme_styles", None),
                     ),
                     menu_cb,
                 )
@@ -1384,7 +1389,11 @@ def process_item_action(screen, item, config):
                         break
 
                 screen.app.push_screen(
-                    bashedit.BashEditScreen(file_path=target_file, display_theme_colors=display_colors),
+                    bashedit.BashEditScreen(
+                        file_path=target_file,
+                        theme=getattr(screen.app, "theme_styles", None),
+                        display_theme_colors=display_colors,
+                    ),
                     lambda res: screen.menu_view.refresh(),
                 )
                 return
@@ -1549,6 +1558,7 @@ class BashMenuScreen(Screen):
                 menu_file_path=MENU_FILE,
                 selected_item=sel_item,
                 title_chain=title_chain,
+                theme=getattr(self.app, "theme_styles", None),
             ),
             lambda res: self.refresh_environment(),
         )

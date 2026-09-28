@@ -10,6 +10,7 @@ __author__ = "HappyAmos"
 import contextlib
 import os
 import sys
+import textwrap
 from typing import ClassVar
 
 import yaml
@@ -60,40 +61,7 @@ ITEM_TYPES = [
 ]
 
 
-PLACEHOLDER_HELP_TEXT = """[bold magenta]── System & Path Placeholders ──[/bold magenta]
-[bold white]{user}[/bold white]           Current logged-in username
-[bold white]{host}[/bold white]           System hostname
-[bold white]{home}[/bold white]           User home directory path (~ / /home/username)
-[bold white]{bashmenu_dir}[/bold white]   Application root directory
-[bold white]{scripts_dir}[/bold white]    Scripts directory path
-[bold white]{templates_dir}[/bold white]  Templates directory path
-[bold white]{cache_dir}[/bold white]      Cache directory path
-
-[bold magenta]── System Status & Network ──[/bold magenta]
-[bold white]{battery}[/bold white]        Current battery capacity percentage
-[bold white]{localip}[/bold white]        Primary outbound IPv4 address
-[bold white]{user-mode}[/bold white]      Privilege level (User or Root)
-[bold white]{version}[/bold white]        BashMenu application version
-
-[bold magenta]── Date & Time Placeholders ──[/bold magenta]
-[bold white]{date_time_12}[/bold white]    Timestamp 12-hr format (YYYY-MM-DD HH:MM:SS AM/PM)
-[bold white]{date_time_24}[/bold white]    Timestamp 24-hr format (YYYY-MM-DD HH:MM:SS)
-[bold white]{date_time_24_short}[/bold white] Timestamp 24-hr short format (YYYY-MM-DD HH:MM)
-[bold white]{date}[/bold white]           Current date (YYYY-MM-DD)
-[bold white]{time_12}[/bold white]        Current time 12-hr format
-[bold white]{time_24}[/bold white]        Current time 24-hr format
-[bold white]{utc_seconds}[/bold white]    UTC Unix epoch timestamp in seconds
-
-[bold magenta]── Terminal Layout Directives ──[/bold magenta]
-[bold white]{window_width}[/bold white]   Inner terminal window column width
-[bold white]{window_height}[/bold white]  Inner terminal window line height
-
-[bold magenta]── Special Encodings & Dynamic Macros ──[/bold magenta]
-[bold white]{ascii:<code_num>}[/bold white]  CP437 ASCII character byte (e.g. {ascii:196} -> ─)
-[bold white]{command:<cmd>}[/bold white]    Executes shell command and inserts output
-[bold white]{nf:<char>:<hex>:<emoji>}[/bold white] Adaptive Nerd Font / Unicode / Emoji glyph
-[bold white]{<key.path>}[/bold white]     Refers to nested key in bashmenu.yml (e.g. {user.postal_code})
-"""
+from bashmenu_ui import PLACEHOLDER_HELP_TEXT
 
 
 class ItemTypePickerModal(ModalScreen[str]):
@@ -105,17 +73,44 @@ class ItemTypePickerModal(ModalScreen[str]):
         background: rgba(0, 0, 0, 0.6);
     }
     #dialog {
-        width: 70;
+        width: 78;
         height: 20;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
     }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
     #title {
+        width: 1fr;
         text-align: center;
         text-style: bold;
         color: $accent;
-        margin-bottom: 1;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
     }
     #option_list {
         height: 13;
@@ -133,18 +128,39 @@ class ItemTypePickerModal(ModalScreen[str]):
         Binding("c", "cancel", "Cancel"),
     ]
 
+    def __init__(self, theme: dict | None = None):
+        super().__init__()
+        self.theme = theme or {}
+
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
-            yield Label("Select Item Type", id="title")
+            with Horizontal(id="title_bar"):
+                yield Label("Select Item Type", id="title")
+                yield Label(bashmenu_ui.format_close_button_label(self.theme), id="btn_close_x", classes="btn_close_x")
             yield OptionList(id="option_list")
             yield Label("[ENTER] Select | [ESC / C] Cancel", id="footer")
 
     def on_mount(self) -> None:
-        bashmenu_ui.apply_modal_theme(self)
+        bashmenu_ui.apply_modal_theme(self, self.theme)
         opts = self.query_one("#option_list", OptionList)
+        col1_width = 24
+        indent_spaces = " " * col1_width
         for type_key, desc in ITEM_TYPES:
             badge = TYPE_BADGES.get(type_key, "[???]")
-            opts.add_option(Option(f"{badge} {type_key:<15} - {desc}"))
+            col1 = f"{badge} {type_key:<15} │ "
+            wrapped_desc = textwrap.wrap(desc, width=44)
+            if wrapped_desc:
+                first_line = f"{col1}{wrapped_desc[0]}"
+                subsequent_lines = [f"{indent_spaces}{line}" for line in wrapped_desc[1:]]
+                option_str = "\n".join([first_line] + subsequent_lines)
+            else:
+                option_str = col1
+            opts.add_option(Option(option_str))
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         idx = event.option_index
@@ -413,9 +429,10 @@ class ItemEditModal(ModalScreen[dict]):
         Binding("f4", "show_placeholders", "Placeholders"),
     ]
 
-    def __init__(self, item: dict):
+    def __init__(self, item: dict, theme: dict | None = None):
         super().__init__()
         self.item = item.copy()
+        self.theme = theme or {}
         self.selected_mode_idx = 0
 
     def compose(self) -> ComposeResult:
@@ -525,10 +542,10 @@ class ItemEditModal(ModalScreen[dict]):
             yield Label(footer_text, id="footer", markup=False)
 
     def on_mount(self) -> None:
-        bashmenu_ui.apply_modal_theme(self)
+        bashmenu_ui.apply_modal_theme(self, self.theme)
         with contextlib.suppress(Exception):
-            bashmenu_ui.apply_button_theme(self.query_one("#btn_save", Button), button_type="button_primary")
-            bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), button_type="button_cancel")
+            bashmenu_ui.apply_button_theme(self.query_one("#btn_save", Button), theme=self.theme, button_type="button_primary")
+            bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_cancel")
         if self.item.get("type") == "divider":
             self.update_divider_preview()
 
@@ -725,6 +742,25 @@ class ItemEditModal(ModalScreen[dict]):
         self.dismiss(None)
 
 
+class MenuEditTree(Tree):
+    """Custom Tree widget using Enter to edit items and Space to expand/collapse nodes."""
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("space", "toggle_node", "Expand/Collapse", show=False),
+        Binding("enter", "edit_node", "Edit Item", show=False),
+    ]
+
+    def action_toggle_node(self) -> None:
+        if self.cursor_node:
+            self.cursor_node.toggle()
+
+    def action_edit_node(self) -> None:
+        if self.cursor_node and self.cursor_node != self.root:
+            screen = getattr(self, "screen", None)
+            if screen and hasattr(screen, "action_edit_item"):
+                screen.action_edit_item()
+
+
 class MenuEditScreen(Screen):
     """Visual Menu Tree & Property Inspector Editor Screen in Textual."""
 
@@ -837,6 +873,7 @@ class MenuEditScreen(Screen):
         Binding("a", "add_item", "Add Item"),
         Binding("e", "edit_item", "Edit Item"),
         Binding("enter", "edit_item", "Edit Item"),
+        Binding("space", "toggle_tree_node", "Expand/Collapse", show=False),
         Binding("d", "delete_item", "Delete Item"),
         Binding("m", "move_down", "Move Down"),
         Binding("M", "move_up", "Move Up"),
@@ -860,12 +897,15 @@ class MenuEditScreen(Screen):
         menu_file_path: str | None = None,
         selected_item: dict | None = None,
         title_chain: list[str] | None = None,
+        theme: dict | str | None = None,
     ):
         super().__init__()
         self.menu_file_path = menu_file_path or bashmenu.MENU_FILE
         self.menu_data, _ = bashmenu.load_yaml_file(self.menu_file_path)
         self.selected_item = selected_item
         self.title_chain = title_chain or []
+        self.raw_theme = theme
+        self.theme_styles = bashmenu_ui.resolve_theme_dict(theme)
         self._target_node_to_focus = None
         self.modified = False
 
@@ -876,7 +916,7 @@ class MenuEditScreen(Screen):
             yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
         with Horizontal(id="workspace"):
             with Vertical(id="tree_panel"):
-                yield Tree("Root Menu", id="tree")
+                yield MenuEditTree("Root Menu", id="tree")
             with Vertical(id="inspector_panel"):
                 yield Label("── Property Inspector ──", id="inspector_title")
                 yield Static("Select a menu item in the hierarchy tree to inspect properties.", id="inspector_content")
@@ -885,11 +925,17 @@ class MenuEditScreen(Screen):
             yield Label("|", classes="footer_sep", markup=False)
             yield Label("[e/ENTER] Edit", id="lbl_edit", classes="footer_item", markup=False)
             yield Label("|", classes="footer_sep", markup=False)
+            yield Label("[SPACE] Toggle", id="lbl_toggle", classes="footer_item", markup=False)
+            yield Label("|", classes="footer_sep", markup=False)
             yield Label("[d] Delete", id="lbl_delete", classes="footer_item", markup=False)
             yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[m/M] Move", id="lbl_move", classes="footer_item", markup=False)
+            yield Label("[m] Move Dn", id="lbl_move_down", classes="footer_item", markup=False)
             yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[>/<] Indent", id="lbl_indent", classes="footer_item", markup=False)
+            yield Label("[M] Move Up", id="lbl_move_up", classes="footer_item", markup=False)
+            yield Label("|", classes="footer_sep", markup=False)
+            yield Label("[>] Indent", id="lbl_indent", classes="footer_item", markup=False)
+            yield Label("|", classes="footer_sep", markup=False)
+            yield Label("[<] Outdent", id="lbl_outdent", classes="footer_item", markup=False)
             yield Label("|", classes="footer_sep", markup=False)
             yield Label("[CTRL+A] ASCII", id="lbl_ascii", classes="footer_item", markup=False)
             yield Label("|", classes="footer_sep", markup=False)
@@ -898,6 +944,12 @@ class MenuEditScreen(Screen):
             yield Label("[s] Save", id="lbl_save", classes="footer_item", markup=False)
             yield Label("|", classes="footer_sep", markup=False)
             yield Label("[ESC/q] Exit", id="lbl_exit", classes="footer_item", markup=False)
+
+    def action_toggle_tree_node(self) -> None:
+        with contextlib.suppress(Exception):
+            tree = self.query_one("#tree", Tree)
+            if tree.cursor_node:
+                tree.cursor_node.toggle()
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -926,12 +978,18 @@ class MenuEditScreen(Screen):
             self.action_add_item()
         elif lbl_id == "lbl_edit":
             self.action_edit_item()
+        elif lbl_id == "lbl_toggle":
+            self.action_toggle_tree_node()
         elif lbl_id == "lbl_delete":
             self.action_delete_item()
-        elif lbl_id == "lbl_move":
+        elif lbl_id == "lbl_move_down":
             self.action_move_down()
+        elif lbl_id == "lbl_move_up":
+            self.action_move_up()
         elif lbl_id == "lbl_indent":
             self.action_indent_item()
+        elif lbl_id == "lbl_outdent":
+            self.action_outdent_item()
         elif lbl_id == "lbl_ascii":
             self.action_lookup_ascii()
         elif lbl_id == "lbl_placeholders":
@@ -950,7 +1008,7 @@ class MenuEditScreen(Screen):
             cfg = getattr(app_obj, "config", {}) if app_obj else {}
         cmd = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
         if app_obj:
-            app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd))
+            app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme_styles))
 
     def action_show_placeholders(self) -> None:
         try:
@@ -962,16 +1020,83 @@ class MenuEditScreen(Screen):
                 bashmenu_ui.MessageModalScreen(
                     "Available Placeholders & Macros",
                     PLACEHOLDER_HELP_TEXT,
+                    theme=self.theme_styles,
                     is_help=True,
                 )
             )
 
+    def apply_theme(self) -> None:
+        """Apply dynamic theme colors to MenuEditScreen and its subwidgets."""
+        with contextlib.suppress(Exception):
+            self.theme_styles = bashmenu_ui.resolve_theme_dict(
+                self.raw_theme or getattr(self.app, "theme_styles", None), self.app
+            )
+            bg_style = self.theme_styles.get("background")
+            if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
+                css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                if css_bg:
+                    for wid in ["#workspace", "#tree_panel", "#inspector_panel", "#tree", "#inspector_content"]:
+                        with contextlib.suppress(Exception):
+                            self.query_one(wid).styles.background = css_bg
+
+            hdr_style = self.theme_styles.get("header") or self.theme_styles.get("title")
+            if hdr_style:
+                if hdr_style.bgcolor and hdr_style.bgcolor.name:
+                    css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
+                    if css_hdr_bg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#header").styles.background = css_hdr_bg
+                if hdr_style.color and hdr_style.color.name:
+                    css_hdr_fg = bashmenu_ui.parse_css_color(hdr_style.color.name)
+                    if css_hdr_fg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#header_title", Label).styles.color = css_hdr_fg
+
+            with contextlib.suppress(Exception):
+                btn_close = self.query_one("#btn_close_x", Label)
+                btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
+
+            border_style = self.theme_styles.get("border") or self.theme_styles.get("accent")
+            if border_style and border_style.color and border_style.color.name:
+                css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+                if css_border:
+                    for pid in ["#tree_panel", "#inspector_panel"]:
+                        with contextlib.suppress(Exception):
+                            self.query_one(pid).styles.border = ("solid", css_border)
+
+            title_style = self.theme_styles.get("title") or self.theme_styles.get("accent")
+            if title_style and title_style.color and title_style.color.name:
+                css_title = bashmenu_ui.parse_css_color(title_style.color.name)
+                if css_title:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#inspector_title", Label).styles.color = css_title
+
+            text_style = self.theme_styles.get("text")
+            if text_style and text_style.color and text_style.color.name:
+                css_text = bashmenu_ui.parse_css_color(text_style.color.name)
+                if css_text:
+                    for wid in ["#tree", "#inspector_content"]:
+                        with contextlib.suppress(Exception):
+                            self.query_one(wid).styles.color = css_text
+
+            footer_style = self.theme_styles.get("footer") or self.theme_styles.get("background")
+            if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
+                css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
+                if css_ftr_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#footer").styles.background = css_ftr_bg
+
+            accent_style = self.theme_styles.get("accent") or self.theme_styles.get("help_text")
+            if accent_style and accent_style.color and accent_style.color.name:
+                css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
+                if css_accent:
+                    with contextlib.suppress(Exception):
+                        for item in self.query(".footer_item"):
+                            item.styles.color = css_accent
+
     def on_mount(self) -> None:
         self.populate_tree()
-        with contextlib.suppress(Exception):
-            self.theme_styles = bashmenu_ui.resolve_theme_dict(getattr(self.app, "theme_styles", None), self.app)
-            btn_close = self.query_one("#btn_close_x", Label)
-            btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
+        self.apply_theme()
         if self._target_node_to_focus:
             tn = self._target_node_to_focus
             self.call_after_refresh(self._focus_target_node, tn)
@@ -1071,6 +1196,13 @@ class MenuEditScreen(Screen):
 
         if target_node:
             self._target_node_to_focus = target_node
+            curr = target_node.parent
+            while curr:
+                curr.expand()
+                curr = curr.parent
+            tree.select_node(target_node)
+            tree.scroll_to_node(target_node)
+            self.update_inspector(target_node.data)
             self.call_after_refresh(self._focus_target_node, target_node)
 
         tree.focus()
@@ -1205,7 +1337,7 @@ class MenuEditScreen(Screen):
                 self.action_save_menu()
                 tree.refresh()
 
-        self.app.push_screen(ItemEditModal(node.data), save_cb)
+        self.app.push_screen(ItemEditModal(node.data, theme=self.theme_styles), save_cb)
 
     def action_add_item(self) -> None:
         tree = self.query_one("#tree", Tree)
@@ -1252,9 +1384,9 @@ class MenuEditScreen(Screen):
                     self.populate_tree(target_item=final_item)
                     self._save_menu_quietly()
 
-            self.app.push_screen(ItemEditModal(new_item), edit_cb)
+            self.app.push_screen(ItemEditModal(new_item, theme=self.theme_styles), edit_cb)
 
-        self.app.push_screen(ItemTypePickerModal(), type_cb)
+        self.app.push_screen(ItemTypePickerModal(theme=self.theme_styles), type_cb)
 
     def action_delete_item(self) -> None:
         tree = self.query_one("#tree", Tree)
@@ -1278,7 +1410,7 @@ class MenuEditScreen(Screen):
                         self.update_inspector(None)
 
         self.app.push_screen(
-            bashmenu_ui.ConfirmModalScreen("Delete Item", "Are you sure you want to delete this menu item?"),
+            bashmenu_ui.ConfirmModalScreen("Delete Item", "Are you sure you want to delete this menu item?", theme=self.theme_styles),
             confirm_cb,
         )
 
@@ -1306,6 +1438,8 @@ class MenuEditScreen(Screen):
     def action_move_up(self) -> None:
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
+        if (not node or not node.data or node == tree.root) and self.selected_item:
+            node = self._find_node_for_item(tree.root, self.selected_item)
         if not node or not node.data or node == tree.root:
             return
 
@@ -1316,6 +1450,7 @@ class MenuEditScreen(Screen):
         if idx > 0:
             target_item = node.data
             opts[idx], opts[idx - 1] = opts[idx - 1], opts[idx]
+            self.selected_item = target_item
             self.modified = True
             self.populate_tree(target_item=target_item)
             self._save_menu_quietly()
@@ -1323,6 +1458,8 @@ class MenuEditScreen(Screen):
     def action_move_down(self) -> None:
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
+        if (not node or not node.data or node == tree.root) and self.selected_item:
+            node = self._find_node_for_item(tree.root, self.selected_item)
         if not node or not node.data or node == tree.root:
             return
 
@@ -1333,6 +1470,7 @@ class MenuEditScreen(Screen):
         if idx < len(opts) - 1:
             target_item = node.data
             opts[idx], opts[idx + 1] = opts[idx + 1], opts[idx]
+            self.selected_item = target_item
             self.modified = True
             self.populate_tree(target_item=target_item)
             self._save_menu_quietly()
@@ -1340,6 +1478,8 @@ class MenuEditScreen(Screen):
     def action_indent_item(self) -> None:
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
+        if (not node or not node.data or node == tree.root) and self.selected_item:
+            node = self._find_node_for_item(tree.root, self.selected_item)
         if not node or not node.data or node == tree.root:
             return
 
@@ -1360,6 +1500,7 @@ class MenuEditScreen(Screen):
                         "options": [],
                     }
                 prev_sibling.setdefault("submenu", {}).setdefault("options", []).append(opts.pop(idx))
+                self.selected_item = target_item
                 self.modified = True
                 self.populate_tree(target_item=target_item)
                 self._save_menu_quietly()
@@ -1367,6 +1508,8 @@ class MenuEditScreen(Screen):
     def action_outdent_item(self) -> None:
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
+        if (not node or not node.data or node == tree.root) and self.selected_item:
+            node = self._find_node_for_item(tree.root, self.selected_item)
         if not node or not node.data or node == tree.root or not node.parent or node.parent == tree.root:
             return
 
@@ -1381,6 +1524,7 @@ class MenuEditScreen(Screen):
             target_item = node.data
             moved_item = parent_opts.pop(idx)
             grand_opts.insert(parent_idx + 1, moved_item)
+            self.selected_item = target_item
             self.modified = True
             self.populate_tree(target_item=target_item)
             self._save_menu_quietly()
@@ -1390,9 +1534,9 @@ class MenuEditScreen(Screen):
             with open(self.menu_file_path, "w", encoding="utf-8") as f:
                 yaml.dump(self.menu_data, f, sort_keys=False, default_flow_style=False)
             self.modified = False
-            self.app.push_screen(bashmenu_ui.MessageModalScreen("Save Menu", "Menu saved successfully to disk."))
+            self.app.push_screen(bashmenu_ui.MessageModalScreen("Save Menu", "Menu saved successfully to disk.", theme=self.theme_styles))
         except (yaml.YAMLError, OSError) as e:
-            self.app.push_screen(bashmenu_ui.MessageModalScreen("Error", f"Failed to save menu:\n{e}"))
+            self.app.push_screen(bashmenu_ui.MessageModalScreen("Error", f"Failed to save menu:\n{e}", theme=self.theme_styles))
 
     def action_exit_editor(self) -> None:
         def safe_exit(res_val):
@@ -1415,7 +1559,7 @@ class MenuEditScreen(Screen):
 
             self.app.push_screen(
                 bashmenu_ui.ConfirmModalScreen(
-                    "Unsaved Changes", "You have unsaved changes in the menu. Save before exiting?"
+                    "Unsaved Changes", "You have unsaved changes in the menu. Save before exiting?", theme=self.theme_styles
                 ),
                 confirm_cb,
             )

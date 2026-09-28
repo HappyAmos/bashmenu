@@ -12,8 +12,9 @@ from typing import ClassVar
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.events import Key
+from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Label
@@ -83,6 +84,10 @@ class EditorWidget(Widget):
     }
     """
 
+    show_line_numbers = reactive(True)
+    show_whitespace = reactive(False)
+    display_theme_colors = reactive(False)
+
     def __init__(
         self,
         lines=None,
@@ -149,18 +154,22 @@ class EditorWidget(Widget):
         width = max(1, self.size.width or 80)
 
         lineno_width = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
+        theme_dict = self.theme if isinstance(self.theme, dict) else {}
+        gutter_style = theme_dict.get("gutter") or theme_dict.get("help_text") or "dim cyan"
+        lineno_style = theme_dict.get("gutter") or theme_dict.get("text") or "dim white"
+        sel_style = theme_dict.get("selection") or "reverse bold magenta"
 
         for row_idx in range(height):
             line_num = self.top_line + row_idx
             if line_num >= len(self.lines):
-                out.append("~\n", style="dim cyan")
+                out.append("~\n", style=gutter_style)
                 continue
 
             line_text = self.lines[line_num]
 
             if self.show_line_numbers:
                 num_str = f"{line_num + 1:>{lineno_width - 1}} "
-                out.append(num_str, style="dim white")
+                out.append(num_str, style=lineno_style)
 
             # Format line content with optional whitespace rendering
             disp_text = line_text
@@ -213,7 +222,7 @@ class EditorWidget(Widget):
                     rel_s = max(0, sm_x - sx)
                     rel_e = min(len(visible_segment), em_x - sx)
                     if rel_s < rel_e:
-                        line_rich.stylize("reverse bold magenta", rel_s, rel_e)
+                        line_rich.stylize(sel_style, rel_s, rel_e)
 
             # Highlight current line cursor position
             if line_num == self.cursor_y:
@@ -445,16 +454,38 @@ class EditorWidget(Widget):
         return "Pasted"
 
 
+class EditorTab:
+    """Represents an open document tab buffer in BashEdit."""
+
+    def __init__(self, file_path: str | None = None, lines: list[str] | None = None):
+        self.file_path = file_path
+        self.lines = list(lines) if lines else [""]
+        self.cursor_y = 0
+        self.cursor_x = 0
+        self.top_line = 0
+        self.left_col = 0
+        self.mark_active = False
+        self.mark_y = 0
+        self.mark_x = 0
+        self.undo_stack = []
+        self.redo_stack = []
+        self.modified = False
+
+
 class BashEditScreen(Screen):
-    """Full screen Nano-style text editor."""
+    """Full screen Nano-style text editor with tab support."""
 
     DEFAULT_CSS = """
     BashEditScreen {
         layout: vertical;
         background: $surface;
     }
-    #editor_header_bar {
+    #editor_header_area {
         dock: top;
+        height: auto;
+        width: 100%;
+    }
+    #editor_header_bar {
         height: 1;
         width: 100%;
         background: $accent;
@@ -464,6 +495,37 @@ class BashEditScreen(Screen):
         width: 1fr;
         text-align: center;
         text-style: bold;
+    }
+    #editor_tab_bar {
+        height: 1;
+        width: 100%;
+        background: $panel;
+        color: $text-muted;
+    }
+    .editor_tab {
+        padding: 0 1;
+        background: $panel;
+        color: $text-muted;
+    }
+    .editor_tab_active {
+        padding: 0 1;
+        background: $surface;
+        color: $text;
+        text-style: bold;
+    }
+    .editor_tab_close {
+        padding: 0 1;
+        color: $error;
+    }
+    .editor_tab_close:hover {
+        color: $text;
+    }
+    .editor_tab_add {
+        padding: 0 1;
+        color: $accent;
+    }
+    .editor_tab_add:hover {
+        color: $text;
     }
     .btn_close_x {
         dock: right;
@@ -487,15 +549,20 @@ class BashEditScreen(Screen):
         margin: 0;
         background: transparent;
     }
-    #editor_status {
+    #editor_footer_area {
         dock: bottom;
+        height: auto;
+        width: 100%;
+    }
+    #editor_status {
         height: 1;
+        width: 100%;
         background: $panel;
         color: $text-muted;
     }
     #editor_legend {
-        dock: bottom;
         height: 1;
+        width: 100%;
         background: $surface;
         color: $accent;
         align: center middle;
@@ -509,7 +576,6 @@ class BashEditScreen(Screen):
         color: $text;
     }
     #editor_divider {
-        dock: bottom;
         height: 1;
         width: 100%;
         color: $accent;
@@ -517,15 +583,16 @@ class BashEditScreen(Screen):
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("ctrl+o", "save_file", "Save"),
-        Binding("f2", "save_file", "Save", show=False),
-        Binding("f3", "save_file", "Save", show=False),
-        Binding("ctrl+r", "open_file", "Open"),
+        Binding("ctrl+o", "open_file", "Open"),
+        Binding("ctrl+r", "open_file", "Open", show=False),
         Binding("f5", "open_file", "Open", show=False),
         Binding("f7", "open_file", "Open", show=False),
+        Binding("ctrl+s", "save_file", "Save"),
+        Binding("f2", "save_file", "Save", show=False),
+        Binding("f3", "save_file", "Save", show=False),
         Binding("ctrl+e", "new_file", "New", show=False),
         Binding("f4", "new_file", "New", show=False),
-        Binding("ctrl+s", "save_file_as", "Save As", show=False),
+        Binding("ctrl+shift+s", "save_file_as", "Save As", show=False),
         Binding("f6", "save_file_as", "Save As", show=False),
         Binding("ctrl+k", "cut_line", "Cut"),
         Binding("f8", "cut_line", "Cut", show=False),
@@ -536,9 +603,12 @@ class BashEditScreen(Screen):
         Binding("ctrl+x", "exit_editor", "Exit"),
         Binding("escape", "exit_editor", "Exit", show=False),
         Binding("esc", "exit_editor", "Exit", show=False),
-        Binding("alt+p", "toggle_whitespace", "Whitespace"),
-        Binding("alt+w", "toggle_whitespace", "Whitespace", show=False),
-        Binding("ctrl+p", "toggle_whitespace", "Whitespace", show=False),
+        Binding("alt+1", "toggle_whitespace", "Whitespace"),
+        Binding("meta+1", "toggle_whitespace", "Whitespace", show=False),
+        Binding("m-1", "toggle_whitespace", "Whitespace", show=False),
+        Binding("m+1", "toggle_whitespace", "Whitespace", show=False),
+        Binding("ctrl+p", "show_placeholders", "Placeholders"),
+        Binding("alt+m", "show_placeholders", "Placeholders", show=False),
         Binding("ctrl+6", "toggle_mark", "Mark"),
         Binding("alt+a", "toggle_mark", "Mark", show=False),
         Binding("ctrl+c", "copy_selection", "Copy", show=False),
@@ -560,6 +630,11 @@ class BashEditScreen(Screen):
         Binding("end", "move_end", "End", show=False),
         Binding("alt+t", "toggle_theme_colors", "Toggle Theme Colors", show=False),
         Binding("alt+v", "view_colors", "View Colors", show=False),
+        Binding("f10", "view_colors", "View Colors", show=False),
+        Binding("alt+]", "next_tab", "Next Tab", show=False),
+        Binding("alt+[", "prev_tab", "Prev Tab", show=False),
+        Binding("ctrl+tab", "next_tab", "Next Tab", show=False),
+        Binding("ctrl+shift+tab", "prev_tab", "Prev Tab", show=False),
     ]
 
     def __init__(
@@ -610,12 +685,23 @@ class BashEditScreen(Screen):
                 lines = [f"# Error reading file: {e}"]
 
         self.initial_lines = lines
+        self.tabs = [EditorTab(file_path=self.file_path, lines=self.initial_lines)]
+        self.active_tab_idx = 0
 
     def compose(self) -> ComposeResult:
         file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
-        with Horizontal(id="editor_header_bar"):
-            yield Label(f"  BashEdit - {file_name}  ", id="editor_header")
-            yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+        with Vertical(id="editor_header_area"):
+            with Horizontal(id="editor_header_bar"):
+                yield Label(f"  BashEdit - {file_name}  ", id="editor_header")
+                yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+            with Horizontal(id="editor_tab_bar"):
+                for idx, tab in enumerate(self.tabs):
+                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                    mod = " *" if tab.modified else ""
+                    cls = "editor_tab_active" if idx == self.active_tab_idx else "editor_tab"
+                    yield Label(f" {idx + 1}: {name}{mod} ", classes=f"editor_tab_select tab_select_{idx} {cls}")
+                    yield Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}")
+                yield Label(" [ + ] ", id="tab_add_new", classes="editor_tab_add")
         yield EditorWidget(
             lines=self.initial_lines,
             show_whitespace=self.show_whitespace,
@@ -625,59 +711,405 @@ class BashEditScreen(Screen):
             display_theme_colors=self.display_theme_colors,
             id="editor_widget",
         )
-        yield Label("─" * 300, id="editor_divider")
-        with Horizontal(id="editor_legend"):
-            yield Label("^O Save", id="lbl_save", classes="footer_item", markup=False)
-            yield Label("^R Open", id="lbl_open", classes="footer_item", markup=False)
-            yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
-            yield Label("^K Cut", id="lbl_cut", classes="footer_item", markup=False)
-            yield Label("Alt+6 Copy", id="lbl_copy", classes="footer_item", markup=False)
-            yield Label("^U Paste", id="lbl_paste", classes="footer_item", markup=False)
-            yield Label("^^ Mark", id="lbl_mark", classes="footer_item", markup=False)
-            yield Label("^P Space", id="lbl_space", classes="footer_item", markup=False)
-            yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
-            yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
-            yield Label("^X Exit", id="lbl_exit", classes="footer_item", markup=False)
-        yield Label("  Line 1/1, Col 1  ", id="editor_status")
+        with Vertical(id="editor_footer_area"):
+            yield Label("─" * 500, id="editor_divider")
+            with Horizontal(id="editor_legend"):
+                yield Label("^O Open", id="lbl_open", classes="footer_item", markup=False)
+                yield Label("^S Save", id="lbl_save", classes="footer_item", markup=False)
+                yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
+                yield Label("^K Cut", id="lbl_cut", classes="footer_item", markup=False)
+                yield Label("Alt+6 Copy", id="lbl_copy", classes="footer_item", markup=False)
+                yield Label("^U Paste", id="lbl_paste", classes="footer_item", markup=False)
+                yield Label("^^ Mark", id="lbl_mark", classes="footer_item", markup=False)
+                yield Label("^P Macros", id="lbl_placeholders", classes="footer_item", markup=False)
+                yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
+                yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
+                yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
+                yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
+                yield Label("^X Exit", id="lbl_exit", classes="footer_item", markup=False)
+            yield Label("  Line 1/1, Col 1  ", id="editor_status")
 
     def on_click(self, event) -> None:
-        widget = getattr(event, "widget", None) or getattr(event, "target", None)
-        if not widget:
+        node = getattr(event, "target", None) or getattr(event, "widget", None)
+        target_action = None
+        target_idx = None
+
+        while node is not None:
+            nid = getattr(node, "id", None) or ""
+            classes = set(getattr(node, "classes", []))
+
+            if nid == "tab_add_new" or "tab_add_new" in classes:
+                target_action = "add"
+                break
+            if nid == "btn_close_x" or "btn_close_x" in classes:
+                target_action = "close_app"
+                break
+
+            if nid.startswith("tab_select_"):
+                target_action = "select"
+                with contextlib.suppress(ValueError):
+                    target_idx = int(nid.split("_")[-1])
+                break
+            if nid.startswith("tab_close_"):
+                target_action = "close_tab"
+                with contextlib.suppress(ValueError):
+                    target_idx = int(nid.split("_")[-1])
+                break
+
+            for cls in classes:
+                if cls.startswith("tab_select_"):
+                    target_action = "select"
+                    with contextlib.suppress(ValueError):
+                        target_idx = int(cls.split("_")[-1])
+                    break
+                if cls.startswith("tab_close_"):
+                    target_action = "close_tab"
+                    with contextlib.suppress(ValueError):
+                        target_idx = int(cls.split("_")[-1])
+                    break
+                if cls.startswith("lbl_"):
+                    target_action = cls
+                    break
+
+            if target_action:
+                break
+
+            if nid and nid.startswith("lbl_"):
+                target_action = nid
+                break
+
+            node = getattr(node, "parent", None)
+
+        if not target_action:
             return
-        lbl_id = getattr(widget, "id", None)
-        if lbl_id == "lbl_save":
-            self.action_save_file()
-        elif lbl_id == "lbl_open":
-            self.action_open_file()
-        elif lbl_id == "lbl_search":
-            self.action_search_text()
-        elif lbl_id == "lbl_cut":
-            self.action_cut_line()
-        elif lbl_id == "lbl_copy":
-            self.action_copy_selection()
-        elif lbl_id == "lbl_paste":
-            self.action_paste_buffer()
-        elif lbl_id == "lbl_mark":
-            self.action_toggle_mark()
-        elif lbl_id == "lbl_space":
-            self.action_toggle_whitespace()
-        elif lbl_id == "lbl_lineno":
-            self.action_toggle_lineno()
-        elif lbl_id == "lbl_help":
-            self.action_help_manual()
-        elif lbl_id in ("lbl_exit", "btn_close_x"):
+
+        with contextlib.suppress(Exception):
+            event.prevent_default()
+            event.stop()
+
+        if target_action == "select" and target_idx is not None:
+            self.load_tab_state(target_idx)
+        elif target_action == "close_tab" and target_idx is not None:
+            self.action_close_tab(target_idx)
+        elif target_action == "add":
+            self.action_new_tab()
+        elif target_action in ("close_app", "lbl_exit"):
             self.action_exit_editor()
+        elif target_action == "lbl_save":
+            self.action_save_file()
+        elif target_action == "lbl_open":
+            self.action_open_file()
+        elif target_action == "lbl_search":
+            self.action_search_text()
+        elif target_action == "lbl_cut":
+            self.action_cut_line()
+        elif target_action == "lbl_copy":
+            self.action_copy_selection()
+        elif target_action == "lbl_paste":
+            self.action_paste_buffer()
+        elif target_action == "lbl_mark":
+            self.action_toggle_mark()
+        elif target_action == "lbl_placeholders":
+            self.action_show_placeholders()
+        elif target_action == "lbl_colors":
+            self.action_view_colors()
+        elif target_action == "lbl_space":
+            self.action_toggle_whitespace()
+        elif target_action == "lbl_lineno":
+            self.action_toggle_lineno()
+        elif target_action == "lbl_help":
+            self.action_help_manual()
+
+    def save_active_tab_state(self) -> None:
+        if 0 <= self.active_tab_idx < len(self.tabs):
+            tab = self.tabs[self.active_tab_idx]
+            try:
+                ed = self.query_one("#editor_widget", EditorWidget)
+                tab.file_path = self.file_path
+                tab.lines = list(ed.lines)
+                tab.cursor_y = ed.cursor_y
+                tab.cursor_x = ed.cursor_x
+                tab.top_line = ed.top_line
+                tab.left_col = ed.left_col
+                tab.mark_active = ed.mark_active
+                tab.mark_y = ed.mark_y
+                tab.mark_x = ed.mark_x
+                tab.undo_stack = list(ed.undo_stack)
+                tab.redo_stack = list(ed.redo_stack)
+                tab.modified = ed.modified
+            except Exception:  # noqa: BLE001, S110
+                pass
+
+    def load_tab_state(self, index: int) -> None:
+        if not (0 <= index < len(self.tabs)):
+            return
+        self.save_active_tab_state()
+        self.active_tab_idx = index
+        tab = self.tabs[index]
+        self.file_path = tab.file_path
+
+        try:
+            ed = self.query_one("#editor_widget", EditorWidget)
+            ed.lines = list(tab.lines)
+            ed.cursor_y = tab.cursor_y
+            ed.cursor_x = tab.cursor_x
+            ed.top_line = tab.top_line
+            ed.left_col = tab.left_col
+            ed.mark_active = tab.mark_active
+            ed.mark_y = tab.mark_y
+            ed.mark_x = tab.mark_x
+            ed.undo_stack = list(tab.undo_stack)
+            ed.redo_stack = list(tab.redo_stack)
+            ed.modified = tab.modified
+            ed.clamp_cursor()
+            ed.refresh()
+
+            file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
+            self.query_one("#editor_header", Label).update(f"  BashEdit - {file_name}  ")
+            self.update_status()
+            self.refresh_tab_bar()
+        except Exception:  # noqa: BLE001, S110
+            pass
+
+    def refresh_tab_bar(self) -> None:
+        try:
+            tab_bar = self.query_one("#editor_tab_bar", Horizontal)
+            existing = list(tab_bar.children)
+            num_tabs = len(self.tabs)
+
+            add_btn = None
+            with contextlib.suppress(Exception):
+                add_btn = tab_bar.query_one("#tab_add_new", Label)
+
+            current_pairs = (len(existing) - 1) // 2 if add_btn and len(existing) >= 1 else 0
+
+            if current_pairs == num_tabs and add_btn:
+                for idx, tab in enumerate(self.tabs):
+                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                    mod = " *" if tab.modified else ""
+                    tab_label = f" {idx + 1}: {name}{mod} "
+                    is_active = idx == self.active_tab_idx
+
+                    select_w = existing[idx * 2]
+                    select_w.update(tab_label)
+                    select_w.set_classes(f"editor_tab_select tab_select_{idx} {'editor_tab_active' if is_active else 'editor_tab'}")
+                    close_w = existing[idx * 2 + 1]
+                    close_w.set_classes(f"editor_tab_close tab_close_{idx}")
+                return
+
+            if current_pairs < num_tabs and add_btn and current_pairs > 0:
+                for idx in range(current_pairs):
+                    tab = self.tabs[idx]
+                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                    mod = " *" if tab.modified else ""
+                    tab_label = f" {idx + 1}: {name}{mod} "
+                    is_active = idx == self.active_tab_idx
+
+                    select_w = existing[idx * 2]
+                    select_w.update(tab_label)
+                    select_w.set_classes(f"editor_tab_select tab_select_{idx} {'editor_tab_active' if is_active else 'editor_tab'}")
+                    close_w = existing[idx * 2 + 1]
+                    close_w.set_classes(f"editor_tab_close tab_close_{idx}")
+
+                new_widgets = []
+                for idx in range(current_pairs, num_tabs):
+                    tab = self.tabs[idx]
+                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                    mod = " *" if tab.modified else ""
+                    tab_label = f" {idx + 1}: {name}{mod} "
+                    cls = "editor_tab_active" if idx == self.active_tab_idx else "editor_tab"
+                    new_widgets.append(Label(tab_label, classes=f"editor_tab_select tab_select_{idx} {cls}"))
+                    new_widgets.append(Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}"))
+
+                tab_bar.mount(*new_widgets, before=add_btn)
+                return
+
+            if current_pairs > num_tabs and add_btn:
+                for idx in range(num_tabs, current_pairs):
+                    with contextlib.suppress(Exception):
+                        existing[idx * 2].remove()
+                        existing[idx * 2 + 1].remove()
+
+                for idx in range(num_tabs):
+                    tab = self.tabs[idx]
+                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                    mod = " *" if tab.modified else ""
+                    tab_label = f" {idx + 1}: {name}{mod} "
+                    is_active = idx == self.active_tab_idx
+
+                    select_w = existing[idx * 2]
+                    select_w.update(tab_label)
+                    select_w.set_classes(f"editor_tab_select tab_select_{idx} {'editor_tab_active' if is_active else 'editor_tab'}")
+                    close_w = existing[idx * 2 + 1]
+                    close_w.set_classes(f"editor_tab_close tab_close_{idx}")
+                return
+
+            tab_bar.remove_children()
+
+            widgets = []
+            for idx, tab in enumerate(self.tabs):
+                name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                mod = " *" if tab.modified else ""
+                tab_label = f" {idx + 1}: {name}{mod} "
+                cls = "editor_tab_active" if idx == self.active_tab_idx else "editor_tab"
+                widgets.append(Label(tab_label, classes=f"editor_tab_select tab_select_{idx} {cls}"))
+                widgets.append(Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}"))
+
+            widgets.append(Label(" [ + ] ", id="tab_add_new", classes="editor_tab_add"))
+            tab_bar.mount(*widgets)
+        except Exception:  # noqa: BLE001, S110
+            pass
+
+    def action_new_tab(self, file_path: str | None = None, lines: list[str] | None = None) -> None:
+        self.save_active_tab_state()
+        new_tab = EditorTab(file_path=file_path, lines=lines or [""])
+        self.tabs.append(new_tab)
+        self.load_tab_state(len(self.tabs) - 1)
+
+    def action_next_tab(self) -> None:
+        if len(self.tabs) > 1:
+            next_idx = (self.active_tab_idx + 1) % len(self.tabs)
+            self.load_tab_state(next_idx)
+
+    def action_prev_tab(self) -> None:
+        if len(self.tabs) > 1:
+            prev_idx = (self.active_tab_idx - 1) % len(self.tabs)
+            self.load_tab_state(prev_idx)
+
+    def action_close_tab(self, index: int | None = None) -> None:
+        if index is None:
+            index = self.active_tab_idx
+        if not (0 <= index < len(self.tabs)):
+            return
+
+        self.save_active_tab_state()
+        target_tab = self.tabs[index]
+
+        def do_close():
+            if len(self.tabs) == 1:
+                self.tabs[0] = EditorTab()
+                self.load_tab_state(0)
+            else:
+                self.tabs.pop(index)
+                if index < self.active_tab_idx:
+                    new_idx = max(0, self.active_tab_idx - 1)
+                else:
+                    new_idx = min(self.active_tab_idx, len(self.tabs) - 1)
+                self.load_tab_state(new_idx)
+
+        if target_tab.modified:
+            tab_name = os.path.basename(target_tab.file_path) if target_tab.file_path else "Untitled"
+
+            def confirm_cb(res):
+                if res == "yes":
+                    if index == self.active_tab_idx:
+                        self.action_save_file()
+                    do_close()
+                elif res == "no":
+                    do_close()
+
+            self.app.push_screen(
+                bashmenu_ui.ConfirmModalScreen(
+                    "Save Modified Tab?",
+                    f"Tab '{tab_name}' has unsaved changes. Save before closing?",
+                    theme=self.theme_styles,
+                ),
+                confirm_cb,
+            )
+        else:
+            do_close()
+
+    def action_exit_editor_force(self) -> None:
+        if len(self.app.screen_stack) > 1:
+            try:
+                self.dismiss(False)
+            except Exception:  # noqa: BLE001
+                self.app.pop_screen()
+        else:
+            self.app.exit(False)
+
+    def apply_theme(self) -> None:
+        """Apply dynamic theme styles to BashEditScreen, EditorWidget, and header/footer elements."""
+        with contextlib.suppress(Exception):
+            self.theme_styles = bashmenu_ui.resolve_theme_dict(
+                getattr(self, "theme_styles", None) or getattr(self.app, "theme_styles", None), self.app
+            )
+            bg_style = self.theme_styles.get("background")
+            if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
+                css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                if css_bg:
+                    with contextlib.suppress(Exception):
+                        self.styles.background = css_bg
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_widget", EditorWidget).styles.background = css_bg
+
+            text_style = self.theme_styles.get("text")
+            if text_style and text_style.color and text_style.color.name:
+                css_text = bashmenu_ui.parse_css_color(text_style.color.name)
+                if css_text:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_widget", EditorWidget).styles.color = css_text
+
+            hdr_style = self.theme_styles.get("header") or self.theme_styles.get("title")
+            if hdr_style:
+                if hdr_style.bgcolor and hdr_style.bgcolor.name:
+                    css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
+                    if css_hdr_bg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#editor_header_bar").styles.background = css_hdr_bg
+                if hdr_style.color and hdr_style.color.name:
+                    css_hdr_fg = bashmenu_ui.parse_css_color(hdr_style.color.name)
+                    if css_hdr_fg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#editor_header", Label).styles.color = css_hdr_fg
+
+            with contextlib.suppress(Exception):
+                btn_close = self.query_one("#btn_close_x", Label)
+                btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
+
+            divider_style = self.theme_styles.get("divider") or self.theme_styles.get("border") or self.theme_styles.get("accent")
+            if divider_style and divider_style.color and divider_style.color.name:
+                css_div = bashmenu_ui.parse_css_color(divider_style.color.name)
+                if css_div:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_divider", Label).styles.color = css_div
+
+            status_style = self.theme_styles.get("status") or self.theme_styles.get("footer") or self.theme_styles.get("header")
+            if status_style:
+                if status_style.bgcolor and status_style.bgcolor.name:
+                    css_st_bg = bashmenu_ui.parse_css_color(status_style.bgcolor.name)
+                    if css_st_bg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#editor_status", Label).styles.background = css_st_bg
+                if status_style.color and status_style.color.name:
+                    css_st_fg = bashmenu_ui.parse_css_color(status_style.color.name)
+                    if css_st_fg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#editor_status", Label).styles.color = css_st_fg
+
+            footer_style = self.theme_styles.get("footer") or self.theme_styles.get("background")
+            if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
+                css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
+                if css_ftr_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_legend").styles.background = css_ftr_bg
+
+            accent_style = self.theme_styles.get("accent") or self.theme_styles.get("help_text")
+            if accent_style and accent_style.color and accent_style.color.name:
+                css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
+                if css_accent:
+                    with contextlib.suppress(Exception):
+                        for item in self.query(".footer_item"):
+                            item.styles.color = css_accent
+
+            with contextlib.suppress(Exception):
+                ed = self.query_one("#editor_widget", EditorWidget)
+                ed.theme = self.theme_styles
+                ed.refresh()
 
     def on_mount(self) -> None:
         self.query_one("#editor_widget", EditorWidget).focus()
-        with contextlib.suppress(Exception):
-            btn_close = self.query_one("#btn_close_x", Label)
-            btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
-        divider_style = self.theme_styles.get("divider") or self.theme_styles.get("border") or self.theme_styles.get("accent")
-        if divider_style and divider_style.color and divider_style.color.name:
-            css_div = bashmenu_ui.parse_css_color(divider_style.color.name)
-            if css_div:
-                self.query_one("#editor_divider", Label).styles.color = css_div
+        self.apply_theme()
 
     def update_status(self, msg: str | None = None):
         ed = self.query_one("#editor_widget", EditorWidget)
@@ -688,35 +1120,75 @@ class BashEditScreen(Screen):
 
     def on_key(self, event: Key) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
+        key_lower = (event.key or "").lower()
+        char_lower = (event.character or "").lower()
+
+        if key_lower in ["alt+]", "meta+]", "ctrl+tab", "alt+right"]:
+            event.prevent_default()
+            event.stop()
+            self.action_next_tab()
+            return
+
+        if key_lower in ["alt+[", "meta+[", "ctrl+shift+tab", "alt+left"]:
+            event.prevent_default()
+            event.stop()
+            self.action_prev_tab()
+            return
+
+        if key_lower in ["alt+1", "meta+1", "m-1", "m+1", "alt_1", "meta_1", "esc 1", "escape 1", "¡"] or (
+            key_lower.startswith(("alt+", "meta+", "m-", "alt_", "meta_")) and key_lower.endswith("1")
+        ) or char_lower in ["¡", "\u00a1"]:
+            event.prevent_default()
+            event.stop()
+            self.action_toggle_whitespace()
+            return
+
+        if key_lower in ["escape", "esc"]:
+            event.prevent_default()
+            event.stop()
+            if ed.mark_active:
+                ed.mark_active = False
+                ed.refresh()
+                self.update_status("Mark Unset")
+            return
 
         # Handle raw ASCII 0x1e (RS) sent by some terminal emulators for Control+^
-        if event.character == "\x1e" or event.key == "rs":
+        if event.character == "\x1e" or key_lower == "rs":
             self.action_toggle_mark()
             return
 
         # Handle section sign (§ / \u00a7) sent by some terminal emulators when no key binding fires
-        if event.character in ["§", "\u00a7"] or event.key in ["§", "section"]:
+        if char_lower in ["§", "\u00a7"] or key_lower in ["§", "section"]:
             event.prevent_default()
             event.stop()
             self.action_copy_selection()
             return
 
-        if event.key in ["f1", "ctrl+g", "alt+h", "meta+h"]:
+        if key_lower in ["f1", "ctrl+g", "alt+h", "meta+h"]:
             event.prevent_default()
             event.stop()
             self.action_help_manual()
             return
 
-        if event.key in ["alt+t", "meta+t"]:
+        if key_lower in ["alt+t", "meta+t"]:
             event.prevent_default()
             event.stop()
-            self.action_toggle_theme_colors()
+            if self.display_theme_colors:
+                self.action_toggle_theme_colors()
+            else:
+                self.action_new_tab()
             return
 
-        if event.key in ["alt+v", "meta+v"]:
+        if key_lower in ["alt+v", "meta+v", "f10"]:
             event.prevent_default()
             event.stop()
             self.action_view_colors()
+            return
+
+        if key_lower in ["ctrl+p", "alt+m", "meta+m"]:
+            event.prevent_default()
+            event.stop()
+            self.action_show_placeholders()
             return
 
         # Ignore modifier combinations, function keys & action shortcut keys so Textual bindings process them as actions
@@ -816,6 +1288,10 @@ class BashEditScreen(Screen):
             with open(self.file_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(ed.lines))
             ed.modified = False
+            if 0 <= self.active_tab_idx < len(self.tabs):
+                self.tabs[self.active_tab_idx].modified = False
+                self.tabs[self.active_tab_idx].file_path = self.file_path
+            self.refresh_tab_bar()
             self.update_status("Wrote file successfully")
         except (OSError, ValueError) as e:
             self.update_status(f"Error saving file: {e}")
@@ -825,68 +1301,62 @@ class BashEditScreen(Screen):
 
         def open_cb(path):
             if path and os.path.exists(path):
-                self.file_path = path
-                try:
-                    with open(path, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read().splitlines()
-                        ed.lines = content if content else [""]
-                    ed.cursor_y = 0
-                    ed.cursor_x = 0
-                    ed.top_line = 0
-                    ed.left_col = 0
-                    ed.modified = False
-                    ed.refresh()
-                    self.query_one("#editor_header", Label).update(f"  BashEdit - {os.path.basename(path)}  ")
-                    self.update_status(f"Opened {os.path.basename(path)}")
-                except (OSError, UnicodeDecodeError, ValueError) as e:
-                    self.update_status(f"Error opening file: {e}")
+                # Check if file is already open in a tab
+                for idx, tab in enumerate(self.tabs):
+                    if tab.file_path and os.path.abspath(tab.file_path) == os.path.abspath(path):
+                        self.load_tab_state(idx)
+                        self.update_status(f"Switched to open tab {os.path.basename(path)}")
+                        return
 
-        if ed.modified:
-            def confirm_open(res):
-                if res == "yes":
-                    self.action_save_file()
-                    self.app.push_screen(bashmenu_ui.FilePickerModalScreen("Open File", mode="file", theme=self.theme_styles), open_cb)
-                elif res == "no":
-                    self.app.push_screen(bashmenu_ui.FilePickerModalScreen("Open File", mode="file", theme=self.theme_styles), open_cb)
+                # If current active tab is empty and unmodified, load into current tab
+                if not self.file_path and not ed.modified and ed.lines == [""]:
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="replace") as f:
+                            content = f.read().splitlines()
+                            lines = content if content else [""]
+                        self.file_path = path
+                        ed.lines = lines
+                        ed.cursor_y = 0
+                        ed.cursor_x = 0
+                        ed.top_line = 0
+                        ed.left_col = 0
+                        ed.modified = False
+                        ed.refresh()
+                        if 0 <= self.active_tab_idx < len(self.tabs):
+                            self.tabs[self.active_tab_idx].file_path = path
+                            self.tabs[self.active_tab_idx].lines = lines
+                            self.tabs[self.active_tab_idx].modified = False
+                        self.query_one("#editor_header", Label).update(f"  BashEdit - {os.path.basename(path)}  ")
+                        self.update_status(f"Opened {os.path.basename(path)}")
+                        self.refresh_tab_bar()
+                    except (OSError, UnicodeDecodeError, ValueError) as e:
+                        self.update_status(f"Error opening file: {e}")
+                else:
+                    # Open in new tab
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="replace") as f:
+                            content = f.read().splitlines()
+                            lines = content if content else [""]
+                        self.action_new_tab(file_path=path, lines=lines)
+                        self.update_status(f"Opened {os.path.basename(path)} in new tab")
+                    except (OSError, UnicodeDecodeError, ValueError) as e:
+                        self.update_status(f"Error opening file: {e}")
 
-            self.app.push_screen(
-                bashmenu_ui.ConfirmModalScreen("Save Changes?", "File has unsaved changes. Save before opening new file?", theme=self.theme_styles),
-                confirm_open,
-            )
-        else:
-            self.app.push_screen(bashmenu_ui.FilePickerModalScreen("Open File", mode="file", theme=self.theme_styles), open_cb)
+        start_dir = (
+            os.path.dirname(os.path.abspath(self.file_path))
+            if self.file_path and os.path.exists(self.file_path)
+            else os.getcwd()
+        )
+        self.app.push_screen(
+            bashmenu_ui.FilePickerModalScreen("Open File", start_dir=start_dir, mode="file", theme=self.theme_styles),
+            open_cb,
+        )
 
     def action_new_file(self) -> None:
-        ed = self.query_one("#editor_widget", EditorWidget)
-
-        def reset_buffer():
-            self.file_path = None
-            ed.lines = [""]
-            ed.cursor_y = 0
-            ed.cursor_x = 0
-            ed.top_line = 0
-            ed.left_col = 0
-            ed.modified = False
-            ed.refresh()
-            self.query_one("#editor_header", Label).update("  BashEdit - Untitled  ")
-            self.update_status("New File")
-
-        if ed.modified:
-            def confirm_new(res):
-                if res == "yes":
-                    self.action_save_file()
-                    reset_buffer()
-                elif res == "no":
-                    reset_buffer()
-
-            self.app.push_screen(
-                bashmenu_ui.ConfirmModalScreen("Save Changes?", "File has unsaved changes. Save before creating new file?", theme=self.theme_styles),
-                confirm_new,
-            )
-        else:
-            reset_buffer()
+        self.action_new_tab()
 
     def action_exit_editor(self) -> None:
+        self.save_active_tab_state()
         ed = self.query_one("#editor_widget", EditorWidget)
         if ed.mark_active:
             ed.mark_active = False
@@ -903,23 +1373,28 @@ class BashEditScreen(Screen):
             else:
                 self.app.exit(res_val)
 
-        if ed.modified:
-
-            def confirm_cb(res):
-                if res == "yes":
-                    self.action_save_file()
-                    safe_exit(True)
-                elif res == "no":
-                    safe_exit(False)
-
-            self.app.push_screen(
-                bashmenu_ui.ConfirmModalScreen(
-                    "Save Modified File?", "File has unsaved changes. Save before exiting?", theme=self.theme_styles
-                ),
-                confirm_cb,
-            )
-        else:
+        modified_tabs = [t for t in self.tabs if t.modified]
+        if not modified_tabs:
             safe_exit(False)
+            return
+
+        target_tab = self.tabs[self.active_tab_idx] if self.tabs[self.active_tab_idx].modified else modified_tabs[0]
+        tab_name = os.path.basename(target_tab.file_path) if target_tab.file_path else "Untitled"
+
+        def confirm_cb(res):
+            if res == "yes":
+                if target_tab == self.tabs[self.active_tab_idx]:
+                    self.action_save_file()
+                safe_exit(True)
+            elif res == "no":
+                safe_exit(False)
+
+        self.app.push_screen(
+            bashmenu_ui.ConfirmModalScreen(
+                "Save Modified Tab?", f"Tab '{tab_name}' has unsaved changes. Save before exiting?", theme=self.theme_styles
+            ),
+            confirm_cb,
+        )
 
     def action_cut_line(self) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
@@ -968,11 +1443,15 @@ class BashEditScreen(Screen):
         help_lines = [
             "BashEdit Keybindings & Controls:",
             "",
-            "• ^O / F2 / F3       : Write Out (Save file)",
-            "• ^R / F5 / F7       : Open File Chooser",
-            "• ^S / F6           : Save As",
-            "• ^E / F4           : New Document",
-            "• ^P / Alt+P        : Toggle Whitespace Display (spaces & tabs)",
+            "• ^O / ^R / F5 / F7   : Open File Picker",
+            "• ^S / F2 / F3       : Save File",
+            "• ^Shift+S / F6      : Save As",
+            "• ^E / [ + ]         : New Tab / New File",
+            "• Alt+] / Ctrl+Tab   : Next Tab",
+            "• Alt+[ / Shift+Tab  : Previous Tab",
+            "• ^P / Alt+M / F4    : Show Available Placeholders & Macros",
+            "• Alt+V / F10        : View Terminal Colors (ncurses_colors.py)",
+            "• Alt+1             : Toggle Whitespace Display (spaces & tabs)",
             "• ^N / Alt+N        : Toggle Line Numbers",
             "• ^^ / Alt+A        : Toggle Mark Selection",
             "• ^W                : Where Is (Search text)",
@@ -984,7 +1463,6 @@ class BashEditScreen(Screen):
         ]
         if self.display_theme_colors:
             help_lines.append("• Alt+T              : Toggle Theme Color Display (Refresh)")
-            help_lines.append("• Alt+V              : View Terminal Colors (256 Palette)")
 
         help_text = "\n".join(help_lines)
         self.app.push_screen(bashmenu_ui.MessageModalScreen("BashEdit Manual", help_text, theme=self.theme_styles, is_help=True))
@@ -999,7 +1477,11 @@ class BashEditScreen(Screen):
                     with open(self.file_path, "w", encoding="utf-8") as f:
                         f.write("\n".join(ed.lines))
                     ed.modified = False
+                    if 0 <= self.active_tab_idx < len(self.tabs):
+                        self.tabs[self.active_tab_idx].modified = False
+                        self.tabs[self.active_tab_idx].file_path = self.file_path
                     self.query_one("#editor_header", Label).update(f"  BashEdit - {os.path.basename(path)}  ")
+                    self.refresh_tab_bar()
                     self.update_status(f"Saved as {os.path.basename(path)}")
                 except (OSError, ValueError) as e:
                     self.update_status(f"Error saving file: {e}")
@@ -1050,11 +1532,27 @@ class BashEditScreen(Screen):
         self.update_status(f"Theme color display {status}")
 
     def action_view_colors(self) -> None:
-        if not self.display_theme_colors:
-            return
         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "ncurses_colors.py")
+        if not os.path.exists(script_path):
+            try:
+                import bashmenu
+                app_obj = getattr(self, "app", None)
+                cfg = getattr(app_obj, "config", {}) if app_obj else {}
+                script_path = bashmenu.interpolate_placeholders("{scripts_dir}/ncurses_colors.py", cfg)
+            except Exception:  # noqa: BLE001, S110
+                pass
         script_cmd = f"{sys.executable} {script_path}"
-        self.app.push_screen(bashmenu_ui.StreamOutputModalScreen("View Colors", script_cmd))
+        self.app.push_screen(bashmenu_ui.StreamOutputModalScreen("View Terminal Colors", script_cmd, theme=self.theme_styles))
+
+    def action_show_placeholders(self) -> None:
+        self.app.push_screen(
+            bashmenu_ui.MessageModalScreen(
+                "Available Placeholders & Macros",
+                bashmenu_ui.PLACEHOLDER_HELP_TEXT,
+                theme=self.theme_styles,
+                is_help=True,
+            )
+        )
 
 
 class BashEditApp(App):
@@ -1066,14 +1564,14 @@ class BashEditApp(App):
         super().__init__()
         self.file_path = file_path
         self.display_theme_colors = display_theme_colors
-        self.theme = theme
+        self.editor_theme = theme
         self.kwargs = kwargs
 
     def on_mount(self) -> None:
         theme_name = "dracula"
-        if isinstance(self.theme, str):
-            theme_name = self.theme
-        elif not isinstance(self.theme, dict):
+        if isinstance(self.editor_theme, str):
+            theme_name = self.editor_theme
+        elif not isinstance(self.editor_theme, dict):
             try:
                 import bashmenu
                 config = bashmenu.load_config() if hasattr(bashmenu, "load_config") else {}
@@ -1081,7 +1579,11 @@ class BashEditApp(App):
                     theme_name = config.get("theme", "dracula")
             except Exception:  # noqa: BLE001, S110
                 pass
-        self.theme_styles = bashmenu_ui.init_theme_colors(theme_name) if isinstance(self.theme, str) or not isinstance(self.theme, dict) else self.theme
+        self.theme_styles = (
+            bashmenu_ui.init_theme_colors(theme_name)
+            if isinstance(self.editor_theme, str) or not isinstance(self.editor_theme, dict)
+            else self.editor_theme
+        )
         self.push_screen(
             BashEditScreen(
                 file_path=self.file_path,

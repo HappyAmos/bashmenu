@@ -288,6 +288,7 @@ class TestBashEditThemeColors(unittest.TestCase):
         screen_without_flag = bashedit.BashEditScreen(display_theme_colors=False)
         self.assertFalse(screen_without_flag.display_theme_colors_flag)
 
+    @mock.patch("bashmenu.get_plugin_outputs", lambda config: [])
     def test_f1_help_modal_press_without_markup_error(self):
         import asyncio
 
@@ -367,6 +368,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         matched = scr._find_node_by_chain(mock_root, chain)
         self.assertEqual(matched, mock_child2)
 
+    @mock.patch("bashmenu.get_plugin_outputs", lambda config: [])
     def test_menuedit_screen_focus_on_selected_item(self):
         import asyncio
 
@@ -678,10 +680,11 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
                 dismissed.append(result)
 
         modal = DummyModal("Title", "Message")
-        btn = bashmenu_ui.Button("✖", id="btn_close_x", classes="btn_close_x")
+        label = bashmenu_ui.Label("[X]", id="btn_close_x", classes="btn_close_x")
         class DummyEvent:
-            button = btn
-        modal.on_button_pressed(DummyEvent())
+            widget = label
+            target = label
+        modal.on_click(DummyEvent())
         self.assertEqual(len(dismissed), 1)
 
     def test_main_menu_view_mouse_click(self):
@@ -747,6 +750,10 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
         screen.action_add_item = lambda: actions_called.append("add")
         screen.action_save_menu = lambda: actions_called.append("save")
         screen.action_exit_editor = lambda: actions_called.append("exit")
+        screen.action_move_down = lambda: actions_called.append("move_down")
+        screen.action_move_up = lambda: actions_called.append("move_up")
+        screen.action_indent_item = lambda: actions_called.append("indent")
+        screen.action_outdent_item = lambda: actions_called.append("outdent")
 
         class DummyWidget:
             def __init__(self, wid):
@@ -766,6 +773,18 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
         screen.on_click(DummyClickEvent(DummyWidget("lbl_add")))
         self.assertIn("add", actions_called)
 
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_move_down")))
+        self.assertIn("move_down", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_move_up")))
+        self.assertIn("move_up", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_indent")))
+        self.assertIn("indent", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_outdent")))
+        self.assertIn("outdent", actions_called)
+
         screen.on_click(DummyClickEvent(DummyWidget("lbl_save")))
         self.assertIn("save", actions_called)
 
@@ -784,14 +803,22 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
         focus_called = []
         class DummyTree:
             root = "ROOT"
-            def is_ancestor_of(self, w):
-                return True
+            cursor_node = DummyNode()
+
+            def __init__(self):
+                self.ancestors = []
+
             def get_node_at_line(self, line):
                 return DummyNode()
+
             def select_node(self, node):
                 pass
+
             def focus(self):
                 focus_called.append(True)
+
+        dummy_tree = DummyTree()
+        dummy_tree.ancestors = [dummy_tree]
 
         class DummyInspector:
             def update(self, val):
@@ -800,13 +827,13 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
         def mock_query(selector, *args, **kwargs):
             if selector == "#inspector_content":
                 return DummyInspector()
-            return DummyTree()
+            return dummy_tree
 
         screen.query_one = mock_query
 
         class DummyClickEvent:
-            widget = DummyTree()
-            target = DummyTree()
+            widget = dummy_tree
+            target = dummy_tree
             y = 1
             button = 1
             chain = 1
@@ -912,6 +939,41 @@ class TestWindowCloseButton(unittest.TestCase):
                     t_def[tier],
                     f"window_close_button missing in theme {tname} tier {tier}",
                 )
+
+
+class TestBashEditTabs(unittest.TestCase):
+    """Unit tests for multi-document tab management in bashedit.py."""
+
+    def test_editor_tab_init(self):
+        tab = bashedit.EditorTab(file_path="test.sh", lines=["echo hi"])
+        self.assertEqual(tab.file_path, "test.sh")
+        self.assertEqual(tab.lines, ["echo hi"])
+        self.assertFalse(tab.modified)
+
+    def test_bashedit_screen_tabs_init(self):
+        screen = bashedit.BashEditScreen(file_path="test.txt")
+        self.assertEqual(len(screen.tabs), 1)
+        self.assertEqual(screen.active_tab_idx, 0)
+        self.assertEqual(screen.tabs[0].file_path, "test.txt")
+
+    def test_bashedit_new_tab_and_switch(self):
+        screen = bashedit.BashEditScreen()
+        screen.action_new_tab(file_path="doc2.py", lines=["print(123)"])
+        self.assertEqual(len(screen.tabs), 2)
+        self.assertEqual(screen.active_tab_idx, 1)
+        self.assertEqual(screen.file_path, "doc2.py")
+
+        screen.action_prev_tab()
+        self.assertEqual(screen.active_tab_idx, 0)
+
+        screen.action_next_tab()
+        self.assertEqual(screen.active_tab_idx, 1)
+
+    def test_bashedit_close_single_tab(self):
+        screen = bashedit.BashEditScreen(file_path="test.txt")
+        screen.action_close_tab(0)
+        self.assertEqual(len(screen.tabs), 1)
+        self.assertIsNone(screen.tabs[0].file_path)
 
 
 if __name__ == "__main__":
