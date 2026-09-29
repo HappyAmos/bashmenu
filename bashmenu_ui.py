@@ -1421,6 +1421,7 @@ class FilePickerModalScreen(ModalScreen[str]):
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+h", "toggle_hidden", "Toggle Hidden"),
         Binding("space", "select_dir", "Select Folder"),
+        Binding("n", "new_item", "New", show=False),
     ]
 
     def __init__(
@@ -1453,7 +1454,8 @@ class FilePickerModalScreen(ModalScreen[str]):
                 yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             yield Label(f"Path: {self.current_path}", id="path_label")
             yield OptionList(id="options_list")
-            yield Label("[ENTER] Open/Select | [ESC] Cancel", id="footer")
+            footer_text = "[ENTER] Open/Select | [N] New | [ESC] Cancel" if self.allow_new else "[ENTER] Open/Select | [ESC] Cancel"
+            yield Label(footer_text, id="footer")
 
     def on_mount(self) -> None:
         self.load_directory()
@@ -1489,6 +1491,13 @@ class FilePickerModalScreen(ModalScreen[str]):
                 [e for e in all_entries if not e.is_dir()],
                 key=lambda e: e.name.lower(),
             )
+
+            if self.allow_new:
+                new_lbl = "➕ [ Create New Folder ]" if self.mode == "dir" else "➕ [ Create New File ]"
+                self.entries.append(
+                    {"name": new_lbl, "is_dir": False, "path": "", "is_new": True}
+                )
+                options_list.add_option(Option(new_lbl))
 
             if self.current_path != "/":
                 parent_path = os.path.dirname(self.current_path)
@@ -1532,6 +1541,10 @@ class FilePickerModalScreen(ModalScreen[str]):
             return
 
         selected = self.entries[idx]
+        if selected.get("is_new"):
+            self.action_new_item()
+            return
+
         if selected.get("is_self"):
             self.dismiss(selected["path"])
             return
@@ -1542,6 +1555,20 @@ class FilePickerModalScreen(ModalScreen[str]):
         elif self.mode in ["file", "any"]:
             self.dismiss(selected["path"])
 
+    def action_new_item(self) -> None:
+        if not self.allow_new:
+            return
+        prompt_type = "Folder" if self.mode == "dir" else "File"
+
+        def name_cb(name: str | None) -> None:
+            if name and name.strip():
+                self.dismiss(os.path.join(self.current_path, name.strip()))
+
+        self.app.push_screen(
+            InputModalScreen(f"New {prompt_type}", f"Enter new {prompt_type.lower()} name:"),
+            name_cb,
+        )
+
     def action_select_dir(self) -> None:
         if self.mode == "dir":
             self.dismiss(self.current_path)
@@ -1549,6 +1576,100 @@ class FilePickerModalScreen(ModalScreen[str]):
     def action_toggle_hidden(self) -> None:
         self.show_hidden_state = not self.show_hidden_state
         self.load_directory()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class ThemePickerModalScreen(ModalScreen[str]):
+    """Modal screen for interactive color theme selection with OptionList."""
+
+    DEFAULT_CSS = """
+    ThemePickerModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 60;
+        height: 20;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    #options_list {
+        height: 12;
+        border: solid $accent;
+    }
+    #footer {
+        text-align: center;
+        margin-top: 1;
+        color: $text-muted;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, current_theme: str = "dracula", theme: dict | None = None):
+        super().__init__()
+        self.current_theme = current_theme
+        self.theme = theme or {}
+        self.theme_keys = []
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="dialog"):
+            with Horizontal(id="title_bar"):
+                yield Label("Select Color Theme", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+            yield OptionList(id="options_list")
+            yield Label("[ENTER] Select Theme | [ESC] Cancel", id="footer")
+
+    def on_mount(self) -> None:
+        themes_data = load_themes_file()
+        opt_list = self.query_one("#options_list", OptionList)
+        self.theme_keys = list(themes_data.keys()) if themes_data else ["dracula", "nord", "cyberpunk"]
+        initial_idx = 0
+        for idx, key in enumerate(self.theme_keys):
+            formatted_name = key.replace("_", " ").title()
+            if key == self.current_theme:
+                initial_idx = idx
+                opt_list.add_option(Option(f"✔  {formatted_name} (Active)"))
+            else:
+                opt_list.add_option(Option(f"   {formatted_name}"))
+        opt_list.highlighted = initial_idx
+        apply_modal_theme(self, self.theme)
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        idx = event.option_index
+        if 0 <= idx < len(self.theme_keys):
+            self.dismiss(self.theme_keys[idx])
 
     def action_cancel(self) -> None:
         self.dismiss(None)

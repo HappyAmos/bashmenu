@@ -39,22 +39,31 @@ These scripts are stored in the `/scripts` directory and can be used directly or
                               active upstream system DNS server settings.
 - `scripts/glyphs.sh`       : Curses search and preview dialog box utility for
                               selecting Unicode emojis and Nerd Font icons.
+- `scripts/gorillas.py`     : QBasic Gorillas clone TUI game implemented as a
+                              Textual Screen, launched from the Games submenu.
+- `scripts/install_basics.sh`: Cross-platform basic tools installer wrapper.
 - `scripts/install_cheat.sh` : Setup script that installs interactive cheat sheet
                               terminal tools into the local environment.
+- `scripts/install_games.sh` : Cross-platform installer for terminal games
+                              (ninvaders, nsnake, greed, moon-buggy, nethack, etc.).
+- `scripts/install_glow.sh`  : Installer script for the Glow markdown viewer.
 - `scripts/install_kmscon.sh`: Installer script for the kmscon console
                               emulator, enabling beautiful Unicode and KMS/DRM
                               video support on raw Linux text consoles.
+- `scripts/install_node.sh`  : Installer script for Node.js via nvm or system
+                              package manager.
 - `scripts/install_scripts.sh`: Deployment script to copy and register utility
                               bash configurations.
-- `scripts/install_basics.sh`: Cross-platform basic tools installer wrapper.
-- `scripts/system_update.sh` : Cross-platform system update wrapper supporting
-                              apt, dnf, pacman, pkg, and brew.
-- `scripts/unicode.sh`       : Interactive Unicode Block Explorer script.
-- `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
+- `scripts/ip_info.sh`       : Displays current network interface IP addresses
+                              and connection status.
 - `scripts/ncurses_colors.py`: Visual tester for ncurses color support.
 - `scripts/otd.sh`           : Shell script fetching a random "On This Day"
                               historical quote/event and link from
                               today.zenquotes.io API using curl and jq.
+- `scripts/system_update.sh` : Cross-platform system update wrapper supporting
+                              apt, dnf, pacman, pkg, and brew.
+- `scripts/unicode.sh`       : Interactive Unicode Block Explorer script.
+- `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
 
 ### 2.2 Provided Templates (`templates/`)
 Used as dynamic templates for code generation, settings, or block injections:
@@ -288,8 +297,8 @@ These variables are dynamically resolved using active configuration and environm
 - `{settings.dot_key}`  : Resolves any nested configuration path from `bashmenu.yml`.
 - `{command:shell_cmd}` : Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output.
   * **Brace Balancing**: Fully supports nested curly braces (e.g. `{command:hostname -I | awk '{print $1}'}`).
-  * **Performance Caching**: Automatically caches outputs for **5.0 seconds** to maintain responsive 60fps/snappy menu movement.
-  * **Safety Timeout**: Features a **2.0-second** execution timeout to prevent freezing or locking the TUI on network/hanging shell calls.
+  * **Performance Caching**: Automatically caches outputs for **30.0 seconds** to maintain responsive menu movement.
+  * **Safety Timeout**: Features a **3.0-second** execution timeout to prevent freezing or locking the TUI on network/hanging shell calls.
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and

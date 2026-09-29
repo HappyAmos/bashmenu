@@ -59,17 +59,38 @@ Discovers currently configured upstream system DNS settings.
 .I scripts/glyphs.sh
 Curses preview dialog box utility for Unicode emojis and icons.
 .TP
+.I scripts/gorillas.py
+QBasic Gorillas clone TUI game implemented as a Textual Screen.
+.TP
+.I scripts/install_basics.sh
+Cross-platform basic tools installer wrapper.
+.TP
 .I scripts/install_cheat.sh
 Installs interactive cheat sheet terminal tools.
+.TP
+.I scripts/install_games.sh
+Cross-platform installer for terminal games.
+.TP
+.I scripts/install_glow.sh
+Installer script for the Glow markdown viewer.
 .TP
 .I scripts/install_kmscon.sh
 Installs the kmscon console emulator for better Unicode rendering.
 .TP
+.I scripts/install_node.sh
+Installer script for Node.js via nvm or system package manager.
+.TP
 .I scripts/install_scripts.sh
 Installer script that registers and deploys custom bash scripts.
 .TP
-.I scripts/install_basics.sh
-Cross-platform basic tools installer wrapper.
+.I scripts/ip_info.sh
+Displays current network interface IP addresses and connection status.
+.TP
+.I scripts/ncurses_colors.py
+Visual tester for ncurses color support.
+.TP
+.I scripts/otd.sh
+Fetches a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq.
 .TP
 .I scripts/system_update.sh
 Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
@@ -79,12 +100,6 @@ Interactive Unicode Block Explorer script.
 .TP
 .I scripts/ascii.sh
 Standard and Extended ASCII viewing utility.
-.TP
-.I scripts/ncurses_colors.py
-Visual tester for ncurses color support.
-.TP
-.I scripts/otd.sh
-Fetches a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq.
 .SS Provided Templates (templates/)
 Utilized as layout sources for code generation and block injections:
 .TP
@@ -384,7 +399,7 @@ Prints character corresponding to decimal code (uses CP437 for extended ASCII, e
 Dot-notation configuration lookup from bashmenu.yml (e.g., {settings.status_gutter}).
 .TP
 .B {command:shell_cmd}
-Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 5.0-second performance cache TTL and a 2.0-second safety execution timeout.
+Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL and a 3.0-second safety execution timeout.
 .SS Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically using three properties: a fallback
 ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:

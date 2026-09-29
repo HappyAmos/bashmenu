@@ -450,6 +450,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{window_width}": str(win_w),
         "{window_height}": str(win_h),
         "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p"),
+        "{date_time_12_short}": now.strftime("%Y-%m-%d %I:%M %p"),
         "{date_time_24}": now.strftime("%Y-%m-%d %H:%M:%S"),
         "{date_time_24_short}": now.strftime("%Y-%m-%d %H:%M"),
         "{date}": now.strftime("%Y-%m-%d"),
@@ -1742,8 +1743,7 @@ class BashMenuScreen(Screen):
         self.app.push_screen(bashmenu_ui.MessageModalScreen("HA Bash Menu Manual", help_text, is_help=True))
 
     def action_themes(self) -> None:
-        themes_data = bashmenu_ui.load_themes_file(THEME_FILE)
-        theme_names = list(themes_data.keys()) if themes_data else ["dracula", "nord", "cyberpunk"]
+        current_theme = self.menu_view.config.get("theme", "dracula")
 
         def theme_cb(choice):
             if choice:
@@ -1758,8 +1758,9 @@ class BashMenuScreen(Screen):
                 self._update_plugin_buffer_geometry()
 
         self.app.push_screen(
-            bashmenu_ui.InputModalScreen(
-                "Select Theme", f"Available themes: {', '.join(theme_names)}"
+            bashmenu_ui.ThemePickerModalScreen(
+                current_theme=current_theme,
+                theme=getattr(self.app, "theme_styles", None),
             ),
             theme_cb,
         )

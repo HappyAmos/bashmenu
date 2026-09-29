@@ -2,14 +2,32 @@
 # TEMPLATE: bash_aliases.tmpl
 # DESCRIPTION: A template file containing useful bash aliases. It uses format
 #              variables like {bashmenu_dir} and {home} to inject local paths.
+#
+# NOTE: The aliases below marked "personal example" are placeholders showing
+#       the syntax for SSH and local-path aliases. Replace or remove them to
+#       suit your own environment before injecting this template.
+#
+# Placeholders supported: {home}, {bashmenu_dir}, {scripts_dir}, {user}, etc.
 # ==============================================================================
+
+# Weather
 alias weather='curl wttr.in/49079'
 alias weather2='curl v2.wttr.in/49079'
 alias weather3='curl wttr.in/49079?format=4'
+
+# Tools
 alias glow='glow -w 0'
 alias shfmt="shfmt -i 4 -bn -w"
-alias cheat="/home/andrew/scripts/cheat/cheat.sh"
+
+# Paths using {home} placeholder (expanded when template is injected)
+alias cheat="{home}/scripts/cheat/cheat.sh"
 alias glyph="{home}/scripts/nerd/glyph.sh"
+
+# Useful sudo wrapper (allows aliases to work under sudo)
 alias sudo="sudo "
-alias ga145g="ssh u0_a287@192.168.5.73:8022"
-alias gpp10="ssh u0_a462@192.168.4.53:8022"
+
+# ── Personal examples ─────────────────────────────────────────────────────────
+# Uncomment and edit the lines below to add your own SSH shortcuts:
+# alias myserver="ssh user@192.168.1.100"
+# alias myphone="ssh user@192.168.1.200:8022"
+# ─────────────────────────────────────────────────────────────────────────────
