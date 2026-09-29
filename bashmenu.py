@@ -33,6 +33,7 @@ from textual.binding import Binding
 from textual.events import Key
 from textual.screen import Screen
 from textual.widget import Widget
+from textual.widgets import Static
 
 # Curses compatibility attributes for mocking/tests
 if not hasattr(curses, "COLS"):
@@ -648,7 +649,7 @@ def process_line_to_segments(line, default_theme_attr=0):
 
 _plugin_output_cache = {}
 _plugin_fetching = set()
-_plugin_lock = threading.Lock()
+_plugin_lock = threading.RLock()
 
 
 def _fetch_plugin_worker(name, script_cmd, now):
@@ -709,7 +710,9 @@ def get_plugin_outputs(config):
 
         script = interpolate_placeholders(str(script_raw), config)
         sleep_time = plugin.get("sleep", 300)
-        cache_entry = _plugin_output_cache.get(name)
+
+        with _plugin_lock:
+            cache_entry = _plugin_output_cache.get(name)
 
         if cache_entry and (now - cache_entry["time"] < sleep_time) and sleep_time > 0:
             plugin_lines = cache_entry["lines"]
@@ -720,23 +723,26 @@ def get_plugin_outputs(config):
                 candidate = os.path.join(scripts_dir, script)
                 script_path = candidate if os.path.exists(candidate) else script
 
-            with _plugin_lock:
-                if (
-                    "unittest" in sys.modules
-                    or hasattr(subprocess.run, "assert_called")
-                    or type(subprocess.run).__name__ in ("MagicMock", "Mock")
-                ):
-                    _fetch_plugin_worker(name, script_path, now)
-                elif name not in _plugin_fetching:
-                    _plugin_fetching.add(name)
-                    t = threading.Thread(
-                        target=_fetch_plugin_worker,
-                        args=(name, script_path, now),
-                        daemon=True,
-                    )
-                    t.start()
+            is_test_env = (
+                "unittest" in sys.modules
+                or hasattr(subprocess.run, "assert_called")
+                or type(subprocess.run).__name__ in ("MagicMock", "Mock")
+            )
+            if is_test_env:
+                _fetch_plugin_worker(name, script_path, now)
+            else:
+                with _plugin_lock:
+                    if name not in _plugin_fetching:
+                        _plugin_fetching.add(name)
+                        t = threading.Thread(
+                            target=_fetch_plugin_worker,
+                            args=(name, script_path, now),
+                            daemon=True,
+                        )
+                        t.start()
 
-            cache_entry = _plugin_output_cache.get(name)
+            with _plugin_lock:
+                cache_entry = _plugin_output_cache.get(name)
             plugin_lines = cache_entry["lines"] if cache_entry else []
 
         pretext = plugin.get("pretext")
@@ -757,11 +763,94 @@ def get_plugin_outputs(config):
 # ==============================================================================
 
 
+def get_hex_from_style(style: Style | None, fallback: str = "#000000") -> str:
+    """The `get_hex_from_style` function converts a Rich Style bgcolor to a
+    valid hex color string accepted by Textual CSS styles.
+    """
+    if not style or not style.bgcolor:
+        return fallback
+    try:
+        trip = style.bgcolor.get_truecolor()
+        return f"#{trip.red:02x}{trip.green:02x}{trip.blue:02x}"
+    except (AttributeError, ValueError):
+        return fallback
+
+
+class PluginBuffer(Static):
+    """The `PluginBuffer` widget displays active plugin lines in an isolated buffer."""
+
+    DEFAULT_CSS = """
+    PluginBuffer {
+        layer: top;
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        overflow-x: hidden;
+        overflow-y: hidden;
+    }
+    """
+
+    def __init__(self, config=None, **kwargs):
+        super().__init__(**kwargs)
+        self.config = config or {}
+
+    def render(self) -> Text:
+        cfg = self.config
+        with contextlib.suppress(Exception):
+            if self.screen and self.screen.menu_view and self.screen.menu_view.config:
+                cfg = self.screen.menu_view.config
+
+        raw_plugin_lines = get_plugin_outputs(cfg)
+        if not raw_plugin_lines:
+            return Text()
+
+        theme_styles = bashmenu_ui.init_theme_colors(cfg.get("theme", "dracula"))
+        plugin_style = theme_styles.get("plugin", Style(color="cyan"))
+        bg_style = theme_styles.get("background", Style())
+
+        buffer_w = max(20, self.size.width or 80)
+        max_rows = min(10, len(raw_plugin_lines))
+        lines_to_display = raw_plugin_lines[:max_rows]
+        extra_vars = {"window_width": buffer_w, "window_height": max_rows}
+
+        out = Text()
+        for idx, p_line in enumerate(lines_to_display):
+            clean_line = (
+                p_line.replace("\x00", "")
+                .replace("\t", "    ")
+                .replace("\ufe0f", "")
+                .replace("\ufe0e", "")
+                .rstrip("\r\n")
+            )
+            p_line_interp = interpolate_placeholders(clean_line, self.config, extra_vars=extra_vars)
+
+            if "\x1b[" in p_line_interp:
+                p_content_rich = Text.from_ansi(p_line_interp)
+            else:
+                p_content_rich = bashmenu_ui.formatting_to_rich_text(
+                    p_line_interp, default_style=plugin_style, theme=theme_styles
+                )
+
+            if p_content_rich.cell_len > buffer_w:
+                p_content_rich.truncate(buffer_w)
+            pad_w = max(0, buffer_w - p_content_rich.cell_len)
+            if pad_w > 0:
+                p_content_rich.append(" " * pad_w, style=bg_style)
+
+            out.append_text(p_content_rich)
+            if idx < len(lines_to_display) - 1:
+                out.append("\n")
+
+        return out
+
+
 class MainMenuView(Widget):
     """Custom canvas rendering the main menu interface with border, margins, brackets alignment, and status gutter."""
 
     DEFAULT_CSS = """
     MainMenuView {
+        layer: base;
         width: 100%;
         height: 1fr;
         background: $surface;
@@ -789,6 +878,18 @@ class MainMenuView(Widget):
             self.selected_rows[-1] = max(0, min(row, len(opts) - 1))
             self.refresh()
 
+    def get_plugin_lines_and_limits(self, total_content_rows: int) -> tuple[list[str], int, int]:
+        """The `get_plugin_lines_and_limits` method returns the capped plugin
+        output lines, separator row count, and available menu option rows.
+        """
+        raw_plugin_lines = get_plugin_outputs(self.config)
+        max_plugin_rows = min(10, max(0, total_content_rows - 2))
+        if len(raw_plugin_lines) > max_plugin_rows:
+            raw_plugin_lines = raw_plugin_lines[:max_plugin_rows] if max_plugin_rows > 0 else []
+        separator_rows = 1 if len(raw_plugin_lines) > 0 else 0
+        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines) - separator_rows)
+        return raw_plugin_lines, separator_rows, visible_option_rows
+
     def render(self) -> Text:
         w = max(40, self.size.width or 80)
         h = max(10, self.size.height or 24)
@@ -813,7 +914,6 @@ class MainMenuView(Widget):
         shortcut_key_style = theme_styles.get("shortcut_key", Style(color="magenta", bold=True))
         gutter_style = theme_styles.get("gutter", Style(color="cyan", bold=True))
         help_text_style = theme_styles.get("help_text", Style(color="cyan"))
-        plugin_style = theme_styles.get("plugin", Style(color="cyan"))
 
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
@@ -821,12 +921,7 @@ class MainMenuView(Widget):
         total_content_rows = max(1, h - 5)
 
         # 2. Plugin lines and row allocation
-        raw_plugin_lines = get_plugin_outputs(self.config)
-        max_plugin_rows = max(0, total_content_rows - 1)
-        if len(raw_plugin_lines) > max_plugin_rows:
-            raw_plugin_lines = raw_plugin_lines[-max_plugin_rows:] if max_plugin_rows > 0 else []
-
-        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines))
+        raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
         extra_vars = {"window_width": avail_w, "window_height": visible_option_rows}
 
         # 3. Header border line: ┌── Title ──┐
@@ -895,7 +990,7 @@ class MainMenuView(Widget):
 
             icon_raw = opt.get("icon") or opt.get("glyph") or ""
             icon_resolved = resolve_glyph(interpolate_placeholders(icon_raw, self.config, extra_vars=extra_vars), self.config) if icon_raw else ""
-            icon_str = f"{icon_resolved} " if icon_resolved else ""
+            icon_str = f"{icon_resolved}  " if icon_resolved else ""
             icon_w = get_display_width(icon_str, self.config)
 
             raw_label = interpolate_placeholders(opt.get("label") or opt.get("title") or "", self.config, extra_vars=extra_vars)
@@ -915,7 +1010,7 @@ class MainMenuView(Widget):
                 row_content.append("    ", style=item_style)
 
             if icon_resolved:
-                row_content.append(f"{icon_resolved} ", style=item_style)
+                row_content.append(f"{icon_resolved}  ", style=item_style)
 
             lbl_truncated = left_label
             if get_visible_len(left_label, self.config) > label_avail_w:
@@ -947,29 +1042,22 @@ class MainMenuView(Widget):
             rendered_content_rows += 1
 
         # 6. Pad blank rows between menu options and plugins
-        while rendered_content_rows < (total_content_rows - len(raw_plugin_lines)):
+        target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows
+        while rendered_content_rows < target_blank_rows:
             out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
             rendered_content_rows += 1
 
-        # 7. Render plugin lines (positioned immediately above Help Keys & Status Gutter row)
-        for p_line in raw_plugin_lines:
-            p_line_interp = interpolate_placeholders(p_line, self.config, extra_vars=extra_vars)
-            p_rich = Text("│  ", style=border_style)
-
-            p_content_rich = bashmenu_ui.formatting_to_rich_text(p_line_interp, default_style=plugin_style, theme=theme_styles)
-            content_w = get_visible_len(p_line_interp, self.config)
-            if content_w > avail_w:
-                p_content_rich.truncate(avail_w)
-                content_w = avail_w
-
-            p_rich.append_text(p_content_rich)
-            pad_w = max(0, avail_w - content_w)
-            p_rich.append(" " * pad_w)
-            p_rich.append("  │\n", style=border_style)
-            out.append_text(p_rich)
+        # 7. Rows reserved for the PluginBuffer widget overlay
+        for _ in raw_plugin_lines:
+            out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
             rendered_content_rows += 1
 
-        # 8. Help Keys & Status Gutter Row (h - 2)
+        # 8. Blank separation row above Help Keys & Status Gutter (when plugins are active)
+        if separator_rows > 0:
+            out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
+            rendered_content_rows += 1
+
+        # 9. Help Keys & Status Gutter Row (h - 2)
         help_variants = [
             "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back",
             "[UP/DN]: Nav | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back",
@@ -1033,8 +1121,7 @@ class MainMenuView(Widget):
             return
 
         total_content_rows = max(1, (self.size.height or 24) - 5)
-        raw_plugin_lines = get_plugin_outputs(self.config)
-        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines))
+        _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
 
         scroll_start = 0
         curr_row = self.current_row()
@@ -1066,8 +1153,7 @@ class MainMenuView(Widget):
             return
 
         total_content_rows = max(1, (self.size.height or 24) - 5)
-        raw_plugin_lines = get_plugin_outputs(self.config)
-        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines))
+        _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
 
         scroll_start = 0
         curr_row = self.current_row()
@@ -1128,6 +1214,8 @@ def process_item_action(screen, item, config):
         if hasattr(screen, "app") and screen.app:
             screen.app.theme_styles = new_styles
         screen.menu_view.refresh()
+        if hasattr(screen, "_update_plugin_buffer_geometry"):
+            screen._update_plugin_buffer_geometry()
 
     elif item_type == "theme_selector":
         item["submenu"] = build_dynamic_theme_submenu()
@@ -1466,6 +1554,12 @@ def process_item_action(screen, item, config):
 class BashMenuScreen(Screen):
     """Main Screen containing MainMenuView widget and keybindings."""
 
+    DEFAULT_CSS = """
+    BashMenuScreen {
+        layers: base top;
+    }
+    """
+
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("up", "move_up", "Up", show=False),
         Binding("down", "move_down", "Down", show=False),
@@ -1486,10 +1580,60 @@ class BashMenuScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield MainMenuView(config=self.initial_config, menu_data=self.initial_menu_data, id="menu_view")
+        yield PluginBuffer(config=self.initial_config, id="plugin_buffer")
 
     @property
     def menu_view(self) -> MainMenuView:
         return self.query_one("#menu_view", MainMenuView)
+
+    @property
+    def plugin_buffer(self) -> PluginBuffer:
+        return self.query_one("#plugin_buffer", PluginBuffer)
+
+    def on_mount(self) -> None:
+        self._update_plugin_buffer_geometry()
+        self.set_interval(1.0, self._periodic_refresh)
+
+    def _update_plugin_buffer_geometry(self) -> None:
+        """The `_update_plugin_buffer_geometry` method positions and bounds
+        the PluginBuffer widget directly above the help/status gutter.
+        """
+        with contextlib.suppress(Exception):
+            w = max(40, self.size.width or 80)
+            h = max(10, self.size.height or 24)
+            avail_w = max(20, w - 6)
+            total_content_rows = max(1, h - 5)
+            raw_plugin_lines, separator_rows, _ = self.menu_view.get_plugin_lines_and_limits(total_content_rows)
+            plugin_count = len(raw_plugin_lines)
+
+            pb = self.plugin_buffer
+            pb.config = self.menu_view.config
+
+            theme_styles = bashmenu_ui.init_theme_colors(self.menu_view.config.get("theme", "dracula"))
+            bg_style = theme_styles.get("background")
+            bg_hex = get_hex_from_style(bg_style, "#000000")
+            pb.styles.background = bg_hex
+            self.menu_view.styles.background = bg_hex
+
+            if plugin_count == 0:
+                pb.styles.display = "none"
+            else:
+                pb.styles.display = "block"
+                plugin_start_row = 3 + total_content_rows - plugin_count - separator_rows
+                pb.styles.offset = (3, plugin_start_row)
+                pb.styles.width = avail_w
+                pb.styles.height = plugin_count
+                pb.refresh()
+
+    def _periodic_refresh(self) -> None:
+        """The `_periodic_refresh` method refreshes the menu view periodically."""
+        with contextlib.suppress(Exception):
+            self.menu_view.refresh()
+            self._update_plugin_buffer_geometry()
+
+    def on_resize(self, event) -> None:
+        """The `on_resize` method updates plugin buffer bounds upon window resize."""
+        self._update_plugin_buffer_geometry()
 
     def on_key(self, event: Key) -> None:
         mv = self.menu_view
@@ -1608,6 +1752,7 @@ class BashMenuScreen(Screen):
                 if hasattr(self, "app") and self.app:
                     self.app.theme_styles = new_styles
                 self.menu_view.refresh()
+                self._update_plugin_buffer_geometry()
 
         self.app.push_screen(
             bashmenu_ui.InputModalScreen(
@@ -1630,6 +1775,7 @@ class BashMenuScreen(Screen):
         mv.menu_stack = [mv.menu_data]
         mv.selected_rows = [0]
         mv.refresh()
+        self._update_plugin_buffer_geometry()
 
 
 class BashMenuApp(App):

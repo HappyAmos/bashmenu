@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
+
+from rich.cells import cell_len
+from textual.geometry import Size
 
 import bashmenu
 
@@ -142,6 +145,179 @@ class TestPluginSystem(unittest.TestCase):
         max_plugin_rows = max(0, bottom_plugin_y - menu_needed_y + 1)  # 9 - 13 + 1 = -3 -> 0
         # Plugins dropped to 0 rows first so menu fits
         self.assertEqual(max_plugin_rows, 0)
+
+    def test_plugin_dynamic_sizing_and_separator(self):
+        """The `test_plugin_dynamic_sizing_and_separator` method tests
+        the dynamic sizing and separator allocation of plugin lines.
+        """
+        cfg = {"theme": "dracula"}
+        mnu = {"title": "Test", "options": [{"title": "Option 1"}]}
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+
+        # 1. No plugins: 0 plugin lines, 0 separator rows
+        with patch("bashmenu.get_plugin_outputs", return_value=[]):
+            lines, sep, opt_rows = mv.get_plugin_lines_and_limits(19)
+            self.assertEqual(len(lines), 0)
+            self.assertEqual(sep, 0)
+            self.assertEqual(opt_rows, 19)
+
+        # 2. 3 plugin lines: 3 lines, 1 separator row, 15 option rows
+        with patch(
+            "bashmenu.get_plugin_outputs",
+            return_value=["Line 1", "Line 2", "Line 3"],
+        ):
+            lines, sep, opt_rows = mv.get_plugin_lines_and_limits(19)
+            self.assertEqual(len(lines), 3)
+            self.assertEqual(sep, 1)
+            self.assertEqual(opt_rows, 15)
+
+        # 3. 15 plugin lines: capped at 10 rows, 1 separator row
+        with patch(
+            "bashmenu.get_plugin_outputs",
+            return_value=[f"Line {i}" for i in range(15)],
+        ):
+            lines, sep, opt_rows = mv.get_plugin_lines_and_limits(19)
+            self.assertEqual(len(lines), 10)
+            self.assertEqual(sep, 1)
+            self.assertEqual(opt_rows, 8)
+
+    def test_plugin_order_preserved(self):
+        """The `test_plugin_order_preserved` method verifies plugins
+        execute and return outputs in configuration order.
+        """
+        config = {
+            "settings": {
+                "scripts_dir": "/tmp",
+                "plugins": {
+                    "first_plugin": {"script": "/tmp/first.sh", "sleep": 0},
+                    "second_plugin": {"script": "/tmp/second.sh", "sleep": 0},
+                    "third_plugin": {"script": "/tmp/third.sh", "sleep": 0},
+                },
+            }
+        }
+        with patch("subprocess.run") as mock_run:
+            def side_effect(cmd, **kwargs):
+                mock_res = MagicMock()
+                cmd_str = cmd[0] if isinstance(cmd, list) else cmd
+                mock_res.stdout = f"Output from {cmd_str}\n"
+                return mock_res
+
+            mock_run.side_effect = side_effect
+            lines = bashmenu.get_plugin_outputs(config)
+            self.assertEqual(
+                lines,
+                [
+                    "Output from /tmp/first.sh",
+                    "Output from /tmp/second.sh",
+                    "Output from /tmp/third.sh",
+                ],
+            )
+
+    def test_plugin_render_border_integrity(self):
+        """The `test_plugin_render_border_integrity` method verifies that
+        MainMenuView.render maintains exact line width and border integrity
+        when plugins output tabs, ANSI codes, emojis, and long lines.
+        """
+        cfg = {
+            "theme": "dracula",
+            "settings": {"status_gutter": "User | 100% | 12:00"},
+        }
+        mnu = {
+            "title": "Test Menu",
+            "options": [
+                {"title": "Option 1", "type": "command"},
+                {"title": "Option 2", "type": "command"},
+            ],
+        }
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+
+        test_widths = [80, 100, 120]
+        test_heights = [24, 30]
+
+        problematic_outputs = [
+            "Normal plugin line",
+            "\tTabbed\tcontent\twith multiple tabs",
+            "\x1b[31;1mRed Bold\x1b[0m and \x1b[32mGreen\x1b[0m text",
+            "Emojis and wide chars: 🚀 🌟 💻 日本語",
+            "Very long line: " + ("x" * 200),
+            "",
+            "   Leading and trailing spaces   ",
+        ]
+
+        with patch("bashmenu.get_plugin_outputs", return_value=problematic_outputs):
+            for w in test_widths:
+                for h in test_heights:
+                    with patch.object(
+                        bashmenu.MainMenuView,
+                        "size",
+                        new_callable=PropertyMock,
+                        return_value=Size(w, h),
+                    ):
+                        rendered_text = mv.render()
+                        lines = rendered_text.plain.split("\n")
+
+                    self.assertEqual(
+                        len(lines),
+                        h,
+                        f"Rendered line count ({len(lines)}) must equal screen height ({h})",
+                    )
+
+                    for idx, line in enumerate(lines):
+                        line_cells = cell_len(line)
+                        self.assertEqual(
+                            line_cells,
+                            w,
+                            f"Row {idx} width ({line_cells}) must equal screen width ({w}):\n'{line}'",
+                        )
+
+                        if idx == 0:
+                            self.assertTrue(line.startswith("┌") and line.endswith("┐"))
+                        elif idx == h - 1:
+                            self.assertTrue(line.startswith("└") and line.endswith("┘"))
+                        else:
+                            self.assertTrue(
+                                line.startswith("│  ") and line.endswith("  │"),
+                                f"Row {idx} borders broken: '{line}'",
+                            )
+
+    def test_plugin_buffer_widget(self):
+        """The `test_plugin_buffer_widget` method verifies that PluginBuffer
+        renders plugin lines in an isolated, undecorated buffer without
+        border characters.
+        """
+        cfg = {"theme": "dracula"}
+        pb = bashmenu.PluginBuffer(config=cfg)
+
+        # Case 1: Empty plugin list -> empty text
+        with patch("bashmenu.get_plugin_outputs", return_value=[]):
+            res = pb.render()
+            self.assertEqual(res.plain, "")
+
+        # Case 2: Weather and OTD plugins with emojis and ANSI
+        sample_lines = [
+            "On This Day: Pompey arrives in Egypt",
+            "49079: \U0001f324\ufe0f  \U0001f321\ufe0f+72°F \U0001f32c\ufe0f\u21935mph",
+        ]
+        with patch("bashmenu.get_plugin_outputs", return_value=sample_lines):
+            res = pb.render()
+            lines = res.plain.split("\n")
+            self.assertEqual(len(lines), 2)
+            self.assertIn("Pompey arrives in Egypt", lines[0])
+            self.assertIn("49079:", lines[1])
+            # The buffer itself does not inject decorative border characters
+            for line in lines:
+                self.assertFalse(line.startswith("│"))
+                self.assertFalse(line.endswith("│"))
+                self.assertNotIn("\ufe0f", line)
+                self.assertNotIn("\ufe0e", line)
+                self.assertEqual(cell_len(line), 80)
+
+        # Case 3: Non-black themes (qbasic, hotdog_stand)
+        for theme_name, expected_hex in [("qbasic", "#0000af"), ("hotdog_stand", "#ff0000")]:
+            th_styles = bashmenu.bashmenu_ui.init_theme_colors(theme_name)
+            hex_c = bashmenu.get_hex_from_style(th_styles.get("background"))
+            self.assertEqual(hex_c, expected_hex)
+
 
 if __name__ == "__main__":
     unittest.main()
