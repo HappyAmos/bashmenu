@@ -1,5 +1,5 @@
 version: 0.0.1
-theme: monochrome
+theme: matrix
 user:
   divider:
     char: '{ascii:196}'
