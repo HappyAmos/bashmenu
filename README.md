@@ -2,7 +2,7 @@
 
 ![](assets/bashmenu.gif)
 
-A lightweight, data-driven Curses TUI (Text User Interface) menu engine
+A lightweight, data-driven Textual TUI (Text User Interface) menu engine
 and settings editor for Linux, configured entirely through modular YAML files.
 
 Extend your shell script experience with widgets, visual file choosers,
@@ -41,6 +41,7 @@ Contains a few personal scripts as examples.
 |:----------------- |:------------------------------------------------------------- |
 | `bashmenu.sh`     | Wrapper launcher. Auto-creates and repairs virtualenv.        |
 | `bashmenu.py`     | Core TUI rendering engine and main menu rendering window.     |
+| `bashmenu_ui.py`  | Shared UI library: modal screens, theme engine, formatters.   |
 | `bashedit.py`     | Built-in Nano-style terminal text editor engine.              |
 | `menuedit.py`     | Visual layout tree editor for `bashmenu.mnu` (run with `F4`). |
 | `bashmenu.yml`    | Dynamic user settings store (YAML).                           |

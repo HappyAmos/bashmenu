@@ -1,11 +1,11 @@
 .TH BASHMENU 1 "2026-09-13" "v0.0.1" "HA Bash Menu Manual"
 .SH NAME
-bashmenu \- lightweight curses TUI menu engine and settings manager
+bashmenu \- lightweight Textual TUI menu engine and settings manager
 .SH SYNOPSIS
 .B bashmenu.sh
 .SH DESCRIPTION
 .B bashmenu
-is a data-driven, Curses-based Text User Interface (TUI) menu engine designed
+is a data-driven, Textual-based Text User Interface (TUI) menu engine designed
 for Linux system administration, settings management, and command execution. It
 reads its menu structure from a YAML-formatted menu file, dynamically
 interpolates configurations and system environment variables, and supports
@@ -16,7 +16,10 @@ custom Nerd Fonts, visual file chooser dialogs, and modular code templates.
 Launcher wrapper script. Handles Python virtual environment setup and repairs.
 .TP
 .I bashmenu.py
-Core Python application containing the Curses renderer and main menu loop.
+Core Textual application containing the main menu rendering engine.
+.TP
+.I bashmenu_ui.py
+Shared UI library providing modal screens, theme engine, and formatting utilities.
 .TP
 .I bashedit.py
 Built-in Nano-style text editor engine.
@@ -302,7 +305,7 @@ Navigates back to the preceding submenu level.
 Shuts down the menu interface completely.
 .SH DYNAMIC DIRECTIVES & SYSTEM PLACEHOLDERS
 .SS Dynamic Input Directives
-These directives prompt the user inside curses dialogs, replacing the placeholder
+These directives prompt the user inside modal dialogs, replacing the placeholder
 with the chosen value prior to action execution.
 .TP
 .B {param}
@@ -407,16 +410,16 @@ The application incorporates a rich inline formatting parser allowing developers
 use nested bracketed formatting tags inside labels, headers, status gutters, and dialogues.
 .TP
 .B [b]text[/b]
-Renders bold text (using curses.A_BOLD).
+Renders bold text (Rich Style(bold=True)).
 .TP
 .B [u]text[/u]
-Renders underlined text (using curses.A_UNDERLINE).
+Renders underlined text (Rich Style(underline=True)).
 .TP
 .B [dim]text[/dim]
-Renders dimmed contrast text (using curses.A_DIM).
+Renders dimmed contrast text (Rich Style(dim=True)).
 .TP
 .B [reverse]text[/reverse]
-Renders reversed contrast text (using curses.A_REVERSE).
+Renders reversed contrast text (Rich Style(reverse=True)).
 .TP
 .B [color=color_name]text[/color]
 Renders custom theme-colored text. Available color names include: text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, and divider.
@@ -446,7 +449,7 @@ seamless interactive installs, updates, and uninstalls.
 .SS In-Process Python Plugins (external: false)
 Python script items of type "script" can set "external: false" to run inside
 bashmenu's parent process, avoiding terminal flashes. Plugins must implement
-"def main(stdscr)".
+a Textual Screen subclass pushed via screen.app.push_screen().
 .SS Background Footer Plugins & Plugin Creation
 HA Bash Menu features an asynchronous, background-cached plugin architecture configured under
 .I settings.plugins

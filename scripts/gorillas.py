@@ -71,8 +71,8 @@ class GorillasCanvas(Widget):
     }
     """
 
-    def __init__(self, p1_name="Player 1", p2_name="Player 2", target_points=3, gravity=9.8):
-        super().__init__()
+    def __init__(self, p1_name="Player 1", p2_name="Player 2", target_points=3, gravity=9.8, **kwargs):
+        super().__init__(**kwargs)
         self.p1_name = p1_name
         self.p2_name = p2_name
         self.target_points = target_points
@@ -272,7 +272,7 @@ class GorillasScreen(Screen):
     #controls_bar {
         dock: bottom;
         height: 3;
-        background: surface-darken-1;
+        background: $surface;
     }
     .input_box {
         width: 15;
@@ -317,6 +317,8 @@ class GorillasScreen(Screen):
 
 
 class GorillasApp(App):
+    ENABLE_COMMAND_PALETTE = False
+
     def on_mount(self) -> None:
         self.push_screen(GorillasScreen())
 

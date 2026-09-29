@@ -75,6 +75,9 @@ THEME_FILE = os.path.join(BASHMENU_DIR, "bashmenu.themes")
 
 if BASHMENU_DIR not in sys.path:
     sys.path.insert(0, BASHMENU_DIR)
+SCRIPTS_DIR = os.path.join(BASHMENU_DIR, "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
 
 try:
     import ymlcheck

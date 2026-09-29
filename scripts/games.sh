@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# SCRIPT: bsdgames.sh
-# DESCRIPTION: Cross-platform wrapper script to run bsdgames on macOS and Linux.
+# SCRIPT: games.sh
+# DESCRIPTION: Cross-platform wrapper script to run terminal games.
 # ==============================================================================
 
 # Get the script directory path for this script
@@ -50,7 +50,7 @@ while true; do
     echo ""
     
     # Prompt the user for choice
-    read -r -p "Select an option [1-18, q]: " choice
+    read -r -p "Select an option [1-7, q]: " choice
     
     # Check if user wants to quit
     if [[ "$choice" == "q" || "$choice" == "Q" ]]; then

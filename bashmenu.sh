@@ -496,10 +496,10 @@ USE_VENV=false
 if [ -f "$VENV_ACTIVATE" ]; then
     VENV_PYTHON="${VENV_DIR}/bin/python3"
     [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/bin/python"
-    if "$VENV_PYTHON" -c "import yaml, ruff" >/dev/null 2>&1; then
+    if "$VENV_PYTHON" -c "import yaml, ruff, textual, rich" >/dev/null 2>&1; then
         USE_VENV=true
     else
-        echo "Virtual environment is broken or missing PyYAML and/or Ruff. Recreating..." >&2
+        echo "Virtual environment is broken or missing required packages (PyYAML, Ruff, Textual, Rich). Recreating..." >&2
         rm -rf "$VENV_DIR"
     fi
 fi

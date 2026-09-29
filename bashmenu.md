@@ -1,7 +1,7 @@
 # HA Bash Menu Specification & User Manual (v0.0.1)
 
 Welcome to the comprehensive specification and user manual for HA Bash Menu,
-a lightweight, data-driven Curses Text User Interface (TUI) menu engine and
+a lightweight, data-driven Textual Text User Interface (TUI) menu engine and
 configuration editor for Linux systems.
 
 ---
@@ -11,7 +11,8 @@ configuration editor for Linux systems.
 HA Bash Menu is comprised of modular scripts and configuration files:
 
 - `bashmenu.sh`  : Launcher shell script with auto-setup and self-healing.
-- `bashmenu.py`  : Core TUI application engine and main rendering window.
+- `bashmenu.py`  : Core Textual TUI application engine and main rendering window.
+- `bashmenu_ui.py` : Shared UI library — modal screens, theme engine, formatting helpers.
 - `bashedit.py`  : Built-in Nano-style text editor engine.
 - `menuedit.py`  : Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`).
 - `bashmenu.yml`  : YAML user settings configuration store.
@@ -240,7 +241,7 @@ Supported Theme Elements:
 ## 6. Dynamic Directives & Variables
 
 ### 6.1 Dynamic Input Directives
-Dynamic input directives trigger curses prompt dialogs when selected,
+Dynamic input directives trigger modal dialogs when selected,
 substituting the placeholder in the action string prior to execution:
 
 - `{param}` : Prompts for a single-line parameter value using a text modal.
@@ -319,10 +320,10 @@ The layout engine processes this tag with the following strict hierarchy:
 The application includes a rich formatting parser allowing developers to use inline, nested BBCode-style tags throughout options, headers, status gutters, and prompts.
 
 #### Available Formatting Tags:
-- `[b]text[/b]` : Renders text in **bold** (`curses.A_BOLD`).
-- `[u]text[/u]` : Renders text with an **underline** (`curses.A_UNDERLINE`).
-- `[dim]text[/dim]` : Renders text with **dimmed** contrast (`curses.A_DIM`).
-- `[reverse]text[/reverse]` : Renders text in **reversed** foreground/background contrast (`curses.A_REVERSE`).
+- `[b]text[/b]` : Renders text in **bold** (Rich `Style(bold=True)`).
+- `[u]text[/u]` : Renders text with an **underline** (Rich `Style(underline=True)`).
+- `[dim]text[/dim]` : Renders text with **dimmed** contrast (Rich `Style(dim=True)`).
+- `[reverse]text[/reverse]` : Renders text in **reversed** foreground/background contrast (Rich `Style(reverse=True)`).
 - `[color=color_name]text[/color]` : Renders text in a custom theme color.
 
 #### Theme Colors Available:
@@ -376,8 +377,8 @@ clipping and console flashes:
   action: "diagnostics_tui.py"
   external: false
 ```
-*Plugin requirement:* The python script must implement a `def main(stdscr)`
-function taking the active curses screen as its sole argument.
+*Plugin requirement:* The python script must implement a Textual `Screen` subclass
+that is pushed via `screen.app.push_screen()`.
 
 ### 7.3 Multi-Platform Support & Environment Detection
 HA Bash Menu incorporates an environment detection engine in `bashmenu.sh` enabling graceful degradation and multi-platform compatibility without manual configuration.

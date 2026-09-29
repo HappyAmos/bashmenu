@@ -138,7 +138,7 @@ options:
       quiet: true
     - label: QBasic Gorillas Clone
       type: script
-      action: python3 gorillas.py
+      action: python3 {scripts_dir}/gorillas.py
       icon: '{nf::}'
       interactive: true
       quiet: true
