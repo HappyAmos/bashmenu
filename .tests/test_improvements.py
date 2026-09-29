@@ -44,6 +44,35 @@ class TestImprovements(unittest.TestCase):
         self.assertTrue(ymlcheck.validate_config_file(config_path))
         self.assertTrue(ymlcheck.validate_menu_file(menu_path))
 
+    def test_bashedit_character_input(self):
+        import asyncio
+
+        import textual.keys as k
+        from textual.app import App
+
+        from bashedit import BashEditScreen
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(BashEditScreen())
+
+        async def run_input_checks():
+            app = TestApp()
+            async with app.run_test() as pilot:
+                screen = app.screen
+                ed = screen.query_one("#editor_widget")
+
+                # Specifically test period and letter f (which were previously blocked by event.key.startswith('f'))
+                for test_char in [".", "f", "F", " ", "/", "-", "a", "Z", "0", "@"]:
+                    ed.lines = [""]
+                    ed.cursor_x = 0
+                    ed.cursor_y = 0
+                    key_name = k._character_to_key(test_char)
+                    await pilot.press(key_name)
+                    self.assertEqual(ed.lines[0], test_char, f"Character '{test_char}' (key '{key_name}') was blocked!")
+
+        asyncio.run(run_input_checks())
+
 
 if __name__ == "__main__":
     unittest.main()

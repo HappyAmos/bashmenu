@@ -1276,7 +1276,7 @@ class BashEditScreen(Screen):
             or event.key.startswith("ctrl+")
             or event.key.startswith("alt+")
             or event.key.startswith("meta+")
-            or event.key.startswith("f")
+            or (event.key.startswith("f") and event.key[1:].isdigit())
             or event.key
             in [
                 "escape",
@@ -1346,8 +1346,17 @@ class BashEditScreen(Screen):
             indent = " " * ed.tabstop if ed.tab_to_spaces else "\t"
             ed.insert_char(indent)
             self.update_status()
+        elif event.key == "space":
+            ed.insert_char(" ")
+            self.update_status()
         elif len(event.character or "") == 1 and event.character.isprintable():
             ed.insert_char(event.character)
+            self.update_status()
+        elif event.key == "full_stop":
+            ed.insert_char(".")
+            self.update_status()
+        elif len(event.key or "") == 1 and event.key.isprintable():
+            ed.insert_char(event.key)
             self.update_status()
 
     def action_save_file(self) -> None:
