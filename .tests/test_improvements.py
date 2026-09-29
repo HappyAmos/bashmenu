@@ -73,6 +73,49 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_input_checks())
 
+    def test_bashedit_mouse_scroll_and_page_nav(self):
+        import asyncio
+
+        from textual.app import App
+        from textual.events import MouseScrollDown, MouseScrollUp
+
+        from bashedit import BashEditScreen
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(BashEditScreen())
+
+        async def run_scroll_checks():
+            app = TestApp()
+            async with app.run_test() as pilot:
+                screen = app.screen
+                ed = screen.query_one("#editor_widget")
+                ed.lines = [f"Line {i}" for i in range(100)]
+                ed.top_line = 0
+                ed.cursor_y = 0
+
+                # Test mouse wheel scroll down
+                ed.post_message(
+                    MouseScrollDown(ed, x=10, y=5, delta_x=0, delta_y=1, button=4, shift=False, meta=False, ctrl=False)
+                )
+                await pilot.pause()
+                self.assertEqual(ed.top_line, 3)
+
+                # Test mouse wheel scroll up
+                ed.post_message(
+                    MouseScrollUp(ed, x=10, y=5, delta_x=0, delta_y=-1, button=5, shift=False, meta=False, ctrl=False)
+                )
+                await pilot.pause()
+                self.assertEqual(ed.top_line, 0)
+
+                # Test pagedown and pageup keys
+                await pilot.press("pagedown")
+                self.assertTrue(ed.top_line > 0)
+                await pilot.press("pageup")
+                self.assertEqual(ed.top_line, 0)
+
+        asyncio.run(run_scroll_checks())
+
 
 if __name__ == "__main__":
     unittest.main()

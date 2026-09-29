@@ -295,6 +295,43 @@ class EditorWidget(Widget):
         elif self.cursor_x >= self.left_col + visible_w:
             self.left_col = self.cursor_x - visible_w + 1
 
+    def scroll_lines_down(self, count: int = 3) -> None:
+        """Scroll the editor viewport down by count lines (navigate page down)."""
+        height = max(1, self.size.height or 20)
+        max_top = max(0, len(self.lines) - height)
+        if self.top_line >= max_top:
+            return
+        self.top_line = min(max_top, self.top_line + count)
+        if self.cursor_y < self.top_line:
+            self.cursor_y = self.top_line
+            self.clamp_cursor()
+        self.refresh()
+
+    def scroll_lines_up(self, count: int = 3) -> None:
+        """Scroll the editor viewport up by count lines (navigate page up)."""
+        height = max(1, self.size.height or 20)
+        if self.top_line <= 0:
+            return
+        self.top_line = max(0, self.top_line - count)
+        if self.cursor_y >= self.top_line + height:
+            self.cursor_y = max(0, self.top_line + height - 1)
+            self.clamp_cursor()
+        self.refresh()
+
+    def on_mouse_scroll_down(self, event) -> None:
+        self.scroll_lines_down(3)
+        if hasattr(self.screen, "update_status"):
+            self.screen.update_status()
+        event.prevent_default()
+        event.stop()
+
+    def on_mouse_scroll_up(self, event) -> None:
+        self.scroll_lines_up(3)
+        if hasattr(self.screen, "update_status"):
+            self.screen.update_status()
+        event.prevent_default()
+        event.stop()
+
     def insert_char(self, char: str):
         self.push_undo()
         self._color_span_cache.clear()
@@ -689,6 +726,8 @@ class BashEditScreen(Screen):
         Binding("alt+[", "prev_tab", "Prev Tab", show=False),
         Binding("ctrl+tab", "next_tab", "Next Tab", show=False),
         Binding("ctrl+shift+tab", "prev_tab", "Prev Tab", show=False),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
     ]
 
     def __init__(
@@ -1333,6 +1372,14 @@ class BashEditScreen(Screen):
             ed.clamp_cursor()
             ed.refresh()
             self.update_status()
+        elif event.key in ("pageup", "page_up"):
+            page_size = max(1, (ed.size.height or 20) - 2)
+            ed.scroll_lines_up(page_size)
+            self.update_status()
+        elif event.key in ("pagedown", "page_down"):
+            page_size = max(1, (ed.size.height or 20) - 2)
+            ed.scroll_lines_down(page_size)
+            self.update_status()
         elif event.key == "enter":
             ed.insert_newline()
             self.update_status()
@@ -1358,6 +1405,28 @@ class BashEditScreen(Screen):
         elif len(event.key or "") == 1 and event.key.isprintable():
             ed.insert_char(event.key)
             self.update_status()
+
+    def on_mouse_scroll_down(self, event) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        ed.scroll_lines_down(3)
+        self.update_status()
+
+    def on_mouse_scroll_up(self, event) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        ed.scroll_lines_up(3)
+        self.update_status()
+
+    def action_page_up(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        page_size = max(1, (ed.size.height or 20) - 2)
+        ed.scroll_lines_up(page_size)
+        self.update_status()
+
+    def action_page_down(self) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        page_size = max(1, (ed.size.height or 20) - 2)
+        ed.scroll_lines_down(page_size)
+        self.update_status()
 
     def action_save_file(self) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
