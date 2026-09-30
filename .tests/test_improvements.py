@@ -150,6 +150,91 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_f1_check())
 
+    def test_bashedit_f11_markdown_toggle(self):
+        import asyncio
+
+        from textual.app import App
+        from textual.events import MouseScrollDown, MouseScrollUp
+        from textual.widgets import Label
+
+        from bashedit import BashEditScreen
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(BashEditScreen())
+
+        async def run_markdown_toggle_checks():
+            app = TestApp()
+            async with app.run_test() as pilot:
+                screen = app.screen
+                ed = screen.query_one("#editor_widget")
+                lbl_md = screen.query_one("#lbl_markdown", Label)
+
+                # 1. Legend label verification
+                self.assertIsNotNone(lbl_md)
+                self.assertEqual(str(lbl_md.render()), "F11 MD")
+
+                # Set up sample markdown lines
+                ed.lines = ["# Title", "", "A paragraph of markdown text.", ""] + [
+                    f"- Item {i}" for i in range(50)
+                ]
+                self.assertFalse(ed.show_markdown)
+                self.assertFalse(screen.tabs[screen.active_tab_idx].show_markdown)
+
+                # 2. Press F11 to enable Markdown rendering
+                await pilot.press("f11")
+                await pilot.pause()
+                self.assertTrue(ed.show_markdown)
+                self.assertTrue(screen.tabs[screen.active_tab_idx].show_markdown)
+                status_lbl = screen.query_one("#editor_status", Label)
+                self.assertIn("Markdown rendering enabled", str(status_lbl.render()))
+
+                # 3. Test scrolling in Markdown mode
+                ed.top_line = 0
+                ed.post_message(
+                    MouseScrollDown(
+                        ed, x=10, y=5, delta_x=0, delta_y=1, button=4, shift=False, meta=False, ctrl=False
+                    )
+                )
+                await pilot.pause()
+                self.assertEqual(ed.top_line, 3)
+
+                ed.post_message(
+                    MouseScrollUp(
+                        ed, x=10, y=5, delta_x=0, delta_y=-1, button=5, shift=False, meta=False, ctrl=False
+                    )
+                )
+                await pilot.pause()
+                self.assertEqual(ed.top_line, 0)
+
+                # 4. In Markdown preview mode, typing keys does not mutate lines
+                initial_lines = list(ed.lines)
+                await pilot.press("a")
+                await pilot.pause()
+                self.assertEqual(ed.lines, initial_lines)
+                self.assertIn("Markdown preview active", str(status_lbl.render()))
+
+                # 5. Press F11 again to disable Markdown rendering
+                await pilot.press("f11")
+                await pilot.pause()
+                self.assertFalse(ed.show_markdown)
+                self.assertFalse(screen.tabs[screen.active_tab_idx].show_markdown)
+                self.assertIn("Markdown rendering disabled", str(status_lbl.render()))
+
+                # 6. Regular editing resumes
+                ed.lines = [""]
+                ed.cursor_x = 0
+                ed.cursor_y = 0
+                await pilot.press("x")
+                await pilot.pause()
+                self.assertEqual(ed.lines[0], "x")
+
+                # 7. Clicking lbl_markdown toggles markdown
+                screen.action_toggle_markdown()
+                self.assertTrue(ed.show_markdown)
+
+        asyncio.run(run_markdown_toggle_checks())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,8 @@ import subprocess
 import sys
 from typing import ClassVar
 
+from rich.console import Console
+from rich.markdown import Markdown
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -88,6 +90,7 @@ class EditorWidget(Widget):
     show_line_numbers = reactive(True)
     show_whitespace = reactive(False)
     display_theme_colors = reactive(False)
+    show_markdown = reactive(False)
 
     def __init__(
         self,
@@ -98,6 +101,7 @@ class EditorWidget(Widget):
         tabstop=8,
         theme=None,
         display_theme_colors=False,
+        show_markdown=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -113,6 +117,8 @@ class EditorWidget(Widget):
         self.tabstop = tabstop
         self.theme = theme or {}
         self.display_theme_colors = display_theme_colors
+        self.show_markdown = show_markdown
+        self._rendered_md_lines = None
         self._color_span_cache = {}
 
         self.mark_active = False
@@ -159,6 +165,31 @@ class EditorWidget(Widget):
         gutter_style = theme_dict.get("gutter") or theme_dict.get("help_text") or "dim cyan"
         lineno_style = theme_dict.get("gutter") or theme_dict.get("text") or "dim white"
         sel_style = theme_dict.get("selection") or "reverse bold magenta"
+
+        if self.show_markdown:
+            content_width = max(1, width)
+            console = (
+                self.app.console
+                if (hasattr(self, "app") and self.app and getattr(self.app, "console", None))
+                else Console(width=content_width)
+            )
+            options = console.options.update_width(content_width)
+            try:
+                rendered_lines = console.render_lines(Markdown("\n".join(self.lines)), options)
+            except Exception:  # noqa: BLE001
+                rendered_lines = []
+            self._rendered_md_lines = rendered_lines
+
+            for row_idx in range(height):
+                line_idx = self.top_line + row_idx
+                if line_idx >= len(rendered_lines):
+                    out.append("~\n", style=gutter_style)
+                    continue
+                line_segs = rendered_lines[line_idx]
+                line_rich = Text.assemble(*[(seg.text, seg.style) for seg in line_segs])
+                out.append_text(line_rich)
+                out.append("\n")
+            return out
 
         for row_idx in range(height):
             line_num = self.top_line + row_idx
@@ -295,14 +326,31 @@ class EditorWidget(Widget):
         elif self.cursor_x >= self.left_col + visible_w:
             self.left_col = self.cursor_x - visible_w + 1
 
+    def _get_rendered_md_lines(self) -> list:
+        if self._rendered_md_lines is not None:
+            return self._rendered_md_lines
+        width = max(1, self.size.width or 80)
+        console = (
+            self.app.console
+            if (hasattr(self, "app") and self.app and getattr(self.app, "console", None))
+            else Console(width=width)
+        )
+        options = console.options.update_width(width)
+        try:
+            self._rendered_md_lines = console.render_lines(Markdown("\n".join(self.lines)), options)
+        except Exception:  # noqa: BLE001
+            self._rendered_md_lines = []
+        return self._rendered_md_lines
+
     def scroll_lines_down(self, count: int = 3) -> None:
         """Scroll the editor viewport down by count lines (navigate page down)."""
         height = max(1, self.size.height or 20)
-        max_top = max(0, len(self.lines) - height)
+        total_lines = len(self._get_rendered_md_lines()) if self.show_markdown else len(self.lines)
+        max_top = max(0, total_lines - height)
         if self.top_line >= max_top:
             return
         self.top_line = min(max_top, self.top_line + count)
-        if self.cursor_y < self.top_line:
+        if not self.show_markdown and self.cursor_y < self.top_line:
             self.cursor_y = self.top_line
             self.clamp_cursor()
         self.refresh()
@@ -313,7 +361,7 @@ class EditorWidget(Widget):
         if self.top_line <= 0:
             return
         self.top_line = max(0, self.top_line - count)
-        if self.cursor_y >= self.top_line + height:
+        if not self.show_markdown and self.cursor_y >= self.top_line + height:
             self.cursor_y = max(0, self.top_line + height - 1)
             self.clamp_cursor()
         self.refresh()
@@ -548,7 +596,7 @@ def set_system_clipboard(text: str) -> bool:
 class EditorTab:
     """Represents an open document tab buffer in BashEdit."""
 
-    def __init__(self, file_path: str | None = None, lines: list[str] | None = None):
+    def __init__(self, file_path: str | None = None, lines: list[str] | None = None, show_markdown: bool = False):
         self.file_path = file_path
         self.lines = list(lines) if lines else [""]
         self.cursor_y = 0
@@ -561,6 +609,7 @@ class EditorTab:
         self.undo_stack = []
         self.redo_stack = []
         self.modified = False
+        self.show_markdown = show_markdown
 
 
 class BashEditScreen(Screen):
@@ -710,6 +759,7 @@ class BashEditScreen(Screen):
         Binding("ctrl+y", "redo", "Redo"),
         Binding("ctrl+n", "toggle_lineno", "Line Numbers"),
         Binding("alt+n", "toggle_lineno", "Line Numbers", show=False),
+        Binding("f11", "toggle_markdown", "Markdown", show=False),
         Binding("f1", "help_manual", "Help"),
         Binding("ctrl+g", "help_manual", "Help", show=False),
         Binding("alt+h", "help_manual", "Help", show=False),
@@ -818,6 +868,7 @@ class BashEditScreen(Screen):
                 yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
                 yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
                 yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
+                yield Label("F11 MD", id="lbl_markdown", classes="footer_item", markup=False)
                 yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
                 yield Label("^X Exit", id="lbl_exit", classes="footer_item", markup=False)
             yield Label("  Line 1/1, Col 1  ", id="editor_status")
@@ -910,6 +961,8 @@ class BashEditScreen(Screen):
             self.action_toggle_whitespace()
         elif target_action == "lbl_lineno":
             self.action_toggle_lineno()
+        elif target_action == "lbl_markdown":
+            self.action_toggle_markdown()
         elif target_action == "lbl_help":
             self.action_help_manual()
 
@@ -930,6 +983,7 @@ class BashEditScreen(Screen):
                 tab.undo_stack = list(ed.undo_stack)
                 tab.redo_stack = list(ed.redo_stack)
                 tab.modified = ed.modified
+                tab.show_markdown = getattr(ed, "show_markdown", False)
             except Exception:  # noqa: BLE001, S110
                 pass
 
@@ -954,6 +1008,7 @@ class BashEditScreen(Screen):
             ed.undo_stack = list(tab.undo_stack)
             ed.redo_stack = list(tab.redo_stack)
             ed.modified = tab.modified
+            ed.show_markdown = getattr(tab, "show_markdown", False)
             ed.clamp_cursor()
             ed.refresh()
 
@@ -1206,7 +1261,12 @@ class BashEditScreen(Screen):
 
     def update_status(self, msg: str | None = None):
         ed = self.query_one("#editor_widget", EditorWidget)
-        pos_info = f"Line {ed.cursor_y + 1}/{len(ed.lines)}, Col {ed.cursor_x + 1}"
+        if ed.show_markdown:
+            total_lines = len(ed._get_rendered_md_lines())
+            cur_line = min(total_lines, ed.top_line + 1)
+            pos_info = f"[MD View] Line {cur_line}/{total_lines}"
+        else:
+            pos_info = f"Line {ed.cursor_y + 1}/{len(ed.lines)}, Col {ed.cursor_x + 1}"
         mod = " *" if ed.modified else ""
         text = f"  {pos_info}{mod} | {msg}  " if msg else f"  {pos_info}{mod}  "
         self.query_one("#editor_status", Label).update(text)
@@ -1308,6 +1368,12 @@ class BashEditScreen(Screen):
             self.action_paste_buffer()
             return
 
+        if key_lower == "f11":
+            event.prevent_default()
+            event.stop()
+            self.action_toggle_markdown()
+            return
+
         # Ignore modifier combinations, function keys & action shortcut keys so Textual bindings process them as actions
         if (
             event.character in ["§", "\u00a7", "\x03", "\x16", "\x0b", "\x15"]
@@ -1340,6 +1406,39 @@ class BashEditScreen(Screen):
                 "section",
             ]
         ):
+            return
+
+        if ed.show_markdown:
+            if event.key == "up":
+                ed.scroll_lines_up(1)
+                self.update_status()
+            elif event.key == "down":
+                ed.scroll_lines_down(1)
+                self.update_status()
+            elif event.key in ("pageup", "page_up"):
+                page_size = max(1, (ed.size.height or 20) - 2)
+                ed.scroll_lines_up(page_size)
+                self.update_status()
+            elif event.key in ("pagedown", "page_down"):
+                page_size = max(1, (ed.size.height or 20) - 2)
+                ed.scroll_lines_down(page_size)
+                self.update_status()
+            elif event.key == "home":
+                ed.top_line = 0
+                ed.refresh()
+                self.update_status()
+            elif event.key == "end":
+                total_lines = len(ed._get_rendered_md_lines())
+                height = max(1, ed.size.height or 20)
+                ed.top_line = max(0, total_lines - height)
+                ed.refresh()
+                self.update_status()
+            elif (
+                event.key in ["enter", "backspace", "delete", "tab", "space", "full_stop"]
+                or (len(event.character or "") == 1 and event.character.isprintable())
+                or (len(event.key or "") == 1 and event.key.isprintable())
+            ):
+                self.update_status("Markdown preview active (Press F11 to edit)")
             return
 
         if event.key == "up":
@@ -1613,6 +1712,7 @@ class BashEditScreen(Screen):
             "• Alt+V / F10        : View Terminal Colors (ncurses_colors.py)",
             "• Alt+1             : Toggle Whitespace Display (spaces & tabs)",
             "• ^N / Alt+N        : Toggle Line Numbers",
+            "• F11                : Toggle Markdown Rendering",
             "• ^^ / Alt+A        : Toggle Mark Selection",
             "• ^W                : Where Is (Search text)",
             "• ^K / F8           : Cut Line or Selection",
@@ -1656,6 +1756,18 @@ class BashEditScreen(Screen):
         ed.show_line_numbers = not ed.show_line_numbers
         ed.refresh()
         self.update_status("Toggled Line Numbers")
+
+    def action_toggle_markdown(self) -> None:
+        """Toggles Markdown rendering for the active document buffer."""
+        ed = self.query_one("#editor_widget", EditorWidget)
+        ed.show_markdown = not ed.show_markdown
+        if 0 <= self.active_tab_idx < len(self.tabs):
+            self.tabs[self.active_tab_idx].show_markdown = ed.show_markdown
+        if not ed.show_markdown:
+            ed.clamp_cursor()
+        status = "enabled" if ed.show_markdown else "disabled"
+        self.update_status(f"Markdown rendering {status}")
+        ed.refresh()
 
     def action_show_pos(self) -> None:
         self.update_status()

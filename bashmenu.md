@@ -119,6 +119,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 - `Ctrl+^` / `Alt+A`       : Set or unset text selection mark.
 - `Alt+N`                 : Toggle line numbers gutter display.
 - `Alt+P` / `Alt+W`       : Toggle whitespace characters visibility.
+- `F11`                   : Toggle Markdown rendering for active document.
 - `F2`                    : Launch external `$EDITOR` (e.g. `vim`).
 
 ---
