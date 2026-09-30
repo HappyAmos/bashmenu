@@ -687,6 +687,36 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
         modal.on_click(DummyEvent())
         self.assertEqual(len(dismissed), 1)
 
+    def test_message_modal_ok_button(self):
+        """Verify MessageModalScreen dismisses on OK button press."""
+        dismissed = []
+
+        class DummyModal(bashmenu_ui.MessageModalScreen):
+            def dismiss(self, result=None):
+                dismissed.append(result)
+
+        modal = DummyModal("Title", "Message")
+        class DummyButton:
+            id = "btn_ok"
+        class DummyButtonEvent:
+            button = DummyButton()
+        modal.on_button_pressed(DummyButtonEvent())
+        self.assertEqual(len(dismissed), 1)
+
+    def test_file_picker_save_mode(self):
+        """Verify FilePickerModalScreen mode='save' path submission."""
+        dismissed = []
+
+        class DummySaveModal(bashmenu_ui.FilePickerModalScreen):
+            def dismiss(self, result=None):
+                dismissed.append(result)
+
+        modal = DummySaveModal("Save File As", start_dir="~", mode="save", default_val="test.txt")
+        self.assertEqual(modal.mode, "save")
+        modal._submit_save()
+        self.assertEqual(len(dismissed), 1)
+        self.assertTrue(dismissed[0].endswith("test.txt"))
+
     def test_main_menu_view_mouse_click(self):
         """Verify MainMenuView handles left-click and right-click on menu options."""
         cfg = {"theme": "dracula"}
@@ -848,6 +878,7 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
 
         actions_called = []
         screen.action_save_file = lambda: actions_called.append("save")
+        screen.action_save_file_as = lambda: actions_called.append("save_as")
         screen.action_open_file = lambda: actions_called.append("open")
         screen.action_exit_editor = lambda: actions_called.append("exit")
 
@@ -862,6 +893,9 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
 
         screen.on_click(DummyClickEvent(DummyWidget("lbl_save")))
         self.assertIn("save", actions_called)
+
+        screen.on_click(DummyClickEvent(DummyWidget("lbl_save_as")))
+        self.assertIn("save_as", actions_called)
 
         screen.on_click(DummyClickEvent(DummyWidget("lbl_open")))
         self.assertIn("open", actions_called)
@@ -974,6 +1008,19 @@ class TestBashEditTabs(unittest.TestCase):
         screen.action_close_tab(0)
         self.assertEqual(len(screen.tabs), 1)
         self.assertIsNone(screen.tabs[0].file_path)
+
+    def test_bashedit_tab_close_button_visibility(self):
+        screen = bashedit.BashEditScreen(file_path="test.txt")
+        self.assertEqual(len(screen.tabs), 1)
+        screen.action_new_tab(file_path="doc2.txt")
+        self.assertEqual(len(screen.tabs), 2)
+        screen.action_close_tab(1)
+        self.assertEqual(len(screen.tabs), 1)
+
+    def test_webopen_script_exists_and_executable(self):
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts", "webopen.sh"))
+        self.assertTrue(os.path.exists(script_path))
+        self.assertTrue(os.access(script_path, os.X_OK))
 
 
 if __name__ == "__main__":

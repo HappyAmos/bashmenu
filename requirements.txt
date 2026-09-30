@@ -1,5 +1,4 @@
 PyYAML==6.0.3
 rich==15.0.0
-rich-cli
 ruff==0.16.8
 textual==8.2.8

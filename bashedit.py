@@ -733,6 +733,8 @@ class BashEditScreen(Screen):
         Binding("ctrl+e", "new_file", "New", show=False),
         Binding("f4", "new_file", "New", show=False),
         Binding("ctrl+shift+s", "save_file_as", "Save As", show=False),
+        Binding("alt+s", "save_file_as", "Save As", show=False),
+        Binding("meta+s", "save_file_as", "Save As", show=False),
         Binding("f6", "save_file_as", "Save As", show=False),
         Binding("ctrl+k", "cut_line", "Cut"),
         Binding("f8", "cut_line", "Cut", show=False),
@@ -843,7 +845,8 @@ class BashEditScreen(Screen):
                     mod = " *" if tab.modified else ""
                     cls = "editor_tab_active" if idx == self.active_tab_idx else "editor_tab"
                     yield Label(f" {idx + 1}: {name}{mod} ", classes=f"editor_tab_select tab_select_{idx} {cls}")
-                    yield Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}")
+                    if len(self.tabs) > 1:
+                        yield Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}")
                 yield Label(" [ + ] ", id="tab_add_new", classes="editor_tab_add")
         yield EditorWidget(
             lines=self.initial_lines,
@@ -857,8 +860,9 @@ class BashEditScreen(Screen):
         with Vertical(id="editor_footer_area"):
             yield Label("─" * 500, id="editor_divider")
             with Horizontal(id="editor_legend"):
-                yield Label("^O Open", id="lbl_open", classes="footer_item", markup=False)
-                yield Label("^S Save", id="lbl_save", classes="footer_item", markup=False)
+                yield Label("^O Open", id="lbl_open", classes="footer_item lbl_open", markup=False)
+                yield Label("^S Save", id="lbl_save", classes="footer_item lbl_save", markup=False)
+                yield Label("Alt+S SaveAs", id="lbl_save_as", classes="footer_item lbl_save_as", markup=False)
                 yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
                 yield Label("^K Cut", id="lbl_cut", classes="footer_item", markup=False)
                 yield Label("Alt+6 Copy", id="lbl_copy", classes="footer_item", markup=False)
@@ -900,6 +904,10 @@ class BashEditScreen(Screen):
                     target_idx = int(nid.split("_")[-1])
                 break
 
+            if nid.startswith("lbl_"):
+                target_action = nid
+                break
+
             for cls in classes:
                 if cls.startswith("tab_select_"):
                     target_action = "select"
@@ -916,10 +924,6 @@ class BashEditScreen(Screen):
                     break
 
             if target_action:
-                break
-
-            if nid and nid.startswith("lbl_"):
-                target_action = nid
                 break
 
             node = getattr(node, "parent", None)
@@ -941,6 +945,8 @@ class BashEditScreen(Screen):
             self.action_exit_editor()
         elif target_action == "lbl_save":
             self.action_save_file()
+        elif target_action in ("lbl_save_as", "lbl_saveas"):
+            self.action_save_file_as()
         elif target_action == "lbl_open":
             self.action_open_file()
         elif target_action == "lbl_search":
@@ -1022,76 +1028,6 @@ class BashEditScreen(Screen):
     def refresh_tab_bar(self) -> None:
         try:
             tab_bar = self.query_one("#editor_tab_bar", Horizontal)
-            existing = list(tab_bar.children)
-            num_tabs = len(self.tabs)
-
-            add_btn = None
-            with contextlib.suppress(Exception):
-                add_btn = tab_bar.query_one("#tab_add_new", Label)
-
-            current_pairs = (len(existing) - 1) // 2 if add_btn and len(existing) >= 1 else 0
-
-            if current_pairs == num_tabs and add_btn:
-                for idx, tab in enumerate(self.tabs):
-                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
-                    mod = " *" if tab.modified else ""
-                    tab_label = f" {idx + 1}: {name}{mod} "
-                    is_active = idx == self.active_tab_idx
-
-                    select_w = existing[idx * 2]
-                    select_w.update(tab_label)
-                    select_w.set_classes(f"editor_tab_select tab_select_{idx} {'editor_tab_active' if is_active else 'editor_tab'}")
-                    close_w = existing[idx * 2 + 1]
-                    close_w.set_classes(f"editor_tab_close tab_close_{idx}")
-                return
-
-            if current_pairs < num_tabs and add_btn and current_pairs > 0:
-                for idx in range(current_pairs):
-                    tab = self.tabs[idx]
-                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
-                    mod = " *" if tab.modified else ""
-                    tab_label = f" {idx + 1}: {name}{mod} "
-                    is_active = idx == self.active_tab_idx
-
-                    select_w = existing[idx * 2]
-                    select_w.update(tab_label)
-                    select_w.set_classes(f"editor_tab_select tab_select_{idx} {'editor_tab_active' if is_active else 'editor_tab'}")
-                    close_w = existing[idx * 2 + 1]
-                    close_w.set_classes(f"editor_tab_close tab_close_{idx}")
-
-                new_widgets = []
-                for idx in range(current_pairs, num_tabs):
-                    tab = self.tabs[idx]
-                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
-                    mod = " *" if tab.modified else ""
-                    tab_label = f" {idx + 1}: {name}{mod} "
-                    cls = "editor_tab_active" if idx == self.active_tab_idx else "editor_tab"
-                    new_widgets.append(Label(tab_label, classes=f"editor_tab_select tab_select_{idx} {cls}"))
-                    new_widgets.append(Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}"))
-
-                tab_bar.mount(*new_widgets, before=add_btn)
-                return
-
-            if current_pairs > num_tabs and add_btn:
-                for idx in range(num_tabs, current_pairs):
-                    with contextlib.suppress(Exception):
-                        existing[idx * 2].remove()
-                        existing[idx * 2 + 1].remove()
-
-                for idx in range(num_tabs):
-                    tab = self.tabs[idx]
-                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
-                    mod = " *" if tab.modified else ""
-                    tab_label = f" {idx + 1}: {name}{mod} "
-                    is_active = idx == self.active_tab_idx
-
-                    select_w = existing[idx * 2]
-                    select_w.update(tab_label)
-                    select_w.set_classes(f"editor_tab_select tab_select_{idx} {'editor_tab_active' if is_active else 'editor_tab'}")
-                    close_w = existing[idx * 2 + 1]
-                    close_w.set_classes(f"editor_tab_close tab_close_{idx}")
-                return
-
             tab_bar.remove_children()
 
             widgets = []
@@ -1101,7 +1037,8 @@ class BashEditScreen(Screen):
                 tab_label = f" {idx + 1}: {name}{mod} "
                 cls = "editor_tab_active" if idx == self.active_tab_idx else "editor_tab"
                 widgets.append(Label(tab_label, classes=f"editor_tab_select tab_select_{idx} {cls}"))
-                widgets.append(Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}"))
+                if len(self.tabs) > 1:
+                    widgets.append(Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}"))
 
             widgets.append(Label(" [ + ] ", id="tab_add_new", classes="editor_tab_add"))
             tab_bar.mount(*widgets)
@@ -1530,6 +1467,7 @@ class BashEditScreen(Screen):
     def action_save_file(self) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
         if not self.file_path:
+            start_dir = os.getcwd()
 
             def save_cb(path):
                 if path:
@@ -1538,7 +1476,13 @@ class BashEditScreen(Screen):
                     self.action_save_file()
 
             self.app.push_screen(
-                bashmenu_ui.InputModalScreen("Save File As", "Enter file path:", theme=self.theme_styles),
+                bashmenu_ui.FilePickerModalScreen(
+                    "Save File As",
+                    start_dir=start_dir,
+                    mode="save",
+                    default_val="untitled.txt",
+                    theme=self.theme_styles,
+                ),
                 save_cb,
             )
             return
@@ -1704,7 +1648,7 @@ class BashEditScreen(Screen):
             "",
             "• ^O / ^R / F5 / F7   : Open File Picker",
             "• ^S / F2 / F3       : Save File",
-            "• ^Shift+S / F6      : Save As",
+            "• Alt+S / ^Shift+S / F6: Save File As (Save Under New Name)",
             "• ^E / [ + ]         : New Tab / New File",
             "• Alt+] / Ctrl+Tab   : Next Tab",
             "• Alt+[ / Shift+Tab  : Previous Tab",
@@ -1729,6 +1673,12 @@ class BashEditScreen(Screen):
 
     def action_save_file_as(self) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
+        start_dir = (
+            os.path.dirname(os.path.abspath(self.file_path))
+            if self.file_path and os.path.exists(self.file_path)
+            else os.getcwd()
+        )
+        default_name = os.path.basename(self.file_path) if self.file_path else "untitled.txt"
 
         def save_cb(path):
             if path:
@@ -1747,7 +1697,13 @@ class BashEditScreen(Screen):
                     self.update_status(f"Error saving file: {e}")
 
         self.app.push_screen(
-            bashmenu_ui.InputModalScreen("Save File As", "Enter file path:", theme=self.theme_styles),
+            bashmenu_ui.FilePickerModalScreen(
+                "Save File As",
+                start_dir=start_dir,
+                mode="save",
+                default_val=default_name,
+                theme=self.theme_styles,
+            ),
             save_cb,
         )
 

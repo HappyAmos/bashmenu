@@ -48,7 +48,7 @@ Contains a few personal scripts as examples.
 | `bashmenu.mnu`    | Hierarchical menu layout options definitions list.            |
 | `bashmenu.themes` | Theme palettes for 256, 16, and 8 color standard screens.     |
 | `ymlcheck.py`     | Command line utility to validate YAML syntax and schemas.     |
-| `scripts/`        | Useful scripts collection (DNS setup, glyph search, etc.).    |
+| `scripts/`        | Useful scripts collection (DNS setup, web browser launcher, glyph search, etc.). |
 | `templates/`      | Sample settings block templates (aliases, autoexec).          |
 
 ### local Manual Pages (Man Pages)

@@ -64,6 +64,9 @@ These scripts are stored in the `/scripts` directory and can be used directly or
                               apt, dnf, pacman, pkg, and brew.
 - `scripts/unicode.sh`       : Interactive Unicode Block Explorer script.
 - `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
+- `scripts/webopen.sh`       : Cross-platform web browser launcher wrapper script
+                              that opens a specified URL, file, or default browser
+                              (supporting Linux, macOS, WSL, and Termux).
 
 ### 2.2 Provided Templates (`templates/`)
 Used as dynamic templates for code generation, settings, or block injections:

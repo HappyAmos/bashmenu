@@ -899,6 +899,14 @@ class MessageModalScreen(ModalScreen[None]):
         margin: 0;
         background: transparent;
     }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
     #scroll_container {
         height: auto;
         max-height: 15;
@@ -956,14 +964,22 @@ class MessageModalScreen(ModalScreen[None]):
                         str(self.message), theme=self.theme, no_formatting=self.no_formatting
                     )
                 yield Static(content, id="message")
+            with Horizontal(id="buttons"):
+                yield Button("OK", variant="primary", id="btn_ok")
             yield Label("[ENTER/ESC] Close", id="footer")
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
+        with contextlib.suppress(Exception):
+            apply_button_theme(self.query_one("#btn_ok", Button), theme=self.theme, button_type="button_primary")
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
         if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id in ("btn_ok", "btn_close_x"):
             self.dismiss(None)
 
     def action_close_modal(self) -> None:
@@ -1374,6 +1390,12 @@ class FilePickerModalScreen(ModalScreen[str]):
         background: $surface;
         padding: 1 2;
     }
+    FilePickerModalScreen.save_modal #dialog {
+        height: 28;
+    }
+    FilePickerModalScreen.save_modal #options_list {
+        height: 10;
+    }
     #title_bar {
         height: 1;
         width: 100%;
@@ -1414,6 +1436,21 @@ class FilePickerModalScreen(ModalScreen[str]):
         height: 14;
         border: solid $accent;
     }
+    #save_filename_container {
+        margin-top: 1;
+        height: auto;
+    }
+    #save_filename_label {
+        color: $accent;
+    }
+    #save_buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
     #footer {
         text-align: center;
         margin-top: 1;
@@ -1441,6 +1478,7 @@ class FilePickerModalScreen(ModalScreen[str]):
         super().__init__()
         self.modal_title = title
         self.mode = mode
+        self.default_val = default_val
         self.show_hidden_state = show_hidden
         self.allow_new = allow_new
         self.theme = theme or {}
@@ -1454,16 +1492,45 @@ class FilePickerModalScreen(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             with Horizontal(id="title_bar"):
-                yield Label(self.modal_title or "File Picker", id="title")
+                title_str = self.modal_title or ("Save File As" if self.mode == "save" else "File Picker")
+                yield Label(title_str, id="title")
                 yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             yield Label(f"Path: {self.current_path}", id="path_label")
             yield OptionList(id="options_list")
-            footer_text = "[ENTER] Open/Select | [N] New | [ESC] Cancel" if self.allow_new else "[ENTER] Open/Select | [ESC] Cancel"
+            if self.mode == "save":
+                with Vertical(id="save_filename_container"):
+                    yield Label("File Name:", id="save_filename_label")
+                    yield Input(value=self.default_val or "", placeholder="Enter file name...", id="filename_input")
+                with Horizontal(id="save_buttons"):
+                    yield Button("Save", variant="primary", id="btn_save")
+                    yield Button("Cancel", variant="default", id="btn_cancel")
+            footer_text = (
+                "[ENTER] Save/Navigate | [ESC] Cancel"
+                if self.mode == "save"
+                else ("[ENTER] Open/Select | [N] New | [ESC] Cancel" if self.allow_new else "[ENTER] Open/Select | [ESC] Cancel")
+            )
             yield Label(footer_text, id="footer")
 
     def on_mount(self) -> None:
+        if self.mode == "save":
+            self.add_class("save_modal")
         self.load_directory()
         apply_modal_theme(self, self.theme)
+        if self.mode == "save":
+            with contextlib.suppress(Exception):
+                apply_button_theme(self.query_one("#btn_save", Button), self.theme, "button_primary")
+                apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+
+    def _submit_save(self) -> None:
+        filename = ""
+        try:
+            filename = self.query_one("#filename_input", Input).value.strip()
+        except Exception:  # noqa: BLE001
+            filename = (self.default_val or "").strip()
+        if filename:
+            self.dismiss(os.path.join(self.current_path, filename))
+        else:
+            self.dismiss(None)
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -1471,8 +1538,25 @@ class FilePickerModalScreen(ModalScreen[str]):
             self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn_close_x":
+        if event.button.id in ("btn_close_x", "btn_cancel"):
             self.dismiss(None)
+        elif event.button.id == "btn_save":
+            self._submit_save()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if self.mode == "save" and getattr(event.input, "id", None) == "filename_input":
+            self._submit_save()
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if self.mode != "save":
+            return
+        idx = event.option_index
+        if 0 <= idx < len(self.entries):
+            selected = self.entries[idx]
+            if not selected.get("is_dir") and selected.get("path"):
+                filename = os.path.basename(selected["path"])
+                with contextlib.suppress(Exception):
+                    self.query_one("#filename_input", Input).value = filename
 
     def load_directory(self) -> None:
         self.query_one("#path_label", Label).update(f"Path: {self.current_path}")
@@ -1550,12 +1634,20 @@ class FilePickerModalScreen(ModalScreen[str]):
             return
 
         if selected.get("is_self"):
-            self.dismiss(selected["path"])
+            if self.mode == "save":
+                self._submit_save()
+            else:
+                self.dismiss(selected["path"])
             return
 
         if selected["is_dir"]:
             self.current_path = selected["path"]
             self.load_directory()
+        elif self.mode == "save":
+            filename = os.path.basename(selected["path"])
+            with contextlib.suppress(Exception):
+                self.query_one("#filename_input", Input).value = filename
+            self._submit_save()
         elif self.mode in ["file", "any"]:
             self.dismiss(selected["path"])
 
