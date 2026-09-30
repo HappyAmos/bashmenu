@@ -759,7 +759,7 @@ class BashEditScreen(Screen):
         Binding("ctrl+y", "redo", "Redo"),
         Binding("ctrl+n", "toggle_lineno", "Line Numbers"),
         Binding("alt+n", "toggle_lineno", "Line Numbers", show=False),
-        Binding("f11", "toggle_markdown", "Markdown", show=False),
+        Binding("f12", "toggle_markdown", "Markdown", show=False),
         Binding("f1", "help_manual", "Help"),
         Binding("ctrl+g", "help_manual", "Help", show=False),
         Binding("alt+h", "help_manual", "Help", show=False),
@@ -868,7 +868,7 @@ class BashEditScreen(Screen):
                 yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
                 yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
                 yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
-                yield Label("F11 MD", id="lbl_markdown", classes="footer_item", markup=False)
+                yield Label("F12 MD", id="lbl_markdown", classes="footer_item", markup=False)
                 yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
                 yield Label("^X Exit", id="lbl_exit", classes="footer_item", markup=False)
             yield Label("  Line 1/1, Col 1  ", id="editor_status")
@@ -1368,7 +1368,7 @@ class BashEditScreen(Screen):
             self.action_paste_buffer()
             return
 
-        if key_lower == "f11":
+        if key_lower == "f12":
             event.prevent_default()
             event.stop()
             self.action_toggle_markdown()
@@ -1438,7 +1438,7 @@ class BashEditScreen(Screen):
                 or (len(event.character or "") == 1 and event.character.isprintable())
                 or (len(event.key or "") == 1 and event.key.isprintable())
             ):
-                self.update_status("Markdown preview active (Press F11 to edit)")
+                self.update_status("Markdown preview active (Press F12 to edit)")
             return
 
         if event.key == "up":
@@ -1712,7 +1712,7 @@ class BashEditScreen(Screen):
             "• Alt+V / F10        : View Terminal Colors (ncurses_colors.py)",
             "• Alt+1             : Toggle Whitespace Display (spaces & tabs)",
             "• ^N / Alt+N        : Toggle Line Numbers",
-            "• F11                : Toggle Markdown Rendering",
+            "• F12                : Toggle Markdown Rendering",
             "• ^^ / Alt+A        : Toggle Mark Selection",
             "• ^W                : Where Is (Search text)",
             "• ^K / F8           : Cut Line or Selection",

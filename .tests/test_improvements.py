@@ -150,7 +150,7 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_f1_check())
 
-    def test_bashedit_f11_markdown_toggle(self):
+    def test_bashedit_f12_markdown_toggle(self):
         import asyncio
 
         from textual.app import App
@@ -172,7 +172,7 @@ class TestImprovements(unittest.TestCase):
 
                 # 1. Legend label verification
                 self.assertIsNotNone(lbl_md)
-                self.assertEqual(str(lbl_md.render()), "F11 MD")
+                self.assertEqual(str(lbl_md.render()), "F12 MD")
 
                 # Set up sample markdown lines
                 ed.lines = ["# Title", "", "A paragraph of markdown text.", ""] + [
@@ -181,8 +181,8 @@ class TestImprovements(unittest.TestCase):
                 self.assertFalse(ed.show_markdown)
                 self.assertFalse(screen.tabs[screen.active_tab_idx].show_markdown)
 
-                # 2. Press F11 to enable Markdown rendering
-                await pilot.press("f11")
+                # 2. Press F12 to enable Markdown rendering
+                await pilot.press("f12")
                 await pilot.pause()
                 self.assertTrue(ed.show_markdown)
                 self.assertTrue(screen.tabs[screen.active_tab_idx].show_markdown)
@@ -214,8 +214,8 @@ class TestImprovements(unittest.TestCase):
                 self.assertEqual(ed.lines, initial_lines)
                 self.assertIn("Markdown preview active", str(status_lbl.render()))
 
-                # 5. Press F11 again to disable Markdown rendering
-                await pilot.press("f11")
+                # 5. Press F12 again to disable Markdown rendering
+                await pilot.press("f12")
                 await pilot.pause()
                 self.assertFalse(ed.show_markdown)
                 self.assertFalse(screen.tabs[screen.active_tab_idx].show_markdown)
