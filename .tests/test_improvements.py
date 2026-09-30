@@ -116,6 +116,19 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_scroll_checks())
 
+    def test_theme_submenu_divider(self):
+        sub = bashmenu.build_dynamic_theme_submenu()
+        self.assertIn("options", sub)
+        options = sub["options"]
+        self.assertTrue(len(options) > 2)
+        # First item must be a divider
+        first_item = options[0]
+        self.assertEqual(first_item.get("type"), "divider")
+        self.assertEqual(first_item.get("length"), "{window_width}")
+        # Second item must be a theme item
+        second_item = options[1]
+        self.assertIn("set_theme", second_item)
+
 
 if __name__ == "__main__":
     unittest.main()

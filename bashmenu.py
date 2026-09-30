@@ -560,7 +560,13 @@ def build_dynamic_theme_submenu():
     Construct a menu structure dictionary populated with available color themes.
     """
     themes = bashmenu_ui.load_themes_file()
-    options = []
+    options = [
+        {
+            "type": "divider",
+            "length": "{window_width}",
+            "char": "{ascii:196}",
+        }
+    ]
     if themes:
         for theme_key in themes:
             formatted_name = theme_key.replace("_", " ").title()
@@ -1225,7 +1231,11 @@ def process_item_action(screen, item, config):
         item["submenu"] = build_dynamic_theme_submenu()
         sub_menu = item["submenu"]
         screen.menu_view.menu_stack.append(sub_menu)
-        screen.menu_view.selected_rows.append(0)
+        sub_options = sub_menu.get("options", [])
+        start_idx = 0
+        while start_idx < len(sub_options) and sub_options[start_idx].get("type") == "divider":
+            start_idx += 1
+        screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
         screen.menu_view.refresh()
 
     elif item_type in ["message", "popup", "info"]:
