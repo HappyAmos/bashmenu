@@ -235,6 +235,87 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_markdown_toggle_checks())
 
+    def test_menuedit_inspector_properties(self):
+        import menuedit
+
+        screen = menuedit.MenuEditScreen()
+        updated_content = []
+
+        class DummyInspector:
+            def update(self, content):
+                updated_content.append(content)
+
+        screen.query_one = lambda *a, **kw: DummyInspector()
+
+        test_item = {
+            "type": "command",
+            "title": "Full Property Test",
+            "command": "echo test",
+            "alt_buffer": True,
+            "no_formatting": True,
+            "start_dir": "/tmp/testdir",
+            "picker": "file_picker",
+            "on_yes": "echo yes",
+            "on_no": "echo no",
+            "show_whitespace": True,
+            "external": True,
+            "custom_prop": "custom_val",
+        }
+
+        screen.update_inspector(test_item)
+        self.assertEqual(len(updated_content), 1)
+        inspector_text = updated_content[0]
+
+        self.assertIn("Alt Buffer:[/bold cyan] True", inspector_text)
+        self.assertIn("No Formatting:[/bold cyan] True", inspector_text)
+        self.assertIn("Start Directory:[/bold cyan] /tmp/testdir", inspector_text)
+        self.assertIn("Picker Type:[/bold cyan] file_picker", inspector_text)
+        self.assertIn("On Yes Action:[/bold green] echo yes", inspector_text)
+        self.assertIn("On No Action:[/bold red] echo no", inspector_text)
+        self.assertIn("show_whitespace=True", inspector_text)
+        self.assertIn("external=True", inspector_text)
+        self.assertIn("Extra Properties:[/bold yellow] [dim]custom_prop=custom_val[/dim]", inspector_text)
+
+    def test_menuedit_modal_properties(self):
+        import menuedit
+
+        item = {
+            "type": "command",
+            "title": "Edit Test",
+            "command": "echo 1",
+            "alt_buffer": True,
+            "no_formatting": True,
+            "show_whitespace": True,
+            "external": True,
+        }
+        modal = menuedit.ItemEditModal(item)
+
+        class DummyCheckbox:
+            def __init__(self, val=True):
+                self.value = val
+
+        class DummyInput:
+            value = "val"
+
+        class DummyContainer:
+            selected_mode_idx = 1
+
+        def dummy_query(selector, *a, **kw):
+            if "exec_mode_container" in selector or selector == menuedit.ExecModeContainer:
+                return DummyContainer()
+            if "chk" in selector:
+                return DummyCheckbox(True)
+            return DummyInput()
+
+        modal.query_one = dummy_query
+        modal.dismiss = lambda item: None
+        modal.perform_save()
+
+        self.assertTrue(modal.item.get("alt_buffer"))
+        self.assertTrue(modal.item.get("no_formatting"))
+        self.assertTrue(modal.item.get("show_whitespace"))
+        self.assertTrue(modal.item.get("external"))
+
 
 if __name__ == "__main__":
     unittest.main()

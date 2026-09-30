@@ -534,6 +534,8 @@ class ItemEditModal(ModalScreen[dict]):
                 yield Checkbox("Disable Formatting (no_formatting=true)", value=bool(self.item.get("no_formatting", False)), id="chk_no_formatting")
                 yield Checkbox("Mask Input (masked=true)", value=bool(self.item.get("masked", False)), id="chk_masked")
                 yield Checkbox("Refresh Environment (refresh=true)", value=bool(self.item.get("refresh", False)), id="chk_refresh")
+                yield Checkbox("Show Whitespace in Editor (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_show_whitespace")
+                yield Checkbox("External Execution (external=true)", value=bool(self.item.get("external", False)), id="chk_external")
 
             with Horizontal(id="buttons"):
                 yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
@@ -678,6 +680,8 @@ class ItemEditModal(ModalScreen[dict]):
         self.item["no_formatting"] = self.query_one("#chk_no_formatting", Checkbox).value
         self.item["masked"] = self.query_one("#chk_masked", Checkbox).value
         self.item["refresh"] = self.query_one("#chk_refresh", Checkbox).value
+        self.item["show_whitespace"] = self.query_one("#chk_show_whitespace", Checkbox).value
+        self.item["external"] = self.query_one("#chk_external", Checkbox).value
 
         self.dismiss(self.item)
 
@@ -835,6 +839,7 @@ class MenuEditScreen(Screen):
         height: 100%;
         border: solid $accent;
         padding: 1 2;
+        overflow-y: auto;
     }
     #tree {
         height: 100%;
@@ -847,7 +852,7 @@ class MenuEditScreen(Screen):
         text-align: center;
     }
     #inspector_content {
-        height: 1fr;
+        height: auto;
     }
     Checkbox {
         background: transparent;
@@ -1303,8 +1308,39 @@ class MenuEditScreen(Screen):
         if block_id:
             lines.append(f"[bold cyan]Block ID:[/bold cyan] {block_id}")
 
+        start_dir = item.get("start_dir")
+        if start_dir:
+            lines.append(f"[bold cyan]Start Directory:[/bold cyan] {start_dir}")
+
+        picker = item.get("picker")
+        if picker:
+            lines.append(f"[bold cyan]Picker Type:[/bold cyan] {picker}")
+
+        on_yes = item.get("on_yes")
+        if on_yes is not None:
+            lines.append(f"[bold green]On Yes Action:[/bold green] {on_yes}")
+
+        on_no = item.get("on_no")
+        if on_no is not None:
+            lines.append(f"[bold red]On No Action:[/bold red] {on_no}")
+
+        if "alt_buffer" in item:
+            lines.append(f"[bold cyan]Alt Buffer:[/bold cyan] {item['alt_buffer']}")
+
+        if "no_formatting" in item:
+            lines.append(f"[bold cyan]No Formatting:[/bold cyan] {item['no_formatting']}")
+
         flags = []
-        for flag_name in ["stream", "quiet", "interactive", "show_whitespace", "masked", "refresh"]:
+        for flag_name in [
+            "stream",
+            "quiet",
+            "interactive",
+            "show_whitespace",
+            "masked",
+            "refresh",
+            "external",
+            "display_theme_colors",
+        ]:
             if flag_name in item:
                 flags.append(f"{flag_name}={item[flag_name]}")
         if "tabstop" in item:
@@ -1315,6 +1351,50 @@ class MenuEditScreen(Screen):
         if "submenu" in item:
             sub_opts = item.get("submenu", {}).get("options", [])
             lines.append(f"[bold magenta]Submenu Options:[/bold magenta] {len(sub_opts)} items")
+
+        known_keys = {
+            "type",
+            "title",
+            "label",
+            "icon",
+            "glyph",
+            "action",
+            "command",
+            "script",
+            "file",
+            "python",
+            "key",
+            "message",
+            "prompt",
+            "text",
+            "template",
+            "target",
+            "block_id",
+            "start_dir",
+            "picker",
+            "on_yes",
+            "on_no",
+            "alt_buffer",
+            "no_formatting",
+            "stream",
+            "quiet",
+            "interactive",
+            "show_whitespace",
+            "masked",
+            "refresh",
+            "external",
+            "display_theme_colors",
+            "tabstop",
+            "submenu",
+            "options",
+            "char",
+            "length",
+            "divider",
+        }
+        extra_keys = [k for k in item if k not in known_keys]
+        if extra_keys:
+            extras = ", ".join(f"{k}={item[k]}" for k in sorted(extra_keys))
+            lines.append(f"[bold yellow]Extra Properties:[/bold yellow] [dim]{extras}[/dim]")
 
         inspector.update("\n\n".join(lines))
 
