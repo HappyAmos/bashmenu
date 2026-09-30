@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from rich._palettes import EIGHT_BIT_PALETTE
+from rich.markdown import Markdown
 from rich.style import Style
 from rich.text import Text
 from textual.app import ComposeResult
@@ -924,10 +925,11 @@ class MessageModalScreen(ModalScreen[None]):
     def __init__(
         self,
         title: str,
-        message: str,
+        message: str | Text | Markdown,
         theme: dict | None = None,
         is_help: bool = False,
         no_formatting: bool = False,
+        is_markdown: bool = False,
     ):
         super().__init__()
         self.modal_title = title
@@ -935,6 +937,7 @@ class MessageModalScreen(ModalScreen[None]):
         self.theme = theme or {}
         self.is_help = is_help
         self.no_formatting = no_formatting
+        self.is_markdown = is_markdown
         if is_help:
             self.add_class("help_modal")
 
@@ -944,13 +947,14 @@ class MessageModalScreen(ModalScreen[None]):
                 yield Label(self.modal_title or "", id="title")
                 yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             with VerticalScroll(id="scroll_container"):
-                content = (
-                    self.message
-                    if isinstance(self.message, Text)
-                    else formatting_to_rich_text(
+                if isinstance(self.message, (Text, Markdown)):
+                    content = self.message
+                elif self.is_markdown:
+                    content = Markdown(str(self.message))
+                else:
+                    content = formatting_to_rich_text(
                         str(self.message), theme=self.theme, no_formatting=self.no_formatting
                     )
-                )
                 yield Static(content, id="message")
             yield Label("[ENTER/ESC] Close", id="footer")
 

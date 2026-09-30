@@ -129,6 +129,27 @@ class TestImprovements(unittest.TestCase):
         second_item = options[1]
         self.assertIn("set_theme", second_item)
 
+    def test_f1_help_markdown(self):
+        import asyncio
+
+        from rich.markdown import Markdown
+        from textual.app import App
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(bashmenu.BashMenuScreen())
+
+        async def run_f1_check():
+            app = TestApp()
+            async with app.run_test() as pilot:
+                await pilot.press("f1")
+                modal = app.screen
+                self.assertIsInstance(modal, bashmenu_ui.MessageModalScreen)
+                msg_widget = modal.query_one("#message")
+                self.assertIsInstance(msg_widget.content, Markdown)
+
+        asyncio.run(run_f1_check())
+
 
 if __name__ == "__main__":
     unittest.main()

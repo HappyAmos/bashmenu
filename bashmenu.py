@@ -1750,7 +1750,15 @@ class BashMenuScreen(Screen):
         if os.path.exists(help_path):
             with open(help_path, "r", encoding="utf-8") as f:
                 help_text = f.read()
-        self.app.push_screen(bashmenu_ui.MessageModalScreen("HA Bash Menu Manual", help_text, is_help=True))
+        self.app.push_screen(
+            bashmenu_ui.MessageModalScreen(
+                "HA Bash Menu Manual",
+                help_text,
+                theme=getattr(self.app, "theme_styles", None),
+                is_help=True,
+                is_markdown=True,
+            )
+        )
 
     def action_themes(self) -> None:
         current_theme = self.menu_view.config.get("theme", "dracula")
