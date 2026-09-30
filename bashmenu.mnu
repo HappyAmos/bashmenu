@@ -600,7 +600,7 @@ options:
       no_formatting: false
       masked: false
       refresh: false
-      alt_buffer: true
+      alt_buffer: false
       submenu:
         title: Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]
         options: []
