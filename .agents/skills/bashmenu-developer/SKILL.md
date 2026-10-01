@@ -170,6 +170,29 @@ Textual interface.
       and `README.md`.
     - Man page and markdown docs must maintain lines wrapped under 80
       characters with a dry, professional tone without promotional hype.
+17. **Terminal Keybinding Collision Invariant (Avoid `<F11>`):**
+    Terminal emulators and window managers reserve `<F11>` globally to toggle
+    fullscreen mode, intercepting the key before it reaches TUI event loops.
+    Never bind `<F11>` for application shortcuts; use `<F12>` or alternate
+    unreserved function keys.
+18. **Rich & ANSI Terminal Pager Pipeline (`FORCE_COLOR` & `less -R`):**
+    When piping Rich or ANSI-styled output into pagers such as `less`, terminal
+    color detection is deactivated by Rich because stdout is a pipe. To preserve
+    color rendering without printing raw escape codes:
+    - Set `export FORCE_COLOR=1` (or pass `--force-terminal`).
+    - Pass `-R` (or `-r`) to `less` to interpret raw ANSI color escape sequences.
+    - Always resolve script directories portably (using `BASH_SOURCE[0]`) rather
+      than hardcoding paths.
+19. **Menu Editor Schema & Property Inspector Completeness (`menuedit.py`):**
+    The visual editor's property inspector (`update_inspector()`) and edit
+    modal (`ItemEditModal`) must support the complete `bashmenu.mnu` schema:
+    - Explicitly render `alt_buffer`, `no_formatting`, `start_dir`, `picker`,
+      `on_yes`, and `on_no`.
+    - Track all flags (`stream`, `quiet`, `interactive`, `show_whitespace`,
+      `masked`, `refresh`, `external`, `display_theme_colors`).
+    - Include an "Extra Properties" fallback for author-defined custom attributes.
+    - Ensure `#inspector_panel` uses `overflow-y: auto;` and `#inspector_content`
+      uses `height: auto;` for scrollable inspection.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the
