@@ -255,12 +255,16 @@ options:
       char: '{ascii:196}'
 - type: submenu
   title: Internet
+  icon: '{nf::#f059f}'
   submenu:
-    title: New submenu
+    title: Internet Options
     options:
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
     - type: command
-      title: Launch Web Browser
-      command: '{scripts_dir}/webopen.sh'
+      title: Github.com
+      command: '{scripts_dir}/webopen.sh https://github.com'
       tabstop: 4
       stream: false
       interactive: true
@@ -271,16 +275,58 @@ options:
       refresh: false
       show_whitespace: false
       external: false
-  tabstop: 4
-  stream: false
-  interactive: true
-  quiet: false
-  alt_buffer: true
-  no_formatting: false
-  masked: false
-  refresh: false
-  show_whitespace: false
-  external: false
+    - type: script
+      title: Google.com
+      script: '{scripts_dir}/webopen.sh https://google.com'
+      tabstop: 4
+      stream: false
+      interactive: true
+      quiet: false
+      alt_buffer: true
+      no_formatting: false
+      masked: false
+      refresh: false
+      show_whitespace: false
+      external: false
+    - label: Launch GUI Web Browser [--gui]
+      type: command
+      action: '{scripts_dir}/webopen.sh --gui'
+      icon: '{nf::#f268:}'
+      interactive: true
+      quiet: true
+      alt_buffer: true
+      command: '{scripts_dir}/webopen.sh --gui'
+      tabstop: 4
+      stream: false
+      no_formatting: false
+      masked: false
+      refresh: false
+      show_whitespace: false
+      external: false
+    - label: Launch Terminal Web Browser [--tty]
+      type: command
+      action: '{scripts_dir}/webopen.sh --tty'
+      icon: '{nf::#f120:}'
+      interactive: true
+      quiet: true
+      alt_buffer: true
+      command: '{scripts_dir}/webopen.sh --tty'
+      tabstop: 4
+      stream: false
+      no_formatting: false
+      masked: false
+      refresh: false
+      show_whitespace: false
+      external: false
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
+    - label: Back to Main Menu
+      type: back
+      icon: '{nf::#f048}'
+    - type: divider
+      length: '{window_width}'
+      char: '{ascii:196}'
 - label: Network Utilities
   icon: "{nf::#ef09:\U0001F310}"
   submenu:

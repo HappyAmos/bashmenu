@@ -9,6 +9,7 @@ color palettes from bashmenu.themes.
 __version__ = "0.0.1"
 __author__ = "HappyAmos"
 
+import codecs
 import contextlib
 import copy
 import curses
@@ -330,31 +331,64 @@ def resolve_glyph(glyph_def, config=None):
     if not isinstance(glyph_def, str) or not glyph_def.startswith("{nf:"):
         return glyph_def
 
-    parts = glyph_def[4:-1].split(":")
-    if len(parts) >= 3:
-        char_part, hex_part, emoji_part = parts[0], parts[1], parts[2]
-    elif len(parts) == 2:
-        if parts[0].startswith("#") or (parts[0] and all(c in "0123456789abcdefABCDEF" for c in parts[0])):
-            char_part, hex_part, emoji_part = "", parts[0], parts[1]
-        else:
-            char_part, hex_part, emoji_part = parts[0], parts[1], parts[0]
-    else:
-        return glyph_def
+    inner = glyph_def[4:-1]
+    parts = inner.split(":")
 
-    if config is None:
+    def is_hex_token(t: str) -> bool:
+        if not t:
+            return False
+        clean = t.lstrip("#$").replace("0x", "").strip()
+        return bool(clean and all(c in "0123456789abcdefABCDEF" for c in clean))
+
+    char_part = ""
+    hex_part = ""
+    emoji_part = ""
+
+    if len(parts) >= 3:
+        char_part = parts[0]
+        hex_part = parts[1]
+        emoji_part = ":".join(parts[2:])
+    elif len(parts) == 2:
+        if parts[0] == "":
+            char_part = ""
+            hex_part = parts[1]
+            emoji_part = ""
+        elif is_hex_token(parts[0]):
+            char_part = ""
+            hex_part = parts[0]
+            emoji_part = parts[1]
+        else:
+            char_part = parts[0]
+            hex_part = parts[1]
+            emoji_part = ""
+    elif len(parts) == 1:
+        part = parts[0]
+        if is_hex_token(part):
+            char_part = ""
+            hex_part = part
+            emoji_part = ""
+        else:
+            char_part = part
+
+    if not config:
         config, _ = load_config()
     use_nerd = get_config_value(config, "settings.use_nerd_fonts", False)
 
-    if use_nerd and hex_part:
-        try:
-            hex_clean = hex_part.lstrip("#")
-            if hex_clean:
-                return chr(int(hex_clean, 16))
-        except ValueError:
-            pass
-
-    if emoji_part:
-        return emoji_part
+    if use_nerd:
+        if emoji_part:
+            if r"\u" in emoji_part.lower():
+                try:
+                    emoji_part = codecs.decode(emoji_part, "unicode-escape")
+                except Exception:
+                    pass
+            return emoji_part
+        if hex_part and is_hex_token(hex_part):
+            try:
+                hex_clean = hex_part.lstrip("#$").replace("0x", "").strip()
+                if hex_clean:
+                    return chr(int(hex_clean, 16))
+            except ValueError:
+                pass
 
     return char_part
 
@@ -1000,8 +1034,15 @@ class MainMenuView(Widget):
 
             icon_raw = opt.get("icon") or opt.get("glyph") or ""
             icon_resolved = resolve_glyph(interpolate_placeholders(icon_raw, self.config, extra_vars=extra_vars), self.config) if icon_raw else ""
-            icon_str = f"{icon_resolved}  " if icon_resolved else ""
-            icon_w = get_display_width(icon_str, self.config)
+            if icon_resolved:
+                clean_icon = icon_resolved.replace("\ufe0f", "").replace("\ufe0e", "")
+                vis_w = get_display_width(clean_icon, self.config)
+                pad_w = max(1, 4 - vis_w)
+                icon_str = f"{clean_icon}{' ' * pad_w}"
+                icon_w = vis_w + pad_w
+            else:
+                icon_str = "    "
+                icon_w = 4
 
             raw_label = interpolate_placeholders(opt.get("label") or opt.get("title") or "", self.config, extra_vars=extra_vars)
             if opt.get("set_theme") == self.config.get("theme"):
@@ -1019,8 +1060,7 @@ class MainMenuView(Widget):
             else:
                 row_content.append("    ", style=item_style)
 
-            if icon_resolved:
-                row_content.append(f"{icon_resolved}  ", style=item_style)
+            row_content.append(icon_str, style=item_style)
 
             lbl_truncated = left_label
             if get_visible_len(left_label, self.config) > label_avail_w:
@@ -1045,6 +1085,12 @@ class MainMenuView(Widget):
             if right_bracket:
                 rb_rich = bashmenu_ui.formatting_to_rich_text(right_bracket, default_style=item_style, theme=theme_styles)
                 row_content.append_text(rb_rich)
+
+            if row_content.cell_len > avail_w:
+                row_content.truncate(avail_w)
+            pad_w = max(0, avail_w - row_content.cell_len)
+            if pad_w > 0:
+                row_content.append(" " * pad_w, style=item_style)
 
             line_rich.append_text(row_content)
             line_rich.append("  │\n", style=border_style)
@@ -1108,12 +1154,22 @@ class MainMenuView(Widget):
         help_w = get_visible_len(chosen_help, self.config)
         footer_spaces = max(0, avail_w - help_w - gutter_w)
 
-        hg_line = Text("│  ", style=border_style)
+        hg_content = Text()
         if chosen_help:
-            hg_line.append_text(bashmenu_ui.formatting_to_rich_text(chosen_help, default_style=help_text_style, theme=theme_styles))
-        hg_line.append(" " * footer_spaces, style=border_style)
+            hg_content.append_text(bashmenu_ui.formatting_to_rich_text(chosen_help, default_style=help_text_style, theme=theme_styles))
+        if footer_spaces > 0:
+            hg_content.append(" " * footer_spaces, style=border_style)
         if gutter_str:
-            hg_line.append_text(bashmenu_ui.formatting_to_rich_text(gutter_str, default_style=gutter_style, theme=theme_styles))
+            hg_content.append_text(bashmenu_ui.formatting_to_rich_text(gutter_str, default_style=gutter_style, theme=theme_styles))
+
+        if hg_content.cell_len > avail_w:
+            hg_content.truncate(avail_w)
+        hg_pad_w = max(0, avail_w - hg_content.cell_len)
+        if hg_pad_w > 0:
+            hg_content.append(" " * hg_pad_w, style=border_style)
+
+        hg_line = Text("│  ", style=border_style)
+        hg_line.append_text(hg_content)
         hg_line.append("  │\n", style=border_style)
         out.append_text(hg_line)
 

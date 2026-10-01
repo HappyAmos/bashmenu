@@ -4,6 +4,7 @@ test_ansi.py - Unit tests for ANSI escape code parsing and color rendering in ba
 """
 
 import os
+import subprocess
 import sys
 import unittest
 from unittest import mock
@@ -251,6 +252,21 @@ class TestNerdFontWidth(unittest.TestCase):
         self.assertGreaterEqual(bashmenu.get_display_width("\u2699\uFE0F"), 1)
         self.assertGreaterEqual(bashmenu.get_display_width("\u2139\uFE0F"), 1)
         self.assertGreaterEqual(bashmenu.get_display_width("\U0001F326\uFE0F"), 1)
+
+    def test_resolve_glyph_priority_and_hex_formats(self):
+        """Test resolve_glyph_preview with dollar hex prefix and emoji vs hex priority rules."""
+        cfg_nerd_on = {"settings": {"use_nerd_fonts": True}}
+        cfg_nerd_off = {"settings": {"use_nerd_fonts": False}}
+
+        # Dollar prefix hex resolution
+        self.assertEqual(menuedit.resolve_glyph_preview("{nf::$f059f}", cfg_nerd_on), "\U000f059f")
+        self.assertEqual(menuedit.resolve_glyph_preview("{nf::#f059f}", cfg_nerd_on), "\U000f059f")
+
+        # Emoji priority over hex when nerd fonts enabled
+        self.assertEqual(menuedit.resolve_glyph_preview("{nf::#ef09:\U0001F310}", cfg_nerd_on), "\U0001F310")
+
+        # Fallback char when nerd fonts disabled
+        self.assertEqual(menuedit.resolve_glyph_preview("{nf:w:$f059f:\U0001F310}", cfg_nerd_off), "w")
 
 
 
@@ -641,6 +657,52 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         self.assertEqual(len(inspector_content), 1)
         self.assertIn("Preview:", inspector_content[0])
 
+        # Test inspector command/standard item preview
+        inspector_content.clear()
+        screen.update_inspector(screen.menu_data["options"][1])
+        self.assertEqual(len(inspector_content), 1)
+        self.assertIn("Preview:", inspector_content[0])
+
+        # Test helper function render_menu_item_preview directly
+        prev_cmd = menuedit.render_menu_item_preview({"title": "Test Item [F1]", "icon": "gear"}, width=40)
+        self.assertIn("Test Item", prev_cmd)
+        self.assertIn("[F1]", prev_cmd)
+
+        # Test ItemEditModal live item preview update
+        updated_item_preview = []
+        class DummyItemPreviewBox:
+            def update(self, content):
+                updated_item_preview.append(content)
+
+        def mock_query_item_preview(*args, **kwargs):
+            selector = str(args[0]) if args else ""
+            if "inp_title" in selector:
+                return DummyInput("New Title [ALT+X]")
+            if "inp_icon" in selector:
+                return DummyInput("star")
+            if "lbl_item_preview" in selector:
+                return DummyItemPreviewBox()
+            return DummyInput("")
+
+        modal_cmd_prev = menuedit.ItemEditModal({"type": "command", "title": "Old Title"})
+        modal_cmd_prev.query_one = mock_query_item_preview
+        modal_cmd_prev.update_item_preview()
+        self.assertEqual(len(updated_item_preview), 1)
+        self.assertIn("New Title", updated_item_preview[0])
+        self.assertIn("[ALT+X]", updated_item_preview[0])
+
+        # Test bracketed path expansion markup escaping (prevent MarkupError)
+        script_item = {
+            "type": "script",
+            "label": "Install Games [{scripts_dir}/install_games.sh]",
+            "icon": "{nf::#:}",
+            "action": "{scripts_dir}/install_games.sh",
+        }
+        inspector_content.clear()
+        screen.update_inspector(script_item)
+        self.assertEqual(len(inspector_content), 1)
+        self.assertIn("Install Games", inspector_content[0])
+
         # Test ASCII lookup action
         pushed_screens = []
         class DummyApp:
@@ -1021,6 +1083,69 @@ class TestBashEditTabs(unittest.TestCase):
         script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts", "webopen.sh"))
         self.assertTrue(os.path.exists(script_path))
         self.assertTrue(os.access(script_path, os.X_OK))
+
+    def test_webopen_help_flag(self):
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts", "webopen.sh"))
+        res = subprocess.run([script_path, "--help"], capture_output=True, text=True, check=False)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("--gui", res.stdout)
+        self.assertIn("--tty", res.stdout)
+
+    def test_webopen_flags_override(self):
+        script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts", "webopen.sh"))
+        # Test that --tty and tty invoke a CLI browser override with BROWSER=echo
+        env = os.environ.copy()
+        env["BROWSER"] = "echo"
+        res_tty = subprocess.run([script_path, "--tty", "https://example.com"], capture_output=True, text=True, env=env, check=False)
+        self.assertEqual(res_tty.returncode, 0)
+        self.assertEqual(res_tty.stdout.strip(), "https://example.com")
+
+        res_bare_tty = subprocess.run([script_path, "tty", "https://example.com"], capture_output=True, text=True, env=env, check=False)
+        self.assertEqual(res_bare_tty.returncode, 0)
+        self.assertEqual(res_bare_tty.stdout.strip(), "https://example.com")
+
+
+class TestEmojiAndGlyphDisplayWidth(unittest.TestCase):
+    """Unit tests for display width calculations of emojis, VS16 sequences, and glyphs."""
+
+    def test_emoji_vs16_display_width(self):
+        # Single-cell symbols with Variation Selector-16 (\uFE0F) return display width 1 matching Rich/terminal cell len
+        info_vs16 = "\u2139\uFE0F"  # ℹ️
+        gear_vs16 = "\u2699\uFE0F"  # ⚙️
+        weather_vs16 = "\U0001F324\uFE0F"  # 🌤️
+        self.assertEqual(bashmenu_ui.get_display_width(info_vs16), 1)
+        self.assertEqual(bashmenu_ui.get_display_width(gear_vs16), 1)
+        self.assertEqual(bashmenu_ui.get_display_width(weather_vs16), 1)
+
+    def test_standard_emoji_display_width(self):
+        self.assertEqual(bashmenu_ui.get_display_width("🚀"), 2)
+        self.assertEqual(bashmenu_ui.get_display_width("🎮"), 2)
+        self.assertEqual(bashmenu_ui.get_display_width("📥"), 2)
+        self.assertEqual(bashmenu_ui.get_display_width("🌐"), 2)
+        self.assertEqual(bashmenu_ui.get_display_width("❓"), 2)
+        self.assertEqual(bashmenu_ui.get_display_width("🚪"), 2)
+
+    def test_nerd_font_glyph_display_width(self):
+        # PUA glyphs return width 1 by default
+        nerd_globe = "\U000f059f"
+        self.assertEqual(bashmenu_ui.get_display_width(nerd_globe), 1)
+
+    def test_resolve_glyph_priority_scheme(self):
+        # 1. Emoji tier defined & Nerd Fonts enabled -> return emoji
+        res1 = bashmenu.resolve_glyph("{nf::#ef09:\U0001F310}", {"settings": {"use_nerd_fonts": True}})
+        self.assertEqual(res1, "🌐")
+
+        # 2. Nerd font tier defined (no emoji) & Nerd Fonts enabled -> return Nerd Font character
+        res2 = bashmenu.resolve_glyph("{nf::#f059f}", {"settings": {"use_nerd_fonts": True}})
+        self.assertEqual(res2, "\U000f059f")
+
+        # 3. Only character defined -> return character
+        res3 = bashmenu.resolve_glyph("{nf:#}", {"settings": {"use_nerd_fonts": True}})
+        self.assertEqual(res3, "#")
+
+        # 4. Nerd Fonts disabled -> return character part
+        res4 = bashmenu.resolve_glyph("{nf:*: #f059f}", {"settings": {"use_nerd_fonts": False}})
+        self.assertEqual(res4, "*")
 
 
 if __name__ == "__main__":

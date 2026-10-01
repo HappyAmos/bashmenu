@@ -54,10 +54,24 @@ Textual interface.
 - **Dividers:** Must dynamically fit `{window_width}`. Formula:
   `{screen_width}` minus left/right margins, minus the width of the
   border characters.
-- **Icon & Glyph Spacing:** When an icon or glyph is present on a menu
-  option, separate it from the label text with exactly two spaces
-  (`f"{icon_resolved}  "`). Ensure prefix width measurements include
-  both spaces so label truncation remains aligned.
+- **Adaptive Glyph Resolution Scheme (`{nf:[char]:[nerd]:[emoji]}`):**
+  Always resolve icon definitions following the strict 4-tier hierarchy:
+  1. *Emoji tier*: Selected first if defined and `settings.use_nerd_fonts` is enabled.
+  2. *Nerd Font tier*: Selected second if hex token defined (`#`, `$`, `0x`) and Nerd Fonts enabled.
+  3. *Character tier*: Selected third if defined (e.g., `{nf:#}` -> `#`) or when Nerd Fonts are disabled.
+  4. *Fallback*: Empty string if unconfigured.
+- **Icon Slot Width & Text Alignment Invariant:**
+  - Every menu option icon slot must occupy exactly **4 columns** of visual width (`vis_w + pad_w = 4`):
+    - 2-column wide emojis (`🚀`, `🎮`, `📥`, `🌐`, `❓`, `🚪`): `vis_w = 2, pad_w = 2` (`f"{icon}  "`).
+    - 1-column glyphs and text symbols (`󰖟`, `⚙`, `ℹ`, `🌤`, `#`): `vis_w = 1, pad_w = 3` (`f"{icon}   "`).
+    - No icon: 4 spaces (`"    "`).
+  - All menu item names/descriptions must strictly align vertically at column 11 (`prefix_w = 10` for single-digit shortcuts).
+- **Variation Selector Normalization (`\ufe0f`, `\ufe0e`):**
+  - Always strip Unicode Variation Selectors (`.replace('\ufe0f', '').replace('\ufe0e', '')`) from resolved icons prior to display width measurement and rendering.
+  - Monospace terminal fonts render text symbols (`⚙`, `ℹ`, `🌤`) in single-column cells. Stripping variation selectors guarantees that `rich.cells.cell_len()` and terminal emulator cursor movement remain identical.
+- **Menu Inner Textual Buffer & Window Border Protection:**
+  - `MainMenuView` must treat all inner rows (options, dividers, status gutter) as an isolated inner textual screen buffer bounded to `avail_w = window_width - 6`.
+  - Inner content must be clamped (`truncate(avail_w)`) and padded to `avail_w` before attaching border characters (`"│  "` and `"  │\n"`), ensuring menu lines can never push out, wrap, or displace window borders.
 - **Elements:** Must accommodate a border, title, menu text, shortcut
   badges, and a help/status gutter (located just above the bottom
   border).
@@ -140,6 +154,22 @@ Textual interface.
     `interpolate_placeholders()` in `bashmenu.py`. When modifying constants
     or cache durations (such as `_CMD_CACHE_TTL`), update both `bashmenu.md`
     and `bashmenu.1` to maintain synchronization.
+15. **Cross-Platform Browser Dispatch Standard (`webopen.sh`):**
+    - Browser launcher scripts must support `--gui` / `-g` (graphical) and
+      `--tty` / `tty` / `-t` (console/terminal) interface flags.
+    - Never pass `"about:blank"` to system openers (`exo-open`, `xdg-open`),
+      as desktop openers reject it with "Failed to open URL" errors. When no
+      target URL is specified, launch the browser executable or desktop verb
+      directly (e.g., `exo-open --launch WebBrowser`, `x-www-browser`).
+    - Implement cascading fallbacks across platforms (Termux, macOS, WSL,
+      X11/Wayland, Linux console) with graceful failover from GUI to terminal
+      browsers (`brow6el`, `links`, `lynx`, `w3m`, `elinks`, `carbonyl`).
+16. **Documentation Synchronization Invariant:**
+    - Any new script utility, CLI flag, or layout feature must be
+      simultaneously updated across `bashmenu.md`, `bashmenu.1` (man page),
+      and `README.md`.
+    - Man page and markdown docs must maintain lines wrapped under 80
+      characters with a dry, professional tone without promotional hype.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the

@@ -195,6 +195,10 @@ def is_emoji_char(c: str) -> bool:
         or (0x1F000 <= cp <= 0x1F02F)
         or (0x1F0A0 <= cp <= 0x1F0FF)
         or (0x1F1E6 <= cp <= 0x1F1FF)
+        or (0x2100 <= cp <= 0x214F)
+        or (0x2000 <= cp <= 0x206F)
+        or (0x2900 <= cp <= 0x297F)
+        or (0x2B00 <= cp <= 0x2BFF)
     )
 
 
@@ -220,12 +224,12 @@ def get_char_width(c: str, config=None) -> int:
         return get_nerd_font_width(config)
     if 0x2500 <= cp <= 0x259F:
         return 1
+    if is_emoji_char(c[0]) or unicodedata.east_asian_width(c[0]) in ("W", "F"):
+        return 2
     if _c_wcwidth is not None:
         w = _c_wcwidth(c[0])
         if w >= 0:
             return w
-    if is_emoji_char(c[0]) or unicodedata.east_asian_width(c[0]) in ("W", "F"):
-        return 2
     return 1
 
 
@@ -237,11 +241,21 @@ def get_display_width(s: str, config=None) -> int:
         return 0
     if not isinstance(s, str):
         s = str(s)
+    clean_s = s.replace("\ufe0f", "").replace("\ufe0e", "")
+    if not clean_s:
+        return 0
+
+    try:
+        from rich.cells import cell_len
+        return cell_len(clean_s)
+    except ImportError:
+        pass
+
     total = 0
     i = 0
-    n = len(s)
+    n = len(clean_s)
     while i < n:
-        c = s[i]
+        c = clean_s[i]
         cp = ord(c)
 
         if 0xFE00 <= cp <= 0xFE0F:
@@ -258,7 +272,7 @@ def get_display_width(s: str, config=None) -> int:
             i += 1
             continue
 
-        if is_emoji_char(c) or unicodedata.east_asian_width(c) in ("W", "F") or (0x1F300 <= cp <= 0x1FAFF):
+        if (0x1F300 <= cp <= 0x1F9FF) or (0x1FA00 <= cp <= 0x1FAFF) or unicodedata.east_asian_width(c) in ("W", "F"):
             total += 2
             i += 1
             continue

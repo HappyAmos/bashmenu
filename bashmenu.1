@@ -102,7 +102,7 @@ Interactive Unicode Block Explorer script.
 Standard and Extended ASCII viewing utility.
 .TP
 .I scripts/webopen.sh
-Cross-platform web browser launcher wrapper script.
+Cross-platform web browser launcher wrapper script. Supports --gui for graphical browsers and --tty or tty for console/terminal browsers (such as lynx, links, brow6el).
 .SS Provided Templates (templates/)
 Utilized as layout sources for code generation and block injections:
 .TP
@@ -171,8 +171,8 @@ Display comprehensive Property Inspector General Help screen.
 Exit editor or cancel dialogs (prompts to save if modifications exist).
 
 .PP
-.B Menu Focus Synchronization:
-When launching menuedit.py from bashmenu.py (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu.py, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. Property inspector binary switches match window background styling (Switch:focus { background: transparent; }), and the help text footer explicitly displays [ESC / C] Cancel.
+.B Menu Focus Synchronization & Property Inspector Previews:
+When launching menuedit.py from bashmenu.py (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu.py, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (Switch:focus { background: transparent; }), and the help text footer explicitly displays [ESC / C] Cancel.
 .SS Built-in Text Editor (bashedit.py)
 The application features a built-in, Nano-style text editor for editing files.
 .TP
@@ -415,17 +415,19 @@ ASCII character, a Nerd Font PUA code point, and a Unicode emoji icon:
 Precedence is evaluated as follows:
 .IP \(bu 2
 .B Emoji Icon (Unicode capable)
-\- Chosen if system is Unicode capable and emoji is provided.
+\- Chosen if system is Unicode capable, use_nerd_fonts is enabled, and emoji is provided.
 .IP \(bu 2
 .B Nerd Font Glyph (Nerd Fonts enabled)
 \- Chosen if system is Unicode capable, use_nerd_fonts is true, and hex is
 provided. Translates and renders the Nerd Font glyph.
 .IP \(bu 2
-.B Fallback ASCII Character
-\- Displayed if Unicode is unsupported or both above fields are missing.
+.B Fallback Character
+\- Displayed if Nerd Fonts are disabled or no icon/hex is defined (e.g., {nf:#} displays '#').
 .IP \(bu 2
-.B Wiped Default
-\- Resolves to empty string if all are missing, collapsing the icon column.
+.B Fallback
+\- Resolves to empty string if all properties are unconfigured.
+.PP
+Every menu option icon slot occupies a standardized 4-column display width (vis_w + pad_w = 4), ensuring that all menu labels and descriptions strictly align vertically at column 11 regardless of icon presence or type. Unicode variation selectors are normalized to ensure terminal font cell alignment.
 .SS Console Tag Rich Formatting
 The application incorporates a rich inline formatting parser allowing developers to
 use nested bracketed formatting tags inside labels, headers, status gutters, and dialogues.

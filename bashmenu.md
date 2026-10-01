@@ -66,7 +66,9 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 - `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
 - `scripts/webopen.sh`       : Cross-platform web browser launcher wrapper script
                               that opens a specified URL, file, or default browser
-                              (supporting Linux, macOS, WSL, and Termux).
+                              (supporting Linux, macOS, WSL, and Termux). Supports
+                              `--gui` / `-g` for graphical browsers and `--tty` / `tty`
+                              for terminal browsers (lynx, links, brow6el).
 
 ### 2.2 Provided Templates (`templates/`)
 Used as dynamic templates for code generation, settings, or block injections:
@@ -104,7 +106,7 @@ Used as dynamic templates for code generation, settings, or block injections:
 - `?` / `h` / `F1`         : Display comprehensive General Help modal.
 - `ESC` / `C`             : Exit editor or cancel dialogs (prompts if unsaved changes exist).
 
-*Note on Menu Focus Synchronization:* When launching `menuedit.py` from `bashmenu.py` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu.py`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. Property inspector binary switches match window background styling (`Switch:focus { background: transparent; }`), and the help text footer clearly displays `[ESC / C] Cancel`.
+*Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit.py` from `bashmenu.py` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu.py`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (`Switch:focus { background: transparent; }`), and the help text footer clearly displays `[ESC / C] Cancel`.
 
 ### 3.3 Built-in Text Editor (`bashedit.py`)
 - `Ctrl+X`                : Exit editor (prompts save if modified).
@@ -315,16 +317,28 @@ Font PUA code point, and a Unicode emoji icon:
 
 #### Precedence of Evaluation & Display:
 The layout engine processes this tag with the following strict hierarchy:
-1. **Emoji Icon (Unicode capable)**: If the system is Unicode-capable and
-   the `emoji-glyph` is provided, it is chosen and displayed.
-2. **Nerd Font Glyph (Nerd Fonts enabled)**: If the system is Unicode-capable,
-   `settings.use_nerd_fonts` is `true` in `bashmenu.yml`, and the `nerd-font hex`
-   (e.g., `#f0a4`) is provided, it translates and displays the Nerd Font glyph.
-3. **Fallback ASCII Character**: If Unicode is unsupported, or both Nerd Fonts and
-   Emojis are disabled or missing, the plain ASCII `character` is displayed.
-4. **Wiped Default**: If all three parameters are missing, the layout engine
-   returns an empty string `""` and automatically collapses the icon column,
-   sliding the option labels left with zero padding gaps.
+1. **Emoji Icon (Unicode capable)**: If the system is Unicode-capable,
+   `settings.use_nerd_fonts` is enabled, and `emoji-glyph` is provided,
+   it is chosen and displayed.
+2. **Nerd Font Glyph (Nerd Fonts enabled)**: If `settings.use_nerd_fonts`
+   is `true` in `bashmenu.yml` and a valid hex code point is provided
+   (e.g., `#f0a4`, `$f059f`, `0xef09`), the Nerd Font glyph is displayed.
+3. **Fallback Character**: If Nerd Fonts are disabled or no icon/hex is
+   defined, the defined character(s) (e.g. `{nf:#}` -> `#`) are displayed.
+4. **Fallback**: If all properties are unconfigured, resolves to empty string.
+
+#### Icon Slot Width & Menu Text Alignment:
+- Every menu option icon slot occupies a standardized **4-column** visual
+  display width (`vis_w + pad_w = 4`):
+  - 2-column wide emojis (`🚀`, `🎮`, `📥`, `🌐`, `❓`, `🚪`): `vis_w=2, pad_w=2`.
+  - 1-column glyphs and text symbols (`󰖟`, `⚙`, `ℹ`, `🌤`, `#`): `vis_w=1, pad_w=3`.
+  - No icon: 4 padding spaces (`"    "`).
+- Menu option names and descriptions **always** align vertically at column 11
+  (`prefix_w = 10` for single-digit shortcuts), guaranteeing consistent column
+  alignment regardless of whether icons are emojis, Nerd Fonts, ASCII, or absent.
+- Unicode Variation Selectors (`\ufe0f`, `\ufe0e`) are automatically stripped
+  prior to display measurement so that monospace font cell dimensions in terminal
+  emulators match layout engine calculations.
 
 *Theme Indicator Syntax:* Uses the exact same bracketed syntax (e.g.,
 `indicator: "{nf:[char]:[nerd-font hex]:[emoji-glyph]}"` inside the theme file).

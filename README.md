@@ -15,15 +15,17 @@ Contains a few personal scripts as examples.
 ## 🚀 Core Features
 
 - **Visual Tree Editor (`menuedit.py`)**: A visual menu tree editor accessed via
-  `F4`. Add, reorder (`m`/`M`), indent (`|`), outdent (`<`), delete (`d`), edit
+  `F4`. Add, reorder (`m`/`M`), indent (`>`), outdent (`<`), delete (`d`), edit
   properties (`e`/`ENTER`), edit raw YAML snippets (`E`), or test actions (`t`)
-  live.
+  live. Includes a Property Inspector panel and edit dialog with real-time visual
+  menu item previews.
 - **Dynamic Prompts & Pickers**: Prompt the user on action select using `{param}`
   text modals, or `{file_picker}`/`{dir_picker}` filesystem navigators. Includes
   intelligent path-aware folder pre-loading.
 - **Adaptive Icons**: Icons mapped via `{nf:[char]:[hex]:[emoji]}`.
-  Toggles gracefully between Unicode Emojis, Nerd Font Glyphs, or Fallback ASCII
-  characters. If disabled, icon paddings collapse for compact alignment.
+  Toggles gracefully between Unicode Emojis, Nerd Font Glyphs, or defined
+  characters. Icon slots standardize to 4 columns, ensuring all menu text
+  strictly aligns at column 11.
 - **Dynamic Settings Injection (`type: inject_block`)**: Interactively inject
   modular configuration snippets from templates into shell profiles (e.g.
   `~/.bashrc`), with automatic install, update, and uninstall prompts.

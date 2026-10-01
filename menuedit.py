@@ -14,6 +14,7 @@ import textwrap
 from typing import ClassVar
 
 import yaml
+from rich.markup import escape
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -303,6 +304,126 @@ def format_pipe_footer(segments: list[str], max_width: int = 82) -> str:
     return "\n".join(lines)
 
 
+def resolve_glyph_preview(glyph_def: str, config: dict | None = None) -> str:
+    """Self-contained glyph resolver for Menu Editor Property Inspector previews."""
+    if not isinstance(glyph_def, str) or not glyph_def.startswith("{nf:"):
+        return glyph_def
+
+    inner = glyph_def[4:-1]
+    parts = inner.split(":")
+
+    char_part = ""
+    hex_part = ""
+    emoji_part = ""
+
+    if len(parts) >= 3:
+        char_part = parts[0]
+        hex_part = parts[1]
+        emoji_part = ":".join(parts[2:])
+    elif len(parts) == 2:
+        if parts[0] == "":
+            char_part = ""
+            hex_part = parts[1]
+            emoji_part = ""
+        elif parts[0].startswith("#") or parts[0].startswith("$") or (parts[0] and all(c in "0123456789abcdefABCDEF" for c in parts[0])):
+            char_part = ""
+            hex_part = parts[0]
+            emoji_part = parts[1]
+        else:
+            char_part = parts[0]
+            hex_part = parts[1]
+            emoji_part = ""
+    elif len(parts) == 1:
+        part = parts[0]
+        if part.startswith("#") or part.startswith("$"):
+            hex_part = part
+        else:
+            char_part = part
+
+    cfg = config if config else bashmenu.load_config()[0]
+    use_nerd = bashmenu.get_config_value(cfg, "settings.use_nerd_fonts", False)
+
+    if use_nerd:
+        if emoji_part:
+            if r"\u" in emoji_part.lower():
+                try:
+                    import codecs
+                    emoji_part = codecs.decode(emoji_part, "unicode-escape")
+                except Exception:
+                    pass
+            return emoji_part
+        if hex_part:
+            try:
+                hex_clean = hex_part.lstrip("#$").replace("0x", "").strip()
+                if hex_clean:
+                    return chr(int(hex_clean, 16))
+            except ValueError:
+                pass
+
+    return char_part
+
+
+def render_menu_item_preview(item: dict, config: dict | None = None, width: int = 38) -> str:
+    """Render a visual preview string for a menu item (command, divider, submenu, script, etc.)."""
+    if not isinstance(item, dict):
+        return ""
+
+    cfg = config if config else bashmenu.load_config()[0]
+    item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
+
+    if item_type == "divider":
+        char_val = item.get("char", "{ascii:196}")
+        length_val = item.get("length", "{window_width}")
+        expanded_char = bashmenu.interpolate_placeholders(char_val, cfg)
+        expanded_char = resolve_glyph_preview(expanded_char, cfg)
+        if not expanded_char:
+            expanded_char = "─"
+
+        expanded_len = bashmenu.interpolate_placeholders(length_val, cfg, extra_vars={"window_width": width})
+        try:
+            target_len = int(expanded_len)
+        except (ValueError, TypeError):
+            target_len = width
+
+        disp_len = min(max(1, target_len), width)
+        char_len = max(1, len(expanded_char))
+        return (expanded_char * ((disp_len // char_len) + 1))[:disp_len]
+
+    raw_title = item.get("title") or item.get("label") or "(No Title)"
+    icon_raw = item.get("icon") or item.get("glyph") or ""
+
+    expanded_title = bashmenu.interpolate_placeholders(raw_title, cfg)
+    expanded_icon = ""
+    if icon_raw:
+        res = bashmenu.interpolate_placeholders(icon_raw, cfg)
+        expanded_icon = resolve_glyph_preview(res, cfg)
+
+    left_label, right_bracket = bashmenu.split_label_brackets(expanded_title)
+
+    if expanded_icon:
+        vis_w = bashmenu.get_display_width(expanded_icon, cfg) if hasattr(bashmenu, "get_display_width") else len(expanded_icon)
+        pad_str = " " * max(1, 4 - vis_w)
+        icon_str = f"{expanded_icon}{pad_str}"
+    else:
+        icon_str = "    "
+    prefix = f"  1.  {icon_str}"
+
+    if hasattr(bashmenu, "get_visible_len"):
+        prefix_len = bashmenu.get_visible_len(prefix, cfg)
+        left_len = bashmenu.get_visible_len(left_label, cfg)
+        right_len = bashmenu.get_visible_len(right_bracket, cfg) if right_bracket else 0
+    else:
+        prefix_len = len(prefix)
+        left_len = len(left_label)
+        right_len = len(right_bracket) if right_bracket else 0
+
+    if right_bracket:
+        spacer_len = max(1, width - prefix_len - left_len - right_len)
+        return f"{prefix}{left_label}{' ' * spacer_len}{right_bracket}"
+    else:
+        return f"{prefix}{left_label}"
+
+
 class ItemEditModal(ModalScreen[dict]):
     """Modal dialog to edit comprehensive properties of a menu item."""
 
@@ -537,6 +658,9 @@ class ItemEditModal(ModalScreen[dict]):
                 yield Checkbox("Show Whitespace in Editor (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_show_whitespace")
                 yield Checkbox("External Execution (external=true)", value=bool(self.item.get("external", False)), id="chk_external")
 
+                yield Label("Preview:", classes="field_label")
+                yield Static("", id="lbl_item_preview", classes="divider_preview_box")
+
             with Horizontal(id="buttons"):
                 yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
                 yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
@@ -550,6 +674,8 @@ class ItemEditModal(ModalScreen[dict]):
             bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_cancel")
         if self.item.get("type") == "divider":
             self.update_divider_preview()
+        else:
+            self.update_item_preview()
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -559,6 +685,26 @@ class ItemEditModal(ModalScreen[dict]):
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id in ("inp_char", "inp_length"):
             self.update_divider_preview()
+        elif event.input.id in ("inp_title", "inp_icon"):
+            self.update_item_preview()
+
+    def update_item_preview(self) -> None:
+        with contextlib.suppress(Exception):
+            inp_title = self.query_one("#inp_title", Input)
+            inp_icon = self.query_one("#inp_icon", Input)
+            preview_box = self.query_one("#lbl_item_preview", Static)
+
+            temp_item = dict(self.item)
+            temp_item["title"] = inp_title.value
+            temp_item["icon"] = inp_icon.value
+
+            try:
+                cfg = getattr(self.app, "config", {})
+            except Exception:  # noqa: BLE001
+                cfg = {}
+
+            preview_str = render_menu_item_preview(temp_item, config=cfg, width=60)
+            preview_box.update(escape(preview_str))
 
     def update_divider_preview(self) -> None:
         with contextlib.suppress(Exception):
@@ -590,7 +736,7 @@ class ItemEditModal(ModalScreen[dict]):
             char_len = max(1, len(expanded_char))
             repeated = (expanded_char * ((disp_len // char_len) + 1))[:disp_len]
 
-            preview_box.update(repeated)
+            preview_box.update(escape(repeated))
 
     def on_exec_mode_container_mode_changed(self, message: ExecModeContainer.ModeChanged) -> None:
         self.update_alt_buffer_visibility(message.mode_idx)
@@ -911,6 +1057,10 @@ class MenuEditScreen(Screen):
         self.title_chain = title_chain or []
         self.raw_theme = theme
         self.theme_styles = bashmenu_ui.resolve_theme_dict(theme)
+        try:
+            self.config, _ = bashmenu.load_config()
+        except Exception:
+            self.config = {}
         self._target_node_to_focus = None
         self.modified = False
 
@@ -1243,158 +1393,145 @@ class MenuEditScreen(Screen):
         item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
         badge = TYPE_BADGES.get(item_type, "[???]")
 
+        try:
+            cfg = getattr(self.app, "config", None) or getattr(self, "config", None) or bashmenu.load_config()[0]
+        except Exception:  # noqa: BLE001
+            cfg = {}
+
         if item_type == "divider":
             char_val = item.get("char", "{ascii:196}")
             length_val = item.get("length", "{window_width}")
-            try:
-                cfg = getattr(self.app, "config", {})
-            except Exception:  # noqa: BLE001
-                cfg = {}
-            expanded_char = bashmenu.interpolate_placeholders(char_val, cfg)
-            if not expanded_char:
-                expanded_char = "─"
-
-            expanded_len = bashmenu.interpolate_placeholders(length_val, cfg, extra_vars={"window_width": 40})
-            try:
-                target_len = int(expanded_len)
-            except (ValueError, TypeError):
-                target_len = 40
-
-            disp_len = min(max(1, target_len), 40)
-            char_len = max(1, len(expanded_char))
-            repeated = (expanded_char * ((disp_len // char_len) + 1))[:disp_len]
-
             lines = [
                 f"[bold magenta]{badge} DIVIDER[/bold magenta]",
-                f"[bold white]Repeating Char:[/bold white] {char_val}",
-                f"[bold white]Length Directive:[/bold white] {length_val}",
-                f"[bold cyan]Preview:[/bold cyan]\n{repeated}",
+                f"[bold white]Repeating Char:[/bold white] {escape(str(char_val))}",
+                f"[bold white]Length Directive:[/bold white] {escape(str(length_val))}",
             ]
-            inspector.update("\n\n".join(lines))
-            return
+        else:
+            title = item.get("title", item.get("label", "(No Title)"))
 
-        title = item.get("title", item.get("label", "(No Title)"))
+            lines = [
+                f"[bold magenta]{badge} {item_type.upper()}[/bold magenta]",
+                f"[bold white]Title/Label:[/bold white] {escape(str(title))}",
+            ]
 
-        lines = [
-            f"[bold magenta]{badge} {item_type.upper()}[/bold magenta]",
-            f"[bold white]Title/Label:[/bold white] {title}",
-        ]
+            icon = item.get("icon") or item.get("glyph")
+            if icon:
+                lines.append(f"[bold cyan]Icon/Glyph:[/bold cyan] {escape(str(icon))}")
 
-        icon = item.get("icon") or item.get("glyph")
-        if icon:
-            lines.append(f"[bold cyan]Icon/Glyph:[/bold cyan] {icon}")
+            action = item.get("action") or item.get("command") or item.get("script") or item.get("file") or item.get("python")
+            if action:
+                lines.append(f"[bold yellow]Action/Target:[/bold yellow] {escape(str(action))}")
 
-        action = item.get("action") or item.get("command") or item.get("script") or item.get("file") or item.get("python")
-        if action:
-            lines.append(f"[bold yellow]Action/Target:[/bold yellow] {action}")
+            key = item.get("key")
+            if key:
+                lines.append(f"[bold green]Config Key:[/bold green] {escape(str(key))}")
 
-        key = item.get("key")
-        if key:
-            lines.append(f"[bold green]Config Key:[/bold green] {key}")
+            msg = item.get("message") or item.get("prompt") or item.get("text")
+            if msg:
+                lines.append(f"[bold blue]Message/Prompt:[/bold blue] {escape(str(msg))}")
 
-        msg = item.get("message") or item.get("prompt") or item.get("text")
-        if msg:
-            lines.append(f"[bold blue]Message/Prompt:[/bold blue] {msg}")
+            template = item.get("template")
+            if template:
+                lines.append(f"[bold cyan]Template:[/bold cyan] {escape(str(template))}")
 
-        template = item.get("template")
-        if template:
-            lines.append(f"[bold cyan]Template:[/bold cyan] {template}")
+            target = item.get("target")
+            if target:
+                lines.append(f"[bold cyan]Target File:[/bold cyan] {escape(str(target))}")
 
-        target = item.get("target")
-        if target:
-            lines.append(f"[bold cyan]Target File:[/bold cyan] {target}")
+            block_id = item.get("block_id")
+            if block_id:
+                lines.append(f"[bold cyan]Block ID:[/bold cyan] {escape(str(block_id))}")
 
-        block_id = item.get("block_id")
-        if block_id:
-            lines.append(f"[bold cyan]Block ID:[/bold cyan] {block_id}")
+            start_dir = item.get("start_dir")
+            if start_dir:
+                lines.append(f"[bold cyan]Start Directory:[/bold cyan] {escape(str(start_dir))}")
 
-        start_dir = item.get("start_dir")
-        if start_dir:
-            lines.append(f"[bold cyan]Start Directory:[/bold cyan] {start_dir}")
+            picker = item.get("picker")
+            if picker:
+                lines.append(f"[bold cyan]Picker Type:[/bold cyan] {escape(str(picker))}")
 
-        picker = item.get("picker")
-        if picker:
-            lines.append(f"[bold cyan]Picker Type:[/bold cyan] {picker}")
+            on_yes = item.get("on_yes")
+            if on_yes is not None:
+                lines.append(f"[bold green]On Yes Action:[/bold green] {escape(str(on_yes))}")
 
-        on_yes = item.get("on_yes")
-        if on_yes is not None:
-            lines.append(f"[bold green]On Yes Action:[/bold green] {on_yes}")
+            on_no = item.get("on_no")
+            if on_no is not None:
+                lines.append(f"[bold red]On No Action:[/bold red] {escape(str(on_no))}")
 
-        on_no = item.get("on_no")
-        if on_no is not None:
-            lines.append(f"[bold red]On No Action:[/bold red] {on_no}")
+            if "alt_buffer" in item:
+                lines.append(f"[bold cyan]Alt Buffer:[/bold cyan] {item['alt_buffer']}")
 
-        if "alt_buffer" in item:
-            lines.append(f"[bold cyan]Alt Buffer:[/bold cyan] {item['alt_buffer']}")
+            if "no_formatting" in item:
+                lines.append(f"[bold cyan]No Formatting:[/bold cyan] {item['no_formatting']}")
 
-        if "no_formatting" in item:
-            lines.append(f"[bold cyan]No Formatting:[/bold cyan] {item['no_formatting']}")
+            flags = []
+            for flag_name in [
+                "stream",
+                "quiet",
+                "interactive",
+                "show_whitespace",
+                "masked",
+                "refresh",
+                "external",
+                "display_theme_colors",
+            ]:
+                if flag_name in item:
+                    flags.append(f"{flag_name}={item[flag_name]}")
+            if "tabstop" in item:
+                flags.append(f"tabstop={item['tabstop']}")
+            if flags:
+                lines.append(f"[dim]Flags: {', '.join(flags)}[/dim]")
 
-        flags = []
-        for flag_name in [
-            "stream",
-            "quiet",
-            "interactive",
-            "show_whitespace",
-            "masked",
-            "refresh",
-            "external",
-            "display_theme_colors",
-        ]:
-            if flag_name in item:
-                flags.append(f"{flag_name}={item[flag_name]}")
-        if "tabstop" in item:
-            flags.append(f"tabstop={item['tabstop']}")
-        if flags:
-            lines.append(f"[dim]Flags: {', '.join(flags)}[/dim]")
+            if "submenu" in item:
+                sub_opts = item.get("submenu", {}).get("options", [])
+                lines.append(f"[bold magenta]Submenu Options:[/bold magenta] {len(sub_opts)} items")
 
-        if "submenu" in item:
-            sub_opts = item.get("submenu", {}).get("options", [])
-            lines.append(f"[bold magenta]Submenu Options:[/bold magenta] {len(sub_opts)} items")
+            known_keys = {
+                "type",
+                "title",
+                "label",
+                "icon",
+                "glyph",
+                "action",
+                "command",
+                "script",
+                "file",
+                "python",
+                "key",
+                "message",
+                "prompt",
+                "text",
+                "template",
+                "target",
+                "block_id",
+                "start_dir",
+                "picker",
+                "on_yes",
+                "on_no",
+                "alt_buffer",
+                "no_formatting",
+                "stream",
+                "quiet",
+                "interactive",
+                "show_whitespace",
+                "masked",
+                "refresh",
+                "external",
+                "display_theme_colors",
+                "tabstop",
+                "submenu",
+                "options",
+                "char",
+                "length",
+                "divider",
+            }
+            extra_keys = [k for k in item if k not in known_keys]
+            if extra_keys:
+                extras = ", ".join(f"{k}={escape(str(item[k]))}" for k in sorted(extra_keys))
+                lines.append(f"[bold yellow]Extra Properties:[/bold yellow] [dim]{extras}[/dim]")
 
-        known_keys = {
-            "type",
-            "title",
-            "label",
-            "icon",
-            "glyph",
-            "action",
-            "command",
-            "script",
-            "file",
-            "python",
-            "key",
-            "message",
-            "prompt",
-            "text",
-            "template",
-            "target",
-            "block_id",
-            "start_dir",
-            "picker",
-            "on_yes",
-            "on_no",
-            "alt_buffer",
-            "no_formatting",
-            "stream",
-            "quiet",
-            "interactive",
-            "show_whitespace",
-            "masked",
-            "refresh",
-            "external",
-            "display_theme_colors",
-            "tabstop",
-            "submenu",
-            "options",
-            "char",
-            "length",
-            "divider",
-        }
-        extra_keys = [k for k in item if k not in known_keys]
-        if extra_keys:
-            extras = ", ".join(f"{k}={item[k]}" for k in sorted(extra_keys))
-            lines.append(f"[bold yellow]Extra Properties:[/bold yellow] [dim]{extras}[/dim]")
+        preview_str = render_menu_item_preview(item, config=cfg, width=38)
+        lines.append(f"[bold cyan]Preview:[/bold cyan]\n{escape(preview_str)}")
 
         inspector.update("\n\n".join(lines))
 
@@ -1656,6 +1793,10 @@ class MenuEditApp(App):
         super().__init__()
         self.menu_file_path = menu_file_path
         self.selected_item = selected_item
+        try:
+            self.config, _ = bashmenu.load_config()
+        except Exception:
+            self.config = {}
 
     def on_mount(self) -> None:
         self.push_screen(MenuEditScreen(menu_file_path=self.menu_file_path, selected_item=self.selected_item))
