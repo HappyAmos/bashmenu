@@ -275,6 +275,7 @@ options:
       refresh: false
       show_whitespace: false
       external: false
+      icon: '{nf::#ea84}'
     - type: script
       title: Google.com
       script: '{scripts_dir}/webopen.sh https://google.com'
@@ -288,6 +289,7 @@ options:
       refresh: false
       show_whitespace: false
       external: false
+      icon: '{nf::#f02ad}'
     - label: Launch GUI Web Browser [--gui]
       type: command
       action: '{scripts_dir}/webopen.sh --gui'
