@@ -104,11 +104,16 @@ Textual interface.
    (`widget.styles.background`), never pass raw color names like
    `'color(19)'`. Always convert 8-bit palette indices to hex color
    strings via `color.get_truecolor()`.
-6. **Theme Palette Validation:** When updating or adding themes to
-   `bashmenu.themes`, always run `python3 ymlcheck.py --themes bashmenu.themes`
-   to verify that 16-color mode indices remain within `0..15` (or valid
-   `COLOR_*` constants) and 8-color mode indices remain within `0..7`.
-   Never use 256-color indices (e.g., `255`) in 16 or 8-color sections.
+6. **Theme Palette Design & Validation:**
+   - **Aesthetics & Tone:** When introducing new themes, design cohesive,
+     low-fatigue, balanced palettes (such as `tokyo_night`, `nord`, `everforest`).
+     Avoid garish, oversaturated, or clashing combinations (e.g., neon red/yellow
+     like `hotdog_stand`) unless explicitly requested.
+   - **Schema & Depth Constraints:** Always run
+     `python3 ymlcheck.py --themes bashmenu.themes` to verify that 16-color mode
+     indices remain within `0..15` (or valid `COLOR_*` constants) and 8-color mode
+     indices remain within `0..7`. Never use 256-color indices (e.g., `255`) in
+     16 or 8-color sections.
 7. **Portable Paths & Macro Invariant:** Never hardcode absolute user
    paths (such as `/home/andrew/`) in menu configurations
    (`bashmenu.mnu`), templates, or launcher scripts. Always utilize
@@ -193,6 +198,31 @@ Textual interface.
     - Include an "Extra Properties" fallback for author-defined custom attributes.
     - Ensure `#inspector_panel` uses `overflow-y: auto;` and `#inspector_content`
       uses `height: auto;` for scrollable inspection.
+20. **Menu Editor Two-Line Help Bar Layout (`menuedit.py`):**
+    The visual menu editor's bottom help bar (`#footer`) must be configured
+    as a two-line `Vertical` container with `height: 2` containing two
+    `Horizontal` rows (`.footer_row` with `height: 1; align: center middle;`):
+    - Row 1: Item operations & reordering (`[a] Add`, `[e/ENTER] Edit`, `[SPACE] Toggle`,
+      `[d] Delete`, `[m] Move Dn`, `[M] Move Up`).
+    - Row 2: Hierarchy adjustments, tools, & session control (`[>] Indent`,
+      `[<] Outdent`, `[CTRL+A] ASCII`, `[CTRL+P] Placeholders`, `[s] Save`, `[ESC/q] Exit`).
+    - Keep interactive widget IDs (`lbl_*`) intact for click handlers and theme styling.
+21. **OpenCode Sub-Agent Delegation Policy:**
+    When delegating tasks to the local `opencode` CLI:
+    - Use sparingly and exclusively for small, low-risk, self-contained jobs
+      (e.g., test case drafts, isolated script prototypes).
+    - Treat all generated output as untrusted draft code requiring strict review,
+      lint verification (`ruff`), and automated test validation before committing.
+    - Always display the prompt and review output transparently with the user.
+22. **Editor Theme Color Code Inversion & Contrast Invariant (`bashedit.py`):**
+    When `--display-theme-colors` is enabled in `bashedit.py` (e.g. editing `bashmenu.themes`):
+    - Check if the rendered text color matches the active theme background.
+    - If the text color matches the active theme background, invert foreground and background
+      styling using the other token in the color pair (`color=css_tok, bgcolor=css_other`).
+    - If both foreground and background values of the pair match the current theme background
+      (e.g., `[16, 16]` on dark background or `[19, 19]` on `qbasic`), select a neutral primary 8
+      color value (`white` on dark backgrounds, `black` on light backgrounds) for contrast.
+    - Fall back to the neutral primary 8 color if the paired color lacks adequate contrast.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the

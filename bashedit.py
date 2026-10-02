@@ -10,6 +10,7 @@ import subprocess
 import sys
 from typing import ClassVar
 
+from rich.color import Color, ColorParseError
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.text import Text
@@ -55,11 +56,77 @@ COLOR_TOKEN_MAP = {
 }
 
 
-def get_token_foreground_style(token_str: str) -> bashmenu_ui.Style | None:
+def is_same_color(c1: str | None, c2: str | None) -> bool:
+    """Check if two color specs represent the same or nearly identical color."""
+    if not c1 or not c2:
+        return False
+    parsed1 = bashmenu_ui.parse_css_color(c1) or c1
+    parsed2 = bashmenu_ui.parse_css_color(c2) or c2
+    if str(parsed1).strip().lower() == str(parsed2).strip().lower():
+        return True
+    try:
+        rgb1 = Color.parse(str(parsed1)).get_truecolor()
+        rgb2 = Color.parse(str(parsed2)).get_truecolor()
+        return (
+            abs(rgb1.red - rgb2.red)
+            + abs(rgb1.green - rgb2.green)
+            + abs(rgb1.blue - rgb2.blue)
+        ) < 25
+    except (ColorParseError, ValueError, TypeError, AttributeError, KeyError):
+        return False
+
+
+def get_contrast_neutral_color(css_color: str | None) -> str:
+    """Return a neutral primary 8 color ('white' or 'black') contrasting input."""
+    if not css_color:
+        return "white"
+    parsed = bashmenu_ui.parse_css_color(css_color) or css_color
+    try:
+        rgb = Color.parse(str(parsed)).get_truecolor()
+        lum = 0.299 * rgb.red + 0.587 * rgb.green + 0.114 * rgb.blue
+        return "black" if lum >= 128 else "white"
+    except (ColorParseError, ValueError, TypeError, AttributeError, KeyError):
+        return "white"
+
+
+def has_sufficient_contrast(c1: str | None, c2: str | None) -> bool:
+    """Determine whether two colors provide adequate luminance contrast."""
+    if not c1 or not c2 or is_same_color(c1, c2):
+        return False
+    parsed1 = bashmenu_ui.parse_css_color(c1) or c1
+    parsed2 = bashmenu_ui.parse_css_color(c2) or c2
+    try:
+        rgb1 = Color.parse(str(parsed1)).get_truecolor()
+        rgb2 = Color.parse(str(parsed2)).get_truecolor()
+        lum1 = 0.299 * rgb1.red + 0.587 * rgb1.green + 0.114 * rgb1.blue
+        lum2 = 0.299 * rgb2.red + 0.587 * rgb2.green + 0.114 * rgb2.blue
+        return abs(lum1 - lum2) >= 60
+    except (ColorParseError, ValueError, TypeError, AttributeError, KeyError):
+        return True
+
+
+def get_theme_background_color(theme: dict | None) -> str:
+    """Resolve active theme background color to a normalized CSS hex string."""
+    if isinstance(theme, dict):
+        bg_style = theme.get("background")
+        if bg_style and getattr(bg_style, "bgcolor", None):
+            bg_val = getattr(bg_style.bgcolor, "name", None) or str(bg_style.bgcolor)
+            parsed = bashmenu_ui.parse_css_color(bg_val)
+            if parsed:
+                return parsed
+    return "#000000"
+
+
+def get_token_foreground_style(token_str: str, theme_bg: str | None = None) -> bashmenu_ui.Style | None:
     """Resolve token inside brackets to its assigned curses foreground color style."""
     clean_tok = token_str.strip("\"'")
     if clean_tok in COLOR_TOKEN_MAP:
-        return COLOR_TOKEN_MAP[clean_tok]
+        st = COLOR_TOKEN_MAP[clean_tok]
+        if theme_bg and clean_tok == "COLOR_BLACK" and not is_same_color(theme_bg, "#000000"):
+            neutral = get_contrast_neutral_color(theme_bg)
+            if neutral == "black":
+                return bashmenu_ui.Style(color="#000000", bold=True)
+        return st
     if clean_tok == "-1":
         return bashmenu_ui.Style(color="white", dim=True)
     if clean_tok.isdigit():
@@ -68,6 +135,9 @@ def get_token_foreground_style(token_str: str) -> bashmenu_ui.Style | None:
             css = bashmenu_ui.parse_css_color(val)
             if css:
                 if val in (0, 16, 232, 233, 234, 235, 236) or css == "black":
+                    neutral = get_contrast_neutral_color(theme_bg or "#000000")
+                    if neutral == "black":
+                        return bashmenu_ui.Style(color=css, bold=True)
                     return bashmenu_ui.Style(color=css, bgcolor="white", bold=True)
                 return bashmenu_ui.Style(color=css, bold=True)
     if clean_tok.startswith("#"):
@@ -132,26 +202,134 @@ class EditorWidget(Widget):
         self.modified = False
 
     def get_line_color_spans(self, text: str) -> list[tuple[int, int, bashmenu_ui.Style]]:
+        """Compute Rich style spans for color code brackets in text line."""
         if not text or "[" not in text or "]" not in text:
             return []
-        if text in self._color_span_cache:
-            return self._color_span_cache[text]
 
+        theme_bg = get_theme_background_color(self.theme)
+        cache_key = (text, theme_bg)
+        if cache_key in self._color_span_cache:
+            return self._color_span_cache[cache_key]
+
+        contrast_neutral = get_contrast_neutral_color(theme_bg)
         spans = []
+
         for bm in BRACKET_PATTERN.finditer(text):
             bracket_content = bm.group(1)
             bracket_start = bm.start(1)
-            for tm in TOKEN_PATTERN.finditer(bracket_content):
-                tok = tm.group(0)
-                st = get_token_foreground_style(tok)
-                if st:
+            token_matches = list(TOKEN_PATTERN.finditer(bracket_content))
+            if not token_matches:
+                continue
+
+            if len(token_matches) == 2:
+                tm0, tm1 = token_matches[0], token_matches[1]
+                tok0, tok1 = tm0.group(0), tm1.group(0)
+                clean0, clean1 = tok0.strip("\"'"), tok1.strip("\"'")
+                css0 = bashmenu_ui.parse_css_color(clean0)
+                css1 = bashmenu_ui.parse_css_color(clean1)
+
+                match0 = clean0 != "-1" and is_same_color(css0, theme_bg)
+                match1 = clean1 != "-1" and is_same_color(css1, theme_bg)
+
+                same_pair_values = clean0 == clean1 or (
+                    css0 and css1 and is_same_color(css0, css1)
+                )
+
+                # Check if foreground and background values match theme background
+                if (match0 and match1) or (same_pair_values and (match0 or match1)):
+                    # Choose a neutral primary 8 color value that contrasts the background
+                    for tm, clean, css in [
+                        (tm0, clean0, css0),
+                        (tm1, clean1, css1),
+                    ]:
+                        s_idx = bracket_start + tm.start()
+                        e_idx = bracket_start + tm.end()
+                        if clean == "-1":
+                            st = bashmenu_ui.Style(color="white", dim=True)
+                        else:
+                            st = bashmenu_ui.Style(
+                                color=css or "white",
+                                bgcolor=contrast_neutral,
+                                bold=True,
+                            )
+                        spans.append((s_idx, e_idx, st))
+                elif match0:
+                    # Invert foreground and background color for token 0
+                    bg_col = (
+                        css1
+                        if (
+                            css1
+                            and clean1 != "-1"
+                            and has_sufficient_contrast(css0, css1)
+                        )
+                        else contrast_neutral
+                    )
+                    st0 = bashmenu_ui.Style(
+                        color=css0 or "white", bgcolor=bg_col, bold=True
+                    )
+                    st1 = get_token_foreground_style(tok1, theme_bg=theme_bg)
+                    spans.append(
+                        (bracket_start + tm0.start(), bracket_start + tm0.end(), st0)
+                    )
+                    if st1:
+                        spans.append(
+                            (bracket_start + tm1.start(), bracket_start + tm1.end(), st1)
+                        )
+                elif match1:
+                    # Invert foreground and background color for token 1
+                    bg_col = (
+                        css0
+                        if (
+                            css0
+                            and clean0 != "-1"
+                            and has_sufficient_contrast(css1, css0)
+                        )
+                        else contrast_neutral
+                    )
+                    st0 = get_token_foreground_style(tok0, theme_bg=theme_bg)
+                    st1 = bashmenu_ui.Style(
+                        color=css1 or "white", bgcolor=bg_col, bold=True
+                    )
+                    if st0:
+                        spans.append(
+                            (bracket_start + tm0.start(), bracket_start + tm0.end(), st0)
+                        )
+                    spans.append(
+                        (bracket_start + tm1.start(), bracket_start + tm1.end(), st1)
+                    )
+                else:
+                    # Neither token matches theme background; render default styles
+                    st0 = get_token_foreground_style(tok0, theme_bg=theme_bg)
+                    st1 = get_token_foreground_style(tok1, theme_bg=theme_bg)
+                    if st0:
+                        spans.append(
+                            (bracket_start + tm0.start(), bracket_start + tm0.end(), st0)
+                        )
+                    if st1:
+                        spans.append(
+                            (bracket_start + tm1.start(), bracket_start + tm1.end(), st1)
+                        )
+            else:
+                for tm in token_matches:
+                    tok = tm.group(0)
+                    clean = tok.strip("\"'")
+                    css = bashmenu_ui.parse_css_color(clean)
                     s_idx = bracket_start + tm.start()
                     e_idx = bracket_start + tm.end()
-                    spans.append((s_idx, e_idx, st))
+                    if clean != "-1" and is_same_color(css, theme_bg):
+                        st = bashmenu_ui.Style(
+                            color=css or "white",
+                            bgcolor=contrast_neutral,
+                            bold=True,
+                        )
+                    else:
+                        st = get_token_foreground_style(tok, theme_bg=theme_bg)
+                    if st:
+                        spans.append((s_idx, e_idx, st))
 
         if len(self._color_span_cache) > 2000:
             self._color_span_cache.clear()
-        self._color_span_cache[text] = spans
+        self._color_span_cache[cache_key] = spans
         return spans
 
     def render(self) -> Text:
@@ -453,6 +631,7 @@ class EditorWidget(Widget):
         return "Mark Set" if self.mark_active else "Mark Unset"
 
     def copy_selection(self) -> str:
+        """Copy active selection block or current line into cutbuffer and system clipboard."""
         sel = self.get_selection_range()
         if not sel:
             line = self.lines[self.cursor_y]
@@ -486,6 +665,7 @@ class EditorWidget(Widget):
         return "Selection Copied"
 
     def cut_line(self) -> str:
+        """Cut active selection block or current line into cutbuffer and push undo state."""
         self.push_undo()
         sel = self.get_selection_range()
         if sel:
@@ -529,6 +709,7 @@ class EditorWidget(Widget):
         return "Selection Cut" if sel else "Line Cut"
 
     def paste_buffer(self) -> str:
+        """Paste text from system clipboard (or local cutbuffer fallback) at cursor position."""
         clip = get_system_clipboard()
         if clip is not None and clip != "":
             clip_lines = clip.splitlines()
@@ -878,6 +1059,7 @@ class BashEditScreen(Screen):
             yield Label("  Line 1/1, Col 1  ", id="editor_status")
 
     def on_click(self, event) -> None:
+        """Route mouse click events across tabs, close buttons, and interactive footer action labels."""
         node = getattr(event, "target", None) or getattr(event, "widget", None)
         target_action = None
         target_idx = None
@@ -1190,6 +1372,7 @@ class BashEditScreen(Screen):
             with contextlib.suppress(Exception):
                 ed = self.query_one("#editor_widget", EditorWidget)
                 ed.theme = self.theme_styles
+                ed._color_span_cache.clear()
                 ed.refresh()
 
     def on_mount(self) -> None:
@@ -1209,6 +1392,7 @@ class BashEditScreen(Screen):
         self.query_one("#editor_status", Label).update(text)
 
     def on_key(self, event: Key) -> None:
+        """Process keyboard shortcut bindings, navigation, editing commands, and character entry."""
         ed = self.query_one("#editor_widget", EditorWidget)
         key_lower = (event.key or "").lower()
         char_lower = (event.character or "").lower()
@@ -1500,6 +1684,7 @@ class BashEditScreen(Screen):
             self.update_status(f"Error saving file: {e}")
 
     def action_open_file(self) -> None:
+        """Prompt user with file picker modal and load chosen file into current or new editor tab."""
         ed = self.query_one("#editor_widget", EditorWidget)
 
         def open_cb(path):

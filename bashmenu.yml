@@ -1,5 +1,5 @@
 version: 0.0.1
-theme: pacman
+theme: everforest
 user:
   divider:
     char: '{ascii:196}'
@@ -27,8 +27,8 @@ settings:
   scripts_dir: '{bashmenu_dir}/scripts'
   ping_target: 1.1.1.1
   tab_to_spaces: true
-  tabstop: 8
+  tabstop: 4
   show_menu_shortcuts: true
   use_nerd_fonts: true
   nerd_font_width: auto
-  status_gutter: '{user} | {battery} | {date_time_24_short} | {user.localip}'
+  status_gutter: '{user} | {battery} | {user.localip} | {date_time_24}'

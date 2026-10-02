@@ -316,6 +316,139 @@ class TestImprovements(unittest.TestCase):
         self.assertTrue(modal.item.get("show_whitespace"))
         self.assertTrue(modal.item.get("external"))
 
+    def test_menuedit_two_line_footer(self):
+        """Verify MenuEditScreen yields a 2-line footer with two footer_row containers."""
+        import asyncio
+
+        from textual.app import App
+        from textual.containers import Horizontal, Vertical
+
+        import menuedit
+
+        class TestApp(App):
+            def on_mount(self):
+                self.push_screen(menuedit.MenuEditScreen())
+
+        async def run_checks():
+            app = TestApp()
+            async with app.run_test():
+                screen = app.screen
+                footer = screen.query_one("#footer", Vertical)
+                self.assertIsNotNone(footer)
+                rows = list(footer.query(".footer_row"))
+                self.assertEqual(len(rows), 2)
+                for r in rows:
+                    self.assertIsInstance(r, Horizontal)
+                self.assertIsNotNone(screen.query_one("#lbl_add"))
+                self.assertIsNotNone(screen.query_one("#lbl_exit"))
+
+        asyncio.run(run_checks())
+        self.assertIn("height: 2;", menuedit.MenuEditScreen.DEFAULT_CSS)
+        self.assertIn(".footer_row", menuedit.MenuEditScreen.DEFAULT_CSS)
+
+    def test_menuedit_input_modal_help_and_footer_clicks(self):
+        """Verify ItemEditModal F1 shortcut, help modal, and clickable footer items."""
+        import menuedit
+
+        modal = menuedit.ItemEditModal({"type": "command", "title": "Test", "command": "ls"})
+
+        actions_called = []
+        modal.action_show_help = lambda: actions_called.append("help")
+        modal.action_save_changes = lambda: actions_called.append("save")
+        modal.action_lookup_ascii = lambda: actions_called.append("ascii")
+        modal.action_show_placeholders = lambda: actions_called.append("placeholders")
+        modal.action_cancel = lambda: actions_called.append("cancel")
+
+        class DummyWidget:
+            def __init__(self, wid):
+                self.id = wid
+                self.classes = []
+
+        class DummyClickEvent:
+            def __init__(self, widget):
+                self.widget = widget
+                self.target = widget
+
+        modal.on_click(DummyClickEvent(DummyWidget("lbl_modal_help")))
+        self.assertIn("help", actions_called)
+
+        modal.on_click(DummyClickEvent(DummyWidget("lbl_modal_save")))
+        self.assertIn("save", actions_called)
+
+        modal.on_click(DummyClickEvent(DummyWidget("lbl_modal_ascii")))
+        self.assertIn("ascii", actions_called)
+
+        modal.on_click(DummyClickEvent(DummyWidget("lbl_modal_placeholders")))
+        self.assertIn("placeholders", actions_called)
+
+        modal.on_click(DummyClickEvent(DummyWidget("lbl_modal_cancel")))
+        self.assertIn("cancel", actions_called)
+
+        binding_keys = [b.key for b in modal.BINDINGS]
+        self.assertIn("f1", binding_keys)
+
+        self.assertIn("BashMenu Item Properties", menuedit.ITEM_EDIT_HELP_TEXT)
+        self.assertIn("Title / Label", menuedit.ITEM_EDIT_HELP_TEXT)
+        self.assertIn("alt_buffer", menuedit.ITEM_EDIT_HELP_TEXT)
+
+
+    def test_editor_theme_background_color_inversion_and_contrast(self):
+        """Test editor color pair inversion and neutral contrast against theme background."""
+        import bashedit
+
+        # 1. qbasic theme: background is color 19 (#0000af)
+        qbasic_theme = bashmenu_ui.init_theme_colors("qbasic")
+        ed_qbasic = bashedit.EditorWidget(display_theme_colors=True, theme=qbasic_theme)
+
+        # In title: [226, 19], 19 matches qbasic theme background.
+        # It must invert foreground and background colors (blue on yellow).
+        spans_title = ed_qbasic.get_line_color_spans("title: [226, 19]")
+        self.assertEqual(len(spans_title), 2)
+        _s0, _e0, st0 = spans_title[0]
+        _s1, _e1, st1 = spans_title[1]
+        self.assertEqual(st0.color.name, "#ffff00")
+        self.assertIsNone(st0.bgcolor)
+        self.assertEqual(st1.color.name, "#0000af")
+        self.assertEqual(st1.bgcolor.name, "#ffff00")
+
+        # In border: [51, 19], 19 matches background, inverting with cyan 51.
+        spans_border = ed_qbasic.get_line_color_spans("border: [51, 19]")
+        self.assertEqual(len(spans_border), 2)
+        self.assertEqual(spans_border[0][2].color.name, "#00ffff")
+        self.assertEqual(spans_border[1][2].color.name, "#0000af")
+        self.assertEqual(spans_border[1][2].bgcolor.name, "#00ffff")
+
+        # 2. dracula theme: background is COLOR_BLACK (#000000)
+        dracula_theme = bashmenu_ui.init_theme_colors("dracula")
+        ed_dracula = bashedit.EditorWidget(display_theme_colors=True, theme=dracula_theme)
+
+        # In shadow: [16, 16], both fg and bg are the same and match background.
+        # Must choose a neutral primary 8 color that contrasts the background (white).
+        spans_shadow = ed_dracula.get_line_color_spans("shadow: [16, 16]")
+        self.assertEqual(len(spans_shadow), 2)
+        for _s, _e, st in spans_shadow:
+            self.assertEqual(st.color.name, "#000000")
+            self.assertEqual(st.bgcolor.name, "white")
+
+        # In shadow: [19, 19] under qbasic, both match blue background.
+        spans_qbasic_shadow = ed_qbasic.get_line_color_spans("shadow: [19, 19]")
+        self.assertEqual(len(spans_qbasic_shadow), 2)
+        for _s, _e, st in spans_qbasic_shadow:
+            self.assertEqual(st.color.name, "#0000af")
+            self.assertEqual(st.bgcolor.name, "white")
+
+        # 3. Helper function unit tests
+        self.assertTrue(bashedit.is_same_color("19", "#0000af"))
+        self.assertTrue(bashedit.is_same_color("COLOR_BLUE", "#5f87ff"))
+        self.assertFalse(bashedit.is_same_color("COLOR_BLUE", "COLOR_RED"))
+        self.assertEqual(bashedit.get_contrast_neutral_color("#000000"), "white")
+        self.assertEqual(bashedit.get_contrast_neutral_color("#0000af"), "white")
+        self.assertEqual(bashedit.get_contrast_neutral_color("#ffffff"), "black")
+        self.assertTrue(bashedit.has_sufficient_contrast("#0000af", "#ffff00"))
+        self.assertFalse(bashedit.has_sufficient_contrast("#0000af", "#000087"))
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

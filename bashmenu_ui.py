@@ -1573,6 +1573,7 @@ class FilePickerModalScreen(ModalScreen[str]):
                     self.query_one("#filename_input", Input).value = filename
 
     def load_directory(self) -> None:
+        """Scan current directory path and populate OptionList with folders, files, and navigation options."""
         self.query_one("#path_label", Label).update(f"Path: {self.current_path}")
         options_list = self.query_one("#options_list", OptionList)
         options_list.clear_options()

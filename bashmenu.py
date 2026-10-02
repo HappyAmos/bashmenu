@@ -377,10 +377,8 @@ def resolve_glyph(glyph_def, config=None):
     if use_nerd:
         if emoji_part:
             if r"\u" in emoji_part.lower():
-                try:
+                with contextlib.suppress(Exception):
                     emoji_part = codecs.decode(emoji_part, "unicode-escape")
-                except Exception:
-                    pass
             return emoji_part
         if hex_part and is_hex_token(hex_part):
             try:
@@ -840,6 +838,11 @@ class PluginBuffer(Static):
         self.config = config or {}
 
     def render(self) -> Text:
+        """Render cached extension script and plugin outputs into an isolated Textual buffer.
+
+        Applies active theme background and plugin colors, limits display to a maximum
+        of 10 rows, and normalizes tabs, null bytes, and Unicode variation selectors.
+        """
         cfg = self.config
         with contextlib.suppress(Exception):
             if self.screen and self.screen.menu_view and self.screen.menu_view.config:
@@ -935,6 +938,13 @@ class MainMenuView(Widget):
         return raw_plugin_lines, separator_rows, visible_option_rows
 
     def render(self) -> Text:
+        """Render the complete primary menu interface as an isolated textual screen buffer.
+
+        Constructs top/bottom window borders, menu titles, options with fixed 4-column
+        icon slots and column 11 label alignment, shortcut badges, divider rules,
+        and bottom status/help gutter. Enforces strict boundary padding and truncation
+        to prevent terminal border overflow.
+        """
         w = max(40, self.size.width or 80)
         h = max(10, self.size.height or 24)
         out = Text()
@@ -1488,9 +1498,11 @@ def process_item_action(screen, item, config):
         )
 
         def resolve_and_run(curr_action):
+            """Recursively resolve interactive macros ({param}, {file_picker}, {dir_picker}) then execute action."""
             if not curr_action:
                 return
 
+            # 1. Resolve interactive parameter input ({param})
             if "{param}" in curr_action:
                 title = item.get("title", "Parameter Input")
                 prompt = item.get("prompt", "Enter parameter:")
@@ -1503,6 +1515,7 @@ def process_item_action(screen, item, config):
                 screen.app.push_screen(bashmenu_ui.InputModalScreen(title, prompt, masked=masked), p_cb)
                 return
 
+            # 2. Resolve interactive file picker macro ({file_picker})
             if "{file_picker}" in curr_action or "{file_picker_new}" in curr_action or "{file_picker:new}" in curr_action:
                 title = item.get("title", "Select File")
                 start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
@@ -1519,6 +1532,7 @@ def process_item_action(screen, item, config):
                 screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="file"), f_cb)
                 return
 
+            # 3. Resolve interactive directory picker macro ({dir_picker})
             if "{dir_picker}" in curr_action or "{dir_picker_new}" in curr_action or "{dir_picker:new}" in curr_action:
                 title = item.get("title", "Select Directory")
                 start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
@@ -1533,6 +1547,7 @@ def process_item_action(screen, item, config):
                         resolve_and_run(res)
 
                 screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="dir"), d_cb)
+                return
 
             if "menuedit.py" in curr_action:
                 import menuedit

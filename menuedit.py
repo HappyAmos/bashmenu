@@ -64,6 +64,130 @@ ITEM_TYPES = [
 
 from bashmenu_ui import PLACEHOLDER_HELP_TEXT
 
+ITEM_EDIT_HELP_TEXT = """\
+[bold magenta]BashMenu Item Properties (Editor Help)[/bold magenta]
+
+[bold magenta]── 1. Text Fields ──[/bold magenta]
+
+[bold cyan]Title / Label[/bold cyan]  (title | label)
+  Purpose: Visible text of the menu entry, aligned at column 11
+           after the fixed 4-column icon slot.
+  Usage:   title: "<text>"   (label is accepted as an alias)
+  Example: title: "Edit Bashmenu Config"
+
+[bold cyan]Icon / Glyph[/bold cyan]  (icon | glyph)
+  Purpose: Leading glyph drawn in a 4-column slot.
+  Usage:   Adaptive form {nf:<char>:<nerd_hex>:<emoji>}.
+           Tiers resolve emoji, then Nerd Font hex, then plain
+           char, then blank when unset.
+  Example: icon: "{nf:#:f015:🏠}"
+
+[bold cyan]Action / Command / Script / File / Key[/bold cyan]
+  Purpose: Payload executed when the entry is selected.
+  Usage:   One editor field writes the type-specific key:
+           command->command, script->script, editor->file,
+           toggle/config->key, python->python, else->action.
+  Example: command: "{scripts_dir}/backup.sh"
+
+[bold cyan]Message / Prompt Text[/bold cyan]  (message | prompt)
+  Purpose: Text shown to the user, or the prompt displayed
+           before an input/confirm step.
+  Usage:   message/info/popup store as message; others as prompt.
+  Example: message: "Backups enabled for {host}."
+
+[bold cyan]Template Path[/bold cyan]  (template)  [inject_block]
+  Purpose: Source file whose contents are injected.
+  Usage:   Relative paths resolve against the app root; macros
+           such as {templates_dir} are expanded.
+  Example: template: "{templates_dir}/autoexec.sh"
+
+[bold cyan]Target Path[/bold cyan]  (target)  [inject_block]
+  Purpose: Destination file edited on install or removal.
+  Usage:   Expanded via macros and ~ (e.g. {home}).
+  Example: target: "{home}/.config/autoexec.sh"
+
+[bold cyan]Block ID[/bold cyan]  (block_id)  [inject_block]
+  Purpose: Names the managed region delimited by the markers
+           # CODEBLOCK:<id>:START and # CODEBLOCK:<id>:END.
+  Usage:   Defaults to "default" when omitted.
+  Example: block_id: "bashmenu-autoexec"
+
+[bold cyan]Start Directory[/bold cyan]  (start_dir)  [pickers]
+  Purpose: Initial browse location for {file_picker} and
+           {dir_picker} items.
+  Usage:   Defaults to ~ ; macros and ~ are expanded.
+  Example: start_dir: "{home}/projects"
+
+[bold cyan]Tabstop[/bold cyan]  (tabstop)
+  Purpose: Tab width used by the built-in editor for the item.
+  Usage:   Integer columns; editor default 8, modal default 4.
+  Example: tabstop: 8
+
+[bold cyan]Repeating Character[/bold cyan]  (char)  [divider]
+  Purpose: Glyph repeated to draw a divider rule.
+  Usage:   Accepts {ascii:<code>} macros; default {ascii:196}.
+  Example: char: "{ascii:61}"
+
+[bold cyan]Length Directive[/bold cyan]  (length)  [divider]
+  Purpose: Width of the divider rule in columns.
+  Usage:   Macro or integer; default {window_width}.
+  Example: length: "{window_width}"
+
+[bold magenta]── 2. Execution Modes ──[/bold magenta]
+
+[bold cyan]Stream[/bold cyan]  (stream=true)
+  Purpose: Render command output live inside a Textual modal.
+  Usage:   Sets stream=true, interactive=false, quiet=true.
+           Honors no_formatting for raw display.
+  Example: stream: true
+
+[bold cyan]Quiet[/bold cyan]  (quiet=true)
+  Purpose: Run in the terminal with no header banner and no
+           ENTER-to-continue pause.
+  Usage:   Sets interactive=true with quiet=true.
+  Example: quiet: true
+
+[bold cyan]Standard / Interactive[/bold cyan]  (quiet=false)
+  Purpose: Full-screen TTY run with a running-command header
+           and an ENTER pause prompt on completion.
+  Usage:   interactive=true, quiet=false; honors alt_buffer.
+  Example: interactive: true
+
+[bold magenta]── 3. Checkboxes & Switches ──[/bold magenta]
+
+[bold cyan]alt_buffer[/bold cyan]
+  Purpose: Run in the alternate screen buffer so the menu is
+           restored when the command exits.
+  Usage:   Boolean; default true; applies to non-stream modes.
+  Example: alt_buffer: false
+
+[bold cyan]no_formatting[/bold cyan]
+  Purpose: Disable the BBCode/rich parser and show raw text.
+  Usage:   Boolean; affects stream output and messages.
+  Example: no_formatting: true
+
+[bold cyan]masked[/bold cyan]
+  Purpose: Mask typed input with asterisks for secrets.
+  Usage:   Boolean; applies to input prompt items.
+  Example: masked: true
+
+[bold cyan]refresh[/bold cyan]
+  Purpose: Re-source the environment after the command ends.
+  Usage:   Boolean; use for scripts that export variables.
+  Example: refresh: true
+
+[bold cyan]show_whitespace[/bold cyan]
+  Purpose: Show tab and space indicators in the built-in editor.
+  Usage:   Boolean; editor items.
+  Example: show_whitespace: true
+
+[bold cyan]external[/bold cyan]
+  Purpose: Execute in a separate shell or process; plugins run
+           in-memory when the value is false.
+  Usage:   Boolean; script and plugin items.
+  Example: external: true
+"""
+
 
 class ItemTypePickerModal(ModalScreen[str]):
     """Modal dialog to select type when adding a new item."""
@@ -118,8 +242,20 @@ class ItemTypePickerModal(ModalScreen[str]):
         border: solid $accent;
     }
     #footer {
-        text-align: center;
+        height: 1;
+        width: 100%;
+        align: center middle;
         margin-top: 1;
+    }
+    .footer_item {
+        padding: 0 1;
+        color: $accent;
+    }
+    .footer_item:hover {
+        text-style: underline;
+        color: $text;
+    }
+    .footer_sep {
         color: $text-muted;
     }
     """
@@ -139,10 +275,19 @@ class ItemTypePickerModal(ModalScreen[str]):
                 yield Label("Select Item Type", id="title")
                 yield Label(bashmenu_ui.format_close_button_label(self.theme), id="btn_close_x", classes="btn_close_x")
             yield OptionList(id="option_list")
-            yield Label("[ENTER] Select | [ESC / C] Cancel", id="footer")
+            with Horizontal(id="footer"):
+                yield Label("[ENTER] Select", id="lbl_picker_select", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[ESC / C] Cancel", id="lbl_picker_cancel", classes="footer_item", markup=False)
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
+        accent_style = self.theme.get("accent") or self.theme.get("help_text")
+        if accent_style and accent_style.color and accent_style.color.name:
+            css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
+            if css_accent:
+                for item in self.query(".footer_item"):
+                    item.styles.color = css_accent
         opts = self.query_one("#option_list", OptionList)
         col1_width = 24
         indent_spaces = " " * col1_width
@@ -160,7 +305,14 @@ class ItemTypePickerModal(ModalScreen[str]):
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
-        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+        if not widget:
+            return
+        lbl_id = getattr(widget, "id", None)
+        if lbl_id == "lbl_picker_select":
+            opts = self.query_one("#option_list", OptionList)
+            if opts.highlighted is not None and 0 <= opts.highlighted < len(ITEM_TYPES):
+                self.dismiss(ITEM_TYPES[opts.highlighted][0])
+        elif lbl_id in ("lbl_picker_cancel", "btn_close_x") or "btn_close_x" in getattr(widget, "classes", []):
             self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -288,22 +440,6 @@ class ExecModeContainer(Vertical):
             event.stop()
 
 
-def format_pipe_footer(segments: list[str], max_width: int = 82) -> str:
-    """Format a list of pipe-delimited segment strings so each segment wraps cleanly without breaking."""
-    lines = []
-    curr = ""
-    for i, seg in enumerate(segments):
-        token = seg.strip() + (" | " if i < len(segments) - 1 else "")
-        if curr and len(curr + token.rstrip()) > max_width:
-            lines.append(curr.rstrip())
-            curr = token
-        else:
-            curr += token
-    if curr:
-        lines.append(curr.rstrip())
-    return "\n".join(lines)
-
-
 def resolve_glyph_preview(glyph_def: str, config: dict | None = None) -> str:
     """Self-contained glyph resolver for Menu Editor Property Inspector previews."""
     if not isinstance(glyph_def, str) or not glyph_def.startswith("{nf:"):
@@ -325,7 +461,7 @@ def resolve_glyph_preview(glyph_def: str, config: dict | None = None) -> str:
             char_part = ""
             hex_part = parts[1]
             emoji_part = ""
-        elif parts[0].startswith("#") or parts[0].startswith("$") or (parts[0] and all(c in "0123456789abcdefABCDEF" for c in parts[0])):
+        elif parts[0].startswith(("#", "$")) or (parts[0] and all(c in "0123456789abcdefABCDEF" for c in parts[0])):
             char_part = ""
             hex_part = parts[0]
             emoji_part = parts[1]
@@ -335,7 +471,7 @@ def resolve_glyph_preview(glyph_def: str, config: dict | None = None) -> str:
             emoji_part = ""
     elif len(parts) == 1:
         part = parts[0]
-        if part.startswith("#") or part.startswith("$"):
+        if part.startswith(("#", "$")):
             hex_part = part
         else:
             char_part = part
@@ -346,11 +482,9 @@ def resolve_glyph_preview(glyph_def: str, config: dict | None = None) -> str:
     if use_nerd:
         if emoji_part:
             if r"\u" in emoji_part.lower():
-                try:
+                with contextlib.suppress(Exception):
                     import codecs
                     emoji_part = codecs.decode(emoji_part, "unicode-escape")
-                except Exception:
-                    pass
             return emoji_part
         if hex_part:
             try:
@@ -532,9 +666,26 @@ class ItemEditModal(ModalScreen[dict]):
         margin: 0 1;
     }
     #footer {
-        text-align: center;
+        height: 2;
+        width: 100%;
+        align: center middle;
+        margin-top: 1;
+    }
+    .footer_row {
+        height: 1;
+        width: 100%;
+        align: center middle;
+    }
+    .footer_item {
+        padding: 0 1;
+        color: $accent;
+    }
+    .footer_item:hover {
+        text-style: underline;
+        color: $text;
+    }
+    .footer_sep {
         color: $text-muted;
-        height: auto;
     }
     """
 
@@ -548,6 +699,8 @@ class ItemEditModal(ModalScreen[dict]):
         Binding("f3", "lookup_ascii", "ASCII Table"),
         Binding("ctrl+p", "show_placeholders", "Placeholders"),
         Binding("f4", "show_placeholders", "Placeholders"),
+        Binding("f1", "show_help", "Help"),
+        Binding("question_mark", "show_help", "Help", show=False),
     ]
 
     def __init__(self, item: dict, theme: dict | None = None):
@@ -558,12 +711,6 @@ class ItemEditModal(ModalScreen[dict]):
 
     def compose(self) -> ComposeResult:
         item_type = self.item.get("type", "command" if "command" in self.item else "submenu" if "submenu" in self.item else "unknown")
-        footer_text = format_pipe_footer([
-            "[CTRL+S / F2] Save",
-            "[CTRL+A / F3] ASCII",
-            "[CTRL+P / F4] Placeholders",
-            "[ESC / C] Cancel",
-        ], max_width=82)
 
         if item_type == "divider":
             char_val = self.item.get("char", "{ascii:196}")
@@ -582,7 +729,17 @@ class ItemEditModal(ModalScreen[dict]):
                 with Horizontal(id="buttons"):
                     yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
                     yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
-                yield Label(footer_text, id="footer", markup=False)
+                with Vertical(id="footer"):
+                    with Horizontal(classes="footer_row"):
+                        yield Label("[F1] Help", id="lbl_modal_help", classes="footer_item", markup=False)
+                        yield Label("|", classes="footer_sep", markup=False)
+                        yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
+                        yield Label("|", classes="footer_sep", markup=False)
+                        yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
+                    with Horizontal(classes="footer_row"):
+                        yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
+                        yield Label("|", classes="footer_sep", markup=False)
+                        yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
             return
 
         title_val = self.item.get("title", self.item.get("label", ""))
@@ -665,10 +822,26 @@ class ItemEditModal(ModalScreen[dict]):
                 yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
                 yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
 
-            yield Label(footer_text, id="footer", markup=False)
+            with Vertical(id="footer"):
+                with Horizontal(classes="footer_row"):
+                    yield Label("[F1] Help", id="lbl_modal_help", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
+                with Horizontal(classes="footer_row"):
+                    yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
+        accent_style = self.theme.get("accent") or self.theme.get("help_text")
+        if accent_style and accent_style.color and accent_style.color.name:
+            css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
+            if css_accent:
+                for item in self.query(".footer_item"):
+                    item.styles.color = css_accent
         with contextlib.suppress(Exception):
             bashmenu_ui.apply_button_theme(self.query_one("#btn_save", Button), theme=self.theme, button_type="button_primary")
             bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_cancel")
@@ -679,8 +852,19 @@ class ItemEditModal(ModalScreen[dict]):
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
-        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
-            self.dismiss(None)
+        if not widget:
+            return
+        lbl_id = getattr(widget, "id", None)
+        if lbl_id == "lbl_modal_help":
+            self.action_show_help()
+        elif lbl_id == "lbl_modal_save":
+            self.action_save_changes()
+        elif lbl_id == "lbl_modal_ascii":
+            self.action_lookup_ascii()
+        elif lbl_id == "lbl_modal_placeholders":
+            self.action_show_placeholders()
+        elif lbl_id in ("lbl_modal_cancel", "btn_cancel", "btn_close_x") or "btn_close_x" in getattr(widget, "classes", []):
+            self.action_cancel()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id in ("inp_char", "inp_length"):
@@ -747,7 +931,13 @@ class ItemEditModal(ModalScreen[dict]):
             chk.display = mode_idx != 0
 
     def perform_save(self) -> None:
+        """Extract user input values from dialog form widgets and persist them to the item dictionary.
+
+        Normalizes type-specific payload fields, handles execution mode mapping, and parses
+        integer tabstops and boolean checkbox flags before dismissing the modal.
+        """
         item_type = self.item.get("type", "command")
+        # 1. Handle divider items separately
         if item_type == "divider":
             self.item = {
                 "type": "divider",
@@ -757,6 +947,7 @@ class ItemEditModal(ModalScreen[dict]):
             self.dismiss(self.item)
             return
 
+        # 2. Extract standard input field strings
         new_title = self.query_one("#inp_title", Input).value.strip()
         new_icon = self.query_one("#inp_icon", Input).value.strip()
         new_action = self.query_one("#inp_action", Input).value.strip()
@@ -872,7 +1063,7 @@ class ItemEditModal(ModalScreen[dict]):
             cfg = getattr(app_obj, "config", {}) if app_obj else {}
         cmd = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
         if app_obj:
-            app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd))
+            app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme))
 
     def action_show_placeholders(self) -> None:
         try:
@@ -884,6 +1075,22 @@ class ItemEditModal(ModalScreen[dict]):
                 bashmenu_ui.MessageModalScreen(
                     "Available Placeholders & Macros",
                     PLACEHOLDER_HELP_TEXT,
+                    theme=self.theme,
+                    is_help=True,
+                )
+            )
+
+    def action_show_help(self) -> None:
+        try:
+            app_obj = self.app
+        except Exception:  # noqa: BLE001
+            app_obj = getattr(self, "_app", None)
+        if app_obj:
+            app_obj.push_screen(
+                bashmenu_ui.MessageModalScreen(
+                    "Menu Item Properties Guide",
+                    ITEM_EDIT_HELP_TEXT,
+                    theme=self.theme,
                     is_help=True,
                 )
             )
@@ -955,9 +1162,13 @@ class MenuEditScreen(Screen):
     }
     #footer {
         dock: bottom;
-        height: 1;
+        height: 2;
         background: $surface;
         color: $accent;
+    }
+    .footer_row {
+        height: 1;
+        width: 100%;
         align: center middle;
     }
     .footer_item {
@@ -1059,12 +1270,13 @@ class MenuEditScreen(Screen):
         self.theme_styles = bashmenu_ui.resolve_theme_dict(theme)
         try:
             self.config, _ = bashmenu.load_config()
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.config = {}
         self._target_node_to_focus = None
         self.modified = False
 
     def compose(self) -> ComposeResult:
+        """Compose the primary visual editor workspace including header, tree, inspector, and footer."""
         file_name = os.path.basename(self.menu_file_path)
         with Horizontal(id="header"):
             yield Label(f"  Visual Menu Editor - {file_name}  ", id="header_title")
@@ -1075,30 +1287,31 @@ class MenuEditScreen(Screen):
             with Vertical(id="inspector_panel"):
                 yield Label("── Property Inspector ──", id="inspector_title")
                 yield Static("Select a menu item in the hierarchy tree to inspect properties.", id="inspector_content")
-        with Horizontal(id="footer"):
-            yield Label("[a] Add", id="lbl_add", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[e/ENTER] Edit", id="lbl_edit", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[SPACE] Toggle", id="lbl_toggle", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[d] Delete", id="lbl_delete", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[m] Move Dn", id="lbl_move_down", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[M] Move Up", id="lbl_move_up", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[>] Indent", id="lbl_indent", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[<] Outdent", id="lbl_outdent", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[CTRL+A] ASCII", id="lbl_ascii", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[CTRL+P] Placeholders", id="lbl_placeholders", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[s] Save", id="lbl_save", classes="footer_item", markup=False)
-            yield Label("|", classes="footer_sep", markup=False)
-            yield Label("[ESC/q] Exit", id="lbl_exit", classes="footer_item", markup=False)
+        with Vertical(id="footer"):
+            with Horizontal(classes="footer_row"):
+                yield Label("[a] Add", id="lbl_add", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[e/ENTER] Edit", id="lbl_edit", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[SPACE] Toggle", id="lbl_toggle", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[d] Delete", id="lbl_delete", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[m] Move Dn", id="lbl_move_down", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[M] Move Up", id="lbl_move_up", classes="footer_item", markup=False)
+            with Horizontal(classes="footer_row"):
+                yield Label("[>] Indent", id="lbl_indent", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[<] Outdent", id="lbl_outdent", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[CTRL+A] ASCII", id="lbl_ascii", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[CTRL+P] Placeholders", id="lbl_placeholders", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[s] Save", id="lbl_save", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[ESC/q] Exit", id="lbl_exit", classes="footer_item", markup=False)
 
     def action_toggle_tree_node(self) -> None:
         with contextlib.suppress(Exception):
@@ -1329,6 +1542,7 @@ class MenuEditScreen(Screen):
         return find_by_attributes(parent_node)
 
     def populate_tree(self, target_item=None) -> None:
+        """Rebuild the menu hierarchy tree and restore active node focus and inspector contents."""
         tree = self.query_one("#tree", Tree)
         tree.clear()
         tree.root.data = self.menu_data
@@ -1363,6 +1577,7 @@ class MenuEditScreen(Screen):
         tree.focus()
 
     def _build_tree_branch(self, parent_node, options_list):
+        """Recursively build tree branch nodes from a list of option dictionaries."""
         for item in options_list:
             if not isinstance(item, dict):
                 continue
@@ -1385,6 +1600,7 @@ class MenuEditScreen(Screen):
         self.update_inspector(event.node.data if event.node else None)
 
     def update_inspector(self, item: dict | None) -> None:
+        """Update the property inspector panel with formatted details and live preview of the selected menu item."""
         inspector = self.query_one("#inspector_content", Static)
         if not item or not isinstance(item, dict):
             inspector.update("[dim]No menu item selected.[/dim]")
@@ -1795,7 +2011,7 @@ class MenuEditApp(App):
         self.selected_item = selected_item
         try:
             self.config, _ = bashmenu.load_config()
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.config = {}
 
     def on_mount(self) -> None:
