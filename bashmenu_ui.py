@@ -83,6 +83,9 @@ PLACEHOLDER_SECTIONS = [
             ("{scripts_dir}", "Scripts directory path"),
             ("{templates_dir}", "Templates directory path"),
             ("{cache_dir}", "Cache directory path"),
+            ("{bashrc}", "Path to ~/.bashrc profile file"),
+            ("{bash_aliases}", "Path to ~/.bash_aliases file"),
+            ("{vimrc}", "Path to ~/.vimrc configuration file"),
         ],
     ),
     (

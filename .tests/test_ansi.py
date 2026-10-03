@@ -120,6 +120,9 @@ class TestAnsiParsing(unittest.TestCase):
             "{time_24}",
             "{battery}",
             "{utc_seconds}",
+            "{bashrc}",
+            "{bash_aliases}",
+            "{vimrc}",
         ]
         for p in placeholders:
             resolved = bashmenu.interpolate_placeholders(p, {})
@@ -130,6 +133,12 @@ class TestAnsiParsing(unittest.TestCase):
                 self.assertTrue(resolved.isdigit())
             elif p == "{date}":
                 self.assertRegex(resolved, r"^\d{4}-\d{2}-\d{2}$")
+            elif p == "{bashrc}":
+                self.assertEqual(resolved, bashmenu.BASHRC_PATH)
+            elif p == "{bash_aliases}":
+                self.assertEqual(resolved, bashmenu.BASH_ALIASES_PATH)
+            elif p == "{vimrc}":
+                self.assertEqual(resolved, bashmenu.VIMRC_PATH)
 
     def test_get_battery_info_caching(self):
         """Test that get_battery_info properly caches results and avoids multiple slower lookups."""
