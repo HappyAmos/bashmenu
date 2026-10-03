@@ -58,17 +58,43 @@ run_as_root() {
     fi
 }
 
+detect_arch() {
+    local raw_m
+    raw_m="$(uname -m 2>/dev/null || echo "unknown")"
+    case "$raw_m" in
+        x86_64|amd64)                 echo "amd64" ;;
+        aarch64|arm64|armv8*)         echo "arm64" ;;
+        armv7*|armv6*|armhf|arm)      echo "arm" ;;
+        i386|i686)                    echo "386" ;;
+        *)                            echo "$raw_m" ;;
+    esac
+}
+
+get_bin_dir() {
+    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+        echo "$PREFIX/bin"
+    elif [ "$(id -u)" = "0" ] || [ -w "/usr/local/bin" ]; then
+        echo "/usr/local/bin"
+    else
+        mkdir -p "$HOME/.local/bin"
+        echo "$HOME/.local/bin"
+    fi
+}
+
 # Function to display tailored solutions for failed package installations
 get_solution_for_pkg() {
     local pkg="$1"
+    local arch
+    arch="$(detect_arch)"
+    local target_bin
+    target_bin="$(get_bin_dir)"
     case "$pkg" in
         glow)
             echo "  - Issue: 'glow' is not in default repositories for many Linux distributions."
             echo "  - Solutions:"
             echo "      1. Run custom script: scripts/install_glow.sh"
-            echo "      2. Add Charm APT repository: curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg"
-            echo "      3. Install using Go: go install github.com/charmbracelet/glow@latest"
-            echo "      4. Install using Homebrew: brew install glow"
+            echo "      2. Use built-in markdown viewer: scripts/rich.sh <file> | scripts/pager.sh"
+            echo "      3. Install using Homebrew: brew install glow"
             ;;
         gum)
             echo "  - Issue: 'gum' is missing from default package repositories."
@@ -87,7 +113,7 @@ get_solution_for_pkg() {
         yq)
             echo "  - Issue: 'yq' failed to install via package manager."
             echo "  - Solutions:"
-            echo "      1. Download binary: wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq"
+            echo "      1. Download binary: wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${arch} -O ${target_bin}/yq && chmod +x ${target_bin}/yq"
             echo "      2. Install via Python pip: pip install yq"
             echo "      3. Install using Homebrew: brew install yq"
             ;;

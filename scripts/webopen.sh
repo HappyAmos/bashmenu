@@ -183,6 +183,18 @@ launch_gui_mode() {
         fi
     fi
 
+    # Check Windows (Git Bash / MSYS2)
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+            local fallback="${TARGET:-https://duckduckgo.com}"
+            if command -v start >/dev/null 2>&1; then
+                start "" "$fallback" 2>/dev/null && exit 0 || true
+            elif command -v cmd.exe >/dev/null 2>&1; then
+                cmd.exe /c start "" "$fallback" 2>/dev/null && exit 0 || true
+            fi
+            ;;
+    esac
+
     # Check Android / Termux
     if [ -n "${TERMUX_VERSION:-}" ] || [[ "${PREFIX:-}" == *"/com.termux/"* ]]; then
         local fallback="${TARGET:-https://duckduckgo.com}"

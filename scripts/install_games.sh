@@ -52,6 +52,23 @@ is_game_installed() {
     esac
 }
 
+IS_TERMUX=false
+if [ -n "$TERMUX_VERSION" ] || [[ "${PREFIX:-}" == *"/com.termux/"* ]]; then
+    IS_TERMUX=true
+fi
+
+run_root() {
+    if [ "$IS_TERMUX" = true ] || [ "$(uname -s)" = "Darwin" ]; then
+        "$@"
+    elif [ "$(id -u)" = "0" ]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
 # Install games using the system's native package manager
 for game in "${games[@]}"; do
     if is_game_installed "$game"; then
@@ -67,23 +84,40 @@ for game in "${games[@]}"; do
             continue
         fi
 
+        if [ "$IS_TERMUX" = true ] && command -v pkg &>/dev/null; then
+            pkg_name="$game"
+            [ "$game" = "nethack-console" ] && pkg_name="nethack"
+            [ "$game" = "bsdgames" ] && pkg_name="bsd-games"
+            pkg install -y "$pkg_name" || echo "Note: Package '$pkg_name' not available in Termux repo."
+            continue
+        fi
+
         case "$(uname -s)" in
             Darwin)
                 pkg_name="$game"
+                [ "$game" = "nethack-console" ] && pkg_name="nethack"
                 [ "$game" = "bsdgames" ] && pkg_name="bsd-games"
                 brew install "$pkg_name"
                 ;;            
             Linux)
                 if command -v apt-get &> /dev/null; then
-                    sudo apt-get install -y "$game"
+                    run_root apt-get install -y "$game"
                 elif command -v dnf &> /dev/null; then
-                    sudo dnf install -y "$game"
+                    pkg_name="$game"
+                    [ "$game" = "nethack-console" ] && pkg_name="nethack"
+                    run_root dnf install -y "$pkg_name"
                 elif command -v pacman &> /dev/null; then
-                    sudo pacman -Syu --noconfirm "$game"
+                    pkg_name="$game"
+                    [ "$game" = "nethack-console" ] && pkg_name="nethack"
+                    run_root pacman -Syu --noconfirm "$pkg_name"
                 elif command -v apk &> /dev/null; then
-                    sudo apk add "$game"
+                    pkg_name="$game"
+                    [ "$game" = "nethack-console" ] && pkg_name="nethack"
+                    run_root apk add "$pkg_name"
                 elif command -v zypper &> /dev/null; then
-                    sudo zypper install -y "$game"
+                    pkg_name="$game"
+                    [ "$game" = "nethack-console" ] && pkg_name="nethack"
+                    run_root zypper install -y "$pkg_name"
                 else
                     echo "Unsupported package manager."
                     exit 1

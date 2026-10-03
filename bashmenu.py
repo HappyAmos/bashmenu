@@ -218,7 +218,27 @@ def get_battery_info():
             avg_cap = sum(capacities) // len(capacities)
             _cached_battery = f"{avg_cap}%"
             return _cached_battery
-    except (OSError, ValueError, TypeError):
+
+        # macOS fallback via pmset
+        if shutil.which("pmset"):
+            res = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=1, check=False)
+            if res.returncode == 0 and res.stdout:
+                m = re.search(r"(\d+)%", res.stdout)
+                if m:
+                    _cached_battery = f"{m.group(1)}%"
+                    return _cached_battery
+
+        # Termux fallback via termux-battery-status
+        if shutil.which("termux-battery-status"):
+            res = subprocess.run(["termux-battery-status"], capture_output=True, text=True, timeout=1, check=False)
+            if res.returncode == 0 and res.stdout:
+                import json
+
+                data = json.loads(res.stdout)
+                if "percentage" in data:
+                    _cached_battery = f"{data['percentage']}%"
+                    return _cached_battery
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
         pass
 
     _cached_battery = "N/A"
@@ -238,7 +258,7 @@ DEFAULT_CONFIG = {
         "example_boolean": True,
         "example_filepath": "{bashmenu_dir}",
         "example_string": "A string of text",
-        "localip": "[b]{command:hostname -I | awk '{print $1}'}[/b]",
+        "localip": "[b]{localip}[/b]",
         "postal_code": 49079,
     },
     "settings": {

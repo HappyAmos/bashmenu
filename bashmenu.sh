@@ -18,21 +18,90 @@ BASHMENU_SCRIPT="${SCRIPT_DIR}/bashmenu.py"
 BASHMENU_SETTINGS="${SCRIPT_DIR}/bashmenu.yml"
 GLOW_INSTALLER="${SCRIPT_DIR}/scripts/install_glow.sh"
 VENV_DIR="${SCRIPT_DIR}/.venv"
-VENV_ACTIVATE="${VENV_DIR}/bin/activate"
-# Define the standard CLI tools required
-REQUIRED_TOOLS=("curl" "git" "glow" "jq" "tput" "python3")
-MISSING_PACKAGES=()
-GLOW_IS_MISSING=false
 
-# Function to extract a value from a YAML file using yq or python3 fallback.
+# --------------------------------------------------------------------------
+# Multi-Platform Detection Engine
+# --------------------------------------------------------------------------
+PLATFORM="unknown"
+IS_TERMUX=false
+IS_WSL=false
+IS_MAC=false
+IS_WINDOWS=false
+IS_BSD=false
+IS_LINUX=false
+IS_RPI=false
+
+KERNEL="$(uname -s 2>/dev/null || echo "Unknown")"
+
+case "$KERNEL" in
+    Darwin)
+        PLATFORM="macos"; IS_MAC=true ;;
+    FreeBSD|OpenBSD|NetBSD)
+        PLATFORM="bsd"; IS_BSD=true ;;
+    MINGW*|MSYS*|CYGWIN*)
+        PLATFORM="windows"; IS_WINDOWS=true ;;
+    Linux)
+        if [ -n "$TERMUX_VERSION" ] || [[ "${PREFIX:-}" == *"/com.termux/"* ]]; then
+            PLATFORM="termux"; IS_TERMUX=true
+        elif grep -qi microsoft /proc/version 2>/dev/null; then
+            PLATFORM="wsl"; IS_WSL=true; IS_LINUX=true
+        else
+            PLATFORM="linux"; IS_LINUX=true
+        fi
+        if [ -f /sys/firmware/devicetree/base/model ] && grep -qi "raspberry pi" /sys/firmware/devicetree/base/model 2>/dev/null; then
+            IS_RPI=true
+        fi
+        ;;
+    *)
+        PLATFORM="unknown" ;;
+esac
+
+# Virtualenv activation path based on platform directory structure
+if [ -d "${VENV_DIR}/Scripts" ] || [ "$IS_WINDOWS" = true ]; then
+    VENV_ACTIVATE="${VENV_DIR}/Scripts/activate"
+else
+    VENV_ACTIVATE="${VENV_DIR}/bin/activate"
+fi
+
+# Define standard CLI tools required (glow eliminated via rich.sh | pager.sh)
+REQUIRED_TOOLS=("python3")
+MISSING_PACKAGES=()
+
+# Multi-layer in-house YAML value extractor (Python -> yq -> pure POSIX awk/grep)
 yaml_get() {
   local key="$1"
   local file="$2"
-  if command -v yq &>/dev/null; then
-      yq -r ".$key" "$file" 2>/dev/null || yq ".$key" "$file" 2>/dev/null || true
-  elif command -v python3 &>/dev/null; then
-      python3 -c "import yaml, sys; data=yaml.safe_load(open('$file')); keys='$key'.split('.'); [data := data.get(k, {}) for k in keys if isinstance(data, dict)]; print(data if not isinstance(data, dict) else '')" 2>/dev/null || true
+  [ ! -f "$file" ] && return 0
+
+  # Layer 1: Python PyYAML check
+  local py_cmd=""
+  if [ -f "${VENV_DIR}/bin/python3" ] && "${VENV_DIR}/bin/python3" -c "import yaml" &>/dev/null; then
+      py_cmd="${VENV_DIR}/bin/python3"
+  elif [ -f "${VENV_DIR}/Scripts/python.exe" ] && "${VENV_DIR}/Scripts/python.exe" -c "import yaml" &>/dev/null; then
+      py_cmd="${VENV_DIR}/Scripts/python.exe"
+  elif command -v python3 &>/dev/null && python3 -c "import yaml" &>/dev/null; then
+      py_cmd="python3"
+  elif command -v python &>/dev/null && python -c "import yaml" &>/dev/null; then
+      py_cmd="python"
   fi
+
+  if [ -n "$py_cmd" ]; then
+      "$py_cmd" -c "import yaml, sys; data=yaml.safe_load(open('$file')) or {}; keys='$key'.split('.'); [data := data.get(k, {}) for k in keys if isinstance(data, dict)]; print(data if not isinstance(data, dict) else '')" 2>/dev/null && return 0
+  fi
+
+  # Layer 2: yq if installed
+  if command -v yq &>/dev/null; then
+      local val
+      val=$(yq -r ".$key" "$file" 2>/dev/null || yq ".$key" "$file" 2>/dev/null || true)
+      if [ -n "$val" ] && [ "$val" != "null" ]; then
+          echo "$val"
+          return 0
+      fi
+  fi
+
+  # Layer 3: Pure POSIX awk/grep fallback for bootstrap scalar keys
+  local leaf_key="${key##*.}"
+  grep -E "^[[:space:]]*${leaf_key}:" "$file" 2>/dev/null | head -n 1 | awk -F': ' '{print $2}' | tr -d '"'\'' ' || true
 }
 
 # Resolve configurable cache directory
@@ -45,25 +114,17 @@ else
 fi
 export CACHE_DIR
 
-# Setup a cache directory
+# Setup cache directory
 mkdir -p "$CACHE_DIR" &>/dev/null || exit 1
 
-IS_TERMUX=false
-IS_WSL=false
-IS_MAC=false
-
-if [ -n "$TERMUX_VERSION" ] || [[ "$PREFIX" == *"/com.termux/"* ]]; then
-    IS_TERMUX=true
-elif grep -qi microsoft /proc/version 2>/dev/null; then
-    IS_WSL=true
-elif [ "$(uname)" = "Darwin" ]; then
-    IS_MAC=true
-fi
-
-# Detect the available package manager safely
+# Detect available package manager safely
 PKG_MANAGER=""
 if [ "$IS_TERMUX" = true ] && command -v pkg &> /dev/null; then
     PKG_MANAGER="pkg"
+elif [ "$IS_MAC" = true ] && command -v brew &> /dev/null; then
+    PKG_MANAGER="brew"
+elif [ "$IS_WINDOWS" = true ] && command -v pacman &> /dev/null; then
+    PKG_MANAGER="pacman"
 elif command -v apt-get &> /dev/null; then
     PKG_MANAGER="apt"
 elif command -v dnf &> /dev/null; then
@@ -83,17 +144,19 @@ fi
 # Flag to ensure package manager index update only runs once per execution
 APT_UPDATED=false
 
-# Function to execute a command with root privileges if necessary.
+# Function to execute a command with root privileges if necessary
 run_as_root() {
-    if [ "$IS_TERMUX" = true ] || [ "$IS_MAC" = true ]; then
+    if [ "$IS_TERMUX" = true ] || [ "$IS_MAC" = true ] || [ "$IS_WINDOWS" = true ]; then
         "$@"
     else
         if [ "$(id -u)" = 0 ]; then
             "$@"
         elif command -v sudo &>/dev/null; then
             sudo "$@"
+        elif command -v doas &>/dev/null; then
+            doas "$@"
         else
-            echo "Warning: Root privileges required but sudo is not available." >&2
+            echo "Warning: Root privileges required but sudo/doas is not available." >&2
             "$@"
         fi
     fi
@@ -214,51 +277,47 @@ install_shortcut() {
     fi
 }
 
-# Handle standalone CLI flags
-for arg in "$@"; do
-    case "$arg" in
-        --install-shortcut|--install-bm)
-            install_shortcut
-            exit $?
-            ;;
-        --install-man|--install-manpage)
-            install_man_page
-            exit $?
-            ;;
-    esac
-done
+
 
 # Map binary names to their respective installation package names based on the package manager
 get_package_name() {
     local binary="$1"
     
     case "$binary" in
-        "pip3")
+        "pip3"|"pip")
             if [ "$PKG_MANAGER" = "apt" ] || [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ] || [ "$PKG_MANAGER" = "zypper" ]; then
                 echo "python3-pip"
-            elif [ "$PKG_MANAGER" = "pacman" ] || [ "$PKG_MANAGER" = "pkg" ]; then
-                echo "python-pip"
+            elif [ "$PKG_MANAGER" = "pacman" ]; then
+                [ "$IS_WINDOWS" = true ] && echo "mingw-w64-x86_64-python-pip" || echo "python-pip"
+            elif [ "$PKG_MANAGER" = "pkg" ]; then
+                echo "python"
             elif [ "$PKG_MANAGER" = "apk" ]; then
                 echo "py3-pip"
+            elif [ "$PKG_MANAGER" = "brew" ]; then
+                echo ""
             else
-                echo "python3"
+                echo "python3-pip"
             fi
             ;;
         "venv")
             if [ "$PKG_MANAGER" = "apt" ]; then
                 echo "python3-venv"
-            elif [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ]; then
-                echo "python3-virtualenv"
-            elif [ "$PKG_MANAGER" = "zypper" ]; then
+            elif [ "$PKG_MANAGER" = "dnf" ] || [ "$PKG_MANAGER" = "yum" ] || [ "$PKG_MANAGER" = "zypper" ]; then
                 echo "python3-virtualenv"
             elif [ "$PKG_MANAGER" = "apk" ]; then
-                echo "python3"
+                echo "py3-virtualenv"
+            elif [ "$PKG_MANAGER" = "pkg" ] || [ "$PKG_MANAGER" = "brew" ]; then
+                echo ""
             else
-                echo "python3"
+                echo "python3-venv"
             fi
             ;;
-        "python3")
+        "python3"|"python")
             if [ "$PKG_MANAGER" = "pacman" ]; then
+                [ "$IS_WINDOWS" = true ] && echo "mingw-w64-x86_64-python" || echo "python"
+            elif [ "$PKG_MANAGER" = "pkg" ]; then
+                echo "python"
+            elif [ "$PKG_MANAGER" = "brew" ]; then
                 echo "python"
             else
                 echo "python3"
@@ -334,6 +393,56 @@ install_apps() {
     done
 }
 
+# If being sourced by tests or subshells, don't execute the main menu loop
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 0 2>/dev/null || true
+fi
+
+show_help() {
+    cat <<EOF
+Usage: $(basename "$0") [options]
+
+HA Bash Menu - Lightweight, cross-platform Textual TUI menu engine.
+
+Options:
+  -h, --help               Display this help message and exit
+  -v, --version            Display version information and exit
+  --check-env              Inspect platform detection, paths, and dependencies
+  --install-bm             Install global 'bm' command shortcut
+  --install-man            Install bashmenu.1 man page
+EOF
+}
+
+# Handle standalone CLI flags
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--version)
+            echo "bashmenu version 0.0.7"
+            exit 0
+            ;;
+        --check-env)
+            echo "Platform:     $PLATFORM (Kernel: $KERNEL)"
+            echo "Pkg Manager:  ${PKG_MANAGER:-none}"
+            echo "Cache Dir:    $CACHE_DIR"
+            echo "Venv Dir:     $VENV_DIR"
+            echo "Venv Active:  $VENV_ACTIVATE"
+            exit 0
+            ;;
+        --install-shortcut|--install-bm)
+            install_shortcut
+            exit $?
+            ;;
+        --install-man|--install-manpage)
+            install_man_page
+            exit $?
+            ;;
+    esac
+done
+
 # ==========================================================================
 # Dependency Checking Phase
 # ==========================================================================
@@ -342,30 +451,36 @@ install_apps() {
 for tool in "${REQUIRED_TOOLS[@]}"; do
     if ! is_installed "$tool"; then
         echo "  [✗] $tool is missing."
-        if [ "$tool" = "glow" ]; then
-            GLOW_IS_MISSING=true
-        else
-            pkg_name=$(get_package_name "$tool")
-            if [ -n "$pkg_name" ]; then
-                MISSING_PACKAGES+=("$pkg_name")
-            fi
+        pkg_name=$(get_package_name "$tool")
+        if [ -n "$pkg_name" ]; then
+            MISSING_PACKAGES+=("$pkg_name")
         fi
     fi
 done
 
-# Check Python internal pip3 binary status
-if ! is_installed "pip3"; then
-    echo "  [✗] pip3 is missing."
-    pkg_name=$(get_package_name "pip3")
-    [ -n "$pkg_name" ] && MISSING_PACKAGES+=("$pkg_name")
+# Check Python internal pip binary status (soft check on Termux/Mac)
+if [ "$IS_TERMUX" = false ] && [ "$IS_MAC" = false ]; then
+    if ! is_installed "pip3" && ! is_installed "pip" && ! python3 -m pip --version >/dev/null 2>&1; then
+        echo "  [✗] pip is missing."
+        pkg_name=$(get_package_name "pip3")
+        [ -n "$pkg_name" ] && MISSING_PACKAGES+=("$pkg_name")
+    fi
 fi
 
-# Check Python internal venv engine status
-if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1; then
-    echo "  [✗] python3 venv module is missing."
-    pkg_name=$(get_package_name "venv")
-    if [ -n "$pkg_name" ] && [[ ! " ${MISSING_PACKAGES[*]} " =~ " ${pkg_name} " ]]; then
-        MISSING_PACKAGES+=("$pkg_name")
+# Check Python internal venv engine status (omit ensurepip requirement on Termux)
+if [ "$IS_TERMUX" = true ]; then
+    if ! python3 -c "import venv" >/dev/null 2>&1; then
+        echo "  [✗] python venv module is missing."
+        pkg_name=$(get_package_name "venv")
+        [ -n "$pkg_name" ] && MISSING_PACKAGES+=("$pkg_name")
+    fi
+else
+    if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1; then
+        echo "  [✗] python3 venv module is missing."
+        pkg_name=$(get_package_name "venv")
+        if [ -n "$pkg_name" ] && [[ ! " ${MISSING_PACKAGES[*]} " =~ " ${pkg_name} " ]]; then
+            MISSING_PACKAGES+=("$pkg_name")
+        fi
     fi
 fi
 
@@ -381,12 +496,12 @@ if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
 fi
 
 # Trigger installation if elements are missing
-if [ ${#MISSING_PACKAGES[@]} -gt 0 ] || [ "$GLOW_IS_MISSING" = true ]; then
-    echo "Found missing dependencies."
+if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
+    echo "Found missing dependencies: ${MISSING_PACKAGES[*]}"
     read -p "Would you like to install the missing tools? [y/N]: " -n 1 -r
     echo ""
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-        # 1. Handle package manager updates first
+        # 1. Handle package manager updates
         if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
             if ! install_apps "${MISSING_PACKAGES[@]}"; then
                 echo "Package installation failed. Exiting script." >&2
@@ -394,27 +509,14 @@ if [ ${#MISSING_PACKAGES[@]} -gt 0 ] || [ "$GLOW_IS_MISSING" = true ]; then
             fi
         fi
 
-        # 2. Run custom installer specifically for Glow
-        if [ "$GLOW_IS_MISSING" = true ]; then
-            if [ -f "$GLOW_INSTALLER" ]; then
-                echo "Installing glow via custom script: $GLOW_INSTALLER"
-                chmod +x "$GLOW_INSTALLER"
-                if ! bash "$GLOW_INSTALLER"; then
-                    echo "Custom Glow installer exited with errors." >&2
-                fi
-            else
-                echo "Error: Glow custom script expected at $GLOW_INSTALLER but it is missing." >&2
-                exit 1
-            fi
-        fi
-
-        # 3. Perform global validation confirmation
+        # 2. Perform global validation confirmation
         ALL_VALID=true
         for tool in "${REQUIRED_TOOLS[@]}"; do
             if ! is_installed "$tool"; then ALL_VALID=false; fi
         done
-        if ! is_installed "pip3"; then ALL_VALID=false; fi
-        if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1; then ALL_VALID=false; fi
+        if [ "$IS_TERMUX" = false ] && ! python3 -c "import venv" >/dev/null 2>&1; then
+            ALL_VALID=false
+        fi
         
         if [ "$ALL_VALID" = true ]; then
             echo "All dependencies resolved successfully!"
@@ -492,39 +594,76 @@ if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1 && [ "$PKG_MANAGER" = "
     fi
 fi
 
+# Resolve venv python and pip paths across OS layouts
+resolve_venv_paths() {
+    if [ -d "${VENV_DIR}/Scripts" ] || [ "$IS_WINDOWS" = true ]; then
+        VENV_ACTIVATE="${VENV_DIR}/Scripts/activate"
+        VENV_PYTHON="${VENV_DIR}/Scripts/python.exe"
+        [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/Scripts/python"
+        VENV_PIP="${VENV_DIR}/Scripts/pip.exe"
+        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/Scripts/pip"
+    else
+        VENV_ACTIVATE="${VENV_DIR}/bin/activate"
+        VENV_PYTHON="${VENV_DIR}/bin/python3"
+        [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/bin/python"
+        VENV_PIP="${VENV_DIR}/bin/pip"
+        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/bin/pip3"
+    fi
+}
+resolve_venv_paths
+
 USE_VENV=false
 if [ -f "$VENV_ACTIVATE" ]; then
-    VENV_PYTHON="${VENV_DIR}/bin/python3"
-    [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/bin/python"
-    if "$VENV_PYTHON" -c "import yaml, ruff, textual, rich" >/dev/null 2>&1; then
+    if "$VENV_PYTHON" -c "import yaml, textual, rich" >/dev/null 2>&1; then
         USE_VENV=true
     else
-        echo "Virtual environment is broken or missing required packages (PyYAML, Ruff, Textual, Rich). Recreating..." >&2
+        echo "Virtual environment is missing required packages (PyYAML, Textual, Rich). Recreating..." >&2
         rm -rf "$VENV_DIR"
     fi
 fi
 
 if [ "$USE_VENV" = false ]; then
     echo "Setting up virtual environment at $VENV_DIR..." >&2
+    VENV_CREATED=false
     if python3 -m venv "$VENV_DIR" >/dev/null 2>&1; then
-        VENV_PIP="${VENV_DIR}/bin/pip"
-        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/bin/pip3"
-        if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
-            if "$VENV_PIP" install --upgrade pip >/dev/null 2>&1 && "$VENV_PIP" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1; then
-                USE_VENV=true
+        VENV_CREATED=true
+    elif [ "$IS_TERMUX" = true ] && python3 -m venv --without-pip "$VENV_DIR" >/dev/null 2>&1; then
+        VENV_CREATED=true
+    fi
+
+    if [ "$VENV_CREATED" = true ]; then
+        resolve_venv_paths
+        if [ -x "$VENV_PIP" ]; then
+            if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+                if "$VENV_PIP" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1 || "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1; then
+                    USE_VENV=true
+                else
+                    echo "Warning: Failed to install requirements inside virtual environment." >&2
+                fi
             else
-                echo "Warning: Failed to install requirements inside virtual environment." >&2
+                "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1 && USE_VENV=true
             fi
         else
-            echo "Warning: requirements.txt file not located. Environment left plain." >&2
-            USE_VENV=true
+            # Venv created without pip (e.g. Termux without ensurepip): check if system python has packages
+            if python3 -c "import yaml, textual, rich" >/dev/null 2>&1; then
+                USE_VENV=false
+            elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+                pip_cmd=$(command -v pip3 || command -v pip)
+                "$pip_cmd" install PyYAML textual rich >/dev/null 2>&1 || true
+            fi
         fi
     else
-        echo "Warning: Could not create virtual environment. Falling back to system Python." >&2
+        echo "Warning: Could not create virtual environment. Checking system Python packages..." >&2
+        if ! python3 -c "import yaml, textual, rich" >/dev/null 2>&1; then
+            if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+                pip_cmd=$(command -v pip3 || command -v pip)
+                "$pip_cmd" install PyYAML textual rich >/dev/null 2>&1 || true
+            fi
+        fi
     fi
 fi
 
-if [ "$USE_VENV" = true ]; then
+if [ "$USE_VENV" = true ] && [ -f "$VENV_ACTIVATE" ]; then
     # shellcheck source=/dev/null
     source "$VENV_ACTIVATE"
     PYTHON_BIN="python3"

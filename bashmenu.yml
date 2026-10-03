@@ -7,7 +7,7 @@ user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
   example_string: A string of text
-  localip: "[b]{command:hostname -I | awk '{print $1}'}[/b]"
+  localip: '[b]{localip}[/b]'
   postal_code: 49079
 settings:
   cache_dir: '{home}/.cache/bashmenu'

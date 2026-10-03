@@ -121,7 +121,7 @@ load_input() {
     # final newline and enforces MAX_LINES so an endless producer such as
     # `yes | pager.sh` cannot exhaust the filesystem.
     local status=0
-    if [ "${HAVE_FILES}" = "1" ]; then
+    if [ "${HAVE_FILES}" -ge 1 ]; then
         awk -v lim="${MAX_LINES}" '
             NR <= lim { print }
             END { if (NR > lim) exit 99 }
@@ -567,7 +567,7 @@ main() {
     SPOOL="$(mktemp "${TMPDIR:-/tmp}/pager.XXXXXX")" \
         || die "cannot create a temporary spool file"
 
-    if [ "${HAVE_FILES}" = "1" ]; then
+    if [ "${HAVE_FILES}" -ge 1 ]; then
         local f=""
         for f in "${FILES[@]}"; do
             [ -e "${f}" ] || die "no such file: ${f}"

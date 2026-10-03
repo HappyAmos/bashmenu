@@ -7,14 +7,24 @@
 
 IS_TERMUX=false
 IS_MAC=false
-if [ -n "$TERMUX_VERSION" ] || [[ "$PREFIX" == *"/com.termux/"* ]]; then
-    IS_TERMUX=true
-elif [ "$(uname)" = "Darwin" ]; then
-    IS_MAC=true
-fi
+IS_WINDOWS=false
+
+case "$(uname -s)" in
+    Darwin)
+        IS_MAC=true
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        IS_WINDOWS=true
+        ;;
+    Linux)
+        if [ -n "$TERMUX_VERSION" ] || [[ "${PREFIX:-}" == *"/com.termux/"* ]]; then
+            IS_TERMUX=true
+        fi
+        ;;
+esac
 
 run_as_root() {
-    if [ "$IS_TERMUX" = true ] || [ "$IS_MAC" = true ]; then
+    if [ "$IS_TERMUX" = true ] || [ "$IS_MAC" = true ] || [ "$IS_WINDOWS" = true ]; then
         "$@"
     else
         if [ "$(id -u)" = 0 ]; then

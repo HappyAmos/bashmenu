@@ -182,9 +182,46 @@ def get_scutil_dns():
         return None
 
 
+def get_android_dns():
+    """Query Android system DNS properties via getprop."""
+    bin_path = shutil.which("getprop")
+    if not bin_path:
+        return None
+
+    servers = []
+    try:
+        for prop in ["net.dns1", "net.dns2", "net.dns3", "net.dns4"]:
+            res = subprocess.run(
+                [bin_path, prop],
+                capture_output=True,
+                text=True,
+                timeout=1,
+                check=False,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                val = res.stdout.strip()
+                if not is_loopback(val) and val not in servers:
+                    servers.append(val)
+        return {"Android System": servers} if servers else None
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, AttributeError):
+        return None
+
+
 def collect_dns_data():
     """Collect DNS servers across discovery sources into structured data."""
     results = []
+
+    # Method 1: Query Android getprop (Termux)
+    android_data = get_android_dns()
+    if android_data:
+        for label, servers in android_data.items():
+            unique_servers = list(dict.fromkeys(servers))
+            if unique_servers:
+                results.append({
+                    "source": label,
+                    "interface": "N/A",
+                    "servers": unique_servers,
+                })
 
     # Method 1: Query systemd-resolved
     resolvectl_data = get_resolvectl_dns()

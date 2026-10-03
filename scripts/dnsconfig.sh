@@ -31,7 +31,17 @@ if [ "$(id -u)" -ne 0 ] && [ "$(uname)" != "Darwin" ]; then
   exit 1
 fi
 
+# Portable sed -i helper for Linux (GNU) and macOS/BSD
+sed_i() {
+    if [ "$(uname)" = "Darwin" ]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 echo "Starting DNS configuration..."
+
 
 # ------------------------------------------------------------------------------
 # 3. Argument Check & Assignment
@@ -121,8 +131,8 @@ if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-r
     echo "    Updating $RESOLVED_CONF..."
     [ ! -f "${RESOLVED_CONF}.bak" ] && cp "$RESOLVED_CONF" "${RESOLVED_CONF}.bak"
 
-    sed -i '/^DNS=/d' "$RESOLVED_CONF"
-    sed -i '/^FallbackDNS=/d' "$RESOLVED_CONF"
+    sed_i '/^DNS=/d' "$RESOLVED_CONF"
+    sed_i '/^FallbackDNS=/d' "$RESOLVED_CONF"
     echo "DNS=$DNS_IPV4_PRIMARY $DNS_IPV4_SECONDARY $DNS_IPV6_PRIMARY $DNS_IPV6_SECONDARY" >> "$RESOLVED_CONF"
 
     echo "    Restarting systemd-resolved..."
@@ -140,7 +150,7 @@ if command -v resolvconf >/dev/null 2>&1; then
     HEAD_FILE="/etc/resolvconf/resolv.conf.d/head"
     mkdir -p /etc/resolvconf/resolv.conf.d/
     echo "    Injecting DNS servers into $HEAD_FILE..."
-    sed -i '/nameserver/d' "$HEAD_FILE"
+    sed_i '/nameserver/d' "$HEAD_FILE"
     {
         echo "nameserver $DNS_IPV4_PRIMARY"
         echo "nameserver $DNS_IPV4_SECONDARY"

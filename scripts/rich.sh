@@ -61,16 +61,29 @@ export LESS="-R"
 WIDTH_ARGS=()
 if [ -t 1 ]; then
     WIDTH="$(tput cols 2>/dev/null || true)"
+    if [ -z "$WIDTH" ] || [ "$WIDTH" -le 0 ] 2>/dev/null; then
+        WIDTH="${COLUMNS:-}"
+    fi
+    if [ -z "$WIDTH" ] || [ "$WIDTH" -le 0 ] 2>/dev/null; then
+        WIDTH="$(stty size 2>/dev/null | awk '{print $2}')"
+    fi
     if [ -n "$WIDTH" ] && [ "$WIDTH" -gt 0 ] 2>/dev/null; then
         WIDTH_ARGS=("-w" "$WIDTH")
     fi
 fi
 
-# Pipe through less -R for interactive terminals, or stream directly if redirected
-if [ -t 1 ] && command -v less >/dev/null 2>&1; then
-    "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE" | less -R
-elif [ -t 1 ] && [ -n "$PAGER" ]; then
-    "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE" | $PAGER
+# Pipe through pager.sh for interactive terminals, or fallback to less -R, $PAGER, or raw stream
+if [ -t 1 ]; then
+    if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
+        "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE" | "${SCRIPT_DIR}/pager.sh"
+    elif command -v less >/dev/null 2>&1; then
+        "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE" | less -R
+    elif [ -n "$PAGER" ]; then
+        "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE" | $PAGER
+    else
+        "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE"
+    fi
 else
     "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" "$TARGET_FILE"
 fi
+

@@ -749,8 +749,17 @@ class EditorWidget(Widget):
 
 
 def get_system_clipboard() -> str | None:
-    """Read plain text from system clipboard using xclip, xsel, or wl-paste."""
-    for cmd in [["xclip", "-selection", "clipboard", "-o"], ["xsel", "--clipboard", "--output"], ["wl-paste"]]:
+    """Read plain text from system clipboard using platform tools (wl-paste, pbpaste, termux, xclip, xsel)."""
+    candidates = [
+        ["wl-paste", "--no-newline"],
+        ["wl-paste"],
+        ["pbpaste"],
+        ["termux-clipboard-get"],
+        ["xclip", "-selection", "clipboard", "-o"],
+        ["xsel", "--clipboard", "--output"],
+        ["powershell.exe", "-NoProfile", "-Command", "Get-Clipboard"],
+    ]
+    for cmd in candidates:
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=1, check=False)
             if res.returncode == 0 and res.stdout is not None:
@@ -761,10 +770,18 @@ def get_system_clipboard() -> str | None:
 
 
 def set_system_clipboard(text: str) -> bool:
-    """Copy text to system clipboard using xclip, xsel, or wl-copy."""
+    """Copy text to system clipboard using platform tools (wl-copy, pbcopy, termux, xclip, xsel, clip.exe)."""
     if text is None:
         return False
-    for cmd in [["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"], ["wl-copy"]]:
+    candidates = [
+        ["wl-copy"],
+        ["pbcopy"],
+        ["termux-clipboard-set"],
+        ["xclip", "-selection", "clipboard"],
+        ["xsel", "--clipboard", "--input"],
+        ["clip.exe"],
+    ]
+    for cmd in candidates:
         try:
             p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             p.communicate(input=text.encode("utf-8"), timeout=1)

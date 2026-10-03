@@ -65,7 +65,7 @@ while true; do
         3)  run_game nsnake ;;
         4)  run_game greed ;;
         5)  run_game moon-buggy ;;
-        6)  run_game nethack-console ;;
+        6)  run_game nethack-console || run_game nethack ;;
         7)  . "$SCRIPT_DIR"/asteroids.sh ;;
         *)  echo -e "\nInvalid choice! Please choose a number from 1 to 7, 'q' to exit." ;;
     esac

@@ -16,6 +16,22 @@ run_root() {
     fi
 }
 
+case "$OS_TYPE" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo "Detected Windows environment."
+        if command -v winget.exe >/dev/null 2>&1 || command -v winget >/dev/null 2>&1; then
+            winget install charmbracelet.glow || true
+            exit 0
+        elif command -v scoop >/dev/null 2>&1; then
+            scoop install glow
+            exit 0
+        else
+            echo "Notice: On Windows, install glow via 'winget install charmbracelet.glow' or 'scoop install glow'."
+            exit 0
+        fi
+        ;;
+esac
+
 if [ "$OS_TYPE" = "Darwin" ]; then
     # --- macOS Installation ---
     echo "Detected macOS. Checking for Homebrew..."
@@ -29,6 +45,13 @@ if [ "$OS_TYPE" = "Darwin" ]; then
 elif [ "$OS_TYPE" = "Linux" ]; then
     # --- Linux Installation ---
     
+    # Check for Termux (Android)
+    if [ -n "$TERMUX_VERSION" ] || [[ "${PREFIX:-}" == *"/com.termux/"* ]]; then
+        echo "Detected Termux environment. Installing via pkg..."
+        pkg install -y glow
+        exit 0
+    fi
+
     # Check for Debian/Ubuntu (APT)
     if [ -d /etc/apt ]; then
         echo "Detected Debian/Ubuntu-based system. Running APT setup..."

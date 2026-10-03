@@ -3,6 +3,40 @@
 # Detect OS
 OS_TYPE=$(uname -s)
 
+case "$OS_TYPE" in
+    MINGW*|MSYS*|CYGWIN*)
+        echo "=========================================="
+        echo "Windows detected. Installing Node.js..."
+        echo "=========================================="
+        if command -v winget.exe >/dev/null 2>&1 || command -v winget >/dev/null 2>&1; then
+            winget install OpenJS.NodeJS.LTS || true
+        else
+            echo "Please install Node.js via official installer: https://nodejs.org/"
+        fi
+        exit 0
+        ;;
+esac
+
+if [ -n "$TERMUX_VERSION" ] || [[ "${PREFIX:-}" == *"/com.termux/"* ]]; then
+    echo "=========================================="
+    echo "🤖 Termux (Android) detected. Installing Node.js LTS via pkg..."
+    echo "=========================================="
+    pkg install -y nodejs-lts || pkg install -y nodejs
+    echo "Node version: $(node -v 2>/dev/null || echo 'N/A')"
+    echo "npm version:  $(npm -v 2>/dev/null || echo 'N/A')"
+    exit 0
+fi
+
+run_root() {
+    if [ "$(id -u)" = "0" ]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
 if [ "$OS_TYPE" = "Darwin" ]; then
     echo "=========================================="
     echo "🍏 macOS detected. Setting up via Homebrew..."
@@ -43,22 +77,22 @@ elif [ "$OS_TYPE" = "Linux" ]; then
     # Determine Package Manager and install dependencies
     if command -v apt-get &> /dev/null; then
         echo "Detected Debian/Ubuntu-based system."
-        sudo apt-get update
-        sudo apt-get install -y curl git build-essential
+        run_root apt-get update
+        run_root apt-get install -y curl git build-essential
     elif command -v dnf &> /dev/null; then
         echo "Detected Fedora/RHEL-based system."
-        sudo dnf groupinstall -y "Development Tools"
-        sudo dnf install -y curl git
+        run_root dnf groupinstall -y "Development Tools"
+        run_root dnf install -y curl git
     elif command -v pacman &> /dev/null; then
         echo "Detected Arch Linux-based system."
-        sudo pacman -Syu --noconfirm base-devel curl git
+        run_root pacman -Syu --noconfirm base-devel curl git
     elif command -v apk &> /dev/null; then
         echo "Detected Alpine Linux-based system."
-        sudo apk add build-base curl git
+        run_root apk add build-base curl git
     elif command -v zypper &> /dev/null; then
         echo "Detected openSUSE-based system."
-        sudo zypper install -y -t pattern devel_basis
-        sudo zypper install -y curl git
+        run_root zypper install -y -t pattern devel_basis
+        run_root zypper install -y curl git
     else
         echo "Warning: Unknown package manager. Proceeding with NVM install anyway..."
     fi

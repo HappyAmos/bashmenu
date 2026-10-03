@@ -28,8 +28,13 @@ for i in {128..255}; do
     # Convert the decimal to an octal byte string
     octal_byte=$(printf '\\%03o' "$i")
     
-    # Use iconv to safely convert the CP437 byte into modern UTF-8 text
-    char=$(printf "%b" "$octal_byte" | iconv -f CP437 -t UTF-8 2>/dev/null)
+    # Use iconv or python to safely convert the CP437 byte into modern UTF-8 text
+    char=""
+    if command -v iconv >/dev/null 2>&1; then
+        char=$(printf "%b" "$octal_byte" | iconv -f CP437 -t UTF-8 2>/dev/null || true)
+    elif command -v python3 >/dev/null 2>&1; then
+        char=$(python3 -c "import sys; sys.stdout.write(bytes([$i]).decode('cp437', errors='replace'))" 2>/dev/null || true)
+    fi
     
     # Print the index and the converted symbol
     printf "%d:%s\t" "$i" "$char"

@@ -709,7 +709,7 @@ options:
 - type: divider
   length: '{window_width}'
   char: '{ascii:196}'
-- label: Help [glow -p bashmenu.md]
+- label: Help [rich.sh bashmenu.md]
   icon: "{nf::#f02d6:\u2753}"
   type: command
   action: '{scripts_dir}/rich.sh {bashmenu_dir}/bashmenu.md'
