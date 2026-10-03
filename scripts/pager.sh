@@ -85,7 +85,8 @@ Keys:
   SPACE f PgDn      Next page            b PgUp          Previous page
   Ctrl-D            Half page down       Ctrl-U          Half page up
   g Home            Jump to TOP          G End           Jump to BOT
-  h                 Toggle hint segment  q Q Ctrl-C Esc  Quit
+  e                 Open in editor       h               Toggle hint segment
+  q Q Ctrl-C Esc    Quit
 EOF
 }
 
@@ -159,7 +160,7 @@ resolve_start() {
 term_setup() {
     # Enter the alternate screen, hide the cursor, disable autowrap, and switch
     # the tty into raw mode with a 100ms read timeout so idle polling stays responsive.
-    STTY_ORIG="$(stty -g < /dev/tty)" || die "cannot control /dev/tty"
+    [ -z "${STTY_ORIG}" ] && { STTY_ORIG="$(stty -g < /dev/tty 2>/dev/null)" || die "cannot control /dev/tty"; }
     trap 'cleanup' EXIT INT TERM HUP
     trap 'NEED_RESIZE=1' WINCH
     TERM_SETUP=1
@@ -502,6 +503,59 @@ read_key() {
     return 0
 }
 
+get_editor() {
+    # Resolve the preferred text editor: $VISUAL, $EDITOR, or system fallbacks.
+    if [ -n "${VISUAL:-}" ]; then
+        printf '%s' "${VISUAL}"
+    elif [ -n "${EDITOR:-}" ]; then
+        printf '%s' "${EDITOR}"
+    elif command -v nano >/dev/null 2>&1; then
+        printf 'nano'
+    elif command -v vim >/dev/null 2>&1; then
+        printf 'vim'
+    elif command -v vi >/dev/null 2>&1; then
+        printf 'vi'
+    fi
+}
+
+open_in_editor() {
+    # Launch the user's default text editor on the current file, positioned at TOP_LINE.
+    if [ "${HAVE_FILES}" -eq 0 ]; then
+        MESSAGE="cannot edit piped input"
+        return 0
+    fi
+
+    local editor=""
+    editor="$(get_editor)"
+    if [ -z "${editor}" ]; then
+        MESSAGE="no editor found (set \$EDITOR or \$VISUAL)"
+        return 0
+    fi
+
+    # Temporarily restore the terminal for interactive editor execution.
+    printf '%s' "${ESC}[0m"
+    printf '%s' "${ESC}[?7h"
+    tput cnorm 2>/dev/null || printf '%s' "${ESC}[?25h"
+    tput rmcup 2>/dev/null || printf '%s' "${ESC}[?1049l"
+    stty "${STTY_ORIG}" < /dev/tty 2>/dev/null
+
+    if [ "${#FILES[@]}" -eq 1 ]; then
+        ${editor} "+${TOP_LINE}" "${FILES[0]}" < /dev/tty > /dev/tty 2>&1 || :
+    else
+        ${editor} "${FILES[@]}" < /dev/tty > /dev/tty 2>&1 || :
+    fi
+
+    # Re-initialize the alternate screen and raw input mode for the pager.
+    term_setup
+
+    # Reload input from the files in case modifications were saved.
+    load_input
+    TOTAL=$(( $(wc -l < "${SPOOL}") ))
+    clamp_top
+    query_size
+    printf '%s[2J' "${ESC}"
+}
+
 handle_key() {
     # Apply the decoded key to the window position, or request termination.
     # This case statement is the single extension point for new bindings.
@@ -517,6 +571,7 @@ handle_key() {
         CTRL_U) TOP_LINE=$(( TOP_LINE - PAGE_ROWS / 2 )) ;;
         HOME|g) TOP_LINE=1 ;;
         END|G) TOP_LINE=$(( TOTAL + 1 )) ;;
+        e|E) open_in_editor ;;
         h) SHOW_HELP=$(( 1 - SHOW_HELP )) ;;
         q|Q|CTRL_C|ESCAPE|EOF) DONE=1 ;;
         LEFT|RIGHT|ALT*) : ;;
@@ -591,7 +646,7 @@ main() {
         exit 0
     fi
 
-    HINTS="j/k line  SPACE pgDn  b pgUp  g/G top/bot  q/^C quit"
+    HINTS="j/k line  SPACE pgDn  b pgUp  e edit  g/G top/bot  q/^C quit"
 
     NEED_RESIZE=0
     query_size

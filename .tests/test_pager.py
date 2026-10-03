@@ -30,6 +30,7 @@ class TestPagerScript(unittest.TestCase):
         )
         self.assertEqual(res_help.returncode, 0)
         self.assertIn("Usage:", res_help.stdout)
+        self.assertIn("Open in editor", res_help.stdout)
 
         res_ver = subprocess.run(
             ["bash", PAGER_SCRIPT, "--version"],
@@ -257,6 +258,114 @@ class TestPagerScript(unittest.TestCase):
             os.close(master)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    def test_editor_shortcut_file(self):
+        """Verify pressing 'e' opens the file in $EDITOR and reloads modified content."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            tf.write("Initial line 1\nInitial line 2\n")
+            temp_path = tf.name
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as ef:
+            ef.write('#!/bin/sh\nfor arg in "$@"; do [ -f "$arg" ] && echo "Appended by editor" >> "$arg"; done\n')
+            editor_path = ef.name
+        os.chmod(editor_path, 0o755)
+
+        env = os.environ.copy()
+        env["EDITOR"] = editor_path
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                env=env,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.15)
+            os.write(master, b"e")
+            time.sleep(0.2)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("Appended by editor", text)
+
+            with open(temp_path, "r") as f:
+                content = f.read()
+            self.assertIn("Appended by editor", content)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(editor_path):
+                os.remove(editor_path)
+
+    def test_editor_shortcut_piped_input(self):
+        """Verify pressing 'e' on piped input shows 'cannot edit piped input' message."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        try:
+            proc = subprocess.Popen(
+                f"printf 'line 1\\nline 2\\n' | bash {PAGER_SCRIPT}",
+                shell=True,
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.2)
+            os.write(master, b"e")
+            time.sleep(0.1)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("cannot edit piped input", text)
+        finally:
+            os.close(master)
 
 
 if __name__ == "__main__":
