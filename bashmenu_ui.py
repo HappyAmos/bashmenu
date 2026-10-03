@@ -999,6 +999,7 @@ class MessageModalScreen(ModalScreen[None]):
         self.is_help = is_help
         self.no_formatting = no_formatting
         self.is_markdown = is_markdown
+        self._cached_anchor_lines = None
         if is_help:
             self.add_class("help_modal")
 
@@ -1012,7 +1013,7 @@ class MessageModalScreen(ModalScreen[None]):
                     yield Static(self.message, id="message")
                 elif self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
                     md_text = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
-                    yield TextualMarkdown(md_text, id="message", open_links=False)
+                    yield Static(Markdown(md_text, hyperlinks=True), id="message")
                 else:
                     content = formatting_to_rich_text(
                         str(self.message), theme=self.theme, no_formatting=self.no_formatting
@@ -1022,16 +1023,11 @@ class MessageModalScreen(ModalScreen[None]):
                 yield Button("OK", variant="primary", id="btn_ok")
             yield Label("[ENTER/ESC] Close", id="footer")
 
-    @on(TextualMarkdown.LinkClicked)
-    def on_markdown_link_clicked(self, event: TextualMarkdown.LinkClicked) -> None:
-        event.stop()
-        event.prevent_default()
-        href = event.href
+    def handle_link(self, href: str) -> None:
+        if not href:
+            return
         if href.startswith("#"):
-            anchor = href.lstrip("#")
-            with contextlib.suppress(Exception):
-                md = self.query_one("#message", TextualMarkdown)
-                md.goto_anchor(anchor)
+            self.goto_anchor(href.lstrip("#"))
         elif href.startswith(("http://", "https://")):
             script_path = os.path.join(os.path.dirname(__file__), "scripts", "webopen.sh")
             if os.path.exists(script_path) and os.access(script_path, os.X_OK):
@@ -1051,11 +1047,71 @@ class MessageModalScreen(ModalScreen[None]):
                     with contextlib.suppress(Exception):
                         with open(target_path, "r", encoding="utf-8") as f:
                             new_text = f.read()
-                        md = self.query_one("#message", TextualMarkdown)
-                        self.app.create_task(md.load(new_text))
+                        self.message = new_text
                         self.modal_title = os.path.basename(target_path)
                         with contextlib.suppress(Exception):
                             self.query_one("#title", Label).update(self.modal_title)
+                        msg_widget = self.query_one("#message", Static)
+                        msg_widget.update(Markdown(new_text, hyperlinks=True))
+                        self._cached_anchor_lines = None
+                        scroller = self.query_one("#scroll_container", VerticalScroll)
+                        scroller.scroll_to(y=0, animate=False)
+
+    def goto_anchor(self, anchor: str) -> None:
+        if not anchor:
+            return
+        try:
+            md = self.query_one("#message", TextualMarkdown)
+            md.goto_anchor(anchor)
+            return
+        except Exception:
+            pass
+
+        if self._cached_anchor_lines is None:
+            self._cached_anchor_lines = self._compute_anchor_lines()
+
+        norm_target = re.sub(r"[^a-zA-Z0-9]+", " ", anchor).lower().strip()
+        target_y = self._cached_anchor_lines.get(norm_target)
+        if target_y is None:
+            for k, y in self._cached_anchor_lines.items():
+                if k.startswith(norm_target) or norm_target.startswith(k):
+                    target_y = y
+                    break
+        if target_y is None:
+            tw = norm_target.split()
+            if len(tw) >= 2:
+                for k, y in self._cached_anchor_lines.items():
+                    kw = k.split()
+                    if len(kw) >= 2 and kw[:2] == tw[:2]:
+                        target_y = y
+                        break
+
+        if target_y is not None:
+            with contextlib.suppress(Exception):
+                scroller = self.query_one("#scroll_container", VerticalScroll)
+                scroller.scroll_to(y=max(0, target_y), animate=True)
+
+    def _compute_anchor_lines(self) -> dict[str, int]:
+        anchors: dict[str, int] = {}
+        with contextlib.suppress(Exception):
+            from rich.console import Console
+            c = Console(width=100)
+            text_str = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
+            lines = c.render_lines(Markdown(text_str, hyperlinks=True))
+            for y, line_segs in enumerate(lines):
+                line_str = "".join(s.text for s in line_segs).strip()
+                if not line_str or line_str.startswith("•") or line_str.startswith("-") or set(line_str).issubset(set("─-=")):
+                    continue
+                clean = re.sub(r"[^a-zA-Z0-9]+", " ", line_str).lower().strip()
+                if clean and clean not in anchors:
+                    anchors[clean] = y
+        return anchors
+
+    @on(TextualMarkdown.LinkClicked)
+    def on_markdown_link_clicked(self, event: TextualMarkdown.LinkClicked) -> None:
+        event.stop()
+        event.prevent_default()
+        self.handle_link(event.href)
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
@@ -1066,6 +1122,20 @@ class MessageModalScreen(ModalScreen[None]):
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
         if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
             self.dismiss(None)
+            return
+
+        link = None
+        style = getattr(event, "style", None)
+        if style and getattr(style, "link", None):
+            link = style.link
+        elif widget and hasattr(widget, "get_style_at"):
+            with contextlib.suppress(Exception):
+                st = widget.get_style_at(event.x, event.y)
+                if getattr(st, "link", None):
+                    link = st.link
+
+        if link:
+            self.handle_link(link)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id in ("btn_ok", "btn_close_x"):

@@ -167,7 +167,7 @@ class TestImprovements(unittest.TestCase):
         import asyncio
         from unittest.mock import MagicMock, patch
         from textual.app import App
-        from textual.widgets import Markdown as TextualMarkdown
+        from textual.widgets import Static
 
         sample_md = (
             "# Help Menu\n\n"
@@ -188,20 +188,17 @@ class TestImprovements(unittest.TestCase):
             async with app.run_test() as pilot:
                 modal = app.screen
                 self.assertIsInstance(modal, bashmenu_ui.MessageModalScreen)
-                md = modal.query_one("#message", TextualMarkdown)
-                self.assertIsNotNone(md)
-                self.assertFalse(md._open_links)
+                msg_widget = modal.query_one("#message")
+                self.assertIsNotNone(msg_widget)
 
-                # Test anchor link click
-                with patch.object(md, "goto_anchor") as mock_goto:
-                    event = TextualMarkdown.LinkClicked(md, "#section-2")
-                    modal.on_markdown_link_clicked(event)
+                # Test anchor link jump
+                with patch.object(modal, "goto_anchor") as mock_goto:
+                    modal.handle_link("#section-2")
                     mock_goto.assert_called_once_with("section-2")
 
                 # Test external link click
                 with patch("subprocess.Popen") as mock_popen, patch("webbrowser.open") as mock_wb:
-                    event = TextualMarkdown.LinkClicked(md, "https://example.com")
-                    modal.on_markdown_link_clicked(event)
+                    modal.handle_link("https://example.com")
                     self.assertTrue(mock_popen.called or mock_wb.called)
 
         asyncio.run(run_modal_links())
