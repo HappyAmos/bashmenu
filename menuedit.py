@@ -931,10 +931,11 @@ class ItemEditModal(ModalScreen[dict]):
             chk.display = mode_idx != 0
 
     def perform_save(self) -> None:
-        """Extract user input values from dialog form widgets and persist them to the item dictionary.
+        """Extract user input values from dialog form widgets and persist them.
 
-        Normalizes type-specific payload fields, handles execution mode mapping, and parses
-        integer tabstops and boolean checkbox flags before dismissing the modal.
+        Normalizes type-specific payload fields, prevents key shadowing across
+        dual action keys, handles execution mode mapping, and parses integer
+        tabstops and boolean checkbox flags before dismissing the modal.
         """
         item_type = self.item.get("type", "command")
         # 1. Handle divider items separately
@@ -958,45 +959,89 @@ class ItemEditModal(ModalScreen[dict]):
         new_start_dir = self.query_one("#inp_start_dir", Input).value.strip()
         new_tabstop = self.query_one("#inp_tabstop", Input).value.strip()
 
-        if "title" in self.item or not ("label" in self.item):
+        # Update title / label without allowing one to shadow the other
+        if "title" in self.item and "label" in self.item:
             self.item["title"] = new_title
-        else:
             self.item["label"] = new_title
+        elif "label" in self.item:
+            self.item["label"] = new_title
+        else:
+            self.item["title"] = new_title
 
+        # Update icon / glyph
         if new_icon:
-            self.item["icon"] = new_icon
+            if "icon" in self.item:
+                self.item["icon"] = new_icon
+            if "glyph" in self.item:
+                self.item["glyph"] = new_icon
+            if "icon" not in self.item and "glyph" not in self.item:
+                self.item["icon"] = new_icon
+        else:
+            self.item.pop("icon", None)
+            self.item.pop("glyph", None)
 
+        # Update action / command / script / file / key / python payload
+        action_type_map = {
+            "command": "command",
+            "script": "script",
+            "editor": "file",
+            "toggle": "key",
+            "config": "key",
+            "python": "python",
+        }
+        primary_key = action_type_map.get(item_type, "action")
         if new_action:
-            if item_type == "command":
-                self.item["command"] = new_action
-            elif item_type == "script":
-                self.item["script"] = new_action
-            elif item_type == "editor":
-                self.item["file"] = new_action
-            elif item_type in ["toggle", "config"]:
-                self.item["key"] = new_action
-            elif item_type == "python":
-                self.item["python"] = new_action
-            else:
+            updated_any = False
+            if "action" in self.item:
                 self.item["action"] = new_action
+                updated_any = True
+            if primary_key in self.item:
+                self.item[primary_key] = new_action
+                updated_any = True
+            if not updated_any:
+                self.item[primary_key] = new_action
+        else:
+            for k in ("action", "command", "script", "file", "key", "python"):
+                self.item.pop(k, None)
 
         if new_prompt:
             if item_type in ["message", "info", "popup"]:
                 self.item["message"] = new_prompt
+                if "prompt" in self.item:
+                    self.item["prompt"] = new_prompt
             else:
                 self.item["prompt"] = new_prompt
+                if "message" in self.item:
+                    self.item["message"] = new_prompt
+        else:
+            self.item.pop("message", None)
+            self.item.pop("prompt", None)
+            self.item.pop("text", None)
 
         if new_template:
             self.item["template"] = new_template
+        else:
+            self.item.pop("template", None)
+
         if new_target:
             self.item["target"] = new_target
+        else:
+            self.item.pop("target", None)
+
         if new_block_id:
             self.item["block_id"] = new_block_id
+        else:
+            self.item.pop("block_id", None)
+
         if new_start_dir:
             self.item["start_dir"] = new_start_dir
+        else:
+            self.item.pop("start_dir", None)
 
         if new_tabstop.isdigit():
             self.item["tabstop"] = int(new_tabstop)
+        elif not new_tabstop:
+            self.item.pop("tabstop", None)
 
         mode_container = self.query_one("#exec_mode_container", ExecModeContainer)
         if mode_container.selected_mode_idx == 0:  # Streaming

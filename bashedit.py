@@ -491,10 +491,12 @@ class EditorWidget(Widget):
         height = max(1, self.size.height or 20)
         width = max(1, self.size.width or 80)
 
+        max_top = max(0, len(self.lines) - 1)
         if self.cursor_y < self.top_line:
             self.top_line = self.cursor_y
         elif self.cursor_y >= self.top_line + height:
             self.top_line = self.cursor_y - height + 1
+        self.top_line = min(self.top_line, max_top)
 
         lineno_w = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
         visible_w = max(10, width - lineno_w)
@@ -522,9 +524,8 @@ class EditorWidget(Widget):
 
     def scroll_lines_down(self, count: int = 3) -> None:
         """Scroll the editor viewport down by count lines (navigate page down)."""
-        height = max(1, self.size.height or 20)
         total_lines = len(self._get_rendered_md_lines()) if self.show_markdown else len(self.lines)
-        max_top = max(0, total_lines - height)
+        max_top = max(0, total_lines - 1)
         if self.top_line >= max_top:
             return
         self.top_line = min(max_top, self.top_line + count)
@@ -1550,8 +1551,7 @@ class BashEditScreen(Screen):
                 self.update_status()
             elif event.key == "end":
                 total_lines = len(ed._get_rendered_md_lines())
-                height = max(1, ed.size.height or 20)
-                ed.top_line = max(0, total_lines - height)
+                ed.top_line = max(0, total_lines - 1)
                 ed.refresh()
                 self.update_status()
             elif (
@@ -1568,8 +1568,11 @@ class BashEditScreen(Screen):
             ed.refresh()
             self.update_status()
         elif event.key == "down":
-            ed.cursor_y = min(len(ed.lines) - 1, ed.cursor_y + 1)
-            ed.clamp_cursor()
+            if ed.cursor_y < len(ed.lines) - 1:
+                ed.cursor_y += 1
+                ed.clamp_cursor()
+            else:
+                ed.scroll_lines_down(1)
             ed.refresh()
             self.update_status()
         elif event.key == "left":

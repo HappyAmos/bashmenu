@@ -114,6 +114,15 @@ class TestImprovements(unittest.TestCase):
                 await pilot.press("pageup")
                 self.assertEqual(ed.top_line, 0)
 
+                # Test scrolling last line all the way to top of viewport
+                ed.scroll_lines_down(200)
+                self.assertEqual(ed.top_line, 99)
+                self.assertEqual(ed.cursor_y, 99)
+                lines_rendered = ed.render().plain.splitlines()
+                self.assertIn("Line 99", lines_rendered[0])
+                self.assertEqual(lines_rendered[1], "~")
+                self.assertNotIn("~Line 99", lines_rendered[0])
+
         asyncio.run(run_scroll_checks())
 
     def test_theme_submenu_divider(self):
@@ -446,6 +455,90 @@ class TestImprovements(unittest.TestCase):
         self.assertEqual(bashedit.get_contrast_neutral_color("#ffffff"), "black")
         self.assertTrue(bashedit.has_sufficient_contrast("#0000af", "#ffff00"))
         self.assertFalse(bashedit.has_sufficient_contrast("#0000af", "#000087"))
+
+    def test_item_edit_modal_perform_save_prevents_shadowing(self):
+        """Test ItemEditModal.perform_save() updates dual action keys.
+
+        Verifies that editing action payload updates both action and command
+        when present, preventing stale keys from shadowing new values.
+        """
+        import menuedit
+
+        # Simulate item with dual action keys (like item #9)
+        item = {
+            "label": "Help [glow -p bashmenu.md]",
+            "type": "command",
+            "action": "glow -p {bashmenu_dir}/bashmenu.md",
+            "command": "{scripts_dir}/rich.sh glow -p {bashmenu_dir}/bashmenu.md",
+        }
+        modal = menuedit.ItemEditModal(item)
+
+        dismissed = []
+        modal.dismiss = lambda res: dismissed.append(res)
+
+        widget_map = {
+            "#inp_title": type("Input", (), {"value": "Help Updated"})(),
+            "#inp_icon": type("Input", (), {"value": "{nf::#1234:}"})(),
+            "#inp_action": type(
+                "Input", (), {"value": "nano {bashmenu_dir}/bashmenu.md"}
+            )(),
+            "#inp_prompt": type("Input", (), {"value": ""})(),
+            "#inp_template": type("Input", (), {"value": ""})(),
+            "#inp_target": type("Input", (), {"value": ""})(),
+            "#inp_block_id": type("Input", (), {"value": ""})(),
+            "#inp_start_dir": type("Input", (), {"value": ""})(),
+            "#inp_tabstop": type("Input", (), {"value": "4"})(),
+            "#exec_mode_container": type("Container", (), {"selected_mode_idx": 1})(),
+            "#chk_alt_buffer": type("Checkbox", (), {"value": True})(),
+            "#chk_no_formatting": type("Checkbox", (), {"value": False})(),
+            "#chk_masked": type("Checkbox", (), {"value": False})(),
+            "#chk_refresh": type("Checkbox", (), {"value": False})(),
+            "#chk_show_whitespace": type("Checkbox", (), {"value": False})(),
+            "#chk_external": type("Checkbox", (), {"value": False})(),
+        }
+        modal.query_one = lambda selector, *args, **kwargs: widget_map[selector]
+
+        modal.perform_save()
+        self.assertEqual(len(dismissed), 1)
+        res = dismissed[0]
+        # Both action and command must be updated to the new action
+        self.assertEqual(res["action"], "nano {bashmenu_dir}/bashmenu.md")
+        self.assertEqual(res["command"], "nano {bashmenu_dir}/bashmenu.md")
+        self.assertEqual(res["label"], "Help Updated")
+
+        # Test single action key item (command type with only action)
+        item2 = {
+            "label": "Copilot",
+            "type": "command",
+            "action": "copilot",
+        }
+        modal2 = menuedit.ItemEditModal(item2)
+        dismissed2 = []
+        modal2.dismiss = lambda res: dismissed2.append(res)
+        widget_map["#inp_action"].value = "copilot --model gpt-4"
+        modal2.query_one = lambda selector, *args, **kwargs: widget_map[selector]
+        modal2.perform_save()
+        self.assertEqual(len(dismissed2), 1)
+        res2 = dismissed2[0]
+        self.assertEqual(res2["action"], "copilot --model gpt-4")
+        self.assertNotIn("command", res2)
+
+        # Test clearing action
+        widget_map["#inp_action"].value = ""
+        item3 = {
+            "label": "Test",
+            "type": "command",
+            "action": "old_action",
+            "command": "old_command",
+        }
+        modal3 = menuedit.ItemEditModal(item3)
+        dismissed3 = []
+        modal3.dismiss = lambda res: dismissed3.append(res)
+        modal3.query_one = lambda selector, *args, **kwargs: widget_map[selector]
+        modal3.perform_save()
+        res3 = dismissed3[0]
+        self.assertNotIn("action", res3)
+        self.assertNotIn("command", res3)
 
 
 if __name__ == "__main__":

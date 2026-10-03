@@ -712,9 +712,17 @@ options:
 - label: Help [glow -p bashmenu.md]
   icon: "{nf::#f02d6:\u2753}"
   type: command
-  action: glow -p {bashmenu_dir}/bashmenu.md
+  action: '{scripts_dir}/rich.sh {bashmenu_dir}/bashmenu.md'
   interactive: true
   quiet: true
+  tabstop: 4
+  stream: false
+  alt_buffer: true
+  no_formatting: false
+  masked: false
+  refresh: false
+  show_whitespace: false
+  external: false
 - label: Exit Menu
   icon: "{nf::#f0a48:\U0001F6AA}"
   type: exit
