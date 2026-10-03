@@ -16,11 +16,12 @@ from rich._palettes import EIGHT_BIT_PALETTE
 from rich.markdown import Markdown
 from rich.style import Style
 from rich.text import Text
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, OptionList, RichLog, Static
+from textual.widgets import Button, Input, Label, Markdown as TextualMarkdown, OptionList, RichLog, Static
 from textual.widgets.option_list import Option
 
 
@@ -773,7 +774,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
                 title.styles.color = css_title
 
     with contextlib.suppress(Exception):
-        msg = screen.query_one("#message", Static)
+        msg = screen.query_one("#message")
         msg_style = theme_dict.get("text")
         if msg_style and msg_style.color and msg_style.color.name:
             css_msg = parse_css_color(msg_style.color.name)
@@ -1007,18 +1008,54 @@ class MessageModalScreen(ModalScreen[None]):
                 yield Label(self.modal_title or "", id="title")
                 yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             with VerticalScroll(id="scroll_container"):
-                if isinstance(self.message, (Text, Markdown)):
-                    content = self.message
-                elif self.is_markdown:
-                    content = Markdown(str(self.message))
+                if isinstance(self.message, Text):
+                    yield Static(self.message, id="message")
+                elif self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
+                    md_text = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
+                    yield TextualMarkdown(md_text, id="message")
                 else:
                     content = formatting_to_rich_text(
                         str(self.message), theme=self.theme, no_formatting=self.no_formatting
                     )
-                yield Static(content, id="message")
+                    yield Static(content, id="message")
             with Horizontal(id="buttons"):
                 yield Button("OK", variant="primary", id="btn_ok")
             yield Label("[ENTER/ESC] Close", id="footer")
+
+    @on(TextualMarkdown.LinkClicked)
+    def on_markdown_link_clicked(self, event: TextualMarkdown.LinkClicked) -> None:
+        event.stop()
+        event.prevent_default()
+        href = event.href
+        if href.startswith("#"):
+            anchor = href.lstrip("#")
+            with contextlib.suppress(Exception):
+                md = self.query_one("#message", TextualMarkdown)
+                md.goto_anchor(anchor)
+        elif href.startswith(("http://", "https://")):
+            script_path = os.path.join(os.path.dirname(__file__), "scripts", "webopen.sh")
+            if os.path.exists(script_path) and os.access(script_path, os.X_OK):
+                subprocess.Popen([script_path, href], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                try:
+                    self.app.open_url(href)
+                except Exception:
+                    import webbrowser
+                    webbrowser.open(href)
+        else:
+            clean_path = href[7:] if href.startswith("file://") else href
+            base_dir = os.path.dirname(__file__)
+            target_path = clean_path if os.path.isabs(clean_path) else os.path.join(base_dir, clean_path)
+            if os.path.exists(target_path):
+                if target_path.endswith((".md", ".markdown")):
+                    with contextlib.suppress(Exception):
+                        with open(target_path, "r", encoding="utf-8") as f:
+                            new_text = f.read()
+                        md = self.query_one("#message", TextualMarkdown)
+                        self.app.create_task(md.load(new_text))
+                        self.modal_title = os.path.basename(target_path)
+                        with contextlib.suppress(Exception):
+                            self.query_one("#title", Label).update(self.modal_title)
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)

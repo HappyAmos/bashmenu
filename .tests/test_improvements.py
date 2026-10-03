@@ -155,9 +155,55 @@ class TestImprovements(unittest.TestCase):
                 modal = app.screen
                 self.assertIsInstance(modal, bashmenu_ui.MessageModalScreen)
                 msg_widget = modal.query_one("#message")
-                self.assertIsInstance(msg_widget.content, Markdown)
+                from textual.widgets import Markdown as TextualMarkdown
+                self.assertTrue(
+                    isinstance(msg_widget, TextualMarkdown)
+                    or isinstance(getattr(msg_widget, "content", None), Markdown)
+                )
 
         asyncio.run(run_f1_check())
+
+    def test_help_modal_link_clicked(self):
+        import asyncio
+        from unittest.mock import MagicMock, patch
+        from textual.app import App
+        from textual.widgets import Markdown as TextualMarkdown
+
+        sample_md = (
+            "# Help Menu\n\n"
+            "- [Jump to Section 2](#section-2)\n"
+            "- [Web](https://example.com)\n\n"
+            "## Section 2\n\n"
+            "Section 2 body."
+        )
+
+        class ModalApp(App):
+            def on_mount(self):
+                self.push_screen(
+                    bashmenu_ui.MessageModalScreen("Help", sample_md, is_markdown=True, is_help=True)
+                )
+
+        async def run_modal_links():
+            app = ModalApp()
+            async with app.run_test() as pilot:
+                modal = app.screen
+                self.assertIsInstance(modal, bashmenu_ui.MessageModalScreen)
+                md = modal.query_one("#message", TextualMarkdown)
+                self.assertIsNotNone(md)
+
+                # Test anchor link click
+                with patch.object(md, "goto_anchor") as mock_goto:
+                    event = TextualMarkdown.LinkClicked(md, "#section-2")
+                    modal.on_markdown_link_clicked(event)
+                    mock_goto.assert_called_once_with("section-2")
+
+                # Test external link click
+                with patch("subprocess.Popen") as mock_popen, patch("webbrowser.open") as mock_wb:
+                    event = TextualMarkdown.LinkClicked(md, "https://example.com")
+                    modal.on_markdown_link_clicked(event)
+                    self.assertTrue(mock_popen.called or mock_wb.called)
+
+        asyncio.run(run_modal_links())
 
     def test_bashedit_f12_markdown_toggle(self):
         import asyncio

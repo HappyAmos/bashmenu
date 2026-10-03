@@ -51,8 +51,12 @@ if ! "$PYTHON_BIN" -c "import rich" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Force Rich to preserve ANSI color codes through pipes
+# Force Rich to preserve ANSI color codes through pipes and generate hyperlinks
 export FORCE_COLOR=1
+if [ -z "$TERM" ] || [ "$TERM" = "dumb" ] || [ "$TERM" = "unknown" ]; then
+    export TERM="xterm-256color"
+fi
+export COLORTERM="${COLORTERM:-truecolor}"
 
 # Tell less to interpret raw ANSI color escape sequences
 export LESS="-R"
@@ -77,20 +81,20 @@ if [ -t 1 ]; then
     if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
         RELOAD_CMD="\"${SCRIPT_DIR}/rich.sh\" \"$TARGET_FILE\""
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" - | \
+            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" - | \
             "${SCRIPT_DIR}/pager.sh" --file="$TARGET_FILE" --reload-cmd="$RELOAD_CMD"
     elif command -v less >/dev/null 2>&1; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" - | less -R
+            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" - | less -R
     elif [ -n "$PAGER" ]; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" - | $PAGER
+            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" - | $PAGER
     else
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" -
+            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" -
     fi
 else
     sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-        "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" -
+        "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" -
 fi
 

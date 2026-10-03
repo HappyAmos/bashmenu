@@ -432,6 +432,116 @@ class TestPagerScript(unittest.TestCase):
             if os.path.exists(editor_path):
                 os.remove(editor_path)
 
+    def test_pager_search(self):
+        """Verify interactive search with / and jumping forward."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            for i in range(1, 40):
+                tf.write(f"Line {i}\n")
+            tf.write("Line 40 UNIQUE_SEARCH_KEYWORD\n")
+            for i in range(41, 100):
+                tf.write(f"Line {i}\n")
+            temp_path = tf.name
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.15)
+            os.write(master, b"/UNIQUE_SEARCH_KEYWORD\n")
+            time.sleep(0.2)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("UNIQUE_SEARCH_KEYWORD", text)
+            self.assertIn("/UNIQUE_SEARCH_KEYWORD", text)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_pager_link_navigation(self):
+        """Verify interactive link dialog and anchor jump with l key."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            tf.write("# Table of Contents\n\n")
+            tf.write("- [1. Target Section](#1-target-section)\n\n")
+            for i in range(1, 40):
+                tf.write(f"Filler line {i}\n")
+            tf.write("## 1. Target Section\n")
+            tf.write("Content of target section.\n")
+            temp_path = tf.name
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.15)
+            os.write(master, b"l")
+            time.sleep(0.15)
+            os.write(master, b"\n")
+            time.sleep(0.2)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("jumped to #1-target-section", text)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
 
 if __name__ == "__main__":
     unittest.main()

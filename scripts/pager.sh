@@ -54,6 +54,9 @@ HINTS=""
 FILES=()
 ORIGINAL_FILE=""
 RELOAD_CMD=""
+LAST_SEARCH=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ------------------------------------------------------------------ utilities
 
@@ -89,8 +92,9 @@ Keys:
   SPACE f PgDn      Next page            b PgUp          Previous page
   Ctrl-D            Half page down       Ctrl-U          Half page up
   g Home            Jump to TOP          G End           Jump to BOT
-  e                 Open in editor       h               Toggle hint segment
-  q Q Ctrl-C Esc    Quit
+  /                 Search forward       n / N           Next / prev match
+  l o               Follow / open link   e               Open in editor
+  h                 Toggle hint segment  q Q Ctrl-C Esc  Quit
 EOF
 }
 
@@ -421,7 +425,11 @@ grab_char() {
     # Read a single character from the controlling terminal into GRAB.
     # Returns 1 when the read timed out or the terminal went away.
     GRAB=""
-    IFS= read -rsn1 GRAB < /dev/tty || GRAB=""
+    local st=0
+    IFS= read -rsn1 GRAB < /dev/tty || st=$?
+    if [ "${st}" -eq 0 ] && [ -z "${GRAB}" ]; then
+        GRAB=$'\n'
+    fi
     [ -n "${GRAB}" ]
 }
 
@@ -575,6 +583,354 @@ open_in_editor() {
     printf '%s[2J' "${ESC}"
 }
 
+prompt_search() {
+    local query=""
+    printf '%s[%d;1H%s[7m/%s[K%s[0m' "${ESC}" "${ROWS}" "${ESC}" "${ESC}"
+    while :; do
+        if grab_char; then
+            case "${GRAB}" in
+                $'\n'|$'\r') break ;;
+                $'\033') return 0 ;;
+                $'\177'|$'\010')
+                    if [ "${#query}" -gt 0 ]; then
+                        query="${query:0:$(( ${#query} - 1 ))}"
+                    fi
+                    ;;
+                [[:print:]]) query="${query}${GRAB}" ;;
+            esac
+            printf '%s[%d;1H%s[7m/%s%s[K%s[0m' "${ESC}" "${ROWS}" "${ESC}" "${query}" "${ESC}" "${ESC}"
+        fi
+    done
+
+    if [ -n "${query}" ]; then
+        LAST_SEARCH="${query}"
+        search_forward "${LAST_SEARCH}" "$(( TOP_LINE + 1 ))"
+    fi
+}
+
+search_forward() {
+    local pat="$1" start="$2"
+    local hit=""
+    hit="$(awk -v top="${start}" -v pat="${pat}" '
+        BEGIN { IGNORECASE=1 }
+        NR >= top && tolower($0) ~ tolower(pat) { print NR; exit }
+    ' "${SPOOL}" 2>/dev/null)"
+    if [ -z "${hit}" ] && [ "${start}" -gt 1 ]; then
+        hit="$(awk -v pat="${pat}" '
+            BEGIN { IGNORECASE=1 }
+            tolower($0) ~ tolower(pat) { print NR; exit }
+        ' "${SPOOL}" 2>/dev/null)"
+    fi
+    if [ -n "${hit}" ]; then
+        TOP_LINE="${hit}"
+        MESSAGE="/${pat}"
+    else
+        MESSAGE="pattern not found: ${pat}"
+    fi
+}
+
+search_next() {
+    local dir="$1"
+    if [ -z "${LAST_SEARCH:-}" ]; then
+        MESSAGE="no previous search pattern"
+        return 0
+    fi
+    if [ "${dir}" = "1" ]; then
+        search_forward "${LAST_SEARCH}" "$(( TOP_LINE + 1 ))"
+    else
+        local hit=""
+        hit="$(awk -v top="$(( TOP_LINE - 1 ))" -v pat="${LAST_SEARCH}" '
+            BEGIN { IGNORECASE=1 }
+            NR <= top && tolower($0) ~ tolower(pat) { last = NR }
+            END { if (last) print last }
+        ' "${SPOOL}" 2>/dev/null)"
+        if [ -z "${hit}" ]; then
+            hit="$(awk -v pat="${LAST_SEARCH}" '
+                BEGIN { IGNORECASE=1 }
+                tolower($0) ~ tolower(pat) { last = NR }
+                END { if (last) print last }
+            ' "${SPOOL}" 2>/dev/null)"
+        fi
+        if [ -n "${hit}" ]; then
+            TOP_LINE="${hit}"
+            MESSAGE="?${LAST_SEARCH}"
+        else
+            MESSAGE="pattern not found: ${LAST_SEARCH}"
+        fi
+    fi
+}
+
+choose_link() {
+    local links_raw=""
+    if command -v python3 >/dev/null 2>&1; then
+        links_raw="$(python3 -c '
+import sys, re
+with open(sys.argv[1], "rb") as f:
+    raw_lines = f.readlines()
+
+osc8_re = re.compile(rb"\x1b\]8;[^\x1b\x07]*;([^\x1b\x07]+)\x1b\\(.*?)\x1b\]8;;\x1b\\", re.DOTALL)
+links = []
+for idx, line in enumerate(raw_lines, 1):
+    for m in osc8_re.finditer(line):
+        url = m.group(1).decode("utf-8", "ignore").strip()
+        raw_text = m.group(2)
+        clean = re.sub(rb"\x1b\[[0-9;?]*[a-zA-Z]", b"", raw_text).decode("utf-8", "ignore").strip()
+        if not clean:
+            clean = url
+        links.append((url, clean, idx))
+
+if not links:
+    md_re = re.compile(rb"\[([^\]]+)\]\(([^)]+)\)")
+    bare_re = re.compile(rb"https?://[^\s)\]]+")
+    for idx, line in enumerate(raw_lines, 1):
+        for m in md_re.finditer(line):
+            clean = m.group(1).decode("utf-8", "ignore").strip()
+            url = m.group(2).decode("utf-8", "ignore").strip()
+            links.append((url, clean, idx))
+        for m in bare_re.finditer(line):
+            url = m.group(0).decode("utf-8", "ignore").strip()
+            links.append((url, url, idx))
+
+consolidated = []
+for url, text, line in links:
+    if consolidated and consolidated[-1][0] == url and consolidated[-1][2] == line:
+        prev_url, prev_text, prev_line = consolidated[-1]
+        consolidated[-1] = (prev_url, (prev_text + " " + text).strip(), prev_line)
+    else:
+        consolidated.append((url, text, line))
+
+for url, text, line in consolidated:
+    print(f"{url}\t{text}\t{line}")
+' "${SPOOL}" 2>/dev/null)"
+    fi
+
+    if [ -z "${links_raw}" ]; then
+        MESSAGE="no links found in document"
+        return 0
+    fi
+
+    local link_urls=() link_texts=() link_lines=()
+    local url="" text="" line_no=""
+    while IFS=$'\t' read -r url text line_no; do
+        [ -z "${url}" ] && continue
+        link_urls+=("${url}")
+        link_texts+=("${text}")
+        link_lines+=("${line_no}")
+    done <<< "${links_raw}"
+
+    local count="${#link_urls[@]}"
+    if [ "${count}" -eq 0 ]; then
+        MESSAGE="no links found in document"
+        return 0
+    fi
+
+    local sel=0 offset=0 max_display=$(( ROWS - 4 ))
+    [ "${max_display}" -lt 3 ] && max_display=3
+
+    local i=0
+    for (( i=0; i<count; i++ )); do
+        if [ "${link_lines[i]}" -ge "${TOP_LINE}" ]; then
+            sel=$i
+            break
+        fi
+    done
+
+    while :; do
+        if [ "${sel}" -lt "${offset}" ]; then
+            offset="${sel}"
+        elif [ "${sel}" -ge $(( offset + max_display )) ]; then
+            offset=$(( sel - max_display + 1 ))
+        fi
+
+        printf '%s[2J%s[1;1H%s[7m── Follow Link (%d found, j/k/arrows, 1-9/Enter to select, ESC to cancel) ──%s[0m%s[K\n' \
+            "${ESC}" "${ESC}" "${ESC}" "${count}" "${ESC}" "${ESC}"
+
+        local row=2 d_idx=0
+        for (( d_idx=offset; d_idx<count && d_idx<offset+max_display; d_idx++ )); do
+            local num=$(( d_idx + 1 ))
+            local item_txt="${link_texts[d_idx]}"
+            local item_url="${link_urls[d_idx]}"
+            local display_str=" [${num}] ${item_txt} (${item_url})"
+            if [ "${#display_str}" -gt "$(( COLS - 2 ))" ]; then
+                display_str="${display_str:0:$(( COLS - 5 ))}..."
+            fi
+            if [ "${d_idx}" -eq "${sel}" ]; then
+                printf '%s[%d;1H%s[1;37;44m>%s%s[0m%s[K\n' "${ESC}" "${row}" "${ESC}" "${display_str}" "${ESC}" "${ESC}"
+            else
+                printf '%s[%d;1H  %s%s[0m%s[K\n' "${ESC}" "${row}" "${display_str}" "${ESC}" "${ESC}"
+            fi
+            row=$(( row + 1 ))
+        done
+
+        while [ "${row}" -lt "${ROWS}" ]; do
+            printf '%s[%d;1H%s[K\n' "${ESC}" "${row}" "${ESC}"
+            row=$(( row + 1 ))
+        done
+
+        printf '%s[%d;1H%s[7mSelect link [1-%d] or ENTER on selection (ESC to cancel): %s[K%s[0m' \
+            "${ESC}" "${ROWS}" "${ESC}" "${count}" "${ESC}" "${ESC}"
+
+        read_key
+        case "${KEY}" in
+            UP|k)
+                [ "${sel}" -gt 0 ] && sel=$(( sel - 1 ))
+                ;;
+            DOWN|j)
+                [ "${sel}" -lt $(( count - 1 )) ] && sel=$(( sel + 1 ))
+                ;;
+            ENTER)
+                break
+                ;;
+            [1-9])
+                local typed_num="${KEY}"
+                if [ "${count}" -ge 10 ] && grab_char; then
+                    case "${GRAB}" in
+                        [0-9]) typed_num="${typed_num}${GRAB}" ;;
+                        $'\n'|$'\r') : ;;
+                    esac
+                fi
+                local target_idx=$(( typed_num - 1 ))
+                if [ "${target_idx}" -ge 0 ] && [ "${target_idx}" -lt "${count}" ]; then
+                    sel="${target_idx}"
+                    break
+                fi
+                ;;
+            q|Q|ESCAPE|CTRL_C)
+                printf '%s[2J' "${ESC}"
+                return 0
+                ;;
+        esac
+    done
+
+    printf '%s[2J' "${ESC}"
+
+    local chosen_url="${link_urls[sel]}"
+    local chosen_text="${link_texts[sel]}"
+    local source_line="${link_lines[sel]}"
+
+    if [[ "${chosen_url}" == \#* ]]; then
+        local target_anchor="${chosen_url#\#}"
+        local dest_line=""
+        dest_line="$(python3 -c '
+import sys, re
+spool = sys.argv[1]
+anchor = sys.argv[2]
+text = sys.argv[3]
+source_line = int(sys.argv[4])
+
+def normalize(s):
+    if isinstance(s, bytes):
+        s = re.sub(rb"\x1b\[[0-9;?]*[a-zA-Z]", b"", s).decode("utf-8", "ignore")
+    else:
+        s = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", s)
+    return re.sub(r"[^a-zA-Z0-9]+", " ", s).lower().strip()
+
+with open(spool, "rb") as f:
+    lines = f.readlines()
+
+norm_text = normalize(text)
+norm_anchor = normalize(anchor)
+
+best_line = None
+best_score = -1
+
+for idx, raw in enumerate(lines[source_line:], source_line + 1):
+    clean = re.sub(rb"\x1b\[[0-9;?]*[a-zA-Z]", b"", raw).decode("utf-8", "ignore").strip()
+    if clean.startswith("•") or clean.startswith("-") or not clean:
+        continue
+    norm_line = normalize(raw)
+    if not norm_line:
+        continue
+
+    score = 0
+    if norm_line.startswith(norm_text) or (norm_text and norm_text.startswith(norm_line)):
+        score += 100
+    elif norm_line.startswith(norm_anchor) or (norm_anchor and norm_anchor.startswith(norm_line)):
+        score += 90
+    else:
+        tw = norm_text.split()
+        lw = norm_line.split()
+        if len(tw) >= 2 and lw[:2] == tw[:2]:
+            score += 80
+        elif len(tw) >= 1 and lw and lw[0] == tw[0]:
+            score += 40
+        common = set(tw) & set(lw)
+        score += len(common) * 5
+
+    if score > best_score and score >= 40:
+        best_score = score
+        best_line = idx
+        if score >= 90:
+            break
+
+if not best_line:
+    for idx, raw in enumerate(lines, 1):
+        clean = re.sub(rb"\x1b\[[0-9;?]*[a-zA-Z]", b"", raw).decode("utf-8", "ignore").strip()
+        if clean.startswith("•") or clean.startswith("-") or not clean:
+            continue
+        norm_line = normalize(raw)
+        if not norm_line:
+            continue
+        score = 0
+        if norm_line.startswith(norm_text) or (norm_text and norm_text.startswith(norm_line)):
+            score += 100
+        elif norm_line.startswith(norm_anchor) or (norm_anchor and norm_anchor.startswith(norm_line)):
+            score += 90
+        else:
+            tw = norm_text.split()
+            lw = norm_line.split()
+            if len(tw) >= 2 and lw[:2] == tw[:2]:
+                score += 80
+            common = set(tw) & set(lw)
+            score += len(common) * 5
+        if score > best_score and score >= 40:
+            best_score = score
+            best_line = idx
+            if score >= 90:
+                break
+
+if best_line:
+    print(best_line)
+' "${SPOOL}" "${target_anchor}" "${chosen_text}" "${source_line}" 2>/dev/null)"
+
+        if [ -n "${dest_line}" ] && [ "${dest_line}" -gt 0 ] 2>/dev/null; then
+            TOP_LINE="${dest_line}"
+            MESSAGE="jumped to ${chosen_url}"
+        else
+            MESSAGE="anchor not found: ${chosen_url}"
+        fi
+    elif [[ "${chosen_url}" == http://* ]] || [[ "${chosen_url}" == https://* ]]; then
+        local webopen="${PROJECT_ROOT}/scripts/webopen.sh"
+        if [ -x "${webopen}" ]; then
+            "${webopen}" "${chosen_url}" >/dev/null 2>&1 &
+        elif command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "${chosen_url}" >/dev/null 2>&1 &
+        else
+            python3 -m webbrowser "${chosen_url}" >/dev/null 2>&1 &
+        fi
+        MESSAGE="opened ${chosen_url}"
+    else
+        local clean_file="${chosen_url#file://}"
+        local full_file=""
+        if [ -e "${clean_file}" ]; then
+            full_file="${clean_file}"
+        elif [ -e "${PROJECT_ROOT}/${clean_file}" ]; then
+            full_file="${PROJECT_ROOT}/${clean_file}"
+        fi
+
+        if [ -n "${full_file}" ]; then
+            if [ -x "${PROJECT_ROOT}/scripts/rich.sh" ] && [[ "${full_file}" == *.md ]]; then
+                "${PROJECT_ROOT}/scripts/rich.sh" "${full_file}"
+            elif [ -x "${0}" ]; then
+                "${0}" "${full_file}"
+            fi
+            MESSAGE="viewed ${chosen_url}"
+        else
+            MESSAGE="file not found: ${chosen_url}"
+        fi
+    fi
+}
+
 handle_key() {
     # Apply the decoded key to the window position, or request termination.
     # This case statement is the single extension point for new bindings.
@@ -590,6 +946,10 @@ handle_key() {
         CTRL_U) TOP_LINE=$(( TOP_LINE - PAGE_ROWS / 2 )) ;;
         HOME|g) TOP_LINE=1 ;;
         END|G) TOP_LINE=$(( TOTAL + 1 )) ;;
+        /) prompt_search ;;
+        n) search_next 1 ;;
+        N) search_next -1 ;;
+        l|o) choose_link ;;
         e|E) open_in_editor ;;
         h) SHOW_HELP=$(( 1 - SHOW_HELP )) ;;
         q|Q|CTRL_C|ESCAPE|EOF) DONE=1 ;;
@@ -674,7 +1034,7 @@ main() {
         exit 0
     fi
 
-    HINTS="j/k line  SPACE pgDn  b pgUp  e edit  g/G top/bot  q/^C quit"
+    HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  e edit  q quit"
 
     NEED_RESIZE=0
     query_size
