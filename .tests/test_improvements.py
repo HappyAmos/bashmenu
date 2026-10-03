@@ -540,6 +540,179 @@ class TestImprovements(unittest.TestCase):
         self.assertNotIn("action", res3)
         self.assertNotIn("command", res3)
 
+    def test_menuedit_item_type_change_in_modal(self):
+        """Verify ItemEditModal allows changing item type, migrating action keys and updating display."""
+        import menuedit
+
+        # 1. Changing command to script
+        item_cmd = {
+            "title": "Run Script",
+            "type": "command",
+            "command": "run.sh",
+            "action": "run.sh",
+        }
+        modal = menuedit.ItemEditModal(item_cmd)
+        self.assertEqual(modal.current_type, "command")
+        self.assertIn("[CMD]", modal.get_type_display_str())
+
+        # Apply type change to script
+        modal.apply_type_change("script")
+        self.assertEqual(modal.current_type, "script")
+        self.assertIn("[SCR]", modal.get_type_display_str())
+        self.assertEqual(modal.get_title_bar_text(), "Edit Properties [SCRIPT]")
+        self.assertIn("script", modal.get_action_label_text().lower())
+
+        widget_map = {
+            "#inp_title": type("Input", (), {"value": "Run Script"})(),
+            "#inp_icon": type("Input", (), {"value": ""})(),
+            "#inp_action": type("Input", (), {"value": "{scripts_dir}/run.sh"})(),
+            "#inp_prompt": type("Input", (), {"value": ""})(),
+            "#inp_template": type("Input", (), {"value": ""})(),
+            "#inp_target": type("Input", (), {"value": ""})(),
+            "#inp_block_id": type("Input", (), {"value": ""})(),
+            "#inp_start_dir": type("Input", (), {"value": ""})(),
+            "#inp_tabstop": type("Input", (), {"value": "4"})(),
+            "#exec_mode_container": type("Container", (), {"selected_mode_idx": 2})(),
+            "#chk_alt_buffer": type("Checkbox", (), {"value": True})(),
+            "#chk_no_formatting": type("Checkbox", (), {"value": False})(),
+            "#chk_masked": type("Checkbox", (), {"value": False})(),
+            "#chk_refresh": type("Checkbox", (), {"value": False})(),
+            "#chk_show_whitespace": type("Checkbox", (), {"value": False})(),
+            "#chk_external": type("Checkbox", (), {"value": False})(),
+        }
+        modal.query_one = lambda selector, *args, **kwargs: widget_map[selector]
+
+        dismissed = []
+        modal.dismiss = lambda res: dismissed.append(res)
+        modal.perform_save()
+
+        self.assertEqual(len(dismissed), 1)
+        res = dismissed[0]
+        self.assertEqual(res["type"], "script")
+        self.assertEqual(res["script"], "{scripts_dir}/run.sh")
+        self.assertEqual(res["action"], "{scripts_dir}/run.sh")
+        self.assertNotIn("command", res)
+
+        # 2. Changing command to submenu
+        item_cmd2 = {"title": "Tools", "type": "command", "command": "tools.sh"}
+        modal2 = menuedit.ItemEditModal(item_cmd2)
+        modal2.apply_type_change("submenu")
+        modal2.query_one = lambda selector, *args, **kwargs: widget_map[selector]
+        dismissed2 = []
+        modal2.dismiss = lambda res: dismissed2.append(res)
+        modal2.perform_save()
+
+        res2 = dismissed2[0]
+        self.assertEqual(res2["type"], "submenu")
+        self.assertIn("submenu", res2)
+        self.assertIn("options", res2["submenu"])
+        self.assertEqual(res2["submenu"]["options"], [])
+
+    def test_menuedit_item_type_divider_transitions(self):
+        """Verify transitioning between divider and standard item types."""
+        import menuedit
+
+        # 1. Standard item to divider
+        item_cmd = {"title": "Separator Item", "type": "command", "command": "echo 1"}
+        modal = menuedit.ItemEditModal(item_cmd)
+        modal.apply_type_change("divider")
+        self.assertEqual(modal.current_type, "divider")
+
+        div_widgets = {
+            "#inp_char": type("Input", (), {"value": "═"})(),
+            "#inp_length": type("Input", (), {"value": "60"})(),
+        }
+        modal.query_one = lambda selector, *args, **kwargs: div_widgets[selector]
+
+        dismissed = []
+        modal.dismiss = lambda res: dismissed.append(res)
+        modal.perform_save()
+
+        self.assertEqual(len(dismissed), 1)
+        res = dismissed[0]
+        self.assertEqual(res["type"], "divider")
+        self.assertEqual(res["char"], "═")
+        self.assertEqual(res["length"], "60")
+        self.assertNotIn("command", res)
+        self.assertNotIn("title", res)
+
+        # 2. Divider to standard item
+        item_div = {"type": "divider", "char": "─", "length": "{window_width}"}
+        modal2 = menuedit.ItemEditModal(item_div)
+        self.assertEqual(modal2.current_type, "divider")
+        modal2.apply_type_change("command")
+        self.assertEqual(modal2.current_type, "command")
+
+        std_widgets = {
+            "#inp_title": type("Input", (), {"value": "New Command"})(),
+            "#inp_icon": type("Input", (), {"value": "star"})(),
+            "#inp_action": type("Input", (), {"value": "htop"})(),
+            "#inp_prompt": type("Input", (), {"value": ""})(),
+            "#inp_template": type("Input", (), {"value": ""})(),
+            "#inp_target": type("Input", (), {"value": ""})(),
+            "#inp_block_id": type("Input", (), {"value": ""})(),
+            "#inp_start_dir": type("Input", (), {"value": ""})(),
+            "#inp_tabstop": type("Input", (), {"value": "4"})(),
+            "#exec_mode_container": type("Container", (), {"selected_mode_idx": 2})(),
+            "#chk_alt_buffer": type("Checkbox", (), {"value": True})(),
+            "#chk_no_formatting": type("Checkbox", (), {"value": False})(),
+            "#chk_masked": type("Checkbox", (), {"value": False})(),
+            "#chk_refresh": type("Checkbox", (), {"value": False})(),
+            "#chk_show_whitespace": type("Checkbox", (), {"value": False})(),
+            "#chk_external": type("Checkbox", (), {"value": False})(),
+        }
+        modal2.query_one = lambda selector, *args, **kwargs: std_widgets[selector]
+
+        dismissed2 = []
+        modal2.dismiss = lambda res: dismissed2.append(res)
+        modal2.perform_save()
+
+        res2 = dismissed2[0]
+        self.assertEqual(res2["type"], "command")
+        self.assertEqual(res2["title"], "New Command")
+        self.assertEqual(res2["command"], "htop")
+        self.assertNotIn("char", res2)
+        self.assertNotIn("length", res2)
+
+    def test_menuedit_item_type_change_direct_action(self):
+        """Verify MenuEditScreen.action_change_item_type directly converts node data."""
+        import menuedit
+
+        screen = menuedit.MenuEditScreen(menu_file_path="/tmp/fake.mnu")
+        screen.menu_data = {
+            "title": "Main Menu",
+            "options": [
+                {"title": "Check Health", "type": "command", "command": "health.sh"},
+            ],
+        }
+
+        class MockNode:
+            def __init__(self, data):
+                self.data = data
+                self.label = ""
+
+        mock_node = MockNode(screen.menu_data["options"][0])
+        tree_mock = type("TreeMock", (), {"cursor_node": mock_node, "root": object()})()
+        screen.query_one = lambda selector, *args, **kwargs: tree_mock
+        screen.populate_tree = lambda **kw: None
+        screen.update_inspector = lambda item: None
+        screen.action_save_menu = lambda: None
+
+        pushed_screens = []
+        screen._app = type("DummyApp", (), {"push_screen": lambda self, s, cb: pushed_screens.append((s, cb))})()
+
+        screen.action_change_item_type()
+        self.assertEqual(len(pushed_screens), 1)
+        picker, callback = pushed_screens[0]
+        self.assertIsInstance(picker, menuedit.ItemTypePickerModal)
+
+        # Trigger callback with "script"
+        callback("script")
+        self.assertEqual(mock_node.data["type"], "script")
+        self.assertEqual(mock_node.data["script"], "health.sh")
+        self.assertNotIn("command", mock_node.data)
+        self.assertIn("[SCR]", mock_node.label)
+
 
 if __name__ == "__main__":
     unittest.main()

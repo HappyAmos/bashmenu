@@ -622,6 +622,19 @@ class ItemEditModal(ModalScreen[dict]):
         height: 3;
         margin-left: 1;
     }
+    #lbl_current_type {
+        height: 3;
+        content-align: left middle;
+        padding: 0 1;
+        width: 1fr;
+        color: $text;
+        text-style: bold;
+    }
+    #container_divider, #container_standard {
+        height: auto;
+        padding: 0;
+        margin: 0;
+    }
     Input {
         height: auto;
         min-height: 3;
@@ -695,6 +708,8 @@ class ItemEditModal(ModalScreen[dict]):
         Binding("s", "save_changes", "Save Changes"),
         Binding("ctrl+s", "save_changes", "Save Changes"),
         Binding("f2", "save_changes", "Save Changes"),
+        Binding("ctrl+t", "change_type", "Change Type"),
+        Binding("t", "change_type", "Change Type", show=False),
         Binding("ctrl+a", "lookup_ascii", "ASCII Table"),
         Binding("f3", "lookup_ascii", "ASCII Table"),
         Binding("ctrl+p", "show_placeholders", "Placeholders"),
@@ -703,45 +718,56 @@ class ItemEditModal(ModalScreen[dict]):
         Binding("question_mark", "show_help", "Help", show=False),
     ]
 
+    def _detect_item_type(self, item: dict) -> str:
+        if "type" in item:
+            return item["type"]
+        if "divider" in item or "char" in item:
+            return "divider"
+        if "submenu" in item:
+            return "submenu"
+        if "command" in item:
+            return "command"
+        if "script" in item:
+            return "script"
+        if "file" in item:
+            return "editor"
+        if "key" in item:
+            return "config"
+        if "python" in item:
+            return "python"
+        return "command"
+
+    def get_type_display_str(self) -> str:
+        badge = TYPE_BADGES.get(self.current_type, "[???]")
+        type_desc = dict(ITEM_TYPES).get(self.current_type, self.current_type)
+        return f"{badge} {type_desc}"
+
+    def get_title_bar_text(self) -> str:
+        return f"Edit Properties [{self.current_type.upper()}]"
+
+    def get_action_label_text(self) -> str:
+        action_labels = {
+            "command": "Shell Command (command):",
+            "script": "Script Path (script):",
+            "editor": "File to Edit (file):",
+            "config": "Configuration Key (key):",
+            "toggle": "Configuration Key (key):",
+            "python": "Python Expression / Routine (python):",
+            "submenu": "Submenu Action / Submenu Title:",
+        }
+        return action_labels.get(self.current_type, "Action / Command / Script / File / Key:")
+
     def __init__(self, item: dict, theme: dict | None = None):
         super().__init__()
         self.item = item.copy()
         self.theme = theme or {}
         self.selected_mode_idx = 0
+        self.current_type = self._detect_item_type(self.item)
+        self.original_type = self.current_type
 
     def compose(self) -> ComposeResult:
-        item_type = self.item.get("type", "command" if "command" in self.item else "submenu" if "submenu" in self.item else "unknown")
-
-        if item_type == "divider":
-            char_val = self.item.get("char", "{ascii:196}")
-            length_val = self.item.get("length", "{window_width}")
-            with Vertical(id="dialog"):
-                with Horizontal(id="title_bar"):
-                    yield Label("Edit Properties [DIVIDER]", id="title")
-                    yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-                with VerticalScroll(id="form_scroll"):
-                    yield Label("Repeating Character (char):", classes="field_label")
-                    yield Input(value=str(char_val), id="inp_char")
-                    yield Label("Length Directive (length):", classes="field_label")
-                    yield Input(value=str(length_val), id="inp_length")
-                    yield Label("Preview:", classes="field_label")
-                    yield Static("", id="lbl_divider_preview", classes="divider_preview_box")
-                with Horizontal(id="buttons"):
-                    yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
-                    yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
-                with Vertical(id="footer"):
-                    with Horizontal(classes="footer_row"):
-                        yield Label("[F1] Help", id="lbl_modal_help", classes="footer_item", markup=False)
-                        yield Label("|", classes="footer_sep", markup=False)
-                        yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
-                        yield Label("|", classes="footer_sep", markup=False)
-                        yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
-                    with Horizontal(classes="footer_row"):
-                        yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
-                        yield Label("|", classes="footer_sep", markup=False)
-                        yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
-            return
-
+        char_val = self.item.get("char", "{ascii:196}")
+        length_val = self.item.get("length", "{window_width}")
         title_val = self.item.get("title", self.item.get("label", ""))
         icon_val = self.item.get("icon", self.item.get("glyph", ""))
         action_val = self.item.get("action", self.item.get("command", self.item.get("script", self.item.get("file", self.item.get("key", self.item.get("python", ""))))))
@@ -760,63 +786,77 @@ class ItemEditModal(ModalScreen[dict]):
 
         with Vertical(id="dialog"):
             with Horizontal(id="title_bar"):
-                yield Label(f"Edit Properties [{item_type.upper()}]", id="title")
+                yield Label(self.get_title_bar_text(), id="title")
                 yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
 
             with VerticalScroll(id="form_scroll"):
-                yield Label("Title / Label:", classes="field_label")
-                yield Input(value=str(title_val), id="inp_title")
+                yield Label("Item Type:", classes="field_label", id="lbl_type_header")
+                with Horizontal(classes="field_row", id="row_item_type"):
+                    yield Label(self.get_type_display_str(), id="lbl_current_type")
+                    yield Button("Change Type [CTRL+T]", id="btn_change_type", variant="primary")
 
-                yield Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):", classes="field_label")
-                yield Input(value=str(icon_val), id="inp_icon")
+                with Vertical(id="container_divider"):
+                    yield Label("Repeating Character (char):", classes="field_label")
+                    yield Input(value=str(char_val), id="inp_char")
+                    yield Label("Length Directive (length):", classes="field_label")
+                    yield Input(value=str(length_val), id="inp_length")
+                    yield Label("Preview:", classes="field_label")
+                    yield Static("", id="lbl_divider_preview", classes="divider_preview_box")
 
-                yield Label("Action / Command / Script / File / Key:", classes="field_label")
-                with Horizontal(classes="field_row"):
-                    yield Input(value=str(action_val), id="inp_action")
-                    yield Button("Browse", id="btn_browse_action", variant="primary")
+                with Vertical(id="container_standard"):
+                    yield Label("Title / Label:", classes="field_label")
+                    yield Input(value=str(title_val), id="inp_title")
 
-                yield Label("Message / Prompt Text:", classes="field_label")
-                yield Input(value=str(prompt_val), id="inp_prompt")
+                    yield Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):", classes="field_label")
+                    yield Input(value=str(icon_val), id="inp_icon")
 
-                yield Label("Template Path (inject_block):", classes="field_label")
-                with Horizontal(classes="field_row"):
-                    yield Input(value=str(template_val), id="inp_template")
-                    yield Button("Browse", id="btn_browse_template", variant="primary")
+                    yield Label(self.get_action_label_text(), classes="field_label", id="lbl_action")
+                    with Horizontal(classes="field_row"):
+                        yield Input(value=str(action_val), id="inp_action")
+                        yield Button("Browse", id="btn_browse_action", variant="primary")
 
-                yield Label("Target Path (inject_block):", classes="field_label")
-                with Horizontal(classes="field_row"):
-                    yield Input(value=str(target_val), id="inp_target")
-                    yield Button("Browse", id="btn_browse_target", variant="primary")
+                    yield Label("Message / Prompt Text:", classes="field_label")
+                    yield Input(value=str(prompt_val), id="inp_prompt")
 
-                yield Label("Block ID (inject_block):", classes="field_label")
-                yield Input(value=str(block_id_val), id="inp_block_id")
+                    yield Label("Template Path (inject_block):", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(value=str(template_val), id="inp_template")
+                        yield Button("Browse", id="btn_browse_template", variant="primary")
 
-                yield Label("Start Directory ({file_picker} / {dir_picker}):", classes="field_label")
-                with Horizontal(classes="field_row"):
-                    yield Input(value=str(start_dir_val), id="inp_start_dir")
-                    yield Button("Browse", id="btn_browse_start_dir", variant="primary")
+                    yield Label("Target Path (inject_block):", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(value=str(target_val), id="inp_target")
+                        yield Button("Browse", id="btn_browse_target", variant="primary")
 
-                yield Label("Tabstop:", classes="field_label")
-                yield Input(value=str(tabstop_val), id="inp_tabstop")
+                    yield Label("Block ID (inject_block):", classes="field_label")
+                    yield Input(value=str(block_id_val), id="inp_block_id")
 
-                yield Label("Execution Mode:", classes="field_label")
-                yield ExecModeContainer(selected_mode_idx=initial_mode_idx, id="exec_mode_container")
+                    yield Label("Start Directory ({file_picker} / {dir_picker}):", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(value=str(start_dir_val), id="inp_start_dir")
+                        yield Button("Browse", id="btn_browse_start_dir", variant="primary")
 
-                chk_alt = Checkbox(
-                    "Run in Alternate Screen Buffer (alt_buffer=true)",
-                    value=bool(self.item.get("alt_buffer", True)),
-                    id="chk_alt_buffer",
-                )
-                chk_alt.display = initial_mode_idx != 0
-                yield chk_alt
-                yield Checkbox("Disable Formatting (no_formatting=true)", value=bool(self.item.get("no_formatting", False)), id="chk_no_formatting")
-                yield Checkbox("Mask Input (masked=true)", value=bool(self.item.get("masked", False)), id="chk_masked")
-                yield Checkbox("Refresh Environment (refresh=true)", value=bool(self.item.get("refresh", False)), id="chk_refresh")
-                yield Checkbox("Show Whitespace in Editor (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_show_whitespace")
-                yield Checkbox("External Execution (external=true)", value=bool(self.item.get("external", False)), id="chk_external")
+                    yield Label("Tabstop:", classes="field_label")
+                    yield Input(value=str(tabstop_val), id="inp_tabstop")
 
-                yield Label("Preview:", classes="field_label")
-                yield Static("", id="lbl_item_preview", classes="divider_preview_box")
+                    yield Label("Execution Mode:", classes="field_label")
+                    yield ExecModeContainer(selected_mode_idx=initial_mode_idx, id="exec_mode_container")
+
+                    chk_alt = Checkbox(
+                        "Run in Alternate Screen Buffer (alt_buffer=true)",
+                        value=bool(self.item.get("alt_buffer", True)),
+                        id="chk_alt_buffer",
+                    )
+                    chk_alt.display = initial_mode_idx != 0
+                    yield chk_alt
+                    yield Checkbox("Disable Formatting (no_formatting=true)", value=bool(self.item.get("no_formatting", False)), id="chk_no_formatting")
+                    yield Checkbox("Mask Input (masked=true)", value=bool(self.item.get("masked", False)), id="chk_masked")
+                    yield Checkbox("Refresh Environment (refresh=true)", value=bool(self.item.get("refresh", False)), id="chk_refresh")
+                    yield Checkbox("Show Whitespace in Editor (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_show_whitespace")
+                    yield Checkbox("External Execution (external=true)", value=bool(self.item.get("external", False)), id="chk_external")
+
+                    yield Label("Preview:", classes="field_label")
+                    yield Static("", id="lbl_item_preview", classes="divider_preview_box")
 
             with Horizontal(id="buttons"):
                 yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
@@ -828,8 +868,10 @@ class ItemEditModal(ModalScreen[dict]):
                     yield Label("|", classes="footer_sep", markup=False)
                     yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
                     yield Label("|", classes="footer_sep", markup=False)
-                    yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
+                    yield Label("[CTRL+T] Type", id="lbl_modal_type", classes="footer_item", markup=False)
                 with Horizontal(classes="footer_row"):
+                    yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
                     yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
                     yield Label("|", classes="footer_sep", markup=False)
                     yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
@@ -845,10 +887,35 @@ class ItemEditModal(ModalScreen[dict]):
         with contextlib.suppress(Exception):
             bashmenu_ui.apply_button_theme(self.query_one("#btn_save", Button), theme=self.theme, button_type="button_primary")
             bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_cancel")
-        if self.item.get("type") == "divider":
+            bashmenu_ui.apply_button_theme(self.query_one("#btn_change_type", Button), theme=self.theme, button_type="button_primary")
+        self.update_type_visibility()
+
+    def update_type_visibility(self) -> None:
+        is_div = self.current_type == "divider"
+        with contextlib.suppress(Exception):
+            self.query_one("#container_divider", Vertical).display = is_div
+            self.query_one("#container_standard", Vertical).display = not is_div
+        if is_div:
             self.update_divider_preview()
         else:
             self.update_item_preview()
+
+    def action_change_type(self) -> None:
+        def type_cb(selected_type: str | None) -> None:
+            if not selected_type or selected_type == self.current_type:
+                return
+            self.apply_type_change(selected_type)
+
+        self.app.push_screen(ItemTypePickerModal(theme=self.theme), type_cb)
+
+    def apply_type_change(self, new_type: str) -> None:
+        self.current_type = new_type
+        self.item["type"] = new_type
+        with contextlib.suppress(Exception):
+            self.query_one("#title", Label).update(self.get_title_bar_text())
+            self.query_one("#lbl_current_type", Label).update(self.get_type_display_str())
+            self.query_one("#lbl_action", Label).update(self.get_action_label_text())
+        self.update_type_visibility()
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -859,6 +926,8 @@ class ItemEditModal(ModalScreen[dict]):
             self.action_show_help()
         elif lbl_id == "lbl_modal_save":
             self.action_save_changes()
+        elif lbl_id == "lbl_modal_type":
+            self.action_change_type()
         elif lbl_id == "lbl_modal_ascii":
             self.action_lookup_ascii()
         elif lbl_id == "lbl_modal_placeholders":
@@ -937,16 +1006,28 @@ class ItemEditModal(ModalScreen[dict]):
         dual action keys, handles execution mode mapping, and parses integer
         tabstops and boolean checkbox flags before dismissing the modal.
         """
-        item_type = self.item.get("type", "command")
+        item_type = getattr(self, "current_type", self.item.get("type", "command"))
+        self.item["type"] = item_type
+
         # 1. Handle divider items separately
         if item_type == "divider":
+            char_val = "{ascii:196}"
+            length_val = "{window_width}"
+            with contextlib.suppress(Exception):
+                char_val = self.query_one("#inp_char", Input).value.strip() or "{ascii:196}"
+            with contextlib.suppress(Exception):
+                length_val = self.query_one("#inp_length", Input).value.strip() or "{window_width}"
             self.item = {
                 "type": "divider",
-                "char": self.query_one("#inp_char", Input).value.strip() or "{ascii:196}",
-                "length": self.query_one("#inp_length", Input).value.strip() or "{window_width}",
+                "char": char_val,
+                "length": length_val,
             }
             self.dismiss(self.item)
             return
+
+        # Pop divider keys if transitioning from divider to standard item
+        self.item.pop("char", None)
+        self.item.pop("length", None)
 
         # 2. Extract standard input field strings
         new_title = self.query_one("#inp_title", Input).value.strip()
@@ -990,6 +1071,21 @@ class ItemEditModal(ModalScreen[dict]):
             "python": "python",
         }
         primary_key = action_type_map.get(item_type, "action")
+        orig_type = getattr(self, "original_type", item_type)
+
+        if item_type != orig_type:
+            old_pk = action_type_map.get(orig_type)
+            if old_pk and old_pk != primary_key:
+                had_old = old_pk in self.item
+                self.item.pop(old_pk, None)
+                if had_old and primary_key != "action":
+                    self.item[primary_key] = new_action
+
+            if item_type == "submenu":
+                self.item.setdefault("submenu", {"title": new_title or "Submenu", "options": []})
+            elif orig_type == "submenu":
+                self.item.pop("submenu", None)
+
         if new_action:
             updated_any = False
             if "action" in self.item:
@@ -1074,6 +1170,8 @@ class ItemEditModal(ModalScreen[dict]):
         btn_id = event.button.id
         if btn_id == "btn_close_x":
             self.dismiss(None)
+        elif btn_id == "btn_change_type":
+            self.action_change_type()
         elif btn_id == "btn_browse_action":
             def file_cb(path):
                 if path:
@@ -1280,6 +1378,7 @@ class MenuEditScreen(Screen):
         Binding("a", "add_item", "Add Item"),
         Binding("e", "edit_item", "Edit Item"),
         Binding("enter", "edit_item", "Edit Item"),
+        Binding("t", "change_item_type", "Change Type"),
         Binding("space", "toggle_tree_node", "Expand/Collapse", show=False),
         Binding("d", "delete_item", "Delete Item"),
         Binding("m", "move_down", "Move Down"),
@@ -1338,6 +1437,8 @@ class MenuEditScreen(Screen):
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[e/ENTER] Edit", id="lbl_edit", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[t] Type", id="lbl_type", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[SPACE] Toggle", id="lbl_toggle", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[d] Delete", id="lbl_delete", classes="footer_item", markup=False)
@@ -1391,6 +1492,8 @@ class MenuEditScreen(Screen):
             self.action_add_item()
         elif lbl_id == "lbl_edit":
             self.action_edit_item()
+        elif lbl_id == "lbl_type":
+            self.action_change_item_type()
         elif lbl_id == "lbl_toggle":
             self.action_toggle_tree_node()
         elif lbl_id == "lbl_delete":
@@ -1804,6 +1907,7 @@ class MenuEditScreen(Screen):
 
         def save_cb(updated_item):
             if updated_item:
+                old_type = node.data.get("type")
                 node.data.clear()
                 node.data.update(updated_item)
                 item_type = updated_item.get("type", "command")
@@ -1811,11 +1915,69 @@ class MenuEditScreen(Screen):
                 title = updated_item.get("title") or updated_item.get("label") or updated_item.get("divider") or "Divider"
                 node.label = f"{badge} {title}"
                 self.modified = True
+                if item_type == "submenu" or old_type == "submenu":
+                    self.populate_tree(target_item=node.data)
+                else:
+                    tree.refresh()
                 self.update_inspector(node.data)
                 self.action_save_menu()
-                tree.refresh()
 
         self.app.push_screen(ItemEditModal(node.data, theme=self.theme_styles), save_cb)
+
+    def action_change_item_type(self) -> None:
+        tree = self.query_one("#tree", Tree)
+        node = tree.cursor_node
+        if not node or not node.data or node == tree.root:
+            return
+
+        def type_cb(selected_type: str | None) -> None:
+            if not selected_type:
+                return
+            item = node.data
+            orig_type = item.get("type", "command")
+            if orig_type == selected_type:
+                return
+
+            action_type_map = {
+                "command": "command",
+                "script": "script",
+                "editor": "file",
+                "toggle": "key",
+                "config": "key",
+                "python": "python",
+            }
+            item["type"] = selected_type
+            if selected_type == "divider":
+                item.setdefault("char", "{ascii:196}")
+                item.setdefault("length", "{window_width}")
+            else:
+                item.pop("char", None)
+                item.pop("length", None)
+                old_pk = action_type_map.get(orig_type)
+                new_pk = action_type_map.get(selected_type)
+                if old_pk and old_pk != new_pk and old_pk in item:
+                    val = item.pop(old_pk)
+                    if new_pk:
+                        item[new_pk] = val
+
+                if selected_type == "submenu":
+                    item.setdefault("submenu", {"title": item.get("title") or item.get("label") or "Submenu", "options": []})
+                elif orig_type == "submenu":
+                    item.pop("submenu", None)
+
+            badge = TYPE_BADGES.get(selected_type, "[???]")
+            title = item.get("title") or item.get("label") or item.get("divider") or "Divider"
+            node.label = f"{badge} {title}"
+            self.modified = True
+            self.populate_tree(target_item=node.data)
+            self.update_inspector(node.data)
+            self.action_save_menu()
+        app_obj = getattr(self, "_app", None)
+        if not app_obj:
+            with contextlib.suppress(Exception):
+                app_obj = self.app
+        if app_obj:
+            app_obj.push_screen(ItemTypePickerModal(theme=self.theme_styles), type_cb)
 
     def action_add_item(self) -> None:
         tree = self.query_one("#tree", Tree)
