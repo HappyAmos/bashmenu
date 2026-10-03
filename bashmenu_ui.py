@@ -88,7 +88,23 @@ PLACEHOLDER_SECTIONS = [
             ("{bashrc}", "Path to ~/.bashrc profile file"),
             ("{bash_aliases}", "Path to ~/.bash_aliases file"),
             ("{zshrc}", "Path to ~/.zshrc configuration file"),
+            ("{profile}", "Path to ~/.profile (or existing profile)"),
+            ("{bash_profile}", "Path to ~/.bash_profile (or existing profile)"),
+            ("{zprofile}", "Path to ~/.zprofile configuration file"),
+            ("{shell_profile}", "Path to active shell login profile"),
             ("{vimrc}", "Path to ~/.vimrc configuration file"),
+            ("{nanorc}", "Path to ~/.nanorc configuration file"),
+        ],
+    ),
+    (
+        "Cross-Platform Environment",
+        [
+            ("{prefix}", "Termux / system prefix path ($PREFIX / /usr)"),
+            ("{termux_properties}", "Termux properties file path"),
+            ("{termux_storage}", "Termux Android storage directory (~/storage)"),
+            ("{powershell_profile}", "PowerShell profile script path"),
+            ("{appdata}", "Windows AppData roaming directory path"),
+            ("{userprofile}", "Windows user profile directory path"),
         ],
     ),
     (

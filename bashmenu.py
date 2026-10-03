@@ -85,12 +85,60 @@ try:
 except ImportError:
     ymlcheck = None
 
+def resolve_existing_path(primary: Path, fallback: Path | None = None) -> str:
+    """Return primary path if it exists, or fallback if primary does not exist and fallback does."""
+    if primary.exists():
+        return str(primary)
+    if fallback and fallback.exists():
+        return str(fallback)
+    return str(primary)
+
+
+def get_powershell_profile_path() -> str:
+    """Return platform-appropriate PowerShell profile path."""
+    home = Path.home()
+    if sys.platform == "win32" or os.name == "nt":
+        ps_core = home / "Documents" / "PowerShell" / "Microsoft.PowerShell_profile.ps1"
+        if ps_core.exists():
+            return str(ps_core)
+        ps_win = home / "Documents" / "WindowsPowerShell" / "Microsoft.PowerShell_profile.ps1"
+        if ps_win.exists():
+            return str(ps_win)
+        return str(ps_core)
+    ps_unix = home / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"
+    return str(ps_unix)
+
+
+def get_shell_profile_path() -> str:
+    """Resolve active login shell profile path, preferring existing files."""
+    home = Path.home()
+    for fname in [".bash_profile", ".bash_login", ".profile", ".zprofile", ".zshrc", ".bashrc"]:
+        candidate = home / fname
+        if candidate.is_file():
+            return str(candidate)
+    return str(home / (".bash_profile" if sys.platform == "darwin" else ".profile"))
+
+
 USERNAME = getpass.getuser()
 USER_HOME = str(Path.home())
 BASHRC_PATH = str(Path.home() / ".bashrc")
 VIMRC_PATH = str(Path.home() / ".vimrc")
+NANORC_PATH = str(Path.home() / ".nanorc")
 BASH_ALIASES_PATH = str(Path.home() / ".bash_aliases")
 ZSHRC_PATH = str(Path.home() / ".zshrc")
+PROFILE_PATH = str(Path.home() / ".profile")
+BASH_PROFILE_PATH = str(Path.home() / ".bash_profile")
+ZPROFILE_PATH = str(Path.home() / ".zprofile")
+TERMUX_PROPERTIES_PATH = str(Path.home() / ".termux" / "termux.properties")
+TERMUX_STORAGE_PATH = str(Path.home() / "storage")
+PREFIX_PATH = os.environ.get(
+    "PREFIX",
+    "/data/data/com.termux/files/usr"
+    if ("TERMUX_VERSION" in os.environ or "/com.termux/" in os.environ.get("PREFIX", ""))
+    else "/usr",
+)
+APPDATA_PATH = os.environ.get("APPDATA", "")
+USERPROFILE_PATH = os.environ.get("USERPROFILE", USER_HOME)
 HOSTNAME = socket.gethostname()
 
 safe_isprintable = bashmenu_ui.safe_isprintable
@@ -484,6 +532,9 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         os.environ["CACHE_DIR"] = resolved_cache
         cache_dir_setting = resolved_cache
 
+    cur_profile = resolve_existing_path(Path.home() / ".profile", Path.home() / ".bash_profile")
+    cur_bash_profile = resolve_existing_path(Path.home() / ".bash_profile", Path.home() / ".profile")
+
     placeholders = {
         "{user}": USERNAME,
         "{username}": USERNAME,
@@ -500,7 +551,18 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{bashrc}": BASHRC_PATH,
         "{bash_aliases}": BASH_ALIASES_PATH,
         "{vimrc}": VIMRC_PATH,
+        "{nanorc}": NANORC_PATH,
         "{zshrc}": ZSHRC_PATH,
+        "{profile}": cur_profile,
+        "{bash_profile}": cur_bash_profile,
+        "{zprofile}": ZPROFILE_PATH,
+        "{shell_profile}": get_shell_profile_path(),
+        "{powershell_profile}": get_powershell_profile_path(),
+        "{prefix}": PREFIX_PATH,
+        "{termux_properties}": TERMUX_PROPERTIES_PATH,
+        "{termux_storage}": TERMUX_STORAGE_PATH,
+        "{appdata}": APPDATA_PATH,
+        "{userprofile}": USERPROFILE_PATH,
         "{battery}": get_battery_info(),
         "{window_width}": str(win_w),
         "{window_height}": str(win_h),

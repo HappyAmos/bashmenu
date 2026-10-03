@@ -371,8 +371,17 @@ Application script directory.
 .B {templates_dir}, {scripts_dir}
 Templates and scripts folders paths.
 .TP
-.B {bashrc}, {zshrc}, {vimrc}, {bash_aliases}
-Path files system profiles.
+.B {bashrc}, {zshrc}, {profile}, {bash_profile}, {zprofile}, {shell_profile}
+User shell profile configuration paths with intelligent existence fallback.
+.TP
+.B {vimrc}, {nanorc}, {bash_aliases}
+Editor configuration files and shell alias paths.
+.TP
+.B {prefix}, {termux_properties}, {termux_storage}
+Termux environment prefix and mobile terminal paths.
+.TP
+.B {powershell_profile}, {appdata}, {userprofile}
+Windows / PowerShell profile scripts and environment paths.
 .TP
 .B {divider}
 Themed horizontal divider line (defaults to {ascii:196} across window width).

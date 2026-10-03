@@ -127,6 +127,16 @@ class TestAnsiParsing(unittest.TestCase):
             "{username}",
             "{hostname}",
             "{divider}",
+            "{profile}",
+            "{bash_profile}",
+            "{zprofile}",
+            "{shell_profile}",
+            "{nanorc}",
+            "{powershell_profile}",
+            "{prefix}",
+            "{termux_properties}",
+            "{termux_storage}",
+            "{userprofile}",
         ]
         for p in placeholders:
             resolved = bashmenu.interpolate_placeholders(p, {})
@@ -143,8 +153,12 @@ class TestAnsiParsing(unittest.TestCase):
                 self.assertEqual(resolved, bashmenu.BASH_ALIASES_PATH)
             elif p == "{vimrc}":
                 self.assertEqual(resolved, bashmenu.VIMRC_PATH)
+            elif p == "{nanorc}":
+                self.assertEqual(resolved, bashmenu.NANORC_PATH)
             elif p == "{zshrc}":
                 self.assertEqual(resolved, bashmenu.ZSHRC_PATH)
+            elif p == "{zprofile}":
+                self.assertEqual(resolved, bashmenu.ZPROFILE_PATH)
             elif p == "{username}":
                 self.assertEqual(resolved, bashmenu.USERNAME)
             elif p == "{hostname}":
@@ -153,6 +167,9 @@ class TestAnsiParsing(unittest.TestCase):
                 self.assertIn("[color=divider]", resolved)
                 self.assertIn("─", resolved)
 
+        # Test appdata expands (even if empty string on Linux)
+        self.assertNotEqual(bashmenu.interpolate_placeholders("{appdata}", {}), "{appdata}")
+
     def test_divider_interpolation_default(self):
         """Test that {divider} and {user.divider} expand with default ascii:196 and window width when undefined."""
         res_div = bashmenu.interpolate_placeholders("{divider}", config={}, extra_vars={"window_width": "20"})
@@ -160,6 +177,42 @@ class TestAnsiParsing(unittest.TestCase):
 
         res_user_div = bashmenu.interpolate_placeholders("{user.divider}", config={}, extra_vars={"window_width": "20"})
         self.assertEqual(res_user_div, f"[color=divider]{'─' * 20}[/color]")
+
+    def test_profile_fallback_behavior(self):
+        """Test intelligent fallback between .profile and .bash_profile based on file existence."""
+        from pathlib import Path
+        from unittest.mock import patch
+
+        home = Path.home()
+        # Case 1: Only .profile exists
+        def mock_exists_profile_only(p=None, *args, **kwargs):
+            return p == home / ".profile"
+
+        with patch.object(Path, "exists", autospec=True, side_effect=mock_exists_profile_only):
+            res_prof = bashmenu.interpolate_placeholders("{profile}", {})
+            res_bash_prof = bashmenu.interpolate_placeholders("{bash_profile}", {})
+            self.assertEqual(res_prof, str(home / ".profile"))
+            self.assertEqual(res_bash_prof, str(home / ".profile"))
+
+        # Case 2: Only .bash_profile exists
+        def mock_exists_bash_profile_only(p=None, *args, **kwargs):
+            return p == home / ".bash_profile"
+
+        with patch.object(Path, "exists", autospec=True, side_effect=mock_exists_bash_profile_only):
+            res_prof = bashmenu.interpolate_placeholders("{profile}", {})
+            res_bash_prof = bashmenu.interpolate_placeholders("{bash_profile}", {})
+            self.assertEqual(res_prof, str(home / ".bash_profile"))
+            self.assertEqual(res_bash_prof, str(home / ".bash_profile"))
+
+        # Case 3: Both exist
+        def mock_exists_both(p=None, *args, **kwargs):
+            return p in (home / ".profile", home / ".bash_profile")
+
+        with patch.object(Path, "exists", autospec=True, side_effect=mock_exists_both):
+            res_prof = bashmenu.interpolate_placeholders("{profile}", {})
+            res_bash_prof = bashmenu.interpolate_placeholders("{bash_profile}", {})
+            self.assertEqual(res_prof, str(home / ".profile"))
+            self.assertEqual(res_bash_prof, str(home / ".bash_profile"))
 
     def test_get_battery_info_caching(self):
         """Test that get_battery_info properly caches results and avoids multiple slower lookups."""

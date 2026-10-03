@@ -291,7 +291,18 @@ These variables are dynamically resolved using active configuration and environm
 - `{bash_aliases}`      : Path to `~/.bash_aliases`.
 - `{bashrc}`            : Path to `~/.bashrc`.
 - `{zshrc}`             : Path to `~/.zshrc`.
+- `{profile}`           : Path to `~/.profile` (falls back to existing `.bash_profile` if `.profile` is absent).
+- `{bash_profile}`      : Path to `~/.bash_profile` (falls back to existing `.profile` if `.bash_profile` is absent).
+- `{zprofile}`          : Path to `~/.zprofile`.
+- `{shell_profile}`     : Path to active user login shell profile.
 - `{vimrc}`             : Path to `~/.vimrc`.
+- `{nanorc}`            : Path to `~/.nanorc`.
+- `{powershell_profile}`: Path to PowerShell `$PROFILE` script.
+- `{prefix}`            : Termux / system installation prefix (`$PREFIX` or `/usr`).
+- `{termux_properties}` : Path to `~/.termux/termux.properties`.
+- `{termux_storage}`    : Path to Termux `~/storage` directory.
+- `{appdata}`           : Path to Windows `%APPDATA%` directory.
+- `{userprofile}`       : Path to Windows `%USERPROFILE%` directory.
 - `{divider}`           : Themed horizontal divider line (defaults to `{ascii:196}` of width `{window_width}`).
 - `{date_time_12}`      : 12-hour formatted date-time (e.g., `2026-09-15 03:00:00 PM`).
 - `{date_time_24}`      : 24-hour formatted date-time (e.g., `2026-09-15 15:00:00`).
