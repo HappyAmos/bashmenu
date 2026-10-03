@@ -75,11 +75,7 @@ fi
 # Pipe through pager.sh for interactive terminals, or fallback to less -R, $PAGER, or raw stream
 if [ -t 1 ]; then
     if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
-        RELOAD_CMD="sed 's/^```[[:space:]]\+/```/' \"$TARGET_FILE\" | \"$PYTHON_BIN\" -m rich.markdown -c"
-        if [ "${#WIDTH_ARGS[@]}" -gt 0 ]; then
-            RELOAD_CMD="${RELOAD_CMD} ${WIDTH_ARGS[*]}"
-        fi
-        RELOAD_CMD="${RELOAD_CMD} -"
+        RELOAD_CMD="\"${SCRIPT_DIR}/rich.sh\" \"$TARGET_FILE\""
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
             "$PYTHON_BIN" -m rich.markdown -c "${WIDTH_ARGS[@]}" - | \
             "${SCRIPT_DIR}/pager.sh" --file="$TARGET_FILE" --reload-cmd="$RELOAD_CMD"
