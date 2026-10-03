@@ -55,7 +55,9 @@ Contains a few personal scripts as examples.
 
 ### local Manual Pages (Man Pages)
 
-- `bashmenu.1` : Exhaustively comprehensive man page for HA Bash Menu.
+| File | Description |
+| :--- | :--- |
+| `bashmenu.1` | Exhaustively comprehensive man page for HA Bash Menu. |
 
 ---
 
@@ -76,9 +78,10 @@ Automatically adds a launcher script ~/.local/bin/bm and adds it to your path.
 For comprehensive guides, lists of all item types, placeholder directives, and
 full YAML schemas:
 
-- **Complete User Manual** : Refer to the localized **[bashmenu.md](bashmenu.md)** file.
-- **Unix Man Page**        : Execute **`man ./bashmenu.1`** from your terminal
-  to pull up the exhaustively detailed manual page in standard formatting.
+| Resource | Description |
+| :--- | :--- |
+| **Complete User Manual** | Refer to the localized **[bashmenu.md](bashmenu.md)** file. |
+| **Unix Man Page** | Execute **`man ./bashmenu.1`** from your terminal to pull up the exhaustively detailed manual page in standard formatting. |
 
 ---
 

@@ -10,18 +10,23 @@ configuration editor for Linux systems.
 
 HA Bash Menu is comprised of modular scripts and configuration files:
 
-- `bashmenu.sh`  : Launcher shell script with auto-setup and self-healing.
-- `bashmenu.py`  : Core Textual TUI application engine and main rendering window.
-- `bashmenu_ui.py` : Shared UI library — modal screens, theme engine, formatting helpers.
-- `bashedit.py`  : Built-in Nano-style text editor engine.
-- `menuedit.py`  : Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`).
-- `bashmenu.yml`  : YAML user settings configuration store.
-- `bashmenu.mnu`  : YAML menu layout structure and action definitions.
-- `bashmenu.themes` : YAML color themes for 256, 16, and 8 color modes.
-- `ymlcheck.py`  : Command line validator for theme and configuration YAML files.
+| Component / File | Description |
+| :--- | :--- |
+| `bashmenu.sh` | Launcher shell script with auto-setup and self-healing. |
+| `bashmenu.py` | Core Textual TUI application engine and main rendering window. |
+| `bashmenu_ui.py` | Shared UI library — modal screens, theme engine, formatting helpers. |
+| `bashedit.py` | Built-in Nano-style text editor engine. |
+| `menuedit.py` | Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`). |
+| `bashmenu.yml` | YAML user settings configuration store. |
+| `bashmenu.mnu` | YAML menu layout structure and action definitions. |
+| `bashmenu.themes` | YAML color themes for 256, 16, and 8 color modes. |
+| `ymlcheck.py` | Command line validator for theme and configuration YAML files. |
 
 ### 1.1 Local Manual Pages (Man Pages)
-- `bashmenu.1`   : Exhaustive terminal manual page for HA Bash Menu.
+
+| File | Description |
+| :--- | :--- |
+| `bashmenu.1` | Exhaustive terminal manual page for HA Bash Menu. |
 
 ---
 
@@ -30,102 +35,92 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 ### 2.1 Provided Utility Scripts (`scripts/`)
 These scripts are stored in the `/scripts` directory and can be used directly or as action references:
 
-- `scripts/dnsconfig.sh`    : Interactive shell script that configures IPv4
-                              and IPv6 DNS server addresses for active network
-                              connections using nmcli and systemd-resolved.
-- `scripts/get_api_key.sh`   : Script to securely retrieve and format API
-                              keys or credentials.
-- `scripts/getdns.py`       : CLI python utility to query and discover currently
-                              active upstream system DNS server settings.
-- `scripts/glyphs.sh`       : Curses search and preview dialog box utility for
-                              selecting Unicode emojis and Nerd Font icons.
-- `scripts/gorillas.py`     : QBasic Gorillas clone TUI game implemented as a
-                              Textual Screen, launched from the Games submenu.
-- `scripts/install_basics.sh`: Cross-platform basic tools installer wrapper.
-- `scripts/install_cheat.sh` : Setup script that installs interactive cheat sheet
-                              terminal tools into the local environment.
-- `scripts/install_games.sh` : Cross-platform installer for terminal games
-                              (ninvaders, nsnake, greed, moon-buggy, nethack, etc.).
-- `scripts/install_glow.sh`  : Installer script for the Glow markdown viewer.
-- `scripts/install_kmscon.sh`: Installer script for the kmscon console
-                              emulator, enabling beautiful Unicode and KMS/DRM
-                              video support on raw Linux text consoles.
-- `scripts/install_node.sh`  : Installer script for Node.js via nvm or system
-                              package manager.
-- `scripts/install_scripts.sh`: Deployment script to copy and register utility
-                              bash configurations.
-- `scripts/ip_info.sh`       : Displays current network interface IP addresses
-                              and connection status.
-- `scripts/ncurses_colors.py`: Visual tester for ncurses color support.
-- `scripts/otd.sh`           : Shell script fetching a random "On This Day"
-                              historical quote/event and link from
-                              today.zenquotes.io API using curl and jq.
-- `scripts/system_update.sh` : Cross-platform system update wrapper supporting
-                              apt, dnf, pacman, pkg, and brew.
-- `scripts/unicode.sh`       : Interactive Unicode Block Explorer script.
-- `scripts/ascii.sh`         : Standard and Extended ASCII viewing utility.
-- `scripts/webopen.sh`       : Cross-platform web browser launcher wrapper script
-                              that opens a specified URL, file, or default browser
-                              (supporting Linux, macOS, WSL, and Termux). Supports
-                              `--gui` / `-g` for graphical browsers and `--tty` / `tty`
-                              for terminal browsers (lynx, links, brow6el).
+| Script | Description |
+| :--- | :--- |
+| `scripts/dnsconfig.sh` | Interactive shell script that configures IPv4 and IPv6 DNS server addresses for active network connections using nmcli and systemd-resolved. |
+| `scripts/get_api_key.sh` | Script to securely retrieve and format API keys or credentials. |
+| `scripts/getdns.py` | CLI python utility to query and discover currently active upstream system DNS server settings. |
+| `scripts/glyphs.sh` | Curses search and preview dialog box utility for selecting Unicode emojis and Nerd Font icons. |
+| `scripts/gorillas.py` | QBasic Gorillas clone TUI game implemented as a Textual Screen, launched from the Games submenu. |
+| `scripts/install_basics.sh` | Cross-platform basic tools installer wrapper. |
+| `scripts/install_cheat.sh` | Setup script that installs interactive cheat sheet terminal tools into the local environment. |
+| `scripts/install_games.sh` | Cross-platform installer for terminal games (ninvaders, nsnake, greed, moon-buggy, nethack, etc.). |
+| `scripts/install_glow.sh` | Installer script for the Glow markdown viewer. |
+| `scripts/install_kmscon.sh` | Installer script for the kmscon console emulator, enabling beautiful Unicode and KMS/DRM video support on raw Linux text consoles. |
+| `scripts/install_node.sh` | Installer script for Node.js via nvm or system package manager. |
+| `scripts/install_scripts.sh` | Deployment script to copy and register utility bash configurations. |
+| `scripts/ip_info.sh` | Displays current network interface IP addresses and connection status. |
+| `scripts/ncurses_colors.py` | Visual tester for ncurses color support. |
+| `scripts/otd.sh` | Shell script fetching a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq. |
+| `scripts/system_update.sh` | Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew. |
+| `scripts/unicode.sh` | Interactive Unicode Block Explorer script. |
+| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility. |
+| `scripts/webopen.sh` | Cross-platform web browser launcher wrapper script that opens a specified URL, file, or default browser (supporting Linux, macOS, WSL, and Termux). Supports `--gui` / `-g` for graphical browsers and `--tty` / `tty` for terminal browsers (lynx, links, brow6el). |
 
 ### 2.2 Provided Templates (`templates/`)
 Used as dynamic templates for code generation, settings, or block injections:
 
-- `templates/autoexec.sh.tmpl` : Configurable template for system autoexec shell
-                                 scripts (used by configure_autoexec plugin).
-- `templates/bash_aliases.tmpl`: Sourced shell alias definitions injected
-                                 dynamically into user profiles.
+| Template | Description |
+| :--- | :--- |
+| `templates/autoexec.sh.tmpl` | Configurable template for system autoexec shell scripts (used by configure_autoexec plugin). |
+| `templates/bash_aliases.tmpl` | Sourced shell alias definitions injected dynamically into user profiles. |
 
 ---
 
 ## 3. Keyboard Shortcuts & Navigation Reference
 
 ### 3.1 Main Menu Engine (`bashmenu.py`)
-- `UP` / `DOWN` / `j` / `k` : Navigate highlighted selection row.
-- `0` - `9`, `a` - `z`, `A` - `Z` : Direct option shortcut hotkey jump.
-- `F1`                     : Display this markdown help manual using the `glow` terminal pager.
-- `F4`                     : Launch visual menu editor (`menuedit.py`).
-- `F5`                     : Toggle option shortcut key badges display.
-- `ENTER`                  : Execute selected item action.
-- `ESC`                    : Return to parent submenu or exit application.
+| Keybinding | Action |
+| :--- | :--- |
+| `UP` / `DOWN` / `j` / `k` | Navigate highlighted selection row. |
+| `0` - `9`, `a` - `z`, `A` - `Z` | Direct option shortcut hotkey jump. |
+| `F1` | Display this markdown help manual using the `glow` terminal pager. |
+| `F4` | Launch visual menu editor (`menuedit.py`). |
+| `F5` | Toggle option shortcut key badges display. |
+| `ENTER` | Execute selected item action. |
+| `ESC` | Return to parent submenu or exit application. |
 
 *Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 
 ### 3.2 Visual Menu Editor (`menuedit.py`)
-- `a` / `Ins`             : Insert new menu option node.
-- `e` / `ENTER`           : Edit selected node properties or menu header (opens `ItemEditModal`).
-- `E`                     : Open raw YAML snippet in editor for selected node.
-- `d` / `Del`             : Delete selected option node (with confirm box).
-- `m` / `M`               : Move selected node down (`m`) or up (`M`).
-- `>` / `.` / `Tab`       : Indent item into preceding Submenu folder.
-- `<` / `,` / `Shift+Tab` : Outdent item out to Parent menu list.
-- `t`                     : Test-run selected menu item action directly.
-- `s`                     : Save changes to `bashmenu.mnu`.
-- `?` / `h` / `F1`         : Display comprehensive General Help modal.
-- `ESC` / `C`             : Exit editor or cancel dialogs (prompts if unsaved changes exist).
+
+| Keybinding | Action |
+| :--- | :--- |
+| `a` / `Ins` | Insert new menu option node. |
+| `e` / `ENTER` | Edit selected node properties or menu header (opens `ItemEditModal`). |
+| `E` | Open raw YAML snippet in editor for selected node. |
+| `d` / `Del` | Delete selected option node (with confirm box). |
+| `m` / `M` | Move selected node down (`m`) or up (`M`). |
+| `>` / `.` / `Tab` | Indent item into preceding Submenu folder. |
+| `<` / `,` / `Shift+Tab` | Outdent item out to Parent menu list. |
+| `t` | Test-run selected menu item action directly. |
+| `s` | Save changes to `bashmenu.mnu`. |
+| `?` / `h` / `F1` | Display comprehensive General Help modal. |
+| `ESC` / `C` | Exit editor or cancel dialogs (prompts if unsaved changes exist). |
 
 *Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit.py` from `bashmenu.py` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu.py`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (`Switch:focus { background: transparent; }`), and the help text footer clearly displays `[ESC / C] Cancel`.
 
 ### 3.3 Built-in Text Editor (`bashedit.py`)
-- `Ctrl+X`                : Exit editor (prompts save if modified).
-- `Ctrl+O` / `F3`          : WriteOut (save active file).
-- `Ctrl+R` / `F5`          : Read File / Open file via file picker modal.
-- `Ctrl+S` / `F6`          : Save As (prompt destination path).
-- `Ctrl+N` / `F4`          : Create new empty document.
-- `Ctrl+G` / `F1`          : Toggle bottom Nano-style shortcut keys bar.
-- `Ctrl+K` / `F8`          : Cut line or active selection block.
-- `Ctrl+U` / `F9`          : Paste (uncut) cutbuffer text.
-- `Ctrl+C`                : Show cursor position or copy selection block.
-- `Alt+6`                 : Copy line or selection block.
-- `Alt+U`                 : Undo edit operation.
-- `Alt+E`                 : Redo edit operation.
-- `Ctrl+^` / `Alt+A`       : Set or unset text selection mark.
-- `Alt+N`                 : Toggle line numbers gutter display.
-- `Alt+P` / `Alt+W`       : Toggle whitespace characters visibility.
-- `F12`                   : Toggle Markdown rendering for active document.
-- `F2`                    : Launch external `$EDITOR` (e.g. `vim`).
+
+| Keybinding | Action |
+| :--- | :--- |
+| `Ctrl+X` | Exit editor (prompts save if modified). |
+| `Ctrl+O` / `F3` | WriteOut (save active file). |
+| `Ctrl+R` / `F5` | Read File / Open file via file picker modal. |
+| `Ctrl+S` / `F6` | Save As (prompt destination path). |
+| `Ctrl+N` / `F4` | Create new empty document. |
+| `Ctrl+G` / `F1` | Toggle bottom Nano-style shortcut keys bar. |
+| `Ctrl+K` / `F8` | Cut line or active selection block. |
+| `Ctrl+U` / `F9` | Paste (uncut) cutbuffer text. |
+| `Ctrl+C` | Show cursor position or copy selection block. |
+| `Alt+6` | Copy line or selection block. |
+| `Alt+U` | Undo edit operation. |
+| `Alt+E` | Redo edit operation. |
+| `Ctrl+^` / `Alt+A` | Set or unset text selection mark. |
+| `Alt+N` | Toggle line numbers gutter display. |
+| `Alt+P` / `Alt+W` | Toggle whitespace characters visibility. |
+| `F12` | Toggle Markdown rendering for active document. |
+| `F2` | Launch external `$EDITOR` (e.g. `vim`). |
 
 ---
 
@@ -158,76 +153,86 @@ Any dot-notation key (e.g., `settings.dns.ipv4.primary`, `settings.plugins.otd.s
 inside menu titles, actions, labels, or template files using brackets.
 
 The `settings.plugins` setting specifies plugin scripts located in the configured `scripts_dir`. Each plugin can be defined as a simple script path or a dictionary with `script`, `sleep`, `pretext`, and `posttext` options:
-- `script`: Script filename or command to execute.
-- `sleep`: Plugin-specific output cache duration in seconds (setting `sleep: 0` will update live data on every frame tick).
-- `pretext`: Text or placeholder rendered immediately before the plugin script output.
-- `posttext`: Text or placeholder rendered immediately after the plugin script output.
+| Setting | Description |
+| :--- | :--- |
+| `script` | Script filename or command to execute. |
+| `sleep` | Plugin-specific output cache duration in seconds (setting `sleep: 0` will update live data on every frame tick). |
+| `pretext` | Text or placeholder rendered immediately before the plugin script output. |
+| `posttext` | Text or placeholder rendered immediately after the plugin script output. |
 
 Dividers can be defined under `user.divider` (or `settings.divider`) with full specifications including `char` (e.g., `{ascii:196}` or `-`) and `length` (e.g., `{window_width}` or `40`). Using `{user.divider}` or `{divider}` in `pretext` or `posttext` expands to a styled divider line matching the active theme's configured divider color.
 
 The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
 
 Available status gutter placeholders (badges) include:
-- `{user}` / `{username}` : Current system username.
-- `{host}` : System hostname.
-- `{battery}` : Current battery percentage (with a 5-second performance cache).
-- `{date_time_12}` / `{date_time_24}` : Full date and time (includes seconds).
-- `{date_time_12_short}` / `{date_time_24_short}` : Short date and time (excludes seconds; optimal for snappier performance).
-- `{time_12}` / `{time_24}` : Current time (includes seconds).
-- `{time_12_short}` / `{time_24_short}` : Short time (excludes seconds; optimal for snappier performance).
-- `{date}` : Current date (YYYY-MM-DD).
-- `{utc_seconds}` : Current epoch seconds.
+
+| Placeholder | Description |
+| :--- | :--- |
+| `{user}` / `{username}` | Current system username. |
+| `{host}` | System hostname. |
+| `{battery}` | Current battery percentage (with a 5-second performance cache). |
+| `{date_time_12}` / `{date_time_24}` | Full date and time (includes seconds). |
+| `{date_time_12_short}` / `{date_time_24_short}` | Short date and time (excludes seconds; optimal for snappier performance). |
+| `{time_12}` / `{time_24}` | Current time (includes seconds). |
+| `{time_12_short}` / `{time_24_short}` | Short time (excludes seconds; optimal for snappier performance). |
+| `{date}` | Current date (YYYY-MM-DD). |
+| `{utc_seconds}` | Current epoch seconds. |
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under
 a main `options` list. Each option dictionary supports several attributes:
 
-- `type`      : The action option type (see Section 5 for complete list).
-- `label`     : The row label string. Can use bracketed placeholders.
-- `icon`      : Icon tag using `{nf:[char]:[nerd-font hex]:[emoji]}` syntax.
-- `action`    : Shell command, script, or editor file path. Can use
-                dynamic directives like `{param}` or `{file_picker}`.
-- `template`  : Source template path for dynamic block injection.
-- `target`    : Destination path for dynamic block injection.
-- `block_id`  : Unique tag for dynamic block boundary markers.
-- `stream`    : `true`|`false` (Execution Mode: real-time streamed command output window inside TUI).
-- `interactive`: `true`|`false` (Execution Mode: suspends TUI for full-screen TTY tools without header/footer prompts).
-- `quiet`     : `true`|`false` (Execution Mode: suppresses command headers and press-ENTER prompts).
-- `no_formatting`: `true`|`false` (disables BBCode rich formatting parser for raw plain text display).
-- `external`  : `true`|`false` (runs scripts in separate shell or process).
-- `user_mode` : `"root"`|`"user"` (defines execution privilege levels).
-- `key`       : YAML dot-notation settings key path in `bashmenu.yml`.
-- `picker`    : `"file"`|`"dir"`|`"none"` (launches visual configuration chooser).
-- `start_dir` : Default folder path for file/directory picker modals.
-- `masked`    : `true`|`false` (masks password input fields with asterisks).
-- `show_whitespace`: `true`|`false` (enables spaces/tabs visual indicators).
-- `tab_to_spaces`  : `true`|`false` (converts typed tab keystrokes to spaces).
-- `tabstop`   : Tab indents column width as integer.
-- `on_yes`    : Nested action executed when "Yes" is selected.
-- `on_no`     : Nested action executed when "No" is selected.
-- `message`   : Body text prompt string for toggle or confirmation popups.
+| Attribute | Description |
+| :--- | :--- |
+| `type` | The action option type (see Section 5 for complete list). |
+| `label` | The row label string. Can use bracketed placeholders. |
+| `icon` | Icon tag using `{nf:[char]:[nerd-font hex]:[emoji]}` syntax. |
+| `action` | Shell command, script, or editor file path. Can use dynamic directives like `{param}` or `{file_picker}`. |
+| `template` | Source template path for dynamic block injection. |
+| `target` | Destination path for dynamic block injection. |
+| `block_id` | Unique tag for dynamic block boundary markers. |
+| `stream` | `true`\|`false` (Execution Mode: real-time streamed command output window inside TUI). |
+| `interactive` | `true`\|`false` (Execution Mode: suspends TUI for full-screen TTY tools without header/footer prompts). |
+| `quiet` | `true`\|`false` (Execution Mode: suppresses command headers and press-ENTER prompts). |
+| `no_formatting` | `true`\|`false` (disables BBCode rich formatting parser for raw plain text display). |
+| `external` | `true`\|`false` (runs scripts in separate shell or process). |
+| `user_mode` | `"root"`\|`"user"` (defines execution privilege levels). |
+| `key` | YAML dot-notation settings key path in `bashmenu.yml`. |
+| `picker` | `"file"`\|`"dir"`\|`"none"` (launches visual configuration chooser). |
+| `start_dir` | Default folder path for file/directory picker modals. |
+| `masked` | `true`\|`false` (masks password input fields with asterisks). |
+| `show_whitespace` | `true`\|`false` (enables spaces/tabs visual indicators). |
+| `tab_to_spaces` | `true`\|`false` (converts typed tab keystrokes to spaces). |
+| `tabstop` | Tab indents column width as integer. |
+| `on_yes` | Nested action executed when "Yes" is selected. |
+| `on_no` | Nested action executed when "No" is selected. |
+| `message` | Body text prompt string for toggle or confirmation popups. |
 
 ### 4.3 Color Themes Specification (`bashmenu.themes`)
 Color themes configure the visual palette for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (`dracula`, `nord`, `cyberpunk`, `gruvbox`, `qbasic`, `pacman`, `industry`, `matrix`, `monochrome`, `synthwave`, `amber_crt`, `hotdog_stand`) for `256`, `16`, and `8` color modes using single-line compact lists `[fg, bg]`.
 
-Supported Theme Elements:
-- `background`     : Window background color (`COLOR_BLACK`, int index `0-255`, or `-1`).
-- `title`          : Top window title header text color.
-- `border`         : Outer frame and panel border line color.
-- `text`           : Regular menu item text color.
-- `highlight`      : Active selection bar text and background colors.
-- `accent`         : Accent highlights, path labels, and prompt titles.
-- `footer`         : Help footer line color.
-- `help_text`      : Dedicated help text color in the bottom gutter and modal footers.
-- `plugin`         : Dedicated text color for background plugin output feeds.
-- `gutter`         : Status gutter text color.
-- `selection`      : Text selection highlight color.
-- `status_bar`     : Status bar header/footer color.
-- `shortcut_key`   : Direct selection shortcut hotkey character badge color.
-- `shortcut_label` : Direct selection shortcut hotkey label color.
-- `divider`        : Horizontal divider line color.
-- `button_primary`, `button_error`, `button_cancel`, `button_success` : Modal dialog action button colors.
-- `scrollbar`      : Scroll bar thumb (foreground) and track (background) colors.
+| Supported Theme Element | Description |
+| :--- | :--- |
+| `background` | Window background color (`COLOR_BLACK`, int index `0-255`, or `-1`). |
+| `title` | Top window title header text color. |
+| `border` | Outer frame and panel border line color. |
+| `text` | Regular menu item text color. |
+| `highlight` | Active selection bar text and background colors. |
+| `accent` | Accent highlights, path labels, and prompt titles. |
+| `footer` | Help footer line color. |
+| `help_text` | Dedicated help text color in the bottom gutter and modal footers. |
+| `plugin` | Dedicated text color for background plugin output feeds. |
+| `gutter` | Status gutter text color. |
+| `selection` | Text selection highlight color. |
+| `status_bar` | Status bar header/footer color. |
+| `shortcut_key` | Direct selection shortcut hotkey character badge color. |
+| `shortcut_label` | Direct selection shortcut hotkey label color. |
+| `divider` | Horizontal divider line color. |
+| `button_primary` | Modal dialog primary action button color. |
+| `button_error` | Modal dialog error/destructive action button color. |
+| `button_cancel` | Modal dialog cancel action button color. |
+| `button_success` | Modal dialog success action button color. |
+| `scrollbar` | Scroll bar thumb (foreground) and track (background) colors. |
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 
@@ -260,16 +265,13 @@ Supported Theme Elements:
 Dynamic input directives trigger modal dialogs when selected,
 substituting the placeholder in the action string prior to execution:
 
-- `{param}` : Prompts for a single-line parameter value using a text modal.
-  * Uses attributes: `title` (modal header) and `prompt` (body text).
-- `{file_picker}` : Launches a visual file chooser dialog.
-  * Uses attributes: `title` and `start_dir`.
-- `{file_picker_new}` / `{file_picker:new}` : Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`).
-  * Uses attributes: `title` and `start_dir`.
-- `{dir_picker}` : Launches a visual directory chooser dialog.
-  * Uses attributes: `title` and `start_dir`.
-- `{dir_picker_new}` / `{dir_picker:new}` : Launches a visual directory chooser dialog that permits creating **new folders** (by pressing `n` or `N`).
-  * Uses attributes: `title` and `start_dir`.
+| Directive | Description | Supported Attributes |
+| :--- | :--- | :--- |
+| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text) |
+| `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
+| `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |
+| `{dir_picker}` | Launches a visual directory chooser dialog. | `title`, `start_dir` |
+| `{dir_picker_new}` / `{dir_picker:new}` | Launches a visual directory chooser dialog that permits creating **new folders** (by pressing `n` or `N`). | `title`, `start_dir` |
 
 #### Picker Auto-Starting Folders (Pro Tip):
 If you precede `{file_picker}` or `{dir_picker}` with a valid folder path in
@@ -280,45 +282,44 @@ visual chooser inside that directory**, completely avoiding double-prefixing.
 ### 6.2 System & Path Placeholders
 These variables are dynamically resolved using active configuration and environment values:
 
-- `{user}` / `{username}` : Current system username.
-- `{host}` / `{hostname}` : System host name.
-- `{user-mode}`         : Current privilege mode (`"root"` if running with root/sudo privileges, otherwise `"user"`).
-- `{version}`           : Script version (e.g., `0.0.1`).
-- `{home}`              : User's absolute home directory path.
-- `{bashmenu_dir}`      : Application root directory path.
-- `{templates_dir}`     : Templates folder path (`settings.templates_dir`).
-- `{scripts_dir}`       : Scripts folder path (`settings.scripts_dir`).
-- `{bash_aliases}`      : Path to `~/.bash_aliases`.
-- `{bashrc}`            : Path to `~/.bashrc`.
-- `{zshrc}`             : Path to `~/.zshrc`.
-- `{profile}`           : Path to `~/.profile` (falls back to existing `.bash_profile` if `.profile` is absent).
-- `{bash_profile}`      : Path to `~/.bash_profile` (falls back to existing `.profile` if `.bash_profile` is absent).
-- `{zprofile}`          : Path to `~/.zprofile`.
-- `{shell_profile}`     : Path to active user login shell profile.
-- `{vimrc}`             : Path to `~/.vimrc`.
-- `{nanorc}`            : Path to `~/.nanorc`.
-- `{powershell_profile}`: Path to PowerShell `$PROFILE` script.
-- `{prefix}`            : Termux / system installation prefix (`$PREFIX` or `/usr`).
-- `{termux_properties}` : Path to `~/.termux/termux.properties`.
-- `{termux_storage}`    : Path to Termux `~/storage` directory.
-- `{appdata}`           : Path to Windows `%APPDATA%` directory.
-- `{userprofile}`       : Path to Windows `%USERPROFILE%` directory.
-- `{divider}`           : Themed horizontal divider line (defaults to `{ascii:196}` of width `{window_width}`).
-- `{date_time_12}`      : 12-hour formatted date-time (e.g., `2026-09-15 03:00:00 PM`).
-- `{date_time_24}`      : 24-hour formatted date-time (e.g., `2026-09-15 15:00:00`).
-- `{date}`              : Current date formatted as `YYYY-MM-DD`.
-- `{time_12}`           : 12-hour formatted time (e.g., `03:00:00 PM`).
-- `{time_24}`           : 24-hour formatted time (e.g., `15:00:00`).
-- `{battery}`           : Current battery percentage (e.g., `84%`, or `N/A` if no battery is detected). Performance-optimized with a 5-second cache to prevent rendering lag.
-- `{utc_seconds}`       : Current UTC time in seconds since epoch.
-- `{window_width}`      : Current active window width in character columns.
-- `{window_height}`     : Current active window height in character lines.
-- `{ascii:decimal}`     : Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`).
-- `{settings.dot_key}`  : Resolves any nested configuration path from `bashmenu.yml`.
-- `{command:shell_cmd}` : Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output.
-  * **Brace Balancing**: Fully supports nested curly braces (e.g. `{command:hostname -I | awk '{print $1}'}`).
-  * **Performance Caching**: Automatically caches outputs for **30.0 seconds** to maintain responsive menu movement.
-  * **Safety Timeout**: Features a **3.0-second** execution timeout to prevent freezing or locking the TUI on network/hanging shell calls.
+| Placeholder | Description |
+| :--- | :--- |
+| `{user}` / `{username}` | Current system username. |
+| `{host}` / `{hostname}` | System host name. |
+| `{user-mode}` | Current privilege mode (`"root"` if running with root/sudo privileges, otherwise `"user"`). |
+| `{version}` | Script version (e.g., `0.0.1`). |
+| `{home}` | User's absolute home directory path. |
+| `{bashmenu_dir}` | Application root directory path. |
+| `{templates_dir}` | Templates folder path (`settings.templates_dir`). |
+| `{scripts_dir}` | Scripts folder path (`settings.scripts_dir`). |
+| `{bash_aliases}` | Path to `~/.bash_aliases`. |
+| `{bashrc}` | Path to `~/.bashrc`. |
+| `{zshrc}` | Path to `~/.zshrc`. |
+| `{profile}` | Path to `~/.profile` (falls back to existing `.bash_profile` if `.profile` is absent). |
+| `{bash_profile}` | Path to `~/.bash_profile` (falls back to existing `.profile` if `.bash_profile` is absent). |
+| `{zprofile}` | Path to `~/.zprofile`. |
+| `{shell_profile}` | Path to active user login shell profile. |
+| `{vimrc}` | Path to `~/.vimrc`. |
+| `{nanorc}` | Path to `~/.nanorc`. |
+| `{powershell_profile}` | Path to PowerShell `$PROFILE` script. |
+| `{prefix}` | Termux / system installation prefix (`$PREFIX` or `/usr`). |
+| `{termux_properties}` | Path to `~/.termux/termux.properties`. |
+| `{termux_storage}` | Path to Termux `~/storage` directory. |
+| `{appdata}` | Path to Windows `%APPDATA%` directory. |
+| `{userprofile}` | Path to Windows `%USERPROFILE%` directory. |
+| `{divider}` | Themed horizontal divider line (defaults to `{ascii:196}` of width `{window_width}`). |
+| `{date_time_12}` | 12-hour formatted date-time (e.g., `2026-09-15 03:00:00 PM`). |
+| `{date_time_24}` | 24-hour formatted date-time (e.g., `2026-09-15 15:00:00`). |
+| `{date}` | Current date formatted as `YYYY-MM-DD`. |
+| `{time_12}` | 12-hour formatted time (e.g., `03:00:00 PM`). |
+| `{time_24}` | 24-hour formatted time (e.g., `15:00:00`). |
+| `{battery}` | Current battery percentage (e.g., `84%`, or `N/A` if no battery is detected). Performance-optimized with a 5-second cache to prevent rendering lag. |
+| `{utc_seconds}` | Current UTC time in seconds since epoch. |
+| `{window_width}` | Current active window width in character columns. |
+| `{window_height}` | Current active window height in character lines. |
+| `{ascii:decimal}` | Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`). |
+| `{settings.dot_key}` | Resolves any nested configuration path from `bashmenu.yml`. |
+| `{command:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces, 30.0s cache, and 3.0s execution timeout). |
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and
@@ -361,23 +362,29 @@ The layout engine processes this tag with the following strict hierarchy:
 The application includes a rich formatting parser allowing developers to use inline, nested BBCode-style tags throughout options, headers, status gutters, and prompts.
 
 #### Available Formatting Tags:
-- `[b]text[/b]` : Renders text in **bold** (Rich `Style(bold=True)`).
-- `[u]text[/u]` : Renders text with an **underline** (Rich `Style(underline=True)`).
-- `[dim]text[/dim]` : Renders text with **dimmed** contrast (Rich `Style(dim=True)`).
-- `[reverse]text[/reverse]` : Renders text in **reversed** foreground/background contrast (Rich `Style(reverse=True)`).
-- `[color=color_name]text[/color]` : Renders text in a custom theme color.
+
+| Tag | Description |
+| :--- | :--- |
+| `[b]text[/b]` | Renders text in **bold** (Rich `Style(bold=True)`). |
+| `[u]text[/u]` | Renders text with an **underline** (Rich `Style(underline=True)`). |
+| `[dim]text[/dim]` | Renders text with **dimmed** contrast (Rich `Style(dim=True)`). |
+| `[reverse]text[/reverse]` | Renders text in **reversed** foreground/background contrast (Rich `Style(reverse=True)`). |
+| `[color=color_name]text[/color]` | Renders text in a custom theme color. |
 
 #### Theme Colors Available:
-- `color=text` : Standard text color of the active theme.
-- `color=border` : Border frame color.
-- `color=title` : Main title header color.
-- `color=highlight` : Selected/highlighted bar colors.
-- `color=footer` : Help footer line color.
-- `color=help_text` : Dedicated help text color in bottom gutter and modal footers.
-- `color=plugin` : Background plugin feed output text color.
-- `color=shortcut_key` : Direct action shortcut character badge color.
-- `color=accent` : Accent indicator/status badge color.
-- `color=divider` : Horizontal line divider color.
+
+| Color Identifier | Target Element / Description |
+| :--- | :--- |
+| `color=text` | Standard text color of the active theme. |
+| `color=border` | Border frame color. |
+| `color=title` | Main title header color. |
+| `color=highlight` | Selected/highlighted bar colors. |
+| `color=footer` | Help footer line color. |
+| `color=help_text` | Dedicated help text color in bottom gutter and modal footers. |
+| `color=plugin` | Background plugin feed output text color. |
+| `color=shortcut_key` | Direct action shortcut character badge color. |
+| `color=accent` | Accent indicator/status badge color. |
+| `color=divider` | Horizontal line divider color. |
 
 #### Key Features:
 * **Nesting Support**: Tags can be nested seamlessly (e.g. `[b]bold text [color=accent]with accented[/color] highlight[/b]`).
@@ -465,8 +472,11 @@ HA Bash Menu features an asynchronous, background-cached plugin architecture for
 3. **Supported Plugin Definition Formats**:
    - **Simple String**: `my_plugin: "my_plugin.sh"` (uses default `sleep: 300`).
    - **Full Dictionary**:
-     - `script` (or `command`, `cmd`, `path`, `file`): Filename inside `scripts_dir`, absolute path, or shell command string.
-     - `sleep`: Cache duration in seconds (`0` for live refresh).
-     - `pretext`: Header text/divider rendered before script output.
-     - `posttext`: Footer text/divider rendered after script output.
+
+     | Property | Description |
+     | :--- | :--- |
+     | `script` (or `command`, `cmd`, `path`, `file`) | Filename inside `scripts_dir`, absolute path, or shell command string. |
+     | `sleep` | Cache duration in seconds (`0` for live refresh). |
+     | `pretext` | Header text/divider rendered before script output. |
+     | `posttext` | Footer text/divider rendered after script output. |
 
