@@ -77,7 +77,9 @@ PLACEHOLDER_SECTIONS = [
         "System & Path Placeholders",
         [
             ("{user}", "Current logged-in username"),
+            ("{username}", "Alias for {user}"),
             ("{host}", "System hostname"),
+            ("{hostname}", "Alias for {host}"),
             ("{home}", "User home directory path (~ / /home/username)"),
             ("{bashmenu_dir}", "Application root directory"),
             ("{scripts_dir}", "Scripts directory path"),
@@ -85,6 +87,7 @@ PLACEHOLDER_SECTIONS = [
             ("{cache_dir}", "Cache directory path"),
             ("{bashrc}", "Path to ~/.bashrc profile file"),
             ("{bash_aliases}", "Path to ~/.bash_aliases file"),
+            ("{zshrc}", "Path to ~/.zshrc configuration file"),
             ("{vimrc}", "Path to ~/.vimrc configuration file"),
         ],
     ),
@@ -117,6 +120,7 @@ PLACEHOLDER_SECTIONS = [
         [
             ("{window_width}", "Inner terminal window column width"),
             ("{window_height}", "Inner terminal window line height"),
+            ("{divider}", "Themed horizontal divider bar ({ascii:196})"),
         ],
     ),
     (

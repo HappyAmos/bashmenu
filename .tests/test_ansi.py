@@ -123,6 +123,10 @@ class TestAnsiParsing(unittest.TestCase):
             "{bashrc}",
             "{bash_aliases}",
             "{vimrc}",
+            "{zshrc}",
+            "{username}",
+            "{hostname}",
+            "{divider}",
         ]
         for p in placeholders:
             resolved = bashmenu.interpolate_placeholders(p, {})
@@ -139,6 +143,23 @@ class TestAnsiParsing(unittest.TestCase):
                 self.assertEqual(resolved, bashmenu.BASH_ALIASES_PATH)
             elif p == "{vimrc}":
                 self.assertEqual(resolved, bashmenu.VIMRC_PATH)
+            elif p == "{zshrc}":
+                self.assertEqual(resolved, bashmenu.ZSHRC_PATH)
+            elif p == "{username}":
+                self.assertEqual(resolved, bashmenu.USERNAME)
+            elif p == "{hostname}":
+                self.assertEqual(resolved, bashmenu.HOSTNAME)
+            elif p == "{divider}":
+                self.assertIn("[color=divider]", resolved)
+                self.assertIn("─", resolved)
+
+    def test_divider_interpolation_default(self):
+        """Test that {divider} and {user.divider} expand with default ascii:196 and window width when undefined."""
+        res_div = bashmenu.interpolate_placeholders("{divider}", config={}, extra_vars={"window_width": "20"})
+        self.assertEqual(res_div, f"[color=divider]{'─' * 20}[/color]")
+
+        res_user_div = bashmenu.interpolate_placeholders("{user.divider}", config={}, extra_vars={"window_width": "20"})
+        self.assertEqual(res_user_div, f"[color=divider]{'─' * 20}[/color]")
 
     def test_get_battery_info_caching(self):
         """Test that get_battery_info properly caches results and avoids multiple slower lookups."""

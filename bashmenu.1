@@ -353,7 +353,7 @@ The following placeholders are auto-interpolated inside actions or templates:
 .B {user}, {username}
 Current system username.
 .TP
-.B {host}
+.B {host}, {hostname}
 System host name.
 .TP
 .B {user-mode}
@@ -371,8 +371,11 @@ Application script directory.
 .B {templates_dir}, {scripts_dir}
 Templates and scripts folders paths.
 .TP
-.B {bashrc}, {vimrc}, {bash_aliases}
+.B {bashrc}, {zshrc}, {vimrc}, {bash_aliases}
 Path files system profiles.
+.TP
+.B {divider}
+Themed horizontal divider line (defaults to {ascii:196} across window width).
 .TP
 .B {date_time_12}, {date_time_24}
 12-hour and 24-hour formatted date-time (includes seconds).

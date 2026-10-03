@@ -90,6 +90,7 @@ USER_HOME = str(Path.home())
 BASHRC_PATH = str(Path.home() / ".bashrc")
 VIMRC_PATH = str(Path.home() / ".vimrc")
 BASH_ALIASES_PATH = str(Path.home() / ".bash_aliases")
+ZSHRC_PATH = str(Path.home() / ".zshrc")
 HOSTNAME = socket.gethostname()
 
 safe_isprintable = bashmenu_ui.safe_isprintable
@@ -251,10 +252,6 @@ DEFAULT_CONFIG = {
     "version": __version__,
     "theme": "dracula",
     "user": {
-        "divider": {
-            "char": "{ascii:196}",
-            "length": "{window_width}",
-        },
         "example_boolean": True,
         "example_filepath": "{bashmenu_dir}",
         "example_string": "A string of text",
@@ -489,7 +486,9 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
 
     placeholders = {
         "{user}": USERNAME,
+        "{username}": USERNAME,
         "{host}": HOSTNAME,
+        "{hostname}": HOSTNAME,
         "{home}": USER_HOME,
         "{bashmenu_dir}": BASHMENU_DIR,
         "{scripts}": str(scripts_dir_setting),
@@ -501,6 +500,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{bashrc}": BASHRC_PATH,
         "{bash_aliases}": BASH_ALIASES_PATH,
         "{vimrc}": VIMRC_PATH,
+        "{zshrc}": ZSHRC_PATH,
         "{battery}": get_battery_info(),
         "{window_width}": str(win_w),
         "{window_height}": str(win_h),
@@ -523,6 +523,10 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         for k, v in extra_vars.items():
             placeholders[f"{{{k}}}"] = str(v)
 
+    if "{divider}" in res_text:
+        tw = win_w if (extra_vars and "window_width" in extra_vars) else None
+        res_text = res_text.replace("{divider}", resolve_divider_string(config, target_w=tw, extra_vars=extra_vars))
+
     for k, v in placeholders.items():
         if k in res_text:
             res_text = res_text.replace(k, str(v))
@@ -530,7 +534,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     def replace_dot_var(match):
         key_path = match.group(1)
         val = get_config_value(config, key_path)
-        if isinstance(val, dict) and ("char" in val or "length" in val):
+        if key_path in ("user.divider", "settings.divider") or (isinstance(val, dict) and ("char" in val or "length" in val)):
             tw = win_w if (extra_vars and "window_width" in extra_vars) else None
             return resolve_divider_string(config, target_w=tw, extra_vars=extra_vars)
         return str(val) if val is not None else match.group(0)
@@ -545,25 +549,30 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
 
 def resolve_divider_string(config, target_w=None, extra_vars=None):
     """Generate divider string based on configuration and target width."""
-    divider_conf = get_config_value(config, "user.divider", {})
-    if isinstance(divider_conf, dict):
-        char = divider_conf.get("char", "-")
-        char = interpolate_placeholders(char, config, extra_vars=extra_vars)
-        char = resolve_glyph(char, config)
-        if target_w is not None:
-            length = target_w
-        elif extra_vars and "window_width" in extra_vars:
-            length = int(extra_vars["window_width"])
-        else:
-            length_spec = divider_conf.get("length", "{window_width}")
-            length_str = interpolate_placeholders(str(length_spec), config, extra_vars=extra_vars)
-            try:
-                length = int(length_str)
-            except ValueError:
-                length = 80
-        raw_div = char * length
+    divider_conf = get_config_value(config, "user.divider", None)
+    if divider_conf is None or not isinstance(divider_conf, dict):
+        divider_conf = get_config_value(config, "settings.divider", {})
+    if not isinstance(divider_conf, dict):
+        divider_conf = {}
+
+    char = divider_conf.get("char", "{ascii:196}")
+    char = interpolate_placeholders(char, config, extra_vars=extra_vars)
+    char = resolve_glyph(char, config)
+    if not char:
+        char = "─"
+
+    if target_w is not None:
+        length = target_w
+    elif extra_vars and "window_width" in extra_vars:
+        length = int(extra_vars["window_width"])
     else:
-        raw_div = "-" * (target_w if target_w is not None else 80)
+        length_spec = divider_conf.get("length", "{window_width}")
+        length_str = interpolate_placeholders(str(length_spec), config, extra_vars=extra_vars)
+        try:
+            length = int(length_str)
+        except ValueError:
+            length = 80
+    raw_div = char * length
     return f"[color=divider]{raw_div}[/color]"
 
 

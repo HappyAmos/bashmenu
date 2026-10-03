@@ -281,7 +281,7 @@ visual chooser inside that directory**, completely avoiding double-prefixing.
 These variables are dynamically resolved using active configuration and environment values:
 
 - `{user}` / `{username}` : Current system username.
-- `{host}`              : System host name.
+- `{host}` / `{hostname}` : System host name.
 - `{user-mode}`         : Current privilege mode (`"root"` if running with root/sudo privileges, otherwise `"user"`).
 - `{version}`           : Script version (e.g., `0.0.1`).
 - `{home}`              : User's absolute home directory path.
@@ -290,7 +290,9 @@ These variables are dynamically resolved using active configuration and environm
 - `{scripts_dir}`       : Scripts folder path (`settings.scripts_dir`).
 - `{bash_aliases}`      : Path to `~/.bash_aliases`.
 - `{bashrc}`            : Path to `~/.bashrc`.
+- `{zshrc}`             : Path to `~/.zshrc`.
 - `{vimrc}`             : Path to `~/.vimrc`.
+- `{divider}`           : Themed horizontal divider line (defaults to `{ascii:196}` of width `{window_width}`).
 - `{date_time_12}`      : 12-hour formatted date-time (e.g., `2026-09-15 03:00:00 PM`).
 - `{date_time_24}`      : 24-hour formatted date-time (e.g., `2026-09-15 15:00:00`).
 - `{date}`              : Current date formatted as `YYYY-MM-DD`.
