@@ -754,6 +754,52 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_checks())
 
+    def test_menuedit_tree_selection_indicator_theme(self):
+        """Verify the menu editor hierarchy tree selection indicator follows assigned themes."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu_ui
+        import menuedit
+
+        async def run_checks():
+            for tname in ["dracula", "matrix", "everforest"]:
+                theme_dict = bashmenu_ui.init_theme_colors(tname)
+                sel_style = theme_dict.get("selection")
+                app = App()
+                screen = menuedit.MenuEditScreen(theme=theme_dict)
+                async with app.run_test() as pilot:
+                    await app.push_screen(screen)
+                    await pilot.pause()
+                    tree = screen.query_one("#tree", menuedit.MenuEditTree)
+
+                    # 1. Custom cursor style is set and matches theme selection
+                    self.assertIsNotNone(tree.custom_cursor_style)
+                    self.assertEqual(tree.custom_cursor_style.bgcolor, sel_style.bgcolor)
+                    self.assertEqual(tree.custom_cursor_style.color, sel_style.color)
+
+                    # 2. Rich style returned for tree--cursor is not default blue (#0178d4)
+                    cur_rich = tree.get_component_rich_style("tree--cursor")
+                    self.assertEqual(cur_rich.bgcolor, sel_style.bgcolor)
+                    self.assertNotEqual(str(cur_rich.bgcolor), "#0178d4")
+
+                    # 3. Selected guide matches selection bgcolor
+                    guides_rich = tree.get_component_rich_style("tree--guides-selected")
+                    self.assertEqual(guides_rich.color, sel_style.bgcolor)
+
+                    # 4. Moving selection renders child item with theme background
+                    await pilot.press("down")
+                    await pilot.pause()
+                    line1 = tree.render_line(1)
+                    has_theme_bg = any(
+                        seg.style is not None and seg.style.bgcolor == sel_style.bgcolor
+                        for seg in line1._segments
+                    )
+                    self.assertTrue(has_theme_bg)
+
+        asyncio.run(run_checks())
+
 
 if __name__ == "__main__":
     unittest.main()

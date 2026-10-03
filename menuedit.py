@@ -15,6 +15,7 @@ from typing import ClassVar
 
 import yaml
 from rich.markup import escape
+from rich.style import Style
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -241,6 +242,14 @@ class ItemTypePickerModal(ModalScreen[str]):
         height: 13;
         border: solid $accent;
     }
+    #option_list > .option-list--option-highlighted {
+        background: $accent;
+        color: $surface;
+    }
+    #option_list:focus > .option-list--option-highlighted {
+        background: $accent;
+        color: $surface;
+    }
     #footer {
         height: 1;
         width: 100%;
@@ -289,6 +298,19 @@ class ItemTypePickerModal(ModalScreen[str]):
                 for item in self.query(".footer_item"):
                     item.styles.color = css_accent
         opts = self.query_one("#option_list", OptionList)
+        sel_style = self.theme.get("selection") or self.theme.get("highlight")
+        if sel_style and hasattr(opts, "_component_styles"):
+            comp = opts._component_styles.get("option-list--option-highlighted")
+            if comp:
+                if sel_style.bgcolor and sel_style.bgcolor.name:
+                    css_bg = bashmenu_ui.parse_css_color(sel_style.bgcolor.name)
+                    if css_bg:
+                        comp.background = css_bg
+                if sel_style.color and sel_style.color.name:
+                    css_fg = bashmenu_ui.parse_css_color(sel_style.color.name)
+                    if css_fg:
+                        comp.auto_color = False
+                        comp.color = css_fg
         col1_width = 24
         indent_spaces = " " * col1_width
         for type_key, desc in ITEM_TYPES:
@@ -1257,6 +1279,21 @@ class MenuEditTree(Tree):
         Binding("enter", "edit_node", "Edit Item", show=False),
     ]
 
+    custom_cursor_style: Style | None = None
+    custom_selected_guide_style: Style | None = None
+    custom_guide_style: Style | None = None
+
+    def get_component_rich_style(
+        self, *names: str, partial: bool = False, default: Style | None = None
+    ) -> Style:
+        if "tree--cursor" in names and self.custom_cursor_style is not None:
+            return self.custom_cursor_style
+        if "tree--guides-selected" in names and self.custom_selected_guide_style is not None:
+            return self.custom_selected_guide_style
+        if "tree--guides" in names and self.custom_guide_style is not None:
+            return self.custom_guide_style
+        return super().get_component_rich_style(*names, partial=partial, default=default)
+
     def action_toggle_node(self) -> None:
         if self.cursor_node:
             self.cursor_node.toggle()
@@ -1351,6 +1388,17 @@ class MenuEditScreen(Screen):
     #tree {
         height: 100%;
         width: 100%;
+    }
+    #tree > .tree--cursor {
+        background: $accent;
+        color: $surface;
+    }
+    #tree:focus > .tree--cursor {
+        background: $accent;
+        color: $surface;
+    }
+    #tree:focus > .tree--guides-selected {
+        color: $accent;
     }
     #inspector_title {
         text-style: bold;
@@ -1617,6 +1665,28 @@ class MenuEditScreen(Screen):
                     with contextlib.suppress(Exception):
                         for item in self.query(".footer_item"):
                             item.styles.color = css_accent
+
+            # Apply theme selection & guide colors to the hierarchy tree
+            sel_style = (
+                self.theme_styles.get("selection")
+                or self.theme_styles.get("highlight")
+                or accent_style
+            )
+            if sel_style:
+                guide_style = self.theme_styles.get("gutter") or border_style
+                with contextlib.suppress(Exception):
+                    tree = self.query_one("#tree", MenuEditTree)
+                    tree.custom_cursor_style = Style(
+                        color=sel_style.color,
+                        bgcolor=sel_style.bgcolor,
+                        bold=True,
+                    )
+                    tree.custom_selected_guide_style = Style(color=sel_style.bgcolor or sel_style.color)
+                    if guide_style and guide_style.color:
+                        tree.custom_guide_style = Style(color=guide_style.color)
+                    if hasattr(tree, "_clear_line_cache"):
+                        tree._clear_line_cache()
+                    tree.refresh()
 
     def on_mount(self) -> None:
         self.populate_tree()
