@@ -1012,7 +1012,7 @@ class MessageModalScreen(ModalScreen[None]):
                     yield Static(self.message, id="message")
                 elif self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
                     md_text = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
-                    yield TextualMarkdown(md_text, id="message")
+                    yield TextualMarkdown(md_text, id="message", open_links=False)
                 else:
                     content = formatting_to_rich_text(
                         str(self.message), theme=self.theme, no_formatting=self.no_formatting

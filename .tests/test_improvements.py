@@ -190,6 +190,7 @@ class TestImprovements(unittest.TestCase):
                 self.assertIsInstance(modal, bashmenu_ui.MessageModalScreen)
                 md = modal.query_one("#message", TextualMarkdown)
                 self.assertIsNotNone(md)
+                self.assertFalse(md._open_links)
 
                 # Test anchor link click
                 with patch.object(md, "goto_anchor") as mock_goto:
