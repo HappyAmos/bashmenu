@@ -755,7 +755,7 @@ class TestImprovements(unittest.TestCase):
         asyncio.run(run_checks())
 
     def test_menuedit_tree_selection_indicator_theme(self):
-        """Verify the menu editor hierarchy tree selection indicator follows assigned themes."""
+        """Verify the menu editor hierarchy tree selection indicator follows theme highlight definition."""
         import asyncio
 
         from textual.app import App
@@ -766,7 +766,7 @@ class TestImprovements(unittest.TestCase):
         async def run_checks():
             for tname in ["dracula", "matrix", "everforest"]:
                 theme_dict = bashmenu_ui.init_theme_colors(tname)
-                sel_style = theme_dict.get("selection")
+                high_style = theme_dict.get("highlight")
                 app = App()
                 screen = menuedit.MenuEditScreen(theme=theme_dict)
                 async with app.run_test() as pilot:
@@ -774,29 +774,67 @@ class TestImprovements(unittest.TestCase):
                     await pilot.pause()
                     tree = screen.query_one("#tree", menuedit.MenuEditTree)
 
-                    # 1. Custom cursor style is set and matches theme selection
+                    # 1. Custom cursor style is set and matches theme highlight definition
                     self.assertIsNotNone(tree.custom_cursor_style)
-                    self.assertEqual(tree.custom_cursor_style.bgcolor, sel_style.bgcolor)
-                    self.assertEqual(tree.custom_cursor_style.color, sel_style.color)
+                    self.assertEqual(tree.custom_cursor_style.bgcolor, high_style.bgcolor)
+                    self.assertEqual(tree.custom_cursor_style.color, high_style.color)
 
-                    # 2. Rich style returned for tree--cursor is not default blue (#0178d4)
+                    # 2. Rich style returned for tree--cursor matches highlight, not default blue (#0178d4)
                     cur_rich = tree.get_component_rich_style("tree--cursor")
-                    self.assertEqual(cur_rich.bgcolor, sel_style.bgcolor)
+                    self.assertEqual(cur_rich.bgcolor, high_style.bgcolor)
                     self.assertNotEqual(str(cur_rich.bgcolor), "#0178d4")
 
-                    # 3. Selected guide matches selection bgcolor
+                    # 3. Selected guide matches highlight bgcolor
                     guides_rich = tree.get_component_rich_style("tree--guides-selected")
-                    self.assertEqual(guides_rich.color, sel_style.bgcolor)
+                    self.assertEqual(guides_rich.color, high_style.bgcolor)
 
-                    # 4. Moving selection renders child item with theme background
+                    # 4. Moving selection renders child item with theme highlight background
                     await pilot.press("down")
                     await pilot.pause()
                     line1 = tree.render_line(1)
                     has_theme_bg = any(
-                        seg.style is not None and seg.style.bgcolor == sel_style.bgcolor
+                        seg.style is not None and seg.style.bgcolor == high_style.bgcolor
                         for seg in line1._segments
                     )
                     self.assertTrue(has_theme_bg)
+
+        asyncio.run(run_checks())
+
+    def test_scrollbar_theming(self):
+        """Verify scrollbar foreground (thumb) and background (track) colors are themed."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu_ui
+        import menuedit
+
+        async def run_checks():
+            for tname in ["dracula", "matrix", "everforest"]:
+                theme_dict = bashmenu_ui.init_theme_colors(tname)
+                sb_style = theme_dict.get("scrollbar")
+                exp_fg = bashmenu_ui.parse_css_color(sb_style.color.name)
+                exp_bg = bashmenu_ui.parse_css_color(sb_style.bgcolor.name)
+
+                # 1. Modal scrollbar theming
+                app_modal = App()
+                modal = bashmenu_ui.MessageModalScreen("Help", "Line\n" * 50, theme=theme_dict, is_help=True)
+                async with app_modal.run_test() as pilot:
+                    await app_modal.push_screen(modal)
+                    await pilot.pause()
+                    sc = modal.query_one("#scroll_container")
+                    self.assertEqual(sc.styles.scrollbar_color.hex.lower(), exp_fg.lower())
+                    self.assertEqual(sc.styles.scrollbar_background.hex.lower(), exp_bg.lower())
+
+                # 2. Menu editor inspector panel scrollbar theming
+                app_editor = App()
+                editor = menuedit.MenuEditScreen(theme=theme_dict)
+                async with app_editor.run_test() as pilot:
+                    await app_editor.push_screen(editor)
+                    await pilot.pause()
+                    insp = editor.query_one("#inspector_panel")
+                    self.assertEqual(insp.styles.scrollbar_color.hex.lower(), exp_fg.lower())
+                    self.assertEqual(insp.styles.scrollbar_background.hex.lower(), exp_bg.lower())
 
         asyncio.run(run_checks())
 

@@ -227,6 +227,7 @@ Supported Theme Elements:
 - `shortcut_label` : Direct selection shortcut hotkey label color.
 - `divider`        : Horizontal divider line color.
 - `button_primary`, `button_error`, `button_cancel`, `button_success` : Modal dialog action button colors.
+- `scrollbar`      : Scroll bar thumb (foreground) and track (background) colors.
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 

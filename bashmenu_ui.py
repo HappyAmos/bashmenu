@@ -623,6 +623,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("help_text", Style(color="cyan", bgcolor=bg_color))
     styles.setdefault("plugin", Style(color="cyan", bgcolor=bg_color))
     styles.setdefault("window_close_button", Style(color="red", bold=True, bgcolor=bg_color))
+    styles.setdefault("scrollbar", Style(color="cyan", bgcolor=bg_color or "grey19"))
     styles["indicator"] = indicator
 
     _theme_styles_cache[cache_key] = styles
@@ -800,6 +801,19 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
     with contextlib.suppress(Exception):
         btn_close = screen.query_one(".btn_close_x", Label)
         btn_close.update(format_close_button_label(theme_dict))
+
+    with contextlib.suppress(Exception):
+        sb_style = theme_dict.get("scrollbar") or theme_dict.get("border")
+        if sb_style:
+            css_sb_fg = parse_css_color(sb_style.color.name) if sb_style.color and sb_style.color.name else None
+            css_sb_bg = parse_css_color(sb_style.bgcolor.name) if sb_style.bgcolor and sb_style.bgcolor.name else None
+            for w in [screen, *list(screen.walk_children())]:
+                if css_sb_fg:
+                    w.styles.scrollbar_color = css_sb_fg
+                    w.styles.scrollbar_color_hover = css_sb_fg
+                if css_sb_bg:
+                    w.styles.scrollbar_background = css_sb_bg
+                    w.styles.scrollbar_background_hover = css_sb_bg
 
 
 def apply_button_theme(button: Button, theme=None, button_type: str = "button_primary") -> None:

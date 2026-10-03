@@ -298,7 +298,7 @@ class ItemTypePickerModal(ModalScreen[str]):
                 for item in self.query(".footer_item"):
                     item.styles.color = css_accent
         opts = self.query_one("#option_list", OptionList)
-        sel_style = self.theme.get("selection") or self.theme.get("highlight")
+        sel_style = self.theme.get("highlight") or self.theme.get("selection")
         if sel_style and hasattr(opts, "_component_styles"):
             comp = opts._component_styles.get("option-list--option-highlighted")
             if comp:
@@ -1666,27 +1666,49 @@ class MenuEditScreen(Screen):
                         for item in self.query(".footer_item"):
                             item.styles.color = css_accent
 
-            # Apply theme selection & guide colors to the hierarchy tree
-            sel_style = (
-                self.theme_styles.get("selection")
-                or self.theme_styles.get("highlight")
+            # Apply theme highlight & guide colors to the hierarchy tree
+            highlight_style = (
+                self.theme_styles.get("highlight")
+                or self.theme_styles.get("selection")
                 or accent_style
             )
-            if sel_style:
+            if highlight_style:
                 guide_style = self.theme_styles.get("gutter") or border_style
                 with contextlib.suppress(Exception):
                     tree = self.query_one("#tree", MenuEditTree)
                     tree.custom_cursor_style = Style(
-                        color=sel_style.color,
-                        bgcolor=sel_style.bgcolor,
+                        color=highlight_style.color,
+                        bgcolor=highlight_style.bgcolor,
                         bold=True,
                     )
-                    tree.custom_selected_guide_style = Style(color=sel_style.bgcolor or sel_style.color)
+                    tree.custom_selected_guide_style = Style(color=highlight_style.bgcolor or highlight_style.color)
                     if guide_style and guide_style.color:
                         tree.custom_guide_style = Style(color=guide_style.color)
                     if hasattr(tree, "_clear_line_cache"):
                         tree._clear_line_cache()
                     tree.refresh()
+
+            # Apply scrollbar theme colors to screen and scrollable panels
+            sb_style = self.theme_styles.get("scrollbar") or border_style or accent_style
+            if sb_style:
+                css_sb_fg = (
+                    bashmenu_ui.parse_css_color(sb_style.color.name)
+                    if sb_style.color and sb_style.color.name
+                    else None
+                )
+                css_sb_bg = (
+                    bashmenu_ui.parse_css_color(sb_style.bgcolor.name)
+                    if sb_style.bgcolor and sb_style.bgcolor.name
+                    else None
+                )
+                with contextlib.suppress(Exception):
+                    for w in [self, *list(self.walk_children())]:
+                        if css_sb_fg:
+                            w.styles.scrollbar_color = css_sb_fg
+                            w.styles.scrollbar_color_hover = css_sb_fg
+                        if css_sb_bg:
+                            w.styles.scrollbar_background = css_sb_bg
+                            w.styles.scrollbar_background_hover = css_sb_bg
 
     def on_mount(self) -> None:
         self.populate_tree()

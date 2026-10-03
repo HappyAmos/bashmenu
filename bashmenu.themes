@@ -22,6 +22,7 @@ dracula:
     help_text: [117, -1]
     plugin: [212, -1]
     window_close_button: [203, -1]
+    scrollbar: [61, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -44,6 +45,7 @@ dracula:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_BLUE, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -66,6 +68,7 @@ dracula:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_BLUE, COLOR_BLACK]
 nord:
   indicator: "{nf:#:\uef66:}"
   256:
@@ -90,6 +93,7 @@ nord:
     help_text: [111, -1]
     plugin: [146, -1]
     window_close_button: [203, -1]
+    scrollbar: [60, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_CYAN, -1]
@@ -112,6 +116,7 @@ nord:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_CYAN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_CYAN, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_CYAN, -1]
@@ -134,6 +139,7 @@ nord:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_CYAN, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_CYAN, COLOR_BLACK]
 cyberpunk:
   indicator: "{nf:>:#f07c0:}"
   256:
@@ -158,6 +164,7 @@ cyberpunk:
     help_text: [51, -1]
     plugin: [201, -1]
     window_close_button: [208, -1]
+    scrollbar: [51, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -180,6 +187,7 @@ cyberpunk:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_CYAN, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -202,6 +210,7 @@ cyberpunk:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_CYAN, COLOR_BLACK]
 gruvbox:
   indicator: "{nf:&:#f0c6b:}"
   256:
@@ -226,6 +235,7 @@ gruvbox:
     help_text: [214, -1]
     plugin: [142, -1]
     window_close_button: [208, -1]
+    scrollbar: [214, 237]
   16:
     background: -1
     title: [COLOR_YELLOW, -1]
@@ -248,6 +258,7 @@ gruvbox:
     help_text: [COLOR_YELLOW, -1]
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
   8:
     background: -1
     title: [COLOR_YELLOW, -1]
@@ -270,6 +281,7 @@ gruvbox:
     help_text: [COLOR_YELLOW, -1]
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 qbasic:
   indicator: "{nf:>:#e629:}"
   256:
@@ -294,6 +306,7 @@ qbasic:
     help_text: [51, 19]
     plugin: [226, 19]
     window_close_button: [203, 19]
+    scrollbar: [51, 19]
   16:
     background: COLOR_BLUE
     title: [COLOR_YELLOW, COLOR_BLUE]
@@ -316,6 +329,7 @@ qbasic:
     help_text: [COLOR_CYAN, COLOR_BLUE]
     plugin: [COLOR_YELLOW, COLOR_BLUE]
     window_close_button: [COLOR_BRIGHT_RED, COLOR_BLUE]
+    scrollbar: [COLOR_CYAN, COLOR_BLUE]
   8:
     background: COLOR_BLUE
     title: [COLOR_YELLOW, COLOR_BLUE]
@@ -338,6 +352,7 @@ qbasic:
     help_text: [COLOR_CYAN, COLOR_BLUE]
     plugin: [COLOR_YELLOW, COLOR_BLUE]
     window_close_button: [COLOR_RED, COLOR_BLUE]
+    scrollbar: [COLOR_CYAN, COLOR_BLUE]
 pacman:
   indicator: "{nf:):#f0baf:}"
   256:
@@ -362,6 +377,7 @@ pacman:
     help_text: [51, -1]
     plugin: [255, -1]
     window_close_button: [196, -1]
+    scrollbar: [226, 235]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -384,6 +400,7 @@ pacman:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -406,6 +423,7 @@ pacman:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 industry:
   indicator: "{nf:#:#f0b46:}"
   256:
@@ -430,6 +448,7 @@ industry:
     help_text: [220, 234]
     plugin: [67, 234]
     window_close_button: [203, 234]
+    scrollbar: [220, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -452,6 +471,7 @@ industry:
     help_text: [COLOR_YELLOW, -1]
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -474,6 +494,7 @@ industry:
     help_text: [COLOR_YELLOW, -1]
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 matrix:
   indicator: "{nf:->:#f0628:}"
   256:
@@ -498,6 +519,7 @@ matrix:
     help_text: [82, -1]
     plugin: [118, -1]
     window_close_button: [196, -1]
+    scrollbar: [46, 22]
   16:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -520,6 +542,7 @@ matrix:
     help_text: [COLOR_GREEN, -1]
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_GREEN, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -542,6 +565,7 @@ matrix:
     help_text: [COLOR_GREEN, -1]
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_GREEN, COLOR_BLACK]
 monochrome:
   indicator: "{nf:>:#eee9:}"
   256:
@@ -566,6 +590,7 @@ monochrome:
     help_text: [250, -1]
     plugin: [245, -1]
     window_close_button: [255, -1]
+    scrollbar: [250, 238]
   16:
     background: COLOR_BLACK
     title: [COLOR_WHITE, -1]
@@ -588,6 +613,7 @@ monochrome:
     help_text: [COLOR_WHITE, -1]
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_WHITE, -1]
+    scrollbar: [COLOR_WHITE, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_WHITE, -1]
@@ -610,6 +636,7 @@ monochrome:
     help_text: [COLOR_WHITE, -1]
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_WHITE, -1]
+    scrollbar: [COLOR_WHITE, COLOR_BLACK]
 synthwave:
   indicator: "{nf:>:#f147d:}"
   256:
@@ -634,6 +661,7 @@ synthwave:
     help_text: [51, -1]
     plugin: [207, -1]
     window_close_button: [207, -1]
+    scrollbar: [201, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -656,6 +684,7 @@ synthwave:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -678,6 +707,7 @@ synthwave:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
 amber_crt:
   indicator: "{nf:>:#f0379:}"
   256:
@@ -702,6 +732,7 @@ amber_crt:
     help_text: [220, -1]
     plugin: [172, -1]
     window_close_button: [214, -1]
+    scrollbar: [214, 234]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -724,6 +755,7 @@ amber_crt:
     help_text: [COLOR_YELLOW, -1]
     plugin: [COLOR_YELLOW, -1]
     window_close_button: [COLOR_YELLOW, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -746,6 +778,7 @@ amber_crt:
     help_text: [COLOR_YELLOW, -1]
     plugin: [COLOR_YELLOW, -1]
     window_close_button: [COLOR_YELLOW, -1]
+    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 hotdog_stand:
   indicator: "{nf:o.O:#e251:}"
   256:
@@ -770,6 +803,7 @@ hotdog_stand:
     help_text: [226, 196]
     plugin: [255, 196]
     window_close_button: [255, 196]
+    scrollbar: [226, 88]
   16:
     background: COLOR_RED
     title: [COLOR_YELLOW, COLOR_RED]
@@ -792,6 +826,7 @@ hotdog_stand:
     help_text: [COLOR_YELLOW, COLOR_RED]
     plugin: [COLOR_WHITE, COLOR_RED]
     window_close_button: [COLOR_WHITE, COLOR_RED]
+    scrollbar: [COLOR_YELLOW, COLOR_RED]
   8:
     background: COLOR_RED
     title: [COLOR_YELLOW, COLOR_RED]
@@ -814,6 +849,7 @@ hotdog_stand:
     help_text: [COLOR_YELLOW, COLOR_RED]
     plugin: [COLOR_WHITE, COLOR_RED]
     window_close_button: [COLOR_WHITE, COLOR_RED]
+    scrollbar: [COLOR_YELLOW, COLOR_RED]
 tokyo_night:
   indicator: "{nf:*:#f0766:}"
   256:
@@ -838,6 +874,7 @@ tokyo_night:
     help_text: [117, -1]
     plugin: [183, -1]
     window_close_button: [210, -1]
+    scrollbar: [117, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_BLUE, -1]
@@ -860,6 +897,7 @@ tokyo_night:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_CYAN, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_BLUE, -1]
@@ -882,6 +920,7 @@ tokyo_night:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_CYAN, COLOR_BLACK]
 everforest:
   indicator: "{nf:^:#f06aa:}"
   256:
@@ -906,6 +945,7 @@ everforest:
     help_text: [108, -1]
     plugin: [175, -1]
     window_close_button: [167, -1]
+    scrollbar: [142, 237]
   16:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -928,6 +968,7 @@ everforest:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_GREEN, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -950,6 +991,7 @@ everforest:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_GREEN, COLOR_BLACK]
 rose_pine:
   indicator: "{nf:*:#f0851:}"
   256:
@@ -974,6 +1016,7 @@ rose_pine:
     help_text: [116, -1]
     plugin: [183, -1]
     window_close_button: [203, -1]
+    scrollbar: [175, 236]
   16:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -996,6 +1039,7 @@ rose_pine:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
   8:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -1018,3 +1062,4 @@ rose_pine:
     help_text: [COLOR_CYAN, -1]
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
