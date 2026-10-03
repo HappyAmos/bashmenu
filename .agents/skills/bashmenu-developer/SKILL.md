@@ -123,7 +123,12 @@ Textual interface.
    Textual and Rich, `requirements.txt` must always declare `textual`
    and `rich` alongside `PyYAML` and `ruff`. `bashmenu.sh` venv
    verification commands must validate `yaml, ruff, textual, rich`
-   before marking the environment ready.
+   before marking the environment ready. Keep required system packages
+   to an absolute minimum (`python3` + venv/pip). Never mandate external
+   CLI utilities like `glow`, `jq`, or `yq` in root shell scripts; always
+   prefer in-house Python standard library fallbacks (`json`, `urllib.request`)
+   to guarantee out-of-the-box compatibility on Termux (Android), Raspberry Pi,
+   and Windows (Git Bash/WSL).
 9. **Test Suite Organization & Import Standard:** All unit and
    integration test scripts must strictly reside inside the `.tests/`
    directory (named `test_*.py`). Never place test scripts in the root
@@ -188,6 +193,9 @@ Textual interface.
     - Pass `-R` (or `-r`) to `less` to interpret raw ANSI color escape sequences.
     - Always resolve script directories portably (using `BASH_SOURCE[0]`) rather
       than hardcoding paths.
+    - Standardize markdown document rendering and pagination on
+      `{scripts_dir}/rich.sh <file> | {scripts_dir}/pager.sh` rather than
+      third-party binary viewers (`glow`).
 19. **Menu Editor Schema & Property Inspector Completeness (`menuedit.py`):**
     The visual editor's property inspector (`update_inspector()`) and edit
     modal (`ItemEditModal`) must support the complete `bashmenu.mnu` schema:
@@ -198,12 +206,28 @@ Textual interface.
     - Include an "Extra Properties" fallback for author-defined custom attributes.
     - Ensure `#inspector_panel` uses `overflow-y: auto;` and `#inspector_content`
       uses `height: auto;` for scrollable inspection.
+    - **Menu Item Type Mutation & Key Remapping:** Menu items must allow full type
+      reconfiguration post-creation. Support type switching both inside
+      `ItemEditModal` (`[CTRL+T]`) and directly from tree nodes in `MenuEditScreen` (`[t]`).
+    - **Payload Migration & Key Shadowing Prevention:** When an item's type changes,
+      migrate the action payload to the target type's canonical primary key
+      (`command`, `script`, `editor` -> `file`, `config`/`toggle` -> `key`, `python`)
+      and prune obsolete type keys to prevent payload pollution.
+    - **Submenu & Divider Transitions:** Converting to `submenu` must initialize
+      `submenu: {title: ..., options: []}`; converting from `submenu` to a leaf item
+      must prune the container block and trigger `populate_tree()` to refresh tree hierarchy.
+      Transitions between `divider` and standard items must dynamically toggle
+      section visibility and clean up divider directives (`char`, `length`).
+    - **Safe App Instance Resolution:** Always resolve application instances via
+      `app_obj = getattr(self, "_app", None) or getattr(self, "app", None)` before
+      calling `push_screen()`, preventing `NoActiveAppError` in headless unit test
+      harnesses.
 20. **Menu Editor Two-Line Help Bar Layout (`menuedit.py`):**
     The visual menu editor's bottom help bar (`#footer`) must be configured
     as a two-line `Vertical` container with `height: 2` containing two
     `Horizontal` rows (`.footer_row` with `height: 1; align: center middle;`):
-    - Row 1: Item operations & reordering (`[a] Add`, `[e/ENTER] Edit`, `[SPACE] Toggle`,
-      `[d] Delete`, `[m] Move Dn`, `[M] Move Up`).
+    - Row 1: Item operations & reordering (`[a] Add`, `[e/ENTER] Edit`, `[t] Type`,
+      `[SPACE] Toggle`, `[d] Delete`, `[m] Move Dn`, `[M] Move Up`).
     - Row 2: Hierarchy adjustments, tools, & session control (`[>] Indent`,
       `[<] Outdent`, `[CTRL+A] ASCII`, `[CTRL+P] Placeholders`, `[s] Save`, `[ESC/q] Exit`).
     - Keep interactive widget IDs (`lbl_*`) intact for click handlers and theme styling.
@@ -223,6 +247,15 @@ Textual interface.
       (e.g., `[16, 16]` on dark background or `[19, 19]` on `qbasic`), select a neutral primary 8
       color value (`white` on dark backgrounds, `black` on light backgrounds) for contrast.
     - Fall back to the neutral primary 8 color if the paired color lacks adequate contrast.
+23. **Headless Execution & Shell Script Source Guarding:**
+    Main shell scripts (`bashmenu.sh`) must provide source guards
+    (`if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`) and non-interactive inspection flags
+    (`--check-env`, `--help`, `--version`) that exit cleanly (0 on success) without
+    launching the TUI.
+24. **Branching Discipline for Substantial Refactors:**
+    When performing extensive structural overhauls (cross-platform compatibility,
+    dependency elimination, or editor re-architecture), always branch from git
+    (e.g., `feat/<topic>`) and verify all test suites and linters pass before merging.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the
