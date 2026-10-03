@@ -1,8 +1,38 @@
 # HA Bash Menu Specification & User Manual (v0.0.1)
 
-Welcome to the comprehensive specification and user manual for HA Bash Menu,
-a lightweight, data-driven Textual Text User Interface (TUI) menu engine and
-configuration editor for Linux systems.
+Welcome to the specification and user manual for HA Bash Menu, a lightweight,
+data-driven Textual Text User Interface (TUI) menu engine and configuration
+editor for Linux systems.
+
+<details>
+<summary><b>Table of Contents</b> (click to expand)</summary>
+
+- [1. Component Overview & Files](#1-component-overview--files)
+  - [1.1 Local Manual Pages (Man Pages)](#11-local-manual-pages-man-pages)
+- [2. Dynamic Scripts & Templates References](#2-dynamic-scripts--templates-references)
+  - [2.1 Provided Utility Scripts (`scripts/`)](#21-provided-utility-scripts-scripts)
+  - [2.2 Provided Templates (`templates/`)](#22-provided-templates-templates)
+- [3. Keyboard Shortcuts & Navigation Reference](#3-keyboard-shortcuts--navigation-reference)
+  - [3.1 Main Menu Engine (`bashmenu.py`)](#31-main-menu-engine-bashmenupy)
+  - [3.2 Visual Menu Editor (`menuedit.py`)](#32-visual-menu-editor-menueditpy)
+  - [3.3 Built-in Text Editor (`bashedit.py`)](#33-built-in-text-editor-basheditpy)
+- [4. Configuration & Schema Specifications](#4-configuration--schema-specifications)
+  - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
+  - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
+  - [4.3 Color Themes Specification (`bashmenu.themes`)](#43-color-themes-specification-bashmenuthemes)
+- [5. Complete Menu Option Types Reference](#5-complete-menu-option-types-reference)
+- [6. Dynamic Directives & Variables](#6-dynamic-directives--variables)
+  - [6.1 Dynamic Input Directives](#61-dynamic-input-directives)
+  - [6.2 System & Path Placeholders](#62-system--path-placeholders)
+  - [6.3 Nerd Fonts & Emoji Adaptive Resolution](#63-nerd-fonts--emoji-adaptive-resolution)
+  - [6.4 Console Tag Rich Formatting](#64-console-tag-rich-formatting)
+- [7. Advanced Integration Use Cases](#7-advanced-integration-use-cases)
+  - [7.1 Modular Block Injection (`type: inject_block`)](#71-modular-block-injection-type-inject_block)
+  - [7.2 In-Process Python Plugins (`external: false`)](#72-in-process-python-plugins-external-false)
+  - [7.3 Multi-Platform Support & Environment Detection](#73-multi-platform-support--environment-detection)
+  - [7.4 Background Footer Plugins Architecture & Creation Guide](#74-background-footer-plugins-architecture--creation-guide)
+
+</details>
 
 ---
 
@@ -479,4 +509,3 @@ HA Bash Menu features an asynchronous, background-cached plugin architecture for
      | `sleep` | Cache duration in seconds (`0` for live refresh). |
      | `pretext` | Header text/divider rendered before script output. |
      | `posttext` | Footer text/divider rendered after script output. |
-
