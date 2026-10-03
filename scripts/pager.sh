@@ -52,6 +52,8 @@ FIT_LINE=""
 BAR_LINE=""
 HINTS=""
 FILES=()
+ORIGINAL_FILE=""
+RELOAD_CMD=""
 
 # ------------------------------------------------------------------ utilities
 
@@ -79,6 +81,8 @@ Options:
   -c, --no-color    Discard ANSI escape sequences instead of rendering them.
   --no-help         Omit the shortcut hints from the command bar.
   --max-lines=N     Store at most N input lines (default ${MAX_LINES}).
+  --file=PATH       Associated file path to open when editing piped streams.
+  --reload-cmd=CMD  Command to refresh spool after editing piped streams.
 
 Keys:
   DOWN j            Next line            UP k            Previous line
@@ -520,7 +524,12 @@ get_editor() {
 
 open_in_editor() {
     # Launch the user's default text editor on the current file, positioned at TOP_LINE.
-    if [ "${HAVE_FILES}" -eq 0 ]; then
+    local target_file=""
+    if [ "${HAVE_FILES}" -ge 1 ]; then
+        target_file="${FILES[0]}"
+    elif [ -n "${ORIGINAL_FILE}" ]; then
+        target_file="${ORIGINAL_FILE}"
+    else
         MESSAGE="cannot edit piped input"
         return 0
     fi
@@ -539,17 +548,27 @@ open_in_editor() {
     tput rmcup 2>/dev/null || printf '%s' "${ESC}[?1049l"
     stty "${STTY_ORIG}" < /dev/tty 2>/dev/null
 
-    if [ "${#FILES[@]}" -eq 1 ]; then
-        ${editor} "+${TOP_LINE}" "${FILES[0]}" < /dev/tty > /dev/tty 2>&1 || :
-    else
+    if [ "${HAVE_FILES}" -gt 1 ]; then
         ${editor} "${FILES[@]}" < /dev/tty > /dev/tty 2>&1 || :
+    else
+        ${editor} "+${TOP_LINE}" "${target_file}" < /dev/tty > /dev/tty 2>&1 || :
     fi
 
     # Re-initialize the alternate screen and raw input mode for the pager.
     term_setup
 
-    # Reload input from the files in case modifications were saved.
-    load_input
+    # Reload input from reload command or file in case modifications were saved.
+    if [ -n "${RELOAD_CMD}" ]; then
+        eval "${RELOAD_CMD}" > "${SPOOL}" 2>/dev/null || :
+    elif [ "${HAVE_FILES}" -ge 1 ]; then
+        load_input
+    elif [ -n "${ORIGINAL_FILE}" ] && [ -r "${ORIGINAL_FILE}" ]; then
+        awk -v lim="${MAX_LINES}" '
+            NR <= lim { print }
+            END { if (NR > lim) exit 99 }
+        ' "${ORIGINAL_FILE}" > "${SPOOL}" 2>/dev/null || :
+    fi
+
     TOTAL=$(( $(wc -l < "${SPOOL}") ))
     clamp_top
     query_size
@@ -598,6 +617,15 @@ parse_args() {
             --max-lines=*) MAX_LINES="${arg#*=}" ;;
             --max-lines) [ "$#" -ge 2 ] || die "--max-lines needs a value"
                          MAX_LINES="$2"; shift ;;
+            --file=*) ORIGINAL_FILE="${arg#*=}" ;;
+            --file) [ "$#" -ge 2 ] || die "--file needs a value"
+                    ORIGINAL_FILE="$2"; shift ;;
+            --edit-target=*) ORIGINAL_FILE="${arg#*=}" ;;
+            --edit-target) [ "$#" -ge 2 ] || die "--edit-target needs a value"
+                    ORIGINAL_FILE="$2"; shift ;;
+            --reload-cmd=*) RELOAD_CMD="${arg#*=}" ;;
+            --reload-cmd) [ "$#" -ge 2 ] || die "--reload-cmd needs a value"
+                    RELOAD_CMD="$2"; shift ;;
             +[0-9]*) START_LINE="${arg#+}" ;;
             +/*) START_PATTERN="${arg#+/}" ;;
             +) die "invalid argument: +" ;;

@@ -367,6 +367,71 @@ class TestPagerScript(unittest.TestCase):
         finally:
             os.close(master)
 
+    def test_editor_shortcut_piped_with_file_flag(self):
+        """Verify pressing 'e' on piped input with --file flag opens the file and runs reload command."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            tf.write("# Markdown Title\nSome content\n")
+            target_path = tf.name
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as ef:
+            ef.write('#!/bin/sh\nfor arg in "$@"; do [ -f "$arg" ] && echo "Appended to md" >> "$arg"; done\n')
+            editor_path = ef.name
+        os.chmod(editor_path, 0o755)
+
+        env = os.environ.copy()
+        env["EDITOR"] = editor_path
+
+        try:
+            reload_cmd = f"cat {target_path}"
+            proc = subprocess.Popen(
+                f"printf 'Formatted Initial Stream\\n' | bash {PAGER_SCRIPT} --file='{target_path}' --reload-cmd='{reload_cmd}'",
+                shell=True,
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                env=env,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.15)
+            os.write(master, b"e")
+            time.sleep(0.2)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("Appended to md", text)
+
+            with open(target_path, "r") as f:
+                self.assertIn("Appended to md", f.read())
+        finally:
+            os.close(master)
+            if os.path.exists(target_path):
+                os.remove(target_path)
+            if os.path.exists(editor_path):
+                os.remove(editor_path)
+
 
 if __name__ == "__main__":
     unittest.main()
