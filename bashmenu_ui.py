@@ -931,6 +931,7 @@ class MessageModalScreen(ModalScreen[None]):
     }
     #message {
         width: 100%;
+        margin-right: 1;
     }
     #footer {
         text-align: center;

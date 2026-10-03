@@ -622,6 +622,12 @@ class ItemEditModal(ModalScreen[dict]):
         height: 3;
         margin-left: 1;
     }
+    #lbl_type_header {
+        margin-right: 1;
+    }
+    #row_item_type {
+        margin-right: 1;
+    }
     #lbl_current_type {
         height: 3;
         content-align: left middle;
@@ -634,6 +640,7 @@ class ItemEditModal(ModalScreen[dict]):
         height: auto;
         padding: 0;
         margin: 0;
+        margin-right: 1;
     }
     Input {
         height: auto;
@@ -1353,6 +1360,7 @@ class MenuEditScreen(Screen):
     }
     #inspector_content {
         height: auto;
+        margin-right: 1;
     }
     Checkbox {
         background: transparent;

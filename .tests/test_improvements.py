@@ -713,6 +713,47 @@ class TestImprovements(unittest.TestCase):
         self.assertNotIn("command", mock_node.data)
         self.assertIn("[SCR]", mock_node.label)
 
+    def test_scrolling_modal_scrollbar_margins(self):
+        """Verify scrolling modals provide at least a one-character right margin before scrollbars."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu_ui
+        import menuedit
+
+        async def run_checks():
+            app = App()
+            # 1. MessageModalScreen (Help modal)
+            long_content = "Line of help text content\n" * 50
+            help_modal = bashmenu_ui.MessageModalScreen("Help", long_content, is_help=True)
+            async with app.run_test(size=(80, 24)) as pilot:
+                await app.push_screen(help_modal)
+                await pilot.pause()
+                sc = help_modal.query_one("#scroll_container")
+                msg = help_modal.query_one("#message")
+                sb_x = sc.vertical_scrollbar.region.x
+                msg_right = msg.region.x + msg.region.width
+                self.assertGreaterEqual(sb_x - msg_right, 1)
+
+            # 2. ItemEditModal
+            app2 = App()
+            item = {"type": "command", "title": "Test Item", "command": "echo test"}
+            edit_modal = menuedit.ItemEditModal(item)
+            async with app2.run_test(size=(90, 30)) as pilot:
+                await app2.push_screen(edit_modal)
+                await pilot.pause()
+                fs = edit_modal.query_one("#form_scroll")
+                inp = edit_modal.query_one("#inp_title")
+                c_std = edit_modal.query_one("#container_standard")
+                row_type = edit_modal.query_one("#row_item_type")
+                sb_x = fs.vertical_scrollbar.region.x
+                self.assertGreaterEqual(sb_x - (c_std.region.x + c_std.region.width), 1)
+                self.assertGreaterEqual(sb_x - (inp.region.x + inp.region.width), 1)
+                self.assertGreaterEqual(sb_x - (row_type.region.x + row_type.region.width), 1)
+
+        asyncio.run(run_checks())
+
 
 if __name__ == "__main__":
     unittest.main()
