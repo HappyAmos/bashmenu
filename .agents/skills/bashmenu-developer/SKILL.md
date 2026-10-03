@@ -256,6 +256,45 @@ Textual interface.
     When performing extensive structural overhauls (cross-platform compatibility,
     dependency elimination, or editor re-architecture), always branch from git
     (e.g., `feat/<topic>`) and verify all test suites and linters pass before merging.
+25. **Markdown Documentation Standards (Tables & Collapsible TOC):**
+    - Description lists across documentation (options, flags, parameters, fields) must be
+      formatted as GitHub-Flavored Markdown tables rather than indented/unaligned bullet lists.
+    - Long-form markdown documentation (such as `bashmenu.md`) should feature a collapsible
+      `<details><summary><b>Table of Contents</b> (click to expand)</summary>...</details>`
+      block with anchor links for major sections.
+    - Code block fences must always have an empty line before them to prevent markdown
+      renderers (like Rich) from inlining the code block into the preceding line.
+26. **Rich Hyperlink Rendering & Terminal Capabilities (`scripts/rich.sh`):**
+    - To render clean terminal hyperlinks (OSC 8) without polluting text with raw anchor URLs:
+      * Pass `-y` (`--hyperlinks`) to `rich.markdown`.
+      * Rich suppresses colors and hyperlinks if `TERM` is `dumb` or unset. Shell wrappers
+        must ensure `TERM` is upgraded to `xterm-256color` and `COLORTERM=truecolor` when
+        `TERM` is unset, `dumb`, or `unknown`.
+27. **Textual Modal Performance vs. Widget Overkill (`bashmenu_ui.py`):**
+    - Avoid using Textual's built-in `Markdown` widget for large documentation documents.
+      Textual's `Markdown` decomposes the document into a tree of individual DOM widgets
+      (e.g., 784 widgets for `bashmenu.md`), leading to severe CPU overhead (~5-second lag
+      on modal mount and choppy scrolling).
+    - Use `Static` containing `rich.markdown.Markdown(text, hyperlinks=True)` instead. It
+      renders the entire document as a single native widget (under 0.1s load time, smooth
+      60 FPS scrolling).
+    - Textual's Click events automatically populate `event.style.link` and
+      `widget.get_style_at(x, y)` from Rich's rendered styles. Use this to handle link clicks
+      directly.
+    - For internal anchor links (`#...`), compute/cache line offsets on-demand via
+      `Console.render_lines()` and scroll the container (`scroller.scroll_to(y=...)`).
+    - If using Textual's `Markdown` widget anywhere, always pass `open_links=False` to prevent
+      Textual's default `open_links=True` from unconditionally launching the system web
+      browser on internal `#anchor` clicks.
+28. **Terminal Pager Interactive Link Following & In-Document Search (`scripts/pager.sh`):**
+    - In terminal pagers, support interactive link selection (`l` / `o`) using a keyboard-navigable
+      overlay that scans the rendered spool for both OSC 8 sequences and Markdown `[text](url)` links.
+    - When jumping to anchor headings from slugs (`#...`), implement normalized token matching
+      (e.g. alphanumeric word matching) because Markdown slugifiers strip periods and punctuation
+      (e.g., `3.1 Main Menu Engine` -> `#31-main-menu-engine`).
+    - Support forward searching (`/`) with next (`n`) and previous (`N`) navigation.
+    - In bash terminal raw mode (`read -rsn1`), newline/enter delimiter returns status 0 with an
+      empty string; explicitly map this to `\n` in raw character grabbers (`grab_char`).
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the
