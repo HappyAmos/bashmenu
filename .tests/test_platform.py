@@ -81,6 +81,21 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertIn("pip:py3-pip", res.stdout)
         self.assertIn("venv:py3-virtualenv", res.stdout)
 
+    def test_package_name_mappings_arch(self):
+        """Verify Arch Linux (pacman) package mappings."""
+        code = f"""
+        source "{BASHMENU_SH}"
+        PKG_MANAGER="pacman"
+        echo "python:$(get_package_name python3)"
+        echo "pip:$(get_package_name pip3)"
+        echo "venv:$(get_package_name venv)"
+        """
+        res = self.run_bash_snippet({}, code)
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("python:python", res.stdout)
+        self.assertIn("pip:python-pip", res.stdout)
+        self.assertIn("venv:python-virtualenv", res.stdout)
+
     def test_yaml_get_fallback_layers(self):
         """Verify yaml_get extracts keys using awk fallback even without Python or yq."""
         # Create a mock minimal YAML

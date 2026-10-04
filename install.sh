@@ -117,6 +117,18 @@ elif command -v dnf >/dev/null 2>&1; then
 
 elif command -v pacman >/dev/null 2>&1; then
     echo "  [+] Arch Linux detected (pacman)"
+    if [ ! -d "/var/lib/pacman" ]; then
+        run_root mkdir -p /var/lib/pacman
+    fi
+    if [ ! -d "/var/lib/pacman/sync" ] || [ -z "$(ls -A /var/lib/pacman/sync 2>/dev/null)" ]; then
+        echo "  [+] Initializing Arch pacman databases..."
+        if command -v pacman-key >/dev/null 2>&1 && [ ! -d "/etc/pacman.d/gnupg" ]; then
+            run_root pacman-key --init 2>/dev/null || true
+            run_root pacman-key --populate archlinux 2>/dev/null || true
+        fi
+        run_root pacman -Sy --noconfirm 2>/dev/null || run_root pacman -Sy || true
+    fi
+
     missing_pacman=""
     command -v bash >/dev/null 2>&1 || missing_pacman="$missing_pacman bash"
     command -v git >/dev/null 2>&1 || missing_pacman="$missing_pacman git"

@@ -25,8 +25,22 @@ if [ -z "$BASH_VERSION" ]; then
     fi
 fi
 
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
+# Ensure UTF-8 locale handling across minimal containers and full distros
+if command -v locale >/dev/null 2>&1; then
+    if locale -a 2>/dev/null | grep -qiE "^en_US\.(utf-?8)$"; then
+        export LANG=en_US.UTF-8
+        export LC_ALL=en_US.UTF-8
+    elif locale -a 2>/dev/null | grep -qiE "^c\.(utf-?8)$"; then
+        export LANG=C.UTF-8
+        export LC_ALL=C.UTF-8
+    else
+        export LANG="${LANG:-C.UTF-8}"
+        export LC_ALL="${LC_ALL:-C.UTF-8}"
+    fi
+else
+    export LANG="${LANG:-C.UTF-8}"
+    export LC_ALL="${LC_ALL:-C.UTF-8}"
+fi
 
 # Canonical symlink resolution to determine true script directory
 SOURCE="${BASH_SOURCE[0]}"
@@ -167,6 +181,7 @@ fi
 
 # Flag to ensure package manager index update only runs once per execution
 APT_UPDATED=false
+PACMAN_UPDATED=false
 
 # Function to execute a command with root privileges if necessary
 run_as_root() {
@@ -376,6 +391,8 @@ get_package_name() {
                 echo "python3-virtualenv"
             elif [ "$PKG_MANAGER" = "apk" ]; then
                 echo "py3-virtualenv"
+            elif [ "$PKG_MANAGER" = "pacman" ]; then
+                [ "$IS_WINDOWS" = true ] && echo "mingw-w64-x86_64-python-virtualenv" || echo "python-virtualenv"
             elif [ "$PKG_MANAGER" = "pkg" ] || [ "$PKG_MANAGER" = "brew" ]; then
                 echo ""
             else
@@ -428,6 +445,17 @@ install_apps() {
         echo "Running apt-get update to synchronize package index..."
         run_as_root apt-get update -qq
         APT_UPDATED=true
+    elif [ "$PKG_MANAGER" = "pacman" ] && [ "$PACMAN_UPDATED" = false ] && [ ${#packages_to_install[@]} -gt 0 ]; then
+        [ ! -d "/var/lib/pacman" ] && run_as_root mkdir -p /var/lib/pacman
+        if [ ! -d "/var/lib/pacman/sync" ] || [ -z "$(ls -A /var/lib/pacman/sync 2>/dev/null)" ]; then
+            echo "Running pacman -Sy to synchronize package databases..."
+            if command -v pacman-key >/dev/null 2>&1 && [ ! -d "/etc/pacman.d/gnupg" ]; then
+                run_as_root pacman-key --init 2>/dev/null || true
+                run_as_root pacman-key --populate archlinux 2>/dev/null || true
+            fi
+            run_as_root pacman -Sy --noconfirm 2>/dev/null || run_as_root pacman -Sy || true
+        fi
+        PACMAN_UPDATED=true
     fi
 
     for pkg in "${packages_to_install[@]}"; do
@@ -448,6 +476,7 @@ install_apps() {
                 run_as_root yum install -y "$pkg"
                 ;;
             "pacman")
+                [ ! -d "/var/lib/pacman" ] && run_as_root mkdir -p /var/lib/pacman
                 run_as_root pacman -S --noconfirm "$pkg"
                 ;;
             "zypper")
