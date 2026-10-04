@@ -1142,6 +1142,10 @@ class MainMenuView(Widget):
         b_tr = borders.get("border_top_right", "┐")
         b_bl = borders.get("border_bottom_left", "└")
         b_br = borders.get("border_bottom_right", "┘")
+        b_tee_l = borders.get("border_tee_left", b_v_left)
+        b_tee_r = borders.get("border_tee_right", b_v_right)
+        title_l_cap = borders.get("title_left_cap", " ") or " "
+        title_r_cap = borders.get("title_right_cap", " ") or " "
 
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
@@ -1152,16 +1156,19 @@ class MainMenuView(Widget):
         raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
         extra_vars = {"window_width": avail_w, "window_height": visible_option_rows}
 
-        # 3. Header border line: ┌── Title ──┐
+        # 3. Header border line: ┌──[ Title ]──┐
         title_raw = interpolate_placeholders(curr_menu.get("title", "HA Bash Menu"), self.config, extra_vars=extra_vars)
-        title_str = f" {title_raw} "
-        title_len = get_visible_len(title_str, self.config)
+        title_body = f" {title_raw} "
+        title_full = f"{title_l_cap}{title_body}{title_r_cap}"
+        title_len = get_visible_len(title_full, self.config)
 
         left_b = max(2, (w - title_len) // 2)
         right_b = max(2, w - left_b - title_len)
 
         top_bar = Text(b_tl + b_h_top * max(0, left_b - 1), style=border_style)
-        top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_str, default_style=title_style, theme=theme_styles))
+        top_bar.append(title_l_cap, style=border_style)
+        top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_body, default_style=title_style, theme=theme_styles))
+        top_bar.append(title_r_cap, style=border_style)
         top_bar.append(b_h_top * max(0, right_b - 1) + b_tr + "\n", style=border_style)
         out.append_text(top_bar)
 
@@ -1194,20 +1201,21 @@ class MainMenuView(Widget):
             is_selected = (idx == curr_row)
             item_style = highlight_style if is_selected else text_style
 
-            line_rich = Text(f"{b_v_left}  ", style=border_style)
-
             if opt.get("type") == "divider":
                 div_str = resolve_divider_string(self.config, target_w=avail_w)
                 div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                line_rich = Text(f"{b_tee_l}  ", style=border_style)
                 line_rich.append_text(div_rich)
 
                 used_w = get_visible_len(div_str, self.config)
                 fill_w = max(0, avail_w - used_w)
                 line_rich.append(" " * fill_w)
-                line_rich.append(f"  {b_v_right}\n", style=border_style)
+                line_rich.append(f"  {b_tee_r}\n", style=border_style)
                 out.append_text(line_rich)
                 rendered_content_rows += 1
                 continue
+
+            line_rich = Text(f"{b_v_left}  ", style=border_style)
 
             ind_str = f"{indicator_symbol} " if is_selected else "  "
             ind_w = get_display_width(ind_str, self.config)

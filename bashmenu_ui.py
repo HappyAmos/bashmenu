@@ -547,7 +547,22 @@ def safe_addstr(win, y_or_text, x_or_attr=None, text_or_none=None, attr=0):
 
 
 def draw_shadow(stdscr, start_y, start_x, box_h, box_w, theme=None):
-    """Compatibility shim."""
+    """Draw a classic drop shadow behind a popup modal window on stdscr."""
+    with contextlib.suppress(Exception):
+        max_y, max_x = stdscr.getmaxyx()
+        shadow_char = "░"
+        if isinstance(theme, dict) and "window_borders" in theme:
+            shadow_char = theme["window_borders"].get("shadow_char", "░")
+
+        for y in range(start_y + 1, min(max_y, start_y + box_h + 1)):
+            for x in range(start_x + box_w, min(max_x, start_x + box_w + 2)):
+                with contextlib.suppress(Exception):
+                    stdscr.addstr(y, x, shadow_char)
+        for x in range(start_x + 2, min(max_x, start_x + box_w + 2)):
+            y = start_y + box_h
+            if y < max_y:
+                with contextlib.suppress(Exception):
+                    stdscr.addstr(y, x, shadow_char)
 
 
 # ==============================================================================
@@ -609,6 +624,14 @@ DEFAULT_WINDOW_BORDER = {
     "border_top_right": "┐",
     "border_bottom_left": "└",
     "border_bottom_right": "┘",
+    "border_tee_top": "┬",
+    "border_tee_bottom": "┴",
+    "border_tee_left": "├",
+    "border_tee_right": "┤",
+    "border_cross": "┼",
+    "title_left_cap": " ",
+    "title_right_cap": " ",
+    "shadow_char": "░",
 }
 
 
@@ -622,8 +645,10 @@ def get_theme_window_borders(
     Returns a dictionary containing border_horizontal, border_vertical,
     border_horizontal_top, border_horizontal_bottom, border_vertical_left,
     border_vertical_right, border_top_left, border_top_right,
-    border_bottom_left, and border_bottom_right.
-    Falls back to single-line box drawing characters for any undefined keys.
+    border_bottom_left, border_bottom_right, border_tee_top, border_tee_bottom,
+    border_tee_left, border_tee_right, border_cross, title_left_cap,
+    title_right_cap, and shadow_char.
+    Falls back to standard box drawing characters for any undefined keys.
     """
     window_def = None
     if isinstance(theme_name, dict):
@@ -676,7 +701,7 @@ def get_theme_window_borders(
         borders["border_vertical_left"] = v_base
         borders["border_vertical_right"] = v_base
 
-    # Specific edge and corner overrides
+    # Specific edge, corner, T-junction, title cap, and shadow overrides
     aliases = {
         "border_horizontal_top": ["border_horizontal_top", "border_top", "window_border_horizontal_top", "window_border_top"],
         "border_horizontal_bottom": ["border_horizontal_bottom", "border_bottom", "window_border_horizontal_bottom", "window_border_bottom"],
@@ -686,6 +711,14 @@ def get_theme_window_borders(
         "border_top_right": ["border_top_right", "window_border_top_right"],
         "border_bottom_left": ["border_bottom_left", "window_border_bottom_left"],
         "border_bottom_right": ["border_bottom_right", "window_border_bottom_right"],
+        "border_tee_top": ["border_tee_top", "window_border_tee_top"],
+        "border_tee_bottom": ["border_tee_bottom", "window_border_tee_bottom"],
+        "border_tee_left": ["border_tee_left", "window_border_tee_left"],
+        "border_tee_right": ["border_tee_right", "window_border_tee_right"],
+        "border_cross": ["border_cross", "window_border_cross"],
+        "title_left_cap": ["title_left_cap", "title_cap_left", "window_title_left_cap", "window_title_cap_left"],
+        "title_right_cap": ["title_right_cap", "title_cap_right", "window_title_right_cap", "window_title_cap_right"],
+        "shadow_char": ["shadow_char", "window_shadow_char"],
     }
 
     for target_key, candidate_keys in aliases.items():
@@ -934,6 +967,12 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
     t_name = theme_dict.get("theme_name") if isinstance(theme_dict, dict) else theme
     if t_name:
         apply_theme_to_textual_borders(t_name)
+    with contextlib.suppress(Exception):
+        shadow_style = theme_dict.get("shadow")
+        if shadow_style and shadow_style.bgcolor and shadow_style.bgcolor.name:
+            css_shadow = parse_css_color(shadow_style.bgcolor.name)
+            if css_shadow and hasattr(screen, "styles"):
+                screen.styles.background = f"{css_shadow} 60%"
     with contextlib.suppress(Exception):
         dialog = screen.query_one("#dialog")
         border_style = theme_dict.get("border") or theme_dict.get("accent")

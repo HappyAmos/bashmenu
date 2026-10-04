@@ -995,12 +995,17 @@ class TestImprovements(unittest.TestCase):
 
     def test_ymlcheck_theme_window_validation(self):
         """Test ymlcheck validation for theme window: and divider: sections."""
-        # Valid window section with top/bottom/left/right keys
+        # Valid window section with top/bottom/left/right, title caps, and tees
         valid_section = {
             "border_horizontal_top": "{ascii:223}",
             "border_horizontal_bottom": "{ascii:220}",
             "border_vertical_left": "{ascii:221}",
             "border_vertical_right": "{ascii:222}",
+            "border_tee_left": "{ascii:195}",
+            "border_tee_right": "{ascii:180}",
+            "title_left_cap": "╡",
+            "title_right_cap": "╞",
+            "shadow_char": "░",
         }
         self.assertEqual(ymlcheck.validate_window_section(valid_section, "test.window"), [])
 
@@ -1022,6 +1027,17 @@ class TestImprovements(unittest.TestCase):
         # Non-dict section
         errors_non_dict = ymlcheck.validate_window_section("not_a_dict", "test.window")
         self.assertTrue(len(errors_non_dict) > 0)
+
+    def test_draw_shadow_compatibility(self):
+        """Test draw_shadow curses compatibility helper with shade characters."""
+        mock_scr = MagicMock()
+        mock_scr.getmaxyx.return_value = (30, 80)
+        bashmenu_ui.draw_shadow(mock_scr, start_y=5, start_x=10, box_h=8, box_w=30)
+        self.assertTrue(mock_scr.addstr.called)
+        calls = [c[0] for c in mock_scr.addstr.call_args_list]
+        # Verify shadow_char '░' was drawn
+        chars_drawn = {c[2] for c in calls}
+        self.assertIn("░", chars_drawn)
 
     def test_theme_window_borders_propagation(self):
         """Verify theme window borders propagate to Textual borders, bashedit, and menuedit."""

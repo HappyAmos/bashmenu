@@ -307,6 +307,14 @@ pacman:
 | `border_top_right` | Top-right corner frame character. | `┐` (`{ascii:191}`) |
 | `border_bottom_left` | Bottom-left corner frame character. | `└` (`{ascii:192}`) |
 | `border_bottom_right` | Bottom-right corner frame character. | `┘` (`{ascii:217}`) |
+| `border_tee_top` | Top horizontal T-junction connector character. | `┬` (`{ascii:194}`) |
+| `border_tee_bottom` | Bottom horizontal T-junction connector character. | `┴` (`{ascii:193}`) |
+| `border_tee_left` | Left vertical T-junction connector character. | `├` (`{ascii:195}`) |
+| `border_tee_right` | Right vertical T-junction connector character. | `┤` (`{ascii:180}`) |
+| `border_cross` | Grid intersection cross character. | `┼` (`{ascii:197}`) |
+| `title_left_cap` | Decorative left cap before the title text in header border. | ` ` (space) |
+| `title_right_cap` | Decorative right cap after the title text in header border. | ` ` (space) |
+| `shadow_char` | Drop shadow shade character for modal dialogs and popups. | `░` (`{ascii:176}`) |
 
 ##### Divider Resolution Precedence
 Dividers (`{divider}` macro, divider menu items, and editor footers) are completely independent of outer window borders (`window:`) and strictly follow a 3-tier priority:

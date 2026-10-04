@@ -356,27 +356,35 @@ Textual interface.
       their caching characteristics and on-demand evaluation behavior.
     - Every newly added macro must include automated assertion coverage in
       `.tests/test_improvements.py` (`test_placeholder_documentation_parity`).
-34. **Theme Window Border Customization (`window:` in `bashmenu.themes`):**
+34. **Theme Window Border & Divider Customization (`window:` and `divider:` in `bashmenu.themes`):**
     - Themes can optionally define an outer window frame character override dictionary
-      under a top-level `window:` key.
-    - Supported keys: `border_horizontal`, `border_vertical`, `border_top_left`,
-      `border_top_right`, `border_bottom_left`, `border_bottom_right` (also accepts
-      `window_border_*` prefix).
-    - Omitted keys must seamlessly fall back to default single-line box drawing
-      characters (`┌─┐│└┘`).
+      under a top-level `window:` key, and a horizontal divider specification under `divider:`.
+    - Supported window keys: `border_horizontal_top`, `border_horizontal_bottom`,
+      `border_vertical_left`, `border_vertical_right` (with `border_horizontal` and
+      `border_vertical` as shorthands/fallbacks), `border_top_left`, `border_top_right`,
+      `border_bottom_left`, `border_bottom_right`, `border_tee_top`, `border_tee_bottom`,
+      `border_tee_left`, `border_tee_right`, `border_cross`, `title_left_cap`, `title_right_cap`,
+      and `shadow_char` (also accepts `window_*` / `window_border_*` prefix).
+    - Omitted keys seamlessly fall back to default box drawing characters (`┌─┐│└┘`, tees, and spaces).
     - Values are resolved through `interpolate_placeholders` and `resolve_glyph`,
-      supporting CP437 ASCII macros (e.g. `{ascii:205}` for double horizontal line `═`),
-      Nerd Font hex tags, and Unicode glyphs. Unicode Variation Selectors (`\ufe0f`, `\ufe0e`)
-      must be stripped prior to measurement.
-    - `ymlcheck.py` must enforce that `window:` is a mapping and all child properties
-      are recognized border keys with string or integer values.
+      supporting CP437 ASCII macros (e.g. `{ascii:223}` for top half block `▀`, `{ascii:220}`
+      for bottom half block `▄`, `{ascii:221}` for left half block `▌`, `{ascii:222}` for right
+      half block `▐`, and `{ascii:181}`/`{ascii:198}` for `╡ Title ╞`). Unicode Variation Selectors
+      (`\ufe0f`, `\ufe0e`) must be stripped prior to measurement.
+    - `ymlcheck.py` enforces that `window:` and `divider:` are valid sections and validates all
+      child properties.
     - Global Textual border synchronization: `apply_theme_to_textual_borders` in `bashmenu_ui.py`
       synchronizes `textual._border.BORDER_CHARS['thick']` and `['solid']` and clears Textual's
-      box cache (`get_box.cache_clear()`), ensuring all modal dialogs across `bashmenu_ui.py`,
-      panel borders in `menuedit.py`, and editor dividers in `bashedit.py` dynamically honor
-      the active theme's borders.
-    - When a divider's `char:` is omitted or resolves empty in `bashmenu.py` or `menuedit.py`,
-      it automatically falls back to the active theme's `border_horizontal`.
+      box cache (`get_box.cache_clear()`), ensuring all modal dialogs across `bashmenu_ui.py`
+      and panel borders in `menuedit.py` dynamically honor the active theme's borders.
+    - **Divider Resolution Precedence**: Dividers are strictly independent of window borders
+      (`window.border_horizontal` must never bleed into or override dividers). Dividers follow
+      a strict 3-tier priority:
+      1. *Theme Definition (`bashmenu.themes`)*: Explicit `divider:` block under active theme (top priority).
+      2. *Plugin Definition (`bashmenu.yml`)*: Plugin divider configurations (`settings.plugins.<name>.divider`,
+         `settings.plugins.divider`, `user.divider`, `settings.divider`).
+      3. *Default Fallback*: `char: "{ascii:196}"` of length `{window_width}`.
+
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the
