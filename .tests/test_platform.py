@@ -220,6 +220,20 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertNotIn("<html", res.stdout)
         self.assertIn("Network IP Information", res.stdout)
 
+    def test_ping_script(self):
+        """Verify scripts/ping.sh runs cleanly with real ping or TCP fallback."""
+        ping_sh = os.path.join(SCRIPTS_DIR, "ping.sh")
+        self.assertTrue(os.path.isfile(ping_sh))
+        res = subprocess.run(
+            [ping_sh, "127.0.0.1", "1"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertTrue("statistics" in res.stdout or "Reply from" in res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

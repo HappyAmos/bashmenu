@@ -466,7 +466,7 @@ options:
       message: Start pinging target host {settings.ping_target}?
       on_yes:
         type: command
-        action: ping -c 4 {settings.ping_target}
+        action: '{scripts_dir}/ping.sh {settings.ping_target}'
         stream: true
       on_no:
         type: message

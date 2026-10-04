@@ -71,6 +71,10 @@ if command -v apk >/dev/null 2>&1; then
     if ! command -v python3 >/dev/null 2>&1 || ! python3 -c "import yaml" >/dev/null 2>&1; then
         missing_apk="$missing_apk py3-yaml"
     fi
+    # Ensure full ping binary from iputils is installed if busybox ping lacks permissions
+    if ! ping -c 1 127.0.0.1 >/dev/null 2>&1; then
+        missing_apk="$missing_apk iputils"
+    fi
     if [ -n "$missing_apk" ]; then
         echo "  [+] Installing missing prerequisites:$missing_apk"
         # shellcheck disable=SC2086
