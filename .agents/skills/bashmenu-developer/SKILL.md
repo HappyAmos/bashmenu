@@ -356,6 +356,20 @@ Textual interface.
       their caching characteristics and on-demand evaluation behavior.
     - Every newly added macro must include automated assertion coverage in
       `.tests/test_improvements.py` (`test_placeholder_documentation_parity`).
+34. **Theme Window Border Customization (`window:` in `bashmenu.themes`):**
+    - Themes can optionally define an outer window frame character override dictionary
+      under a top-level `window:` key.
+    - Supported keys: `border_horizontal`, `border_vertical`, `border_top_left`,
+      `border_top_right`, `border_bottom_left`, `border_bottom_right` (also accepts
+      `window_border_*` prefix).
+    - Omitted keys must seamlessly fall back to default single-line box drawing
+      characters (`┌─┐│└┘`).
+    - Values are resolved through `interpolate_placeholders` and `resolve_glyph`,
+      supporting CP437 ASCII macros (e.g. `{ascii:205}` for double horizontal line `═`),
+      Nerd Font hex tags, and Unicode glyphs. Unicode Variation Selectors (`\ufe0f`, `\ufe0e`)
+      must be stripped prior to measurement.
+    - `ymlcheck.py` must enforce that `window:` is a mapping and all child properties
+      are recognized border keys with string or integer values.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the

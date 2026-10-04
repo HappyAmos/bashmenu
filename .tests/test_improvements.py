@@ -940,6 +940,59 @@ class TestImprovements(unittest.TestCase):
         for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}"]:
             self.assertIn(ep, man_content, f"Missing {ep} in bashmenu.1")
 
+    def test_theme_window_borders(self):
+        """Test window border extraction, defaults, and CP437 ASCII macro resolution."""
+        # 1. Default fallback (dracula theme has no window section)
+        dracula_borders = bashmenu_ui.get_theme_window_borders("dracula")
+        self.assertEqual(dracula_borders["border_horizontal"], "─")
+        self.assertEqual(dracula_borders["border_vertical"], "│")
+        self.assertEqual(dracula_borders["border_top_left"], "┌")
+        self.assertEqual(dracula_borders["border_top_right"], "┐")
+        self.assertEqual(dracula_borders["border_bottom_left"], "└")
+        self.assertEqual(dracula_borders["border_bottom_right"], "┘")
+
+        # 2. QBasic theme double-line border overrides
+        qbasic_borders = bashmenu_ui.get_theme_window_borders("qbasic")
+        self.assertEqual(qbasic_borders["border_horizontal"], "═")
+        self.assertEqual(qbasic_borders["border_vertical"], "║")
+        self.assertEqual(qbasic_borders["border_top_left"], "╔")
+        self.assertEqual(qbasic_borders["border_top_right"], "╗")
+        self.assertEqual(qbasic_borders["border_bottom_left"], "╚")
+        self.assertEqual(qbasic_borders["border_bottom_right"], "╝")
+
+        # 3. Partial override test
+        mock_theme_data = {
+            "custom_theme": {
+                "window": {
+                    "border_horizontal": "=",
+                }
+            }
+        }
+        custom_borders = bashmenu_ui.get_theme_window_borders("custom_theme", raw_theme_data=mock_theme_data)
+        self.assertEqual(custom_borders["border_horizontal"], "=")
+        self.assertEqual(custom_borders["border_vertical"], "│")  # Unspecified falls back to default
+
+    def test_ymlcheck_theme_window_validation(self):
+        """Test ymlcheck validation for theme window: sections."""
+        # Valid window section
+        valid_section = {
+            "border_horizontal": "{ascii:205}",
+            "border_vertical": "{ascii:186}",
+        }
+        self.assertEqual(ymlcheck.validate_window_section(valid_section, "test.window"), [])
+
+        # Invalid key
+        invalid_section = {
+            "invalid_border_key": "-",
+        }
+        errors = ymlcheck.validate_window_section(invalid_section, "test.window")
+        self.assertTrue(len(errors) > 0)
+        self.assertIn("Unknown window border property", errors[0])
+
+        # Non-dict section
+        errors_non_dict = ymlcheck.validate_window_section("not_a_dict", "test.window")
+        self.assertTrue(len(errors_non_dict) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()

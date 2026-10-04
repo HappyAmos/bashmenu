@@ -284,6 +284,13 @@ gruvbox:
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 qbasic:
   indicator: "{nf:>:#e629:}"
+  window:
+    border_horizontal: "{ascii:205}"
+    border_vertical: "{ascii:186}"
+    border_top_left: "{ascii:201}"
+    border_top_right: "{ascii:187}"
+    border_bottom_left: "{ascii:200}"
+    border_bottom_right: "{ascii:188}"
   256:
     background: 19
     title: [226, 19]

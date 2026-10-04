@@ -1067,7 +1067,8 @@ class MainMenuView(Widget):
         curr_row = self.current_row()
         options = curr_menu.get("options", [])
 
-        theme_styles = bashmenu_ui.init_theme_colors(self.config.get("theme", "dracula"))
+        theme_name = self.config.get("theme", "dracula")
+        theme_styles = bashmenu_ui.init_theme_colors(theme_name)
         self.theme_styles = theme_styles
         with contextlib.suppress(Exception):
             if hasattr(self, "app") and self.app:
@@ -1082,6 +1083,15 @@ class MainMenuView(Widget):
         shortcut_key_style = theme_styles.get("shortcut_key", Style(color="magenta", bold=True))
         gutter_style = theme_styles.get("gutter", Style(color="cyan", bold=True))
         help_text_style = theme_styles.get("help_text", Style(color="cyan"))
+
+        # Window borders resolved from theme
+        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
+        b_h = borders.get("border_horizontal", "─")
+        b_v = borders.get("border_vertical", "│")
+        b_tl = borders.get("border_top_left", "┌")
+        b_tr = borders.get("border_top_right", "┐")
+        b_bl = borders.get("border_bottom_left", "└")
+        b_br = borders.get("border_bottom_right", "┘")
 
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
@@ -1100,14 +1110,14 @@ class MainMenuView(Widget):
         left_b = max(2, (w - title_len) // 2)
         right_b = max(2, w - left_b - title_len)
 
-        top_bar = Text("┌" + "─" * (left_b - 1), style=border_style)
+        top_bar = Text(b_tl + b_h * max(0, left_b - 1), style=border_style)
         top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_str, default_style=title_style, theme=theme_styles))
-        top_bar.append("─" * (right_b - 1) + "┐\n", style=border_style)
+        top_bar.append(b_h * max(0, right_b - 1) + b_tr + "\n", style=border_style)
         out.append_text(top_bar)
 
         # Top Margin Rows (2 blank lines below top border per .gemini specification)
-        out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
-        out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
+        out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
+        out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
 
         # 4. Scroll position calculation
         scroll_start = 0
@@ -1134,7 +1144,7 @@ class MainMenuView(Widget):
             is_selected = (idx == curr_row)
             item_style = highlight_style if is_selected else text_style
 
-            line_rich = Text("│  ", style=border_style)
+            line_rich = Text(f"{b_v}  ", style=border_style)
 
             if opt.get("type") == "divider":
                 div_str = resolve_divider_string(self.config, target_w=avail_w)
@@ -1144,7 +1154,7 @@ class MainMenuView(Widget):
                 used_w = get_visible_len(div_str, self.config)
                 fill_w = max(0, avail_w - used_w)
                 line_rich.append(" " * fill_w)
-                line_rich.append("  │\n", style=border_style)
+                line_rich.append(f"  {b_v}\n", style=border_style)
                 out.append_text(line_rich)
                 rendered_content_rows += 1
                 continue
@@ -1217,24 +1227,24 @@ class MainMenuView(Widget):
                 row_content.append(" " * pad_w, style=item_style)
 
             line_rich.append_text(row_content)
-            line_rich.append("  │\n", style=border_style)
+            line_rich.append(f"  {b_v}\n", style=border_style)
             out.append_text(line_rich)
             rendered_content_rows += 1
 
         # 6. Pad blank rows between menu options and plugins
         target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows
         while rendered_content_rows < target_blank_rows:
-            out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
+            out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
             rendered_content_rows += 1
 
         # 7. Rows reserved for the PluginBuffer widget overlay
         for _ in raw_plugin_lines:
-            out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
+            out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
             rendered_content_rows += 1
 
         # 8. Blank separation row above Help Keys & Status Gutter (when plugins are active)
         if separator_rows > 0:
-            out.append_text(Text("│  " + " " * avail_w + "  │\n", style=border_style))
+            out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
             rendered_content_rows += 1
 
         # 9. Help Keys & Status Gutter Row (h - 2)
@@ -1292,13 +1302,13 @@ class MainMenuView(Widget):
         if hg_pad_w > 0:
             hg_content.append(" " * hg_pad_w, style=border_style)
 
-        hg_line = Text("│  ", style=border_style)
+        hg_line = Text(f"{b_v}  ", style=border_style)
         hg_line.append_text(hg_content)
-        hg_line.append("  │\n", style=border_style)
+        hg_line.append(f"  {b_v}\n", style=border_style)
         out.append_text(hg_line)
 
         # 9. Bottom Border Row (h - 1): └────────...────────┘
-        bot_bar = Text("└" + "─" * (w - 2) + "┘", style=border_style)
+        bot_bar = Text(b_bl + b_h * max(0, w - 2) + b_br, style=border_style)
         out.append_text(bot_bar)
 
         return out

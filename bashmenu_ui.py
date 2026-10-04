@@ -597,6 +597,59 @@ def parse_color_val(val):
 _themes_file_cache = {}
 _theme_styles_cache = {}
 
+DEFAULT_WINDOW_BORDER = {
+    "border_horizontal": "─",
+    "border_vertical": "│",
+    "border_top_left": "┌",
+    "border_top_right": "┐",
+    "border_bottom_left": "└",
+    "border_bottom_right": "┘",
+}
+
+
+def get_theme_window_borders(
+    theme_name: str = "dracula",
+    config: dict | None = None,
+    raw_theme_data: dict | None = None,
+) -> dict[str, str]:
+    """Retrieve and interpolate window border characters for the specified theme.
+
+    Returns a dictionary containing border_horizontal, border_vertical,
+    border_top_left, border_top_right, border_bottom_left, border_bottom_right.
+    Falls back to single-line box drawing characters for any undefined keys.
+    """
+    if not raw_theme_data:
+        raw_theme_data = load_themes_file()
+
+    theme_def = raw_theme_data.get(theme_name, {})
+    if not theme_def and raw_theme_data:
+        theme_def = next(iter(raw_theme_data.values()), {})
+
+    window_def = theme_def.get("window", {}) if isinstance(theme_def, dict) else {}
+    if not isinstance(window_def, dict):
+        window_def = {}
+
+    borders = dict(DEFAULT_WINDOW_BORDER)
+    if not window_def:
+        return borders
+
+    import bashmenu
+
+    for key in DEFAULT_WINDOW_BORDER:
+        raw_val = window_def.get(key)
+        if raw_val is None:
+            raw_val = window_def.get(f"window_{key}")
+        if raw_val is not None:
+            val_str = str(raw_val)
+            if "{" in val_str:
+                val_str = bashmenu.interpolate_placeholders(val_str, config or {})
+                val_str = bashmenu.resolve_glyph(val_str, config or {})
+            val_clean = val_str.replace("\ufe0f", "").replace("\ufe0e", "")
+            if val_clean:
+                borders[key] = val_clean
+
+    return borders
+
 
 def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None = None) -> dict:
     """

@@ -266,6 +266,35 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 
+#### Window Border Customization (`window:`)
+Themes can optionally override the outer window frame border characters using
+a top-level `window:` section. Authors may specify CP437 ASCII macros (e.g.,
+`{ascii:205}`), Unicode characters, or Nerd Font glyphs. Any omitted keys
+automatically fall back to standard single-line box drawing characters.
+
+```yaml
+qbasic:
+  indicator: ">"
+  window:
+    border_horizontal: "{ascii:205}"    # ═ (Double horizontal)
+    border_vertical: "{ascii:186}"      # ║ (Double vertical)
+    border_top_left: "{ascii:201}"      # ╔ (Double top-left)
+    border_top_right: "{ascii:187}"     # ╗ (Double top-right)
+    border_bottom_left: "{ascii:200}"   # ╚ (Double bottom-left)
+    border_bottom_right: "{ascii:188}"  # ╝ (Double bottom-right)
+  256:
+    ...
+```
+
+| Window Border Attribute | Description | Default Fallback |
+| :--- | :--- | :--- |
+| `border_horizontal` | Horizontal frame border character. | `─` (`{ascii:196}`) |
+| `border_vertical` | Vertical frame border character. | `│` (`{ascii:179}`) |
+| `border_top_left` | Top-left corner frame character. | `┌` (`{ascii:218}`) |
+| `border_top_right` | Top-right corner frame character. | `┐` (`{ascii:191}`) |
+| `border_bottom_left` | Bottom-left corner frame character. | `└` (`{ascii:192}`) |
+| `border_bottom_right` | Bottom-right corner frame character. | `┘` (`{ascii:217}`) |
+
 ---
 
 ## 5. Complete Menu Option Types Reference

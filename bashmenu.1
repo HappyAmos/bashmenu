@@ -487,6 +487,14 @@ Supported Theme Elements: background, title, border, text, highlight, accent, fo
 .PP
 .B Formatting Rule for Editor Compatibility:
 Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.
+.PP
+.B Window Border Customization (window:):
+Themes can optionally customize outer window frame border characters using a
+top-level \fBwindow:\fR section. Authors can specify CP437 ASCII directives
+(e.g., {ascii:205}), Unicode characters, or Nerd Font glyphs. Supported keys:
+\fBborder_horizontal\fR, \fBborder_vertical\fR, \fBborder_top_left\fR,
+\fBborder_top_right\fR, \fBborder_bottom_left\fR, and \fBborder_bottom_right\fR.
+Omitted keys fall back to standard single-line box drawing characters.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

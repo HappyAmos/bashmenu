@@ -30,7 +30,23 @@ VALID_16_COLORS = {
 VALID_DEPTHS = {"256", "16", "8", "truecolor"}
 
 # Non-color structural attributes permitted in theme definitions
-VALID_NON_COLOR_KEYS = {"indicator", "prefix"}
+VALID_NON_COLOR_KEYS = {"indicator", "prefix", "window"}
+
+# Permitted window border keys in theme window: sections
+VALID_WINDOW_BORDER_KEYS = {
+    "border_horizontal",
+    "border_vertical",
+    "border_top_left",
+    "border_top_right",
+    "border_bottom_left",
+    "border_bottom_right",
+    "window_border_horizontal",
+    "window_border_vertical",
+    "window_border_top_left",
+    "window_border_top_right",
+    "window_border_bottom_left",
+    "window_border_bottom_right",
+}
 
 # Permitted option types in bashmenu.mnu
 VALID_OPTION_TYPES = {
@@ -85,6 +101,23 @@ def validate_indicator_value(val: Any, path: str) -> list[str]:
     return [
         f"'{path}': Invalid type {type(val).__name__} for indicator. Expected string or character symbol."
     ]
+
+
+def validate_window_section(window_data: Any, path: str) -> list[str]:
+    """Validate window border overrides in a theme."""
+    if not isinstance(window_data, dict):
+        return [f"'{path}': Section must contain key-value pairs."]
+
+    errors = []
+    for key, val in window_data.items():
+        subpath = f"{path}.{key}"
+        if key not in VALID_WINDOW_BORDER_KEYS:
+            errors.append(f"'{subpath}': Unknown window border property '{key}'.")
+        elif not isinstance(val, (str, int)):
+            errors.append(
+                f"'{subpath}': Window border character must be a string or integer, got {type(val).__name__}."
+            )
+    return errors
 
 
 def validate_color_value(val: Any, depth_mode: str, path: str) -> list[str]:
@@ -174,14 +207,18 @@ def validate_theme_file(filepath: str) -> bool:
 
             for depth_key, keys in depth_map.items():
                 depth_str = str(depth_key)
-                if depth_str in VALID_NON_COLOR_KEYS:
+                if depth_str == "window":
+                    errors.extend(validate_window_section(keys, f"{theme_name}.window"))
+                elif depth_str in VALID_NON_COLOR_KEYS:
                     errors.extend(validate_indicator_value(keys, f"{theme_name}.{depth_str}"))
                 else:
                     errors.extend(validate_depth_section(depth_str, keys, theme_name))
     else:
         for depth_key, keys in data.items():
             depth_str = str(depth_key)
-            if depth_str in VALID_NON_COLOR_KEYS:
+            if depth_str == "window":
+                errors.extend(validate_window_section(keys, "root.window"))
+            elif depth_str in VALID_NON_COLOR_KEYS:
                 errors.extend(validate_indicator_value(keys, f"root.{depth_str}"))
             else:
                 errors.extend(validate_depth_section(depth_str, keys, "root"))
