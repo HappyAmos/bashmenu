@@ -1181,6 +1181,92 @@ class TestImprovements(unittest.TestCase):
         screen.on_key(te.Key("ctrl+s", "\x13"))
         self.assertEqual(ed.lines, lines_before)
 
+    def test_title_caps_rendering_and_styling(self):
+        """Test title caps default to brackets, use title/cap style, and decorate titles."""
+        # 1. Default window borders default to '[' and ']'
+        default_borders = bashmenu_ui.get_theme_window_borders("nonexistent_theme", raw_theme_data={})
+        self.assertEqual(default_borders["title_left_cap"], "[")
+        self.assertEqual(default_borders["title_right_cap"], "]")
+
+        # 2. Config window overrides
+        custom_cfg = {"window": {"title_left_cap": "«", "title_right_cap": "»"}}
+        cfg_borders = bashmenu_ui.get_theme_window_borders("dracula", config=custom_cfg, raw_theme_data={})
+        self.assertEqual(cfg_borders["title_left_cap"], "«")
+        self.assertEqual(cfg_borders["title_right_cap"], "»")
+
+        # 3. MainMenuView.render uses cap_style matching title
+        cfg = {"theme": "pacman"}
+        mnu = {"title": "My Title", "options": [{"name": "Opt1"}]}
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+        mv._size = type("Size", (), {"width": 80, "height": 24})()
+        rendered_top = mv.render().split("\n")[0]
+        self.assertIn("My Title", rendered_top.plain)
+        theme_styles = bashmenu_ui.init_theme_colors("pacman")
+        expected_title_style = theme_styles.get("title")
+        cap_spans = [s for s in rendered_top.spans if s.style.color == expected_title_style.color]
+        self.assertTrue(len(cap_spans) > 0)
+
+    def test_screen_width_vs_window_width_divider_rendering(self):
+        """Test divider rendering with {window_width} (margins, no tees) vs {screen_width} (no margins, with tees)."""
+        custom_cfg = {
+            "window": {
+                "border_vertical_left": "│",
+                "border_vertical_right": "│",
+                "left_tee": "├",
+                "right_tee": "┤",
+            }
+        }
+        # 1. Window width divider: bounded by margins, framed by b_v_left/b_v_right + 2 spaces, NO tees
+        mnu_win = {
+            "title": "Test Window Div",
+            "options": [{"type": "divider", "length": "{window_width}"}],
+        }
+        mv_win = bashmenu.MainMenuView(config=custom_cfg, menu_data=mnu_win)
+        mv_win._size = type("Size", (), {"width": 80, "height": 24})()
+        lines_win = [line.plain for line in mv_win.render().split("\n")]
+        # Content starts at line 3 (index 3: after top border and 2 margin lines)
+        div_line_win = lines_win[3]
+        self.assertEqual(len(div_line_win), 80)
+        self.assertTrue(div_line_win.startswith("│  "))
+        self.assertTrue(div_line_win.endswith("  │"))
+        self.assertNotIn("├", div_line_win)
+        self.assertNotIn("┤", div_line_win)
+
+        # 2. Screen width divider: runs border to border, starts at left_tee, ends at right_tee, overrides margins
+        mnu_scr = {
+            "title": "Test Screen Div",
+            "options": [{"type": "divider", "length": "{screen_width}"}],
+        }
+        mv_scr = bashmenu.MainMenuView(config=custom_cfg, menu_data=mnu_scr)
+        mv_scr._size = type("Size", (), {"width": 80, "height": 24})()
+        lines_scr = [line.plain for line in mv_scr.render().split("\n")]
+        div_line_scr = lines_scr[3]
+        self.assertEqual(len(div_line_scr), 80)
+        self.assertTrue(div_line_scr.startswith("├"))
+        self.assertTrue(div_line_scr.endswith("┤"))
+        self.assertFalse(div_line_scr.startswith("├ "))
+        self.assertFalse(div_line_scr.endswith(" ┤"))
+
+    def test_tee_border_theme_keys(self):
+        """Test left_tee, right_tee, top_tee, and bottom_tee border keys and aliases."""
+        cfg = {
+            "window": {
+                "left_tee": "L",
+                "right_tee": "R",
+                "top_tee": "T",
+                "bottom_tee": "B",
+            }
+        }
+        borders = bashmenu_ui.get_theme_window_borders("dracula", config=cfg)
+        self.assertEqual(borders["left_tee"], "L")
+        self.assertEqual(borders["right_tee"], "R")
+        self.assertEqual(borders["top_tee"], "T")
+        self.assertEqual(borders["bottom_tee"], "B")
+        self.assertEqual(borders["border_tee_left"], "L")
+        self.assertEqual(borders["border_tee_right"], "R")
+        self.assertEqual(borders["border_tee_top"], "T")
+        self.assertEqual(borders["border_tee_bottom"], "B")
+
 
 if __name__ == "__main__":
     unittest.main()

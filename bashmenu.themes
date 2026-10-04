@@ -296,6 +296,10 @@ qbasic:
     border_bottom_right: "{ascii:188}"
     border_tee_left: "{ascii:199}"
     border_tee_right: "{ascii:182}"
+    left_tee: "{ascii:199}"
+    right_tee: "{ascii:182}"
+    top_tee: "{ascii:209}"
+    bottom_tee: "{ascii:207}"
     title_left_cap: "{ascii:181}"
     title_right_cap: "{ascii:198}"
   256:
@@ -381,8 +385,12 @@ pacman:
     border_top_right: "{ascii:219}"
     border_bottom_left: "{ascii:219}"
     border_bottom_right: "{ascii:219}"
-    title_left_cap: "{ascii:181}"
-    title_right_cap: "{ascii:198}"
+    left_tee: "{ascii:219}"
+    right_tee: "{ascii:219}"
+    top_tee: "{ascii:219}"
+    bottom_tee: "{ascii:219}"
+    title_left_cap: "{ascii:219}"
+    title_right_cap: "{ascii:219}"
   256:
     background: COLOR_BLACK
     title: [226, -1]
@@ -752,6 +760,10 @@ amber_crt:
     border_top_right: "╮"
     border_bottom_left: "╰"
     border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
   256:

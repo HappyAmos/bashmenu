@@ -524,6 +524,7 @@ install_apps() {
 }
 
 # If being sourced by tests or subshells, don't execute the main menu loop
+# shellcheck disable=SC2317
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     return 0 2>/dev/null || true
 fi

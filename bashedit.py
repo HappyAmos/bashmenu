@@ -1232,7 +1232,10 @@ class BashEditScreen(Screen):
             ed.refresh()
 
             file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
-            self.query_one("#editor_header", Label).update(f"  BashEdit - {file_name}  ")
+            borders = getattr(self, "theme_styles", {}).get("window_borders") or bashmenu_ui.get_theme_window_borders(getattr(self, "theme_name", "dracula"))
+            l_cap = borders.get("title_left_cap", "[").strip() or "["
+            r_cap = borders.get("title_right_cap", "]").strip() or "]"
+            self.query_one("#editor_header", Label).update(f"  {l_cap} BashEdit - {file_name} {r_cap}  ")
             self.update_status()
             self.refresh_tab_bar()
         except Exception:  # noqa: BLE001, S110
@@ -1364,6 +1367,13 @@ class BashEditScreen(Screen):
                     if css_hdr_fg:
                         with contextlib.suppress(Exception):
                             self.query_one("#editor_header", Label).styles.color = css_hdr_fg
+
+            with contextlib.suppress(Exception):
+                borders = self.theme_styles.get("window_borders") or bashmenu_ui.get_theme_window_borders(getattr(self, "theme_name", "dracula"))
+                l_cap = borders.get("title_left_cap", "[").strip() or "["
+                r_cap = borders.get("title_right_cap", "]").strip() or "]"
+                file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
+                self.query_one("#editor_header", Label).update(f"  {l_cap} BashEdit - {file_name} {r_cap}  ")
 
             with contextlib.suppress(Exception):
                 btn_close = self.query_one("#btn_close_x", Label)

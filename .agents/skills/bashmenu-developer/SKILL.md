@@ -363,9 +363,10 @@ Textual interface.
       `border_vertical_left`, `border_vertical_right` (with `border_horizontal` and
       `border_vertical` as shorthands/fallbacks), `border_top_left`, `border_top_right`,
       `border_bottom_left`, `border_bottom_right`, `border_tee_top`, `border_tee_bottom`,
-      `border_tee_left`, `border_tee_right`, `border_cross`, `title_left_cap`, `title_right_cap`,
-      and `shadow_char` (also accepts `window_*` / `window_border_*` prefix).
-    - Omitted keys seamlessly fall back to default box drawing characters (`┌─┐│└┘`, tees, and spaces).
+      `border_tee_left`, `border_tee_right`, `left_tee`, `right_tee`, `top_tee`, `bottom_tee`,
+      `border_cross`, `title_left_cap`, `title_right_cap`, and `shadow_char` (also accepts
+      `window_*` / `window_border_*` prefix).
+    - Omitted keys seamlessly fall back to default box drawing characters (`┌─┐│└┘`, tees, and brackets `[` / `]`).
     - Values are resolved through `interpolate_placeholders` and `resolve_glyph`,
       supporting CP437 ASCII macros (e.g. `{ascii:223}` for top half block `▀`, `{ascii:220}`
       for bottom half block `▄`, `{ascii:221}` for left half block `▌`, `{ascii:222}` for right
@@ -377,13 +378,20 @@ Textual interface.
       synchronizes `textual._border.BORDER_CHARS['thick']` and `['solid']` and clears Textual's
       box cache (`get_box.cache_clear()`), ensuring all modal dialogs across `bashmenu_ui.py`
       and panel borders in `menuedit.py` dynamically honor the active theme's borders.
-    - **Divider Resolution Precedence**: Dividers are strictly independent of window borders
-      (`window.border_horizontal` must never bleed into or override dividers). Dividers follow
-      a strict 3-tier priority:
+    - **Divider Resolution Precedence & Width Semantics**: Dividers are strictly independent
+      of window borders (`window.border_horizontal` must never bleed into or override dividers).
+      Dividers follow a strict 3-tier priority:
       1. *Theme Definition (`bashmenu.themes`)*: Explicit `divider:` block under active theme (top priority).
       2. *Plugin Definition (`bashmenu.yml`)*: Plugin divider configurations (`settings.plugins.<name>.divider`,
          `settings.plugins.divider`, `user.divider`, `settings.divider`).
       3. *Default Fallback*: `char: "{ascii:196}"` of length `{window_width}`.
+    - **Divider Width Modes**:
+      * `{window_width}`: Standard shorter divider bounded within window borders and 2-space margins
+        (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/
+        `border_vertical_right`) with 2 spaces on each side, and **without** border tees.
+      * `{screen_width}`: Full-width divider running from left border to right border (`w - 2`),
+        overriding all margins. Connects directly to `left_tee` (`border_tee_left`) on the left and
+        `right_tee` (`border_tee_right`) on the right without margin spaces.
 
 
 ## Documentation Guidelines

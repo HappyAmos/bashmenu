@@ -507,13 +507,15 @@ window border keys: \fBborder_horizontal_top\fR, \fBborder_horizontal_bottom\fR,
 \fBborder_vertical_left\fR, \fBborder_vertical_right\fR (with \fBborder_horizontal\fR
 and \fBborder_vertical\fR as shorthands), \fBborder_top_left\fR,
 \fBborder_top_right\fR, \fBborder_bottom_left\fR, \fBborder_bottom_right\fR,
-\fBborder_tee_top\fR, \fBborder_tee_bottom\fR, \fBborder_tee_left\fR,
-\fBborder_tee_right\fR, \fBborder_cross\fR, \fBtitle_left_cap\fR,
-\fBtitle_right_cap\fR, and \fBshadow_char\fR.
+\fBborder_tee_top\fR / \fBtop_tee\fR, \fBborder_tee_bottom\fR / \fBbottom_tee\fR,
+\fBborder_tee_left\fR / \fBleft_tee\fR, \fBborder_tee_right\fR / \fBright_tee\fR,
+\fBborder_cross\fR, \fBtitle_left_cap\fR, \fBtitle_right_cap\fR, and \fBshadow_char\fR.
 Omitted keys fall back to standard single-line box drawing characters.
 Dividers strictly follow a 3-tier priority: theme divider definition overrides
 plugin divider definitions, which override the default {ascii:196}. Outer window
-borders never override dividers.
+borders never override dividers. Dividers of length \fB{window_width}\fR render
+within standard margins with vertical borders and no tees; dividers of length
+\fB{screen_width}\fR run border to border using left and right tees without margins.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

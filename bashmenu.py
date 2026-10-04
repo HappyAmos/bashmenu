@@ -527,6 +527,16 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
             term_size = shutil.get_terminal_size((80, 24))
             win_w = max(1, term_size.columns - 8)
 
+    if extra_vars and "screen_width" in extra_vars:
+        scr_w = int(extra_vars["screen_width"])
+    else:
+        cols = getattr(curses, "COLS", None)
+        if cols is not None and isinstance(cols, int) and cols > 0:
+            scr_w = max(1, cols - 2)
+        else:
+            term_size = shutil.get_terminal_size((80, 24))
+            scr_w = max(1, term_size.columns - 2)
+
     if extra_vars and "window_height" in extra_vars:
         win_h = int(extra_vars["window_height"])
     else:
@@ -584,6 +594,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{userprofile}": USERPROFILE_PATH,
         "{battery}": get_battery_info() if "{battery}" in res_text else "",
         "{window_width}": str(win_w),
+        "{screen_width}": str(scr_w),
         "{window_height}": str(win_h),
         "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p"),
         "{date_time_12_short}": now.strftime("%Y-%m-%d %I:%M %p"),
@@ -675,9 +686,13 @@ def get_effective_divider_config(config):
     return {"char": "{ascii:196}", "length": "{window_width}"}
 
 
-def resolve_divider_string(config, target_w=None, extra_vars=None):
+def resolve_divider_string(config, target_w=None, extra_vars=None, item_conf=None):
     """Generate divider string based on configuration and target width."""
-    divider_conf = get_effective_divider_config(config)
+    divider_conf = dict(get_effective_divider_config(config))
+    if isinstance(item_conf, dict):
+        for k in ("char", "length"):
+            if item_conf.get(k) is not None:
+                divider_conf[k] = item_conf[k]
 
     char = divider_conf.get("char")
     if not char:
@@ -690,17 +705,20 @@ def resolve_divider_string(config, target_w=None, extra_vars=None):
 
     if target_w is not None:
         length = target_w
-    elif extra_vars and "window_width" in extra_vars:
-        length = int(extra_vars["window_width"])
     else:
         length_spec = divider_conf.get("length", "{window_width}")
-        if isinstance(length_spec, dict) and any(k in length_spec for k in ("window_width", "screen_width")):
-            length_spec = "{window_width}"
+        if isinstance(length_spec, dict):
+            for k in ("screen_width", "window_width"):
+                if k in length_spec:
+                    length_spec = f"{{{k}}}"
+                    break
+            else:
+                length_spec = "{window_width}"
         length_str = interpolate_placeholders(str(length_spec), config, extra_vars=extra_vars)
         try:
             length = int(length_str)
         except ValueError:
-            length = 80
+            length = int(extra_vars.get("window_width", 80)) if extra_vars else 80
     raw_div = char * length
     return f"[color=divider]{raw_div}[/color]"
 
@@ -1142,19 +1160,20 @@ class MainMenuView(Widget):
         b_tr = borders.get("border_top_right", "┐")
         b_bl = borders.get("border_bottom_left", "└")
         b_br = borders.get("border_bottom_right", "┘")
-        b_tee_l = borders.get("border_tee_left", b_v_left)
-        b_tee_r = borders.get("border_tee_right", b_v_right)
+        b_tee_l = borders.get("left_tee") or borders.get("border_tee_left") or b_v_left
+        b_tee_r = borders.get("right_tee") or borders.get("border_tee_right") or b_v_right
         title_l_cap = borders.get("title_left_cap", " ") or " "
         title_r_cap = borders.get("title_right_cap", " ") or " "
 
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
+        screen_div_w = max(20, w - 2)
         # Content rows available for menu options & plugins (excludes top border, 2-row top margin, help/status gutter row, and bottom border)
         total_content_rows = max(1, h - 5)
 
         # 2. Plugin lines and row allocation
         raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
-        extra_vars = {"window_width": avail_w, "window_height": visible_option_rows}
+        extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
 
         # 3. Header border line: ┌──[ Title ]──┐
         title_raw = interpolate_placeholders(curr_menu.get("title", "HA Bash Menu"), self.config, extra_vars=extra_vars)
@@ -1165,10 +1184,12 @@ class MainMenuView(Widget):
         left_b = max(2, (w - title_len) // 2)
         right_b = max(2, w - left_b - title_len)
 
+        cap_style = theme_styles.get("title_cap") or theme_styles.get("title") or title_style
+
         top_bar = Text(b_tl + b_h_top * max(0, left_b - 1), style=border_style)
-        top_bar.append(title_l_cap, style=border_style)
+        top_bar.append(title_l_cap, style=cap_style)
         top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_body, default_style=title_style, theme=theme_styles))
-        top_bar.append(title_r_cap, style=border_style)
+        top_bar.append(title_r_cap, style=cap_style)
         top_bar.append(b_h_top * max(0, right_b - 1) + b_tr + "\n", style=border_style)
         out.append_text(top_bar)
 
@@ -1202,16 +1223,44 @@ class MainMenuView(Widget):
             item_style = highlight_style if is_selected else text_style
 
             if opt.get("type") == "divider":
-                div_str = resolve_divider_string(self.config, target_w=avail_w)
-                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
-                line_rich = Text(f"{b_tee_l}  ", style=border_style)
-                line_rich.append_text(div_rich)
+                item_div_conf = dict(get_effective_divider_config(self.config))
+                if opt.get("length") is not None:
+                    item_div_conf["length"] = opt["length"]
+                if opt.get("char") is not None:
+                    item_div_conf["char"] = opt["char"]
 
-                used_w = get_visible_len(div_str, self.config)
-                fill_w = max(0, avail_w - used_w)
-                line_rich.append(" " * fill_w)
-                line_rich.append(f"  {b_tee_r}\n", style=border_style)
-                out.append_text(line_rich)
+                length_val = item_div_conf.get("length", "{window_width}")
+                if isinstance(length_val, dict):
+                    is_screen = any("screen_width" in str(k) for k in length_val)
+                else:
+                    is_screen = "screen_width" in str(length_val)
+
+                if is_screen:
+                    div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars, item_conf=item_div_conf)
+                    div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                    line_rich = Text(f"{b_tee_l}", style=border_style)
+                    line_rich.append_text(div_rich)
+                    used_w = get_visible_len(div_str, self.config)
+                    fill_w = max(0, screen_div_w - used_w)
+                    if fill_w > 0:
+                        line_rich.append(" " * fill_w)
+                    line_rich.append(f"{b_tee_r}\n", style=border_style)
+                    out.append_text(line_rich)
+                else:
+                    target_div_w = avail_w
+                    if str(length_val).isdigit():
+                        target_div_w = min(avail_w, int(length_val))
+                    div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars, item_conf=item_div_conf)
+                    div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                    line_rich = Text(f"{b_v_left}  ", style=border_style)
+                    line_rich.append_text(div_rich)
+                    used_w = get_visible_len(div_str, self.config)
+                    fill_w = max(0, avail_w - used_w)
+                    if fill_w > 0:
+                        line_rich.append(" " * fill_w)
+                    line_rich.append(f"  {b_v_right}\n", style=border_style)
+                    out.append_text(line_rich)
+
                 rendered_content_rows += 1
                 continue
 

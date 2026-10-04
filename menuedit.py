@@ -1659,6 +1659,13 @@ class MenuEditScreen(Screen):
                             self.query_one("#header_title", Label).styles.color = css_hdr_fg
 
             with contextlib.suppress(Exception):
+                borders = self.theme_styles.get("window_borders") or bashmenu_ui.get_theme_window_borders(self.theme_name)
+                l_cap = borders.get("title_left_cap", "[").strip() or "["
+                r_cap = borders.get("title_right_cap", "]").strip() or "]"
+                file_name = os.path.basename(self.menu_file_path)
+                self.query_one("#header_title", Label).update(f"  {l_cap} Visual Menu Editor - {file_name} {r_cap}  ")
+
+            with contextlib.suppress(Exception):
                 btn_close = self.query_one("#btn_close_x", Label)
                 btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
 

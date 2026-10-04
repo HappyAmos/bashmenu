@@ -307,20 +307,24 @@ pacman:
 | `border_top_right` | Top-right corner frame character. | `┐` (`{ascii:191}`) |
 | `border_bottom_left` | Bottom-left corner frame character. | `└` (`{ascii:192}`) |
 | `border_bottom_right` | Bottom-right corner frame character. | `┘` (`{ascii:217}`) |
-| `border_tee_top` | Top horizontal T-junction connector character. | `┬` (`{ascii:194}`) |
-| `border_tee_bottom` | Bottom horizontal T-junction connector character. | `┴` (`{ascii:193}`) |
-| `border_tee_left` | Left vertical T-junction connector character. | `├` (`{ascii:195}`) |
-| `border_tee_right` | Right vertical T-junction connector character. | `┤` (`{ascii:180}`) |
+| `border_tee_top` / `top_tee` | Top horizontal T-junction connector character. | `┬` (`{ascii:194}`) |
+| `border_tee_bottom` / `bottom_tee` | Bottom horizontal T-junction connector character. | `┴` (`{ascii:193}`) |
+| `border_tee_left` / `left_tee` | Left vertical T-junction connector character. | `├` (`{ascii:195}`) |
+| `border_tee_right` / `right_tee` | Right vertical T-junction connector character. | `┤` (`{ascii:180}`) |
 | `border_cross` | Grid intersection cross character. | `┼` (`{ascii:197}`) |
-| `title_left_cap` | Decorative left cap before the title text in header border. | ` ` (space) |
-| `title_right_cap` | Decorative right cap after the title text in header border. | ` ` (space) |
+| `title_left_cap` | Decorative left cap before the title text in header border. | `[` (bracket) |
+| `title_right_cap` | Decorative right cap after the title text in header border. | `]` (bracket) |
 | `shadow_char` | Drop shadow shade character for modal dialogs and popups. | `░` (`{ascii:176}`) |
 
-##### Divider Resolution Precedence
+##### Divider Resolution Precedence & Width Semantics
 Dividers (`{divider}` macro, divider menu items, and editor footers) are completely independent of outer window borders (`window:`) and strictly follow a 3-tier priority:
-1. **Theme Definition (`bashmenu.themes`)**: Explicit `divider:` block under the active theme (e.g. `char: "{ascii:205}"`). This takes highest priority over plugins.
+1. **Theme Definition (`bashmenu.themes`)**: Explicit `divider:` block under the active theme (e.g. `char: "{ascii:205}", length: "{screen_width}"`). This takes highest priority over plugins.
 2. **Plugin Definition (`bashmenu.yml`)**: If the theme does not define a divider, dividers configured in plugins (e.g. `settings.plugins.<name>.divider`, `user.divider`, or `settings.divider`) are used.
 3. **Default Fallback**: If neither the theme nor any plugin defines a divider, the engine defaults to `char: "{ascii:196}"` of length `{window_width}`.
+
+###### Divider Widths: `{window_width}` vs `{screen_width}`
+- `{window_width}`: Standard shorter divider bounded within window borders and 2-character margins (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/`border_vertical_right`) with 2-character padding on each side, and **without** border tees.
+- `{screen_width}`: Full-width divider running from left border to right border (`w - 2`), overriding all margins. Connects directly to `left_tee` (`border_tee_left`) on the left and `right_tee` (`border_tee_right`) on the right without margin spaces.
 
 
 ---

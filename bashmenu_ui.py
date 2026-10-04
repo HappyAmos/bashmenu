@@ -628,9 +628,13 @@ DEFAULT_WINDOW_BORDER = {
     "border_tee_bottom": "┴",
     "border_tee_left": "├",
     "border_tee_right": "┤",
+    "left_tee": "├",
+    "right_tee": "┤",
+    "top_tee": "┬",
+    "bottom_tee": "┴",
     "border_cross": "┼",
-    "title_left_cap": " ",
-    "title_right_cap": " ",
+    "title_left_cap": "[",
+    "title_right_cap": "]",
     "shadow_char": "░",
 }
 
@@ -672,6 +676,13 @@ def get_theme_window_borders(
         if not isinstance(window_def, dict):
             window_def = {}
 
+    if isinstance(config, dict):
+        cfg_win = config.get("window") or config.get("settings", {}).get("window") or config.get("user", {}).get("window")
+        if isinstance(cfg_win, dict):
+            merged_win = dict(window_def)
+            merged_win.update(cfg_win)
+            window_def = merged_win
+
     borders = dict(DEFAULT_WINDOW_BORDER)
     if not window_def:
         return borders
@@ -711,10 +722,10 @@ def get_theme_window_borders(
         "border_top_right": ["border_top_right", "window_border_top_right"],
         "border_bottom_left": ["border_bottom_left", "window_border_bottom_left"],
         "border_bottom_right": ["border_bottom_right", "window_border_bottom_right"],
-        "border_tee_top": ["border_tee_top", "window_border_tee_top"],
-        "border_tee_bottom": ["border_tee_bottom", "window_border_tee_bottom"],
-        "border_tee_left": ["border_tee_left", "window_border_tee_left"],
-        "border_tee_right": ["border_tee_right", "window_border_tee_right"],
+        "border_tee_top": ["border_tee_top", "top_tee", "tee_top", "window_border_tee_top", "window_top_tee", "window_tee_top"],
+        "border_tee_bottom": ["border_tee_bottom", "bottom_tee", "tee_bottom", "window_border_tee_bottom", "window_bottom_tee", "window_tee_bottom"],
+        "border_tee_left": ["border_tee_left", "left_tee", "tee_left", "window_border_tee_left", "window_left_tee", "window_tee_left"],
+        "border_tee_right": ["border_tee_right", "right_tee", "tee_right", "window_border_tee_right", "window_right_tee", "window_tee_right"],
         "border_cross": ["border_cross", "window_border_cross"],
         "title_left_cap": ["title_left_cap", "title_cap_left", "window_title_left_cap", "window_title_cap_left"],
         "title_right_cap": ["title_right_cap", "title_cap_right", "window_title_right_cap", "window_title_cap_right"],
@@ -728,6 +739,12 @@ def get_theme_window_borders(
                 if res:
                     borders[target_key] = res
                     break
+
+    # Provide direct convenient aliases in the returned border dictionary
+    borders["left_tee"] = borders["border_tee_left"]
+    borders["right_tee"] = borders["border_tee_right"]
+    borders["top_tee"] = borders["border_tee_top"]
+    borders["bottom_tee"] = borders["border_tee_bottom"]
 
     return borders
 
@@ -993,6 +1010,12 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_title = parse_css_color(title_style.color.name)
             if css_title:
                 title.styles.color = css_title
+        borders = theme_dict.get("window_borders") or get_theme_window_borders(theme_dict.get("theme_name", "dracula"))
+        l_cap = borders.get("title_left_cap", "[").strip() or "["
+        r_cap = borders.get("title_right_cap", "]").strip() or "]"
+        raw_text = str(title.renderable) if hasattr(title, "renderable") else str(getattr(screen, "modal_title", ""))
+        if raw_text and not raw_text.startswith(l_cap):
+            title.update(f"{l_cap} {raw_text.strip()} {r_cap}")
 
     with contextlib.suppress(Exception):
         msg = screen.query_one("#message")
