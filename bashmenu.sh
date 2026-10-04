@@ -88,7 +88,7 @@ else
 fi
 
 # Define standard CLI tools required (glow eliminated via rich.sh | pager.sh)
-REQUIRED_TOOLS=("python3")
+REQUIRED_TOOLS=("python3" "curl")
 MISSING_PACKAGES=()
 
 # Multi-layer in-house YAML value extractor (Python -> yq -> pure POSIX awk/grep)

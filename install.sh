@@ -65,6 +65,7 @@ if command -v apk >/dev/null 2>&1; then
     missing_apk=""
     command -v bash >/dev/null 2>&1 || missing_apk="$missing_apk bash"
     command -v git >/dev/null 2>&1 || missing_apk="$missing_apk git"
+    command -v curl >/dev/null 2>&1 || missing_apk="$missing_apk curl"
     command -v python3 >/dev/null 2>&1 || missing_apk="$missing_apk python3"
     command -v virtualenv >/dev/null 2>&1 || missing_apk="$missing_apk py3-virtualenv"
     command -v pip3 >/dev/null 2>&1 || missing_apk="$missing_apk py3-pip"
@@ -86,6 +87,7 @@ elif command -v apt-get >/dev/null 2>&1; then
     missing_apt=""
     command -v bash >/dev/null 2>&1 || missing_apt="$missing_apt bash"
     command -v git >/dev/null 2>&1 || missing_apt="$missing_apt git"
+    command -v curl >/dev/null 2>&1 || missing_apt="$missing_apt curl"
     command -v python3 >/dev/null 2>&1 || missing_apt="$missing_apt python3"
     if ! python3 -c "import venv" >/dev/null 2>&1; then
         missing_apt="$missing_apt python3-venv"
@@ -105,6 +107,7 @@ elif command -v dnf >/dev/null 2>&1; then
     missing_dnf=""
     command -v bash >/dev/null 2>&1 || missing_dnf="$missing_dnf bash"
     command -v git >/dev/null 2>&1 || missing_dnf="$missing_dnf git"
+    command -v curl >/dev/null 2>&1 || missing_dnf="$missing_dnf curl"
     command -v python3 >/dev/null 2>&1 || missing_dnf="$missing_dnf python3"
     if [ -n "$missing_dnf" ]; then
         echo "  [+] Installing missing prerequisites:$missing_dnf"
@@ -117,6 +120,7 @@ elif command -v pacman >/dev/null 2>&1; then
     missing_pacman=""
     command -v bash >/dev/null 2>&1 || missing_pacman="$missing_pacman bash"
     command -v git >/dev/null 2>&1 || missing_pacman="$missing_pacman git"
+    command -v curl >/dev/null 2>&1 || missing_pacman="$missing_pacman curl"
     command -v python3 >/dev/null 2>&1 || missing_pacman="$missing_pacman python"
     if [ -n "$missing_pacman" ]; then
         echo "  [+] Installing missing prerequisites:$missing_pacman"
@@ -129,6 +133,7 @@ elif command -v pkg >/dev/null 2>&1; then
     missing_pkg=""
     command -v bash >/dev/null 2>&1 || missing_pkg="$missing_pkg bash"
     command -v git >/dev/null 2>&1 || missing_pkg="$missing_pkg git"
+    command -v curl >/dev/null 2>&1 || missing_pkg="$missing_pkg curl"
     command -v python3 >/dev/null 2>&1 || missing_pkg="$missing_pkg python"
     if [ -n "$missing_pkg" ]; then
         echo "  [+] Installing missing prerequisites:$missing_pkg"
@@ -139,6 +144,7 @@ elif command -v pkg >/dev/null 2>&1; then
 elif command -v brew >/dev/null 2>&1; then
     echo "  [+] macOS Homebrew detected"
     command -v git >/dev/null 2>&1 || brew install git
+    command -v curl >/dev/null 2>&1 || brew install curl
     command -v python3 >/dev/null 2>&1 || brew install python
 fi
 
