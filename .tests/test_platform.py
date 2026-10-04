@@ -204,5 +204,22 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertIn("Searching for ['hat']:", res.stdout)
 
 
+    def test_ip_info_output(self):
+        """Verify scripts/ip_info.sh produces valid IP addresses and never outputs HTML."""
+        ip_info_sh = os.path.join(SCRIPTS_DIR, "ip_info.sh")
+        self.assertTrue(os.path.isfile(ip_info_sh))
+        res = subprocess.run(
+            [ip_info_sh],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertNotIn("<!DOCTYPE", res.stdout)
+        self.assertNotIn("<html", res.stdout)
+        self.assertIn("Network IP Information", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

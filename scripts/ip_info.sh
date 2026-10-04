@@ -45,18 +45,40 @@ fi
 # Fetch Public IP Address
 echo -e "\n[Public IP Address]"
 public_ip=""
-if command -v curl &>/dev/null; then
-    fourip="$(curl -s -m 3 -4 https://ifconfig.me 2>/dev/null || true)"
-    sixip="$(curl -s -m 3 -6 https://icanhazip.com 2>/dev/null || true)"
-    [ -n "$fourip" ] && public_ip+="IPV4: $fourip\n"
-    [ -n "$sixip" ] && public_ip+="IPV6: $sixip\n"
-elif command -v wget &>/dev/null; then
-    fourip=$(wget -qO- -t 1 -T 3 https://ifconfig.me 2>/dev/null || true)
-    [ -n "$fourip" ] && public_ip+="IPV4: $fourip\n"
-elif command -v python3 &>/dev/null; then
-    fourip=$(python3 -c "import urllib.request; req=urllib.request.Request('https://ifconfig.me', headers={'User-Agent': 'curl/7.68.0'}); print(urllib.request.urlopen(req, timeout=3).read().decode('utf-8').strip())" 2>/dev/null || true)
-    [ -n "$fourip" ] && public_ip+="IPV4: $fourip\n"
+fourip=""
+sixip=""
+
+fetch_ip() {
+    local url="$1"
+    if command -v curl &>/dev/null; then
+        curl -s -m 3 "$url" 2>/dev/null || true
+    elif command -v wget &>/dev/null; then
+        wget -qO- -t 1 -T 3 "$url" 2>/dev/null || true
+    elif command -v python3 &>/dev/null; then
+        python3 -c "import urllib.request; req=urllib.request.Request('$url', headers={'User-Agent': 'curl/7.88.1'}); print(urllib.request.urlopen(req, timeout=3).read().decode('utf-8').strip())" 2>/dev/null || true
+    fi
+}
+
+# Fetch IPv4 from dedicated plain-text endpoints (never returns HTML)
+raw_v4=$(fetch_ip "https://api.ipify.org")
+[ -z "$raw_v4" ] && raw_v4=$(fetch_ip "https://ifconfig.me/ip")
+
+# Strictly validate that response is an IPv4 address and not HTML
+if echo "$raw_v4" | grep -Eq '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'; then
+    fourip="$raw_v4"
 fi
+
+# Fetch IPv6 from dedicated endpoint
+raw_v6=$(fetch_ip "https://api6.ipify.org")
+[ -z "$raw_v6" ] && raw_v6=$(fetch_ip "https://icanhazip.com")
+
+# Strictly validate that response is an IPv6 address and not HTML
+if echo "$raw_v6" | grep -Eq '^[0-9a-fA-F:]+$' && [[ "$raw_v6" == *:* ]]; then
+    sixip="$raw_v6"
+fi
+
+[ -n "$fourip" ] && public_ip+="IPV4: $fourip\n"
+[ -n "$sixip" ] && public_ip+="IPV6: $sixip\n"
 
 if [ -z "$public_ip" ]; then
     echo "Could not fetch public IP (Check internet connection)"
