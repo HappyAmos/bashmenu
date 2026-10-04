@@ -706,9 +706,9 @@ options:
       char: '{ascii:196}'
     - label: Check Disk Usage [df -h]
       type: command
-      action: df -h
+      action: df -h 2>/dev/null
       icon: '{nf::#f02ca:}'
-      command: df -h
+      command: df -h 2>/dev/null
       tabstop: 4
       stream: true
       quiet: false
