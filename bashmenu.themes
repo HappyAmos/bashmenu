@@ -1,5 +1,18 @@
 dracula:
   indicator: "{nf:@:\uee90:}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
   256:
     background: COLOR_BLACK
     title: [201, -1]
@@ -71,6 +84,22 @@ dracula:
     scrollbar: [COLOR_BLUE, COLOR_BLACK]
 nord:
   indicator: "{nf:#:\uef66:}"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "«"
+    title_right_cap: "»"
   256:
     background: COLOR_BLACK
     title: [111, -1]
@@ -142,6 +171,22 @@ nord:
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
 cyberpunk:
   indicator: "{nf:>:#f07c0:}"
+  divider:
+    char: "━"
+    length: "{screen_width}"
+  window:
+    border_horizontal: "━"
+    border_vertical: "┃"
+    border_top_left: "┏"
+    border_top_right: "┓"
+    border_bottom_left: "┗"
+    border_bottom_right: "┛"
+    left_tee: "┣"
+    right_tee: "┫"
+    top_tee: "┳"
+    bottom_tee: "┻"
+    title_left_cap: "【"
+    title_right_cap: "】"
   256:
     background: COLOR_BLACK
     title: [226, -1]
@@ -213,6 +258,22 @@ cyberpunk:
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
 gruvbox:
   indicator: "{nf:&:#f0c6b:}"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "〔"
+    title_right_cap: "〕"
   256:
     background: -1
     title: [214, -1]
@@ -462,6 +523,22 @@ pacman:
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 industry:
   indicator: "{nf:#:#f0b46:}"
+  divider:
+    char: "{ascii:205}"
+    length: "{screen_width}"
+  window:
+    border_horizontal: "{ascii:205}"
+    border_vertical: "{ascii:186}"
+    border_top_left: "{ascii:201}"
+    border_top_right: "{ascii:187}"
+    border_bottom_left: "{ascii:200}"
+    border_bottom_right: "{ascii:188}"
+    left_tee: "{ascii:204}"
+    right_tee: "{ascii:185}"
+    top_tee: "{ascii:203}"
+    bottom_tee: "{ascii:202}"
+    title_left_cap: "«"
+    title_right_cap: "»"
   256:
     background: 234
     title: [214, 234]
@@ -537,6 +614,16 @@ matrix:
     char: "-"
     length: "{window_width}"
   window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
   256:
@@ -610,6 +697,22 @@ matrix:
     scrollbar: [COLOR_GREEN, COLOR_BLACK]
 monochrome:
   indicator: "{nf:>:#eee9:}"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
   256:
     background: COLOR_BLACK
     title: [255, -1]
@@ -681,6 +784,22 @@ monochrome:
     scrollbar: [COLOR_WHITE, COLOR_BLACK]
 synthwave:
   indicator: "{nf:>:#f147d:}"
+  divider:
+    char: "~"
+    length: "{screen_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "╭"
+    border_top_right: "╮"
+    border_bottom_left: "╰"
+    border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "«"
+    title_right_cap: "»"
   256:
     background: COLOR_BLACK
     title: [207, -1]
@@ -756,6 +875,8 @@ amber_crt:
     char: "{ascii:196}"
     length: "{window_width}"
   window:
+    border_horizontal: "─"
+    border_vertical: "│"
     border_top_left: "╭"
     border_top_right: "╮"
     border_bottom_left: "╰"
@@ -837,6 +958,22 @@ amber_crt:
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
 hotdog_stand:
   indicator: "{nf:o.O:#e251:}"
+  divider:
+    char: "="
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
   256:
     background: 196
     title: [226, 196]
@@ -908,6 +1045,22 @@ hotdog_stand:
     scrollbar: [COLOR_YELLOW, COLOR_RED]
 tokyo_night:
   indicator: "{nf:*:#f0766:}"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "╭"
+    border_top_right: "╮"
+    border_bottom_left: "╰"
+    border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
   256:
     background: 234
     title: [111, -1]
@@ -979,6 +1132,22 @@ tokyo_night:
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
 everforest:
   indicator: "{nf:^:#f06aa:}"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "╭"
+    border_top_right: "╮"
+    border_bottom_left: "╰"
+    border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
   256:
     background: 235
     title: [142, -1]
@@ -1050,6 +1219,22 @@ everforest:
     scrollbar: [COLOR_GREEN, COLOR_BLACK]
 rose_pine:
   indicator: "{nf:*:#f0851:}"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "╭"
+    border_top_right: "╮"
+    border_bottom_left: "╰"
+    border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
   256:
     background: 234
     title: [175, -1]
