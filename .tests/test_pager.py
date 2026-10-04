@@ -542,6 +542,190 @@ class TestPagerScript(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_status_bar_filename_badge(self):
+        """Verify file viewing renders the centered [ filename.ext ] badge."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile(
+            "w+", suffix="_report.txt", delete=False
+        ) as tf:
+            tf.write("Hello world file content line 1\nLine 2\n")
+            temp_path = tf.name
+
+        base_name = os.path.basename(temp_path)
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.15)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            expected_badge = f"[ {base_name} ]"
+            self.assertIn(expected_badge, text)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_status_bar_stdin_badge(self):
+        """Verify piped stdin renders the centered [ <stdin> ] badge."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(1, termios.TIOCSCTTY, 0)
+
+        # Pipe stdin into pager.sh using pty for interactive tty output
+        pipe_r, pipe_w = os.pipe()
+        os.write(pipe_w, b"Piped line 1\nPiped line 2\n")
+        os.close(pipe_w)
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT],
+                stdin=pipe_r,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+            os.close(pipe_r)
+
+            time.sleep(0.15)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("[ <stdin> ]", text)
+        finally:
+            os.close(master)
+
+    def test_status_bar_file_flag_badge(self):
+        """Verify --file= flag renders the specified filename badge."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(1, termios.TIOCSCTTY, 0)
+
+        pipe_r, pipe_w = os.pipe()
+        os.write(pipe_w, b"Stream line 1\nStream line 2\n")
+        os.close(pipe_w)
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, "--file=manual_stream.md"],
+                stdin=pipe_r,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+            os.close(pipe_r)
+
+            time.sleep(0.15)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 1024)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            text = out.decode("utf-8", errors="replace")
+            self.assertIn("[ manual_stream.md ]", text)
+        finally:
+            os.close(master)
+
+    def test_status_bar_centering_and_columns(self):
+        """Verify build_bar accurately centers badge and pads to exact COLS."""
+        cmd = """
+        source scripts/pager.sh >/dev/null 2>&1 || true
+        for cols in 120 80 60 40; do
+            COLS=$cols
+            TOTAL=50
+            TOP_LINE=1
+            LAST_SHOWN=23
+            SHOW_HELP=1
+            MESSAGE=""
+            HAVE_FILES=1
+            FILES=("doc.md")
+            ORIGINAL_FILE=""
+            build_bar
+            printf "%d:%d:%s\\n" "$cols" "${#BAR_LINE}" "$BAR_LINE"
+        done
+        """
+        res = subprocess.run(
+            ["bash", "-c", cmd],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=PROJECT_ROOT,
+        )
+        self.assertEqual(res.returncode, 0)
+        lines = res.stdout.strip().splitlines()
+        for line in lines:
+            parts = line.split(":", 2)
+            cols = int(parts[0])
+            bar_len = int(parts[1])
+            bar_text = parts[2]
+            self.assertEqual(
+                bar_len,
+                cols,
+                f"Bar length {bar_len} does not match COLS {cols}",
+            )
+            self.assertIn("[ doc.md ]", bar_text)
+
 
 if __name__ == "__main__":
     unittest.main()
+

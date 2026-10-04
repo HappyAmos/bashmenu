@@ -309,8 +309,11 @@ fit_line() {
 
 build_bar() {
     # Compose the bottom command bar: position label and line range on the
-    # left, message or shortcut hints flush right, padded to exactly COLS.
-    local label="" right="" pad=0 pad_str="" pct=0
+    # left, centered badge (filename or <stdin>), message or shortcut hints
+    # flush right, padded to exactly COLS.
+    local label="" pct=0 left="" badge="" fname="" extra="" right=""
+    local pad_left=0 pad_right=0 pad_left_str="" pad_right_str=""
+    local center_start=0 center_end=0 avail_right=0 prefix="" pad=0 pad_str=""
 
     if [ "${TOTAL}" -eq 0 ]; then
         label="EMPTY"
@@ -324,30 +327,85 @@ build_bar() {
         printf -v label '%3d%%' "${pct}"
     fi
 
-    BAR_LINE="${label}"
+    left="${label}"
     if [ "${TOTAL}" -gt 0 ]; then
-        BAR_LINE="${label}  ${TOP_LINE}-${LAST_SHOWN}/${TOTAL}"
+        left="${label}  ${TOP_LINE}-${LAST_SHOWN}/${TOTAL}"
     fi
-    if [ "${#BAR_LINE}" -gt $(( COLS - 4 )) ]; then
-        BAR_LINE="${BAR_LINE:0:$(( COLS - 4 ))}"
+
+    # Determine badge label: [ filename.ext ] or [ <stdin> ]
+    if [ "${HAVE_FILES}" -ge 1 ]; then
+        fname="${FILES[0]##*/}"
+        if [ "${HAVE_FILES}" -gt 1 ]; then
+            extra=" (+$((${HAVE_FILES} - 1)))"
+        fi
+    elif [ -n "${ORIGINAL_FILE}" ]; then
+        fname="${ORIGINAL_FILE##*/}"
     fi
+
+    if [ -n "${fname}" ]; then
+        local max_fname=28
+        [ "${COLS}" -lt 80 ] && max_fname=20
+        [ "${COLS}" -lt 60 ] && max_fname=14
+        [ "${COLS}" -lt 40 ] && max_fname=8
+        if [ "${#fname}" -gt "${max_fname}" ]; then
+            fname="${fname:0:$((max_fname - 3))}..."
+        fi
+        badge="[ ${fname}${extra} ]"
+    else
+        badge="[ <stdin> ]"
+    fi
+
+    center_start=$(( (COLS - ${#badge}) / 2 ))
+    center_end=$(( center_start + ${#badge} ))
+    avail_right=$(( COLS - center_end - 1 ))
 
     if [ -n "${MESSAGE}" ]; then
         right="${MESSAGE}"
-    elif [ "${SHOW_HELP}" = "1" ] && [ "${COLS}" -ge 62 ]; then
-        right="${HINTS}"
+        if [ "${#right}" -gt "${avail_right}" ] && [ "${avail_right}" -gt 4 ]; then
+            right="${right:0:$((avail_right - 3))}..."
+        fi
+    elif [ "${SHOW_HELP}" = "1" ]; then
+        if [ "${avail_right}" -ge 62 ]; then
+            right="${HINTS}"
+        elif [ "${avail_right}" -ge 42 ]; then
+            right="SPACE pgDn  b pgUp  / find  q quit"
+        elif [ "${avail_right}" -ge 24 ]; then
+            right="SPACE pgDn  / find  q"
+        elif [ "${avail_right}" -ge 14 ]; then
+            right="h help  q quit"
+        elif [ "${avail_right}" -ge 6 ]; then
+            right="q quit"
+        fi
+    fi
+
+    if [ "${center_start}" -gt "${#left}" ]; then
+        pad_left=$(( center_start - ${#left} ))
+        printf -v pad_left_str '%*s' "${pad_left}" ''
+        pad_right=$(( COLS - center_end - ${#right} ))
+        [ "${pad_right}" -lt 0 ] && pad_right=0
+        printf -v pad_right_str '%*s' "${pad_right}" ''
+        BAR_LINE="${left}${pad_left_str}${badge}${pad_right_str}${right}"
     else
-        right=""
+        prefix="${left} ${badge}"
+        if [ "${#prefix}" -lt "${COLS}" ]; then
+            if [ -n "${right}" ] && [ $(( ${#prefix} + 1 + ${#right} )) -le "${COLS}" ]; then
+                pad=$(( COLS - ${#prefix} - ${#right} ))
+                printf -v pad_str '%*s' "${pad}" ''
+                BAR_LINE="${prefix}${pad_str}${right}"
+            else
+                pad=$(( COLS - ${#prefix} ))
+                printf -v pad_str '%*s' "${pad}" ''
+                BAR_LINE="${prefix}${pad_str}"
+            fi
+        else
+            BAR_LINE="${prefix:0:${COLS}}"
+        fi
     fi
 
-    if [ -n "${right}" ]; then
-        pad=$(( COLS - ${#BAR_LINE} - ${#right} - 2 ))
-        [ "${pad}" -lt 1 ] && pad=1
-        printf -v pad_str '%*s' "${pad}" ''
-        BAR_LINE="${BAR_LINE} ${pad_str} ${right}"
-    fi
-
-    if [ "${#BAR_LINE}" -gt "${COLS}" ]; then
+    if [ "${#BAR_LINE}" -lt "${COLS}" ]; then
+        printf -v pad_str '%*s' "$(( COLS - ${#BAR_LINE} ))" ''
+        BAR_LINE="${BAR_LINE}${pad_str}"
+    elif [ "${#BAR_LINE}" -gt "${COLS}" ]; then
         BAR_LINE="${BAR_LINE:0:${COLS}}"
     fi
 }
@@ -1072,4 +1130,6 @@ main() {
     exit 0
 }
 
-main "$@"
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
