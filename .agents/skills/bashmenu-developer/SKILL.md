@@ -27,7 +27,9 @@ description: Core developer guidelines for the multi-platform BashMenu
 ## Project Structure & Architecture
 This project is a multi-platform bash menu system wrapped around a Python
 Textual interface.
-- `bashmenu.sh`: Main Bash wrapper script. Sets up the environment,
+- `install.sh`: Universal POSIX /bin/sh installer with package auto-detection and self-cleanup.
+- `uninstall.sh`: Pure POSIX /bin/sh uninstaller removing files, symlinks, and cache.
+- `bashmenu.sh`: Main wrapper script with POSIX /bin/sh trampoline and --setup flag. Sets up the environment,
   validates prerequisites, and manages/activates the Python venv.
 - `bashmenu.py`: Core menu system interface built using the **Python
   Textual framework** (migrated from ncurses).
