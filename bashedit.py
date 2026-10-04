@@ -1535,6 +1535,117 @@ class BashEditScreen(Screen):
             self.action_toggle_markdown()
             return
 
+        if ed.show_markdown:
+            if event.key == "up":
+                ed.scroll_lines_up(1)
+                self.update_status()
+            elif event.key == "down":
+                ed.scroll_lines_down(1)
+                self.update_status()
+            elif event.key in ("pageup", "page_up"):
+                page_size = max(1, (ed.size.height or 20) - 2)
+                ed.scroll_lines_up(page_size)
+                self.update_status()
+            elif event.key in ("pagedown", "page_down"):
+                page_size = max(1, (ed.size.height or 20) - 2)
+                ed.scroll_lines_down(page_size)
+                self.update_status()
+            elif event.key == "home":
+                ed.top_line = 0
+                ed.refresh()
+                self.update_status()
+            elif event.key == "end":
+                total_lines = len(ed._get_rendered_md_lines())
+                ed.top_line = max(0, total_lines - 1)
+                ed.refresh()
+                self.update_status()
+            elif (
+                key_lower in ["enter", "return", "backspace", "ctrl+h", "delete", "tab", "space", "full_stop"]
+                or char_lower in ["\r", "\n", "\t", " "]
+                or (len(event.character or "") == 1 and event.character.isprintable())
+                or (len(event.key or "") == 1 and event.key.isprintable())
+            ):
+                self.update_status("Markdown preview active (Press F12 to edit)")
+            return
+
+        # Navigation keys
+        if event.key == "up":
+            ed.cursor_y = max(0, ed.cursor_y - 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+        if event.key == "down":
+            if ed.cursor_y < len(ed.lines) - 1:
+                ed.cursor_y += 1
+                ed.clamp_cursor()
+            else:
+                ed.scroll_lines_down(1)
+            ed.refresh()
+            self.update_status()
+            return
+        if event.key == "left":
+            ed.cursor_x = max(0, ed.cursor_x - 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+        if event.key == "right":
+            ed.cursor_x = min(len(ed.lines[ed.cursor_y]), ed.cursor_x + 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+        if event.key == "home":
+            ed.cursor_x = 0
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+        if event.key == "end":
+            ed.cursor_x = len(ed.lines[ed.cursor_y])
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+        if event.key in ("pageup", "page_up"):
+            page_size = max(1, (ed.size.height or 20) - 2)
+            ed.scroll_lines_up(page_size)
+            self.update_status()
+            return
+        if event.key in ("pagedown", "page_down"):
+            page_size = max(1, (ed.size.height or 20) - 2)
+            ed.scroll_lines_down(page_size)
+            self.update_status()
+            return
+
+        # Core editing keys (Enter, Backspace, Delete, Tab, Space)
+        if key_lower in ["enter", "return", "ctrl+m", "ctrl+j"] or char_lower in ["\r", "\n"]:
+            ed.insert_newline()
+            self.update_status()
+            return
+
+        if key_lower in ["backspace", "ctrl+h"] or char_lower in ["\x08", "\x7f"]:
+            ed.backspace()
+            self.update_status()
+            return
+
+        if key_lower == "delete":
+            ed.delete_char()
+            self.update_status()
+            return
+
+        if key_lower in ["tab", "ctrl+i"] or char_lower in ["\t"]:
+            indent = " " * ed.tabstop if ed.tab_to_spaces else "\t"
+            ed.insert_char(indent)
+            self.update_status()
+            return
+
+        if key_lower == "space" or char_lower == " ":
+            ed.insert_char(" ")
+            self.update_status()
+            return
+
         # Ignore modifier combinations, function keys & action shortcut keys so Textual bindings process them as actions
         if (
             event.character in ["§", "\u00a7", "\x03", "\x16", "\x0b", "\x15"]
@@ -1569,96 +1680,7 @@ class BashEditScreen(Screen):
         ):
             return
 
-        if ed.show_markdown:
-            if event.key == "up":
-                ed.scroll_lines_up(1)
-                self.update_status()
-            elif event.key == "down":
-                ed.scroll_lines_down(1)
-                self.update_status()
-            elif event.key in ("pageup", "page_up"):
-                page_size = max(1, (ed.size.height or 20) - 2)
-                ed.scroll_lines_up(page_size)
-                self.update_status()
-            elif event.key in ("pagedown", "page_down"):
-                page_size = max(1, (ed.size.height or 20) - 2)
-                ed.scroll_lines_down(page_size)
-                self.update_status()
-            elif event.key == "home":
-                ed.top_line = 0
-                ed.refresh()
-                self.update_status()
-            elif event.key == "end":
-                total_lines = len(ed._get_rendered_md_lines())
-                ed.top_line = max(0, total_lines - 1)
-                ed.refresh()
-                self.update_status()
-            elif (
-                event.key in ["enter", "backspace", "delete", "tab", "space", "full_stop"]
-                or (len(event.character or "") == 1 and event.character.isprintable())
-                or (len(event.key or "") == 1 and event.key.isprintable())
-            ):
-                self.update_status("Markdown preview active (Press F12 to edit)")
-            return
-
-        if event.key == "up":
-            ed.cursor_y = max(0, ed.cursor_y - 1)
-            ed.clamp_cursor()
-            ed.refresh()
-            self.update_status()
-        elif event.key == "down":
-            if ed.cursor_y < len(ed.lines) - 1:
-                ed.cursor_y += 1
-                ed.clamp_cursor()
-            else:
-                ed.scroll_lines_down(1)
-            ed.refresh()
-            self.update_status()
-        elif event.key == "left":
-            ed.cursor_x = max(0, ed.cursor_x - 1)
-            ed.clamp_cursor()
-            ed.refresh()
-            self.update_status()
-        elif event.key == "right":
-            ed.cursor_x = min(len(ed.lines[ed.cursor_y]), ed.cursor_x + 1)
-            ed.clamp_cursor()
-            ed.refresh()
-            self.update_status()
-        elif event.key == "home":
-            ed.cursor_x = 0
-            ed.clamp_cursor()
-            ed.refresh()
-            self.update_status()
-        elif event.key == "end":
-            ed.cursor_x = len(ed.lines[ed.cursor_y])
-            ed.clamp_cursor()
-            ed.refresh()
-            self.update_status()
-        elif event.key in ("pageup", "page_up"):
-            page_size = max(1, (ed.size.height or 20) - 2)
-            ed.scroll_lines_up(page_size)
-            self.update_status()
-        elif event.key in ("pagedown", "page_down"):
-            page_size = max(1, (ed.size.height or 20) - 2)
-            ed.scroll_lines_down(page_size)
-            self.update_status()
-        elif event.key == "enter":
-            ed.insert_newline()
-            self.update_status()
-        elif event.key in ["backspace", "ctrl+h"]:
-            ed.backspace()
-            self.update_status()
-        elif event.key == "delete":
-            ed.delete_char()
-            self.update_status()
-        elif event.key == "tab":
-            indent = " " * ed.tabstop if ed.tab_to_spaces else "\t"
-            ed.insert_char(indent)
-            self.update_status()
-        elif event.key == "space":
-            ed.insert_char(" ")
-            self.update_status()
-        elif len(event.character or "") == 1 and event.character.isprintable():
+        if len(event.character or "") == 1 and event.character.isprintable():
             ed.insert_char(event.character)
             self.update_status()
         elif event.key == "full_stop":

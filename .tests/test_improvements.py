@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 import unittest
@@ -1060,6 +1061,52 @@ class TestImprovements(unittest.TestCase):
         binding_keys = {b.key for b in bashedit.BashEditScreen.BINDINGS}
         self.assertIn("ctrl+a", binding_keys)
         self.assertIn("f11", binding_keys)
+
+    def test_bashedit_terminal_key_input_handling(self):
+        """Verify Enter, Tab, Backspace, and characters are never swallowed by control character checks."""
+        import textual.events as te
+
+        import bashedit
+
+        screen = bashedit.BashEditScreen()
+        ed = bashedit.EditorWidget(lines=["FirstLine"])
+        status_mock = MagicMock()
+        screen.query_one = lambda selector, *args, **kwargs: ed if selector == "#editor_widget" else status_mock
+
+        # 1. Terminal Enter key (key='enter', character='\r')
+        ed.cursor_x = len(ed.lines[0])
+        screen.on_key(te.Key("enter", "\r"))
+        self.assertEqual(ed.lines, ["FirstLine", ""])
+
+        # 2. Typing characters
+        for ch in "Text":
+            screen.on_key(te.Key(ch, ch))
+        self.assertEqual(ed.lines, ["FirstLine", "Text"])
+
+        # 3. Terminal Tab key (key='tab', character='\t')
+        screen.on_key(te.Key("tab", "\t"))
+        self.assertTrue(ed.lines[1].startswith("Text"))
+        self.assertTrue(len(ed.lines[1]) > 4)
+
+        # 4. Terminal Backspace with \x08 and \x7f
+        prev_len = len(ed.lines[1])
+        screen.on_key(te.Key("backspace", "\x08"))
+        self.assertEqual(len(ed.lines[1]), prev_len - 1)
+        screen.on_key(te.Key("backspace", "\x7f"))
+        self.assertEqual(len(ed.lines[1]), prev_len - 2)
+
+        # 5. Terminal ctrl+h backspace
+        screen.on_key(te.Key("ctrl+h", "\x08"))
+        self.assertEqual(len(ed.lines[1]), prev_len - 3)
+
+        # 6. Terminal Enter with ctrl+j (\n)
+        screen.on_key(te.Key("ctrl+j", "\n"))
+        self.assertEqual(len(ed.lines), 3)
+
+        # 7. Action shortcuts (e.g. ctrl+s) must not type into lines
+        lines_before = list(ed.lines)
+        screen.on_key(te.Key("ctrl+s", "\x13"))
+        self.assertEqual(ed.lines, lines_before)
 
 
 if __name__ == "__main__":
