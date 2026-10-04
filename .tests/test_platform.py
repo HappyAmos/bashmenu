@@ -143,6 +143,21 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertIn("urllib.request", content)
         self.assertIn("json", content)
 
+    def test_hostname_sh_execution(self):
+        """Verify scripts/hostname.sh executes and returns hostname information."""
+        hostname_sh = os.path.join(SCRIPTS_DIR, "hostname.sh")
+        res = subprocess.run(
+            ["bash", hostname_sh],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Hostname Information", res.stdout)
+        self.assertIn("Hostname:", res.stdout)
+        self.assertIn("Kernel:", res.stdout)
+
     def test_asteroids_syntax_and_paths(self):
         """Verify asteroids.sh has no rogue break and uses get_bin_dir."""
         asteroids_sh = os.path.join(SCRIPTS_DIR, "asteroids.sh")

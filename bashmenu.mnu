@@ -487,9 +487,10 @@ options:
       action: '{scripts_dir}/getdns.py'
       stream: true
       icon: '{nf::#f01d6}'
-    - label: Show Hostname Information [hostname]
-      type: command
-      action: hostname
+    - label: Show Hostname Information [{scripts_dir}/hostname.sh]
+      type: script
+      action: '{scripts_dir}/hostname.sh'
+      stream: true
       icon: '{nf::#f08ad}'
     - label: Show Network Interfaces [ip a]
       type: command
