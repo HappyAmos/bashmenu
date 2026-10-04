@@ -517,7 +517,7 @@ matrix:
     button_cancel: [46, 234]
     button_success: [COLOR_BLACK, 46]
     help_text: [82, -1]
-    plugin: [118, -1]
+    plugin: [22, -1]
     window_close_button: [196, -1]
     scrollbar: [46, 22]
   16:

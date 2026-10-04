@@ -1,9 +1,6 @@
 version: 0.0.1
-theme: everforest
+theme: matrix
 user:
-  divider:
-    char: '{ascii:196}'
-    length: '{window_width}'
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
   example_string: A string of text
@@ -16,13 +13,13 @@ settings:
     otd:
       script: otd.sh
       sleep: 300
-      pretext: '{user.divider}'
-      posttext: '{user.divider}'
+      pretext: '{divider}'
+      posttext: '{divider}'
     weather:
       script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
       sleep: 300
       pretext: ''
-      posttext: '{user.divider}'
+      posttext: '{divider}'
   templates_dir: '{bashmenu_dir}/templates'
   scripts_dir: '{bashmenu_dir}/scripts'
   ping_target: 1.1.1.1
@@ -31,4 +28,4 @@ settings:
   show_menu_shortcuts: true
   use_nerd_fonts: true
   nerd_font_width: auto
-  status_gutter: '{user} | {battery} | {user.localip} | {date_time_24}'
+  status_gutter: '{user} | Battery: {battery} | {user.localip} | {date_time_24}'

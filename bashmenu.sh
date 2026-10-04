@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 BASHMENU_SCRIPT="${SCRIPT_DIR}/bashmenu.py"
 BASHMENU_SETTINGS="${SCRIPT_DIR}/bashmenu.yml"
 GLOW_INSTALLER="${SCRIPT_DIR}/scripts/install_glow.sh"
+ADDITIONAL_SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 
 # --------------------------------------------------------------------------
@@ -235,8 +236,8 @@ install_man_page() {
     fi
 }
 
-# Install global 'bm' command shortcut pointing to bashmenu.sh
-install_shortcut() {
+# Install 'bm' command symlink pointing to bashmenu.sh
+install_bm() {
     local shortcut_name="bm"
     local target_dir=""
 
@@ -254,7 +255,7 @@ install_shortcut() {
     local target_file="${target_dir}/${shortcut_name}"
     local real_script_path="${SCRIPT_DIR}/bashmenu.sh"
 
-    echo "Installing global '$shortcut_name' shortcut pointing to: $real_script_path"
+    echo "Installing symlink '$shortcut_name' shortcut pointing to: $real_script_path"
 
     ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
 
@@ -277,6 +278,47 @@ install_shortcut() {
     fi
 }
 
+# Install 'cheat' command symlink pointing to bashmenu.sh
+install_cheat() {
+    local shortcut_name="cheat"
+    local target_dir=""
+
+    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+        target_dir="$PREFIX/bin"
+    elif [ "$(id -u)" = 0 ]; then
+        target_dir="/usr/local/bin"
+    elif [ -w "/usr/local/bin" ]; then
+        target_dir="/usr/local/bin"
+    else
+        target_dir="$HOME/.local/bin"
+    fi
+
+    mkdir -p "$target_dir" 2>/dev/null || true
+    local target_file="${target_dir}/${shortcut_name}"
+    local real_script_path="${ADDITIONAL_SCRIPTS_DIR}/cheat.sh"
+
+    echo "Installing symlink '$shortcut_name' shortcut pointing to: $real_script_path"
+
+    ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
+
+    if [ -L "$target_file" ] || [ -f "$target_file" ]; then
+        echo "  [✓] Successfully installed '$shortcut_name' shortcut at $target_file"
+
+        if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+            echo "  [!] Notice: $target_dir is not currently in your PATH environment variable."
+            for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+                if [ -f "$rc" ] && ! grep -q "$target_dir" "$rc"; then
+                    echo "export PATH=\"$target_dir:\$PATH\"" >> "$rc"
+                    echo "  [+] Added $target_dir to $rc"
+                fi
+            done
+        fi
+        return 0
+    else
+        echo "  [✗] Failed to create shortcut (symlink) at $target_file" >&2
+        return 1
+    fi
+}
 
 
 # Map binary names to their respective installation package names based on the package manager
@@ -408,8 +450,9 @@ Options:
   -h, --help               Display this help message and exit
   -v, --version            Display version information and exit
   --check-env              Inspect platform detection, paths, and dependencies
-  --install-bm             Install global 'bm' command shortcut
-  --install-man            Install bashmenu.1 man page
+  --install-bm             Install 'bm' command shortcut [/.local/bin/bm]
+  --install-cheat          Install 'cheat' command shortcut [/.local/bin/cheat]
+  --install-man            Install bashmenu.1 man page [/.local/share/man/man1/bashmenu.1]
 EOF
 }
 
@@ -432,8 +475,12 @@ for arg in "$@"; do
             echo "Venv Active:  $VENV_ACTIVATE"
             exit 0
             ;;
-        --install-shortcut|--install-bm)
-            install_shortcut
+        --install-bm)
+            install_bm
+            exit $?
+            ;;
+        --install-cheat)
+            install_cheat
             exit $?
             ;;
         --install-man|--install-manpage)
@@ -535,7 +582,7 @@ if ! is_installed "bm"; then
         read -p "Global 'bm' command shortcut is not installed. Install it now? [y/N]: " -n 1 -r
         echo ""
         if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-            install_shortcut
+            install_bm
         fi
     fi
 fi
