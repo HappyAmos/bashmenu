@@ -552,12 +552,18 @@ def render_menu_item_preview(item: dict, config: dict | None = None, width: int 
     item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
 
     if item_type == "divider":
-        char_val = item.get("char", "{ascii:196}")
+        char_val = item.get("char")
+        if not char_val:
+            theme_name = cfg.get("theme", "dracula") if isinstance(cfg, dict) else "dracula"
+            borders = bashmenu_ui.get_theme_window_borders(theme_name, config=cfg)
+            char_val = borders.get("border_horizontal", "{ascii:196}")
         length_val = item.get("length", "{window_width}")
         expanded_char = bashmenu.interpolate_placeholders(char_val, cfg)
         expanded_char = resolve_glyph_preview(expanded_char, cfg)
         if not expanded_char:
-            expanded_char = "─"
+            theme_name = cfg.get("theme", "dracula") if isinstance(cfg, dict) else "dracula"
+            borders = bashmenu_ui.get_theme_window_borders(theme_name, config=cfg)
+            expanded_char = borders.get("border_horizontal", "─")
 
         expanded_len = bashmenu.interpolate_placeholders(length_val, cfg, extra_vars={"window_width": width})
         try:
@@ -1028,7 +1034,9 @@ class ItemEditModal(ModalScreen[dict]):
 
             expanded_char = bashmenu.interpolate_placeholders(raw_char, cfg)
             if not expanded_char:
-                expanded_char = "─"
+                theme_name = cfg.get("theme", "dracula") if isinstance(cfg, dict) else "dracula"
+                borders = bashmenu_ui.get_theme_window_borders(theme_name, config=cfg)
+                expanded_char = borders.get("border_horizontal", "─")
 
             expanded_len = bashmenu.interpolate_placeholders(raw_len, cfg, extra_vars={"window_width": 60})
             try:
@@ -1627,6 +1635,9 @@ class MenuEditScreen(Screen):
             self.theme_styles = bashmenu_ui.resolve_theme_dict(
                 self.raw_theme or getattr(self.app, "theme_styles", None), self.app
             )
+            t_name = self.theme_styles.get("theme_name") if isinstance(self.theme_styles, dict) else self.raw_theme
+            if t_name:
+                bashmenu_ui.apply_theme_to_textual_borders(t_name)
             bg_style = self.theme_styles.get("background")
             if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
                 css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)

@@ -993,6 +993,43 @@ class TestImprovements(unittest.TestCase):
         errors_non_dict = ymlcheck.validate_window_section("not_a_dict", "test.window")
         self.assertTrue(len(errors_non_dict) > 0)
 
+    def test_theme_window_borders_propagation(self):
+        """Verify theme window borders propagate to Textual borders, bashedit, and menuedit."""
+        import textual._border as tb
+
+        import bashmenu_ui
+        import menuedit
+
+        # 1. Test Textual border synchronization on init_theme_colors
+        styles_qbasic = bashmenu_ui.init_theme_colors("qbasic")
+        self.assertIn("window_borders", styles_qbasic)
+        self.assertEqual(styles_qbasic["window_borders"]["border_horizontal"], "═")
+
+        # BORDER_CHARS['thick'] and ['solid'] should match qbasic box characters
+        self.assertEqual(tb.BORDER_CHARS["thick"][0], ("╔", "═", "╗"))
+        self.assertEqual(tb.BORDER_CHARS["thick"][1], ("║", " ", "║"))
+        self.assertEqual(tb.BORDER_CHARS["thick"][2], ("╚", "═", "╝"))
+        self.assertEqual(tb.BORDER_CHARS["solid"][0], ("╔", "═", "╗"))
+
+        # Re-initialize with dracula
+        styles_dracula = bashmenu_ui.init_theme_colors("dracula")
+        self.assertEqual(styles_dracula["window_borders"]["border_horizontal"], "─")
+        self.assertEqual(tb.BORDER_CHARS["thick"][0], ("┌", "─", "┐"))
+        self.assertEqual(tb.BORDER_CHARS["thick"][1], ("│", " ", "│"))
+        self.assertEqual(tb.BORDER_CHARS["thick"][2], ("└", "─", "┘"))
+
+        # 2. Test menuedit preview divider falls back to theme border_horizontal
+        div_item = {"type": "divider"}
+        preview_qbasic = menuedit.render_menu_item_preview(div_item, config={"theme": "qbasic"}, width=10)
+        self.assertEqual(preview_qbasic, "═" * 10)
+
+        preview_dracula = menuedit.render_menu_item_preview(div_item, config={"theme": "dracula"}, width=10)
+        self.assertEqual(preview_dracula, "─" * 10)
+
+        # 3. Test bashmenu resolve_divider_string falls back to theme border_horizontal
+        div_str = bashmenu.resolve_divider_string({"theme": "qbasic"}, target_w=10)
+        self.assertIn("═" * 10, div_str)
+
 
 if __name__ == "__main__":
     unittest.main()

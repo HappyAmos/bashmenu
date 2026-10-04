@@ -636,7 +636,11 @@ def resolve_divider_string(config, target_w=None, extra_vars=None):
     if not isinstance(divider_conf, dict):
         divider_conf = {}
 
-    char = divider_conf.get("char", "{ascii:196}")
+    char = divider_conf.get("char")
+    if not char:
+        theme_name = get_config_value(config, "theme", "dracula")
+        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=config)
+        char = borders.get("border_horizontal", "{ascii:196}")
     char = interpolate_placeholders(char, config, extra_vars=extra_vars)
     char = resolve_glyph(char, config)
     if not char:

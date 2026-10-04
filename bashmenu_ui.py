@@ -21,7 +21,8 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Markdown as TextualMarkdown, OptionList, RichLog, Static
+from textual.widgets import Button, Input, Label, OptionList, RichLog, Static
+from textual.widgets import Markdown as TextualMarkdown
 from textual.widgets.option_list import Option
 
 
@@ -608,7 +609,7 @@ DEFAULT_WINDOW_BORDER = {
 
 
 def get_theme_window_borders(
-    theme_name: str = "dracula",
+    theme_name: str | dict = "dracula",
     config: dict | None = None,
     raw_theme_data: dict | None = None,
 ) -> dict[str, str]:
@@ -618,16 +619,27 @@ def get_theme_window_borders(
     border_top_left, border_top_right, border_bottom_left, border_bottom_right.
     Falls back to single-line box drawing characters for any undefined keys.
     """
+    window_def = None
+    if isinstance(theme_name, dict):
+        if "window_borders" in theme_name and isinstance(theme_name["window_borders"], dict):
+            return dict(theme_name["window_borders"])
+        if "window" in theme_name and isinstance(theme_name["window"], dict):
+            window_def = theme_name["window"]
+            theme_def = theme_name
+        else:
+            theme_name = theme_name.get("theme_name", "dracula")
+
     if not raw_theme_data:
         raw_theme_data = load_themes_file()
 
-    theme_def = raw_theme_data.get(theme_name, {})
-    if not theme_def and raw_theme_data:
-        theme_def = next(iter(raw_theme_data.values()), {})
+    if window_def is None:
+        theme_def = raw_theme_data.get(theme_name, {}) if isinstance(theme_name, str) else {}
+        if not theme_def and raw_theme_data:
+            theme_def = next(iter(raw_theme_data.values()), {})
 
-    window_def = theme_def.get("window", {}) if isinstance(theme_def, dict) else {}
-    if not isinstance(window_def, dict):
-        window_def = {}
+        window_def = theme_def.get("window", {}) if isinstance(theme_def, dict) else {}
+        if not isinstance(window_def, dict):
+            window_def = {}
 
     borders = dict(DEFAULT_WINDOW_BORDER)
     if not window_def:
@@ -651,16 +663,49 @@ def get_theme_window_borders(
     return borders
 
 
+def apply_theme_to_textual_borders(
+    theme_name: str | dict = "dracula",
+    config: dict | None = None,
+    raw_theme_data: dict | None = None,
+) -> None:
+    """Synchronize Textual's global border rendering characters with the active theme borders."""
+    with contextlib.suppress(Exception):
+        import textual._border as tb
+
+        borders = get_theme_window_borders(theme_name, config=config, raw_theme_data=raw_theme_data)
+        b_h = borders.get("border_horizontal", "─")
+        b_v = borders.get("border_vertical", "│")
+        b_tl = borders.get("border_top_left", "┌")
+        b_tr = borders.get("border_top_right", "┐")
+        b_bl = borders.get("border_bottom_left", "└")
+        b_br = borders.get("border_bottom_right", "┘")
+        new_box = (
+            (b_tl, b_h, b_tr),
+            (b_v, " ", b_v),
+            (b_bl, b_h, b_br),
+        )
+        tb.BORDER_CHARS["thick"] = new_box
+        tb.BORDER_CHARS["solid"] = new_box
+        if hasattr(tb.get_box, "cache_clear"):
+            tb.get_box.cache_clear()
+
+
 def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None = None) -> dict:
     """
     Initialize theme data and construct Rich Style mapping for elements.
     """
+    borders = get_theme_window_borders(theme_name, raw_theme_data=raw_theme_data)
+    apply_theme_to_textual_borders(theme_name, raw_theme_data=raw_theme_data)
+
     if not raw_theme_data:
         raw_theme_data = load_themes_file()
 
     cache_key = (theme_name, id(raw_theme_data))
     if cache_key in _theme_styles_cache:
-        return _theme_styles_cache[cache_key]
+        cached = _theme_styles_cache[cache_key]
+        cached["theme_name"] = theme_name
+        cached["window_borders"] = borders
+        return cached
 
     theme_def = raw_theme_data.get(theme_name, {})
     if not theme_def and raw_theme_data:
@@ -715,6 +760,8 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("window_close_button", Style(color="red", bold=True, bgcolor=bg_color))
     styles.setdefault("scrollbar", Style(color="cyan", bgcolor=bg_color or "grey19"))
     styles["indicator"] = indicator
+    styles["theme_name"] = theme_name
+    styles["window_borders"] = borders
 
     _theme_styles_cache[cache_key] = styles
     return styles
@@ -818,6 +865,9 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
     theme_dict = resolve_theme_dict(theme, getattr(screen, "app", None))
     if not theme_dict:
         return
+    t_name = theme_dict.get("theme_name") if isinstance(theme_dict, dict) else theme
+    if t_name:
+        apply_theme_to_textual_borders(t_name)
     with contextlib.suppress(Exception):
         dialog = screen.query_one("#dialog")
         border_style = theme_dict.get("border") or theme_dict.get("accent")
@@ -1101,37 +1151,34 @@ class MessageModalScreen(ModalScreen[None]):
             else:
                 try:
                     self.app.open_url(href)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     import webbrowser
                     webbrowser.open(href)
         else:
-            clean_path = href[7:] if href.startswith("file://") else href
+            clean_path = href.removeprefix("file://")
             base_dir = os.path.dirname(__file__)
             target_path = clean_path if os.path.isabs(clean_path) else os.path.join(base_dir, clean_path)
-            if os.path.exists(target_path):
-                if target_path.endswith((".md", ".markdown")):
+            if os.path.exists(target_path) and target_path.endswith((".md", ".markdown")):
+                with contextlib.suppress(Exception):
+                    with open(target_path, "r", encoding="utf-8") as f:
+                        new_text = f.read()
+                    self.message = new_text
+                    self.modal_title = os.path.basename(target_path)
                     with contextlib.suppress(Exception):
-                        with open(target_path, "r", encoding="utf-8") as f:
-                            new_text = f.read()
-                        self.message = new_text
-                        self.modal_title = os.path.basename(target_path)
-                        with contextlib.suppress(Exception):
-                            self.query_one("#title", Label).update(self.modal_title)
-                        msg_widget = self.query_one("#message", Static)
-                        msg_widget.update(Markdown(new_text, hyperlinks=True))
-                        self._cached_anchor_lines = None
-                        scroller = self.query_one("#scroll_container", VerticalScroll)
-                        scroller.scroll_to(y=0, animate=False)
+                        self.query_one("#title", Label).update(self.modal_title)
+                    msg_widget = self.query_one("#message", Static)
+                    msg_widget.update(Markdown(new_text, hyperlinks=True))
+                    self._cached_anchor_lines = None
+                    scroller = self.query_one("#scroll_container", VerticalScroll)
+                    scroller.scroll_to(y=0, animate=False)
 
     def goto_anchor(self, anchor: str) -> None:
         if not anchor:
             return
-        try:
+        with contextlib.suppress(Exception):
             md = self.query_one("#message", TextualMarkdown)
             md.goto_anchor(anchor)
             return
-        except Exception:
-            pass
 
         if self._cached_anchor_lines is None:
             self._cached_anchor_lines = self._compute_anchor_lines()
@@ -1166,7 +1213,7 @@ class MessageModalScreen(ModalScreen[None]):
             lines = c.render_lines(Markdown(text_str, hyperlinks=True))
             for y, line_segs in enumerate(lines):
                 line_str = "".join(s.text for s in line_segs).strip()
-                if not line_str or line_str.startswith("•") or line_str.startswith("-") or set(line_str).issubset(set("─-=")):
+                if not line_str or line_str.startswith(("•", "-")) or set(line_str).issubset(set("─-=")):
                     continue
                 clean = re.sub(r"[^a-zA-Z0-9]+", " ", line_str).lower().strip()
                 if clean and clean not in anchors:

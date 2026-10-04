@@ -1016,7 +1016,7 @@ class BashEditScreen(Screen):
             except Exception:  # noqa: BLE001, S110
                 pass
             self.theme_styles = bashmenu_ui.init_theme_colors(theme_name)
-
+        self.theme_name = theme_name
         self.theme = self.theme_styles
 
         lines = [""]
@@ -1056,8 +1056,10 @@ class BashEditScreen(Screen):
             display_theme_colors=self.display_theme_colors,
             id="editor_widget",
         )
+        borders = bashmenu_ui.get_theme_window_borders(getattr(self, "theme_name", "dracula"))
+        div_char = borders.get("border_horizontal", "─")
         with Vertical(id="editor_footer_area"):
-            yield Label("─" * 500, id="editor_divider")
+            yield Label(div_char * 500, id="editor_divider")
             with Horizontal(id="editor_legend"):
                 yield Label("^O Open", id="lbl_open", classes="footer_item lbl_open", markup=False)
                 yield Label("^S Save", id="lbl_save", classes="footer_item lbl_save", markup=False)
@@ -1319,6 +1321,10 @@ class BashEditScreen(Screen):
             self.theme_styles = bashmenu_ui.resolve_theme_dict(
                 getattr(self, "theme_styles", None) or getattr(self.app, "theme_styles", None), self.app
             )
+            t_name = self.theme_styles.get("theme_name") if isinstance(self.theme_styles, dict) else None
+            if t_name:
+                self.theme_name = t_name
+                bashmenu_ui.apply_theme_to_textual_borders(t_name)
             bg_style = self.theme_styles.get("background")
             if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
                 css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
@@ -1351,6 +1357,11 @@ class BashEditScreen(Screen):
             with contextlib.suppress(Exception):
                 btn_close = self.query_one("#btn_close_x", Label)
                 btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
+
+            borders = bashmenu_ui.get_theme_window_borders(getattr(self, "theme_name", "dracula"))
+            div_char = borders.get("border_horizontal", "─")
+            with contextlib.suppress(Exception):
+                self.query_one("#editor_divider", Label).update(div_char * 500)
 
             divider_style = self.theme_styles.get("divider") or self.theme_styles.get("border") or self.theme_styles.get("accent")
             if divider_style and divider_style.color and divider_style.color.name:

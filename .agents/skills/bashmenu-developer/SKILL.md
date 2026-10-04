@@ -370,6 +370,13 @@ Textual interface.
       must be stripped prior to measurement.
     - `ymlcheck.py` must enforce that `window:` is a mapping and all child properties
       are recognized border keys with string or integer values.
+    - Global Textual border synchronization: `apply_theme_to_textual_borders` in `bashmenu_ui.py`
+      synchronizes `textual._border.BORDER_CHARS['thick']` and `['solid']` and clears Textual's
+      box cache (`get_box.cache_clear()`), ensuring all modal dialogs across `bashmenu_ui.py`,
+      panel borders in `menuedit.py`, and editor dividers in `bashedit.py` dynamically honor
+      the active theme's borders.
+    - When a divider's `char:` is omitted or resolves empty in `bashmenu.py` or `menuedit.py`,
+      it automatically falls back to the active theme's `border_horizontal`.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the
