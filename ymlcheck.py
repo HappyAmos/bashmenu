@@ -104,7 +104,7 @@ VALID_WINDOW_BORDER_KEYS = {
 VALID_OPTION_TYPES = {
     "command", "script", "submenu", "config", "toggle", "editor",
     "confirm", "message", "popup", "info", "python", "inject_block",
-    "theme_selector", "divider", "back", "exit", "action"
+    "theme_selector", "{divider}", "back", "exit", "action"
 }
 
 
@@ -360,7 +360,8 @@ def _validate_menu_options(options: list[Any], path: str, errors: list[str]) -> 
             continue
 
         opt_type = opt.get("type", "command")
-        if opt_type not in VALID_OPTION_TYPES and "submenu" not in opt:
+        is_div = opt_type == "{divider}" or (isinstance(opt_type, dict) and "divider" in opt_type)
+        if not is_div and opt_type not in VALID_OPTION_TYPES and "submenu" not in opt:
             errors.append(f"'{opt_path}': Unknown option type '{opt_type}'.")
 
         if opt_type == "submenu" or "submenu" in opt:

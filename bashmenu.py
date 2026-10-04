@@ -639,74 +639,26 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     return res_text
 
 
-def get_effective_divider_config(config=None, menu_data=None, item_conf=None):
-    """Resolve effective divider configuration following priority:
-    1. Active theme in bashmenu.themes (highest priority - overrides all declared divider styles)
-    2. Plugin configuration in bashmenu.yml (settings.plugins.divider, settings.plugins.*.divider, settings.divider)
-    3. Declarations in bashmenu.mnu (item_conf attributes 'char'/'length', or menu_data divider definitions)
-    4. Default fallback: char='{ascii:196}', length='{window_width}'
-    Note: Outer window borders never override dividers.
+def is_divider(opt) -> bool:
+    """Return True if the option represents a visual divider.
+    Only strictly recognizes '{divider}' (quoted or unquoted YAML '{divider}'),
+    never plain 'divider'.
+    """
+    if not isinstance(opt, dict):
+        return False
+    t = opt.get("type")
+    return t == "{divider}" or bool(isinstance(t, dict) and "divider" in t)
+
+
+def get_effective_divider_config(config=None, **kwargs):
+    """Resolve effective divider configuration strictly from the active theme in bashmenu.themes.
+    Default fallback: char='{ascii:196}', length='{window_width}'
     """
     if not isinstance(config, dict):
         config = {}
 
-    # Start with base default
     result = {"char": "{ascii:196}", "length": "{window_width}"}
 
-    # Tier 3: bashmenu.mnu definitions
-    if isinstance(menu_data, dict):
-        m_div = menu_data.get("divider") or menu_data.get("settings", {}).get("divider")
-        if isinstance(m_div, dict):
-            for k in ("char", "length"):
-                if m_div.get(k) is not None:
-                    result[k] = m_div[k]
-        elif isinstance(m_div, (str, int)):
-            result["char"] = str(m_div)
-    if isinstance(item_conf, dict):
-        for k in ("char", "length"):
-            if item_conf.get(k) is not None:
-                result[k] = item_conf[k]
-
-    # Tier 2: bashmenu.yml definitions (for plugins / settings)
-    settings = config.get("settings", {})
-    if isinstance(settings, dict):
-        plugins = settings.get("plugins", {})
-        if isinstance(plugins, dict):
-            if "divider" in plugins:
-                p_div = plugins["divider"]
-                if isinstance(p_div, dict):
-                    for k in ("char", "length"):
-                        if p_div.get(k) is not None:
-                            result[k] = p_div[k]
-                elif isinstance(p_div, (str, int)):
-                    result["char"] = str(p_div)
-            for plug in plugins.values():
-                if isinstance(plug, dict) and "divider" in plug:
-                    p_div = plug["divider"]
-                    if isinstance(p_div, dict):
-                        for k in ("char", "length"):
-                            if p_div.get(k) is not None:
-                                result[k] = p_div[k]
-                    elif isinstance(p_div, (str, int)):
-                        result["char"] = str(p_div)
-
-        settings_div = settings.get("divider")
-        if isinstance(settings_div, dict):
-            for k in ("char", "length"):
-                if settings_div.get(k) is not None:
-                    result[k] = settings_div[k]
-        elif isinstance(settings_div, (str, int)):
-            result["char"] = str(settings_div)
-
-    user_div = get_config_value(config, "user.divider", None)
-    if isinstance(user_div, dict):
-        for k in ("char", "length"):
-            if user_div.get(k) is not None:
-                result[k] = user_div[k]
-    elif isinstance(user_div, (str, int)):
-        result["char"] = str(user_div)
-
-    # Tier 1 (Highest Priority): Active theme in bashmenu.themes
     theme_name = get_config_value(config, "theme", "dracula")
     theme_div = bashmenu_ui.get_theme_divider(theme_name, config=config)
     if isinstance(theme_div, dict):
@@ -719,9 +671,9 @@ def get_effective_divider_config(config=None, menu_data=None, item_conf=None):
     return result
 
 
-def resolve_divider_string(config, target_w=None, extra_vars=None, item_conf=None, menu_data=None):
-    """Generate divider string based on configuration and target width."""
-    divider_conf = get_effective_divider_config(config, menu_data=menu_data, item_conf=item_conf)
+def resolve_divider_string(config, target_w=None, extra_vars=None, **kwargs):
+    """Generate divider string based on active theme configuration and target width."""
+    divider_conf = get_effective_divider_config(config)
 
     char = divider_conf.get("char")
     if not char:
@@ -802,9 +754,7 @@ def build_dynamic_theme_submenu():
     themes = bashmenu_ui.load_themes_file()
     options = [
         {
-            "type": "divider",
-            "length": "{window_width}",
-            "char": "{ascii:196}",
+            "type": "{divider}",
         }
     ]
     if themes:
@@ -817,9 +767,7 @@ def build_dynamic_theme_submenu():
                 "icon": "{nf::#f0301:🎨}",
             })
     options.append({
-        "type": "divider",
-        "length": "{window_width}",
-        "char": "{ascii:196}",
+        "type": "{divider}",
     })
     options.append({
         "title": "Back to Options & Settings",
@@ -1235,7 +1183,7 @@ class MainMenuView(Widget):
         shortcut_map = {}
         sc_idx = 0
         for idx, opt in enumerate(options):
-            if opt.get("type") != "divider" and sc_idx < len(shortcut_chars):
+            if not is_divider(opt) and sc_idx < len(shortcut_chars):
                 shortcut_map[idx] = shortcut_chars[sc_idx]
                 sc_idx += 1
 
@@ -1251,8 +1199,8 @@ class MainMenuView(Widget):
             is_selected = (idx == curr_row)
             item_style = highlight_style if is_selected else text_style
 
-            if opt.get("type") == "divider":
-                item_div_conf = get_effective_divider_config(self.config, menu_data=self.menu_data, item_conf=opt)
+            if is_divider(opt):
+                item_div_conf = get_effective_divider_config(self.config)
 
                 length_val = item_div_conf.get("length", "{window_width}")
                 if isinstance(length_val, dict):
@@ -1261,7 +1209,7 @@ class MainMenuView(Widget):
                     is_screen = "screen_width" in str(length_val)
 
                 if is_screen:
-                    div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars, item_conf=opt, menu_data=self.menu_data)
+                    div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars)
                     div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
                     line_rich = Text(f"{b_tee_l}", style=border_style)
                     line_rich.append_text(div_rich)
@@ -1275,7 +1223,7 @@ class MainMenuView(Widget):
                     target_div_w = avail_w
                     if str(length_val).isdigit():
                         target_div_w = min(avail_w, int(length_val))
-                    div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars, item_conf=opt, menu_data=self.menu_data)
+                    div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars)
                     div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
                     line_rich = Text(f"{b_v_left}  ", style=border_style)
                     line_rich.append_text(div_rich)
@@ -1464,7 +1412,7 @@ class MainMenuView(Widget):
             target_idx = scroll_start + rendered_row
             if 0 <= target_idx < len(options):
                 opt = options[target_idx]
-                if opt.get("type") != "divider":
+                if not is_divider(opt):
                     self.set_current_row(target_idx)
                     scr = None
                     with contextlib.suppress(Exception):
@@ -1496,7 +1444,7 @@ class MainMenuView(Widget):
             target_idx = scroll_start + rendered_row
             if 0 <= target_idx < len(options):
                 opt = options[target_idx]
-                if opt.get("type") != "divider" and self.current_row() != target_idx:
+                if not is_divider(opt) and self.current_row() != target_idx:
                     self.set_current_row(target_idx)
 
 
@@ -1530,7 +1478,7 @@ def process_item_action(screen, item, config):
         screen.menu_view.menu_stack.append(sub_menu)
         sub_options = sub_menu.get("options", [])
         start_idx = 0
-        while start_idx < len(sub_options) and sub_options[start_idx].get("type") == "divider":
+        while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
             start_idx += 1
         screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
         screen.menu_view.refresh()
@@ -1555,7 +1503,7 @@ def process_item_action(screen, item, config):
         screen.menu_view.menu_stack.append(sub_menu)
         sub_options = sub_menu.get("options", [])
         start_idx = 0
-        while start_idx < len(sub_options) and sub_options[start_idx].get("type") == "divider":
+        while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
             start_idx += 1
         screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
         screen.menu_view.refresh()
@@ -1986,7 +1934,7 @@ class BashMenuScreen(Screen):
         shortcut_map = {}
         sc_idx = 0
         for idx, opt in enumerate(opts):
-            if opt.get("type") != "divider" and sc_idx < len(shortcut_chars):
+            if not is_divider(opt) and sc_idx < len(shortcut_chars):
                 shortcut_map[shortcut_chars[sc_idx]] = idx
                 sc_idx += 1
 
@@ -2009,7 +1957,7 @@ class BashMenuScreen(Screen):
             return
         orig = mv.current_row()
         idx = (orig - 1) % len(opts)
-        while idx != orig and opts[idx].get("type") == "divider":
+        while idx != orig and is_divider(opts[idx]):
             idx = (idx - 1) % len(opts)
         mv.set_current_row(idx)
 
@@ -2020,7 +1968,7 @@ class BashMenuScreen(Screen):
             return
         orig = mv.current_row()
         idx = (orig + 1) % len(opts)
-        while idx != orig and opts[idx].get("type") == "divider":
+        while idx != orig and is_divider(opts[idx]):
             idx = (idx + 1) % len(opts)
         mv.set_current_row(idx)
 
@@ -2028,7 +1976,7 @@ class BashMenuScreen(Screen):
         mv = self.menu_view
         opts = mv.current_menu().get("options", [])
         idx = 0
-        while idx < len(opts) and opts[idx].get("type") == "divider":
+        while idx < len(opts) and is_divider(opts[idx]):
             idx += 1
         mv.set_current_row(idx)
 
@@ -2036,7 +1984,7 @@ class BashMenuScreen(Screen):
         mv = self.menu_view
         opts = mv.current_menu().get("options", [])
         idx = len(opts) - 1
-        while idx >= 0 and opts[idx].get("type") == "divider":
+        while idx >= 0 and is_divider(opts[idx]):
             idx -= 1
         mv.set_current_row(idx)
 

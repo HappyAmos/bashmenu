@@ -42,7 +42,7 @@ TYPE_BADGES = {
     "theme_selector": "[THM]",
     "back": "[BCK]",
     "exit": "[EXT]",
-    "divider": "[DIV]",
+    "{divider}": "[DIV]",
 }
 
 ITEM_TYPES = [
@@ -59,7 +59,7 @@ ITEM_TYPES = [
     ("theme_selector", "Theme Selector (dynamic theme menu)"),
     ("back", "Back Button (returns to parent menu)"),
     ("exit", "Exit Button (terminates application)"),
-    ("divider", "Visual Divider Line (aesthetic separator)"),
+    ("{divider}", "Visual Divider Line (aesthetic separator)"),
 ]
 
 
@@ -551,8 +551,8 @@ def render_menu_item_preview(item: dict, config: dict | None = None, width: int 
     cfg = config if config else bashmenu.load_config()[0]
     item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
 
-    if item_type == "divider":
-        div_cfg = bashmenu.get_effective_divider_config(cfg, item_conf=item)
+    if item_type in ("divider", "{divider}") or (isinstance(item_type, dict) and "divider" in item_type):
+        div_cfg = bashmenu.get_effective_divider_config(cfg)
         char_val = div_cfg.get("char", "{ascii:196}")
         length_val = div_cfg.get("length", "{window_width}")
         expanded_char = bashmenu.interpolate_placeholders(char_val, cfg)
@@ -774,9 +774,10 @@ class ItemEditModal(ModalScreen[dict]):
 
     def _detect_item_type(self, item: dict) -> str:
         if "type" in item:
-            return item["type"]
-        if "divider" in item or "char" in item:
-            return "divider"
+            t = item["type"]
+            if t in ("divider", "{divider}") or (isinstance(t, dict) and "divider" in t):
+                return "{divider}"
+            return t
         if "submenu" in item:
             return "submenu"
         if "command" in item:
@@ -945,7 +946,7 @@ class ItemEditModal(ModalScreen[dict]):
         self.update_type_visibility()
 
     def update_type_visibility(self) -> None:
-        is_div = self.current_type == "divider"
+        is_div = self.current_type in ("divider", "{divider}")
         with contextlib.suppress(Exception):
             self.query_one("#container_divider", Vertical).display = is_div
             self.query_one("#container_standard", Vertical).display = not is_div
@@ -1073,17 +1074,9 @@ class ItemEditModal(ModalScreen[dict]):
         self.item["type"] = item_type
 
         # 1. Handle divider items separately
-        if item_type == "divider":
-            char_val = "{ascii:196}"
-            length_val = "{window_width}"
-            with contextlib.suppress(Exception):
-                char_val = self.query_one("#inp_char", Input).value.strip() or "{ascii:196}"
-            with contextlib.suppress(Exception):
-                length_val = self.query_one("#inp_length", Input).value.strip() or "{window_width}"
+        if item_type in ("divider", "{divider}"):
             self.item = {
-                "type": "divider",
-                "char": char_val,
-                "length": length_val,
+                "type": "{divider}",
             }
             self.dismiss(self.item)
             return
@@ -1874,7 +1867,9 @@ class MenuEditScreen(Screen):
             if not isinstance(item, dict):
                 continue
             item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
-            title = item.get("title", item.get("label", item.get("divider", "Divider")))
+            if item_type in ("divider", "{divider}") or (isinstance(item_type, dict) and "divider" in item_type):
+                item_type = "{divider}"
+            title = "Divider" if item_type == "{divider}" else item.get("title", item.get("label", "(No Title)"))
             badge = TYPE_BADGES.get(item_type, "[???]")
 
             node_label = f"{badge} {title}"
@@ -1899,6 +1894,8 @@ class MenuEditScreen(Screen):
             return
 
         item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
+        if item_type in ("divider", "{divider}") or (isinstance(item_type, dict) and "divider" in item_type):
+            item_type = "{divider}"
         badge = TYPE_BADGES.get(item_type, "[???]")
 
         try:
@@ -1906,13 +1903,14 @@ class MenuEditScreen(Screen):
         except Exception:  # noqa: BLE001
             cfg = {}
 
-        if item_type == "divider":
-            char_val = item.get("char", "{ascii:196}")
-            length_val = item.get("length", "{window_width}")
+        if item_type == "{divider}":
+            div_cfg = bashmenu.get_effective_divider_config(cfg)
+            char_val = div_cfg.get("char", "{ascii:196}")
+            length_val = div_cfg.get("length", "{window_width}")
             lines = [
                 f"[bold magenta]{badge} DIVIDER[/bold magenta]",
-                f"[bold white]Repeating Char:[/bold white] {escape(str(char_val))}",
-                f"[bold white]Length Directive:[/bold white] {escape(str(length_val))}",
+                f"[bold white]Repeating Char (Theme):[/bold white] {escape(str(char_val))}",
+                f"[bold white]Length Directive (Theme):[/bold white] {escape(str(length_val))}",
             ]
         else:
             title = item.get("title", item.get("label", "(No Title)"))
@@ -2055,8 +2053,10 @@ class MenuEditScreen(Screen):
                 node.data.clear()
                 node.data.update(updated_item)
                 item_type = updated_item.get("type", "command")
+                if item_type in ("divider", "{divider}") or (isinstance(item_type, dict) and "divider" in item_type):
+                    item_type = "{divider}"
                 badge = TYPE_BADGES.get(item_type, "[???]")
-                title = updated_item.get("title") or updated_item.get("label") or updated_item.get("divider") or "Divider"
+                title = "Divider" if item_type == "{divider}" else (updated_item.get("title") or updated_item.get("label") or "Item")
                 node.label = f"{badge} {title}"
                 self.modified = True
                 if item_type == "submenu" or old_type == "submenu":
@@ -2090,11 +2090,13 @@ class MenuEditScreen(Screen):
                 "config": "key",
                 "python": "python",
             }
-            item["type"] = selected_type
-            if selected_type == "divider":
-                item.setdefault("char", "{ascii:196}")
-                item.setdefault("length", "{window_width}")
+            if selected_type in ("divider", "{divider}"):
+                selected_type = "{divider}"
+                item["type"] = "{divider}"
+                item.pop("char", None)
+                item.pop("length", None)
             else:
+                item["type"] = selected_type
                 item.pop("char", None)
                 item.pop("length", None)
                 old_pk = action_type_map.get(orig_type)
@@ -2110,7 +2112,7 @@ class MenuEditScreen(Screen):
                     item.pop("submenu", None)
 
             badge = TYPE_BADGES.get(selected_type, "[???]")
-            title = item.get("title") or item.get("label") or item.get("divider") or "Divider"
+            title = "Divider" if selected_type == "{divider}" else (item.get("title") or item.get("label") or "Item")
             node.label = f"{badge} {title}"
             self.modified = True
             self.populate_tree(target_item=node.data)
@@ -2131,11 +2133,9 @@ class MenuEditScreen(Screen):
             if not selected_type:
                 return
 
-            if selected_type == "divider":
+            if selected_type in ("divider", "{divider}"):
                 new_item = {
-                    "type": "divider",
-                    "char": "{ascii:196}",
-                    "length": "{window_width}",
+                    "type": "{divider}",
                 }
             else:
                 new_item = {"type": selected_type, "title": f"New {selected_type}"}
@@ -2274,7 +2274,7 @@ class MenuEditScreen(Screen):
         if idx > 0:
             prev_sibling = opts[idx - 1]
             if isinstance(prev_sibling, dict):
-                if prev_sibling.get("type") == "divider":
+                if bashmenu.is_divider(prev_sibling):
                     return
                 target_item = node.data
                 if "submenu" not in prev_sibling and prev_sibling.get("type") != "submenu":

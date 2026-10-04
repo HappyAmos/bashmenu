@@ -80,23 +80,18 @@ class TestPluginSystem(unittest.TestCase):
 
     def test_pretext_posttext_and_divider(self):
         config = {
-            "user": {
-                "divider": {
-                    "char": "-",
-                    "length": "10"
-                }
-            },
+            "theme": "pacman",  # pacman defines divider char: {ascii:205} (═)
             "settings": {
                 "scripts_dir": "/tmp",
                 "plugins": {
                     "otd": {
                         "script": "otd.sh",
                         "sleep": 300,
-                        "pretext": "{user.divider}",
-                        "posttext": "{user.divider}"
+                        "pretext": "{divider}",
+                        "posttext": "{divider}",
                     }
-                }
-            }
+                },
+            },
         }
         with patch("subprocess.run") as mock_run:
             mock_res = MagicMock()
@@ -105,31 +100,24 @@ class TestPluginSystem(unittest.TestCase):
 
             lines = bashmenu.get_plugin_outputs(config)
             self.assertEqual(lines, [
-                "{user.divider}",
+                "{divider}",
                 "Sample OTD text",
                 "https://example.com",
-                "{user.divider}"
+                "{divider}",
             ])
 
-            # Verify placeholder expansion of {user.divider}
-            expanded = [bashmenu.interpolate_placeholders(line, config) for line in lines]
-            self.assertEqual(expanded[0], "[color=divider]----------[/color]")
-            self.assertEqual(expanded[3], "[color=divider]----------[/color]")
+            # Verify placeholder expansion of {divider} with window_width
+            expanded = [bashmenu.interpolate_placeholders(line, config, extra_vars={"window_width": 10}) for line in lines]
+            self.assertEqual(expanded[0], "[color=divider]══════════[/color]")
+            self.assertEqual(expanded[3], "[color=divider]══════════[/color]")
 
     def test_divider_window_width_scaling(self):
-        config = {
-            "user": {
-                "divider": {
-                    "char": "-",
-                    "length": "{window_width}"
-                }
-            }
-        }
+        config = {"theme": "pacman"}
         # Force target_w to 76 (corresponding to 80-char width with 2-char margins)
         div_str = bashmenu.resolve_divider_string(config, target_w=76)
         vis_len = bashmenu.get_visible_len(div_str)
         self.assertEqual(vis_len, 76)
-        self.assertEqual(div_str, "[color=divider]" + ("-" * 76) + "[/color]")
+        self.assertEqual(div_str, "[color=divider]" + ("═" * 76) + "[/color]")
 
     def test_menu_priority_over_plugins(self):
         options = [{"label": f"Option {i}"} for i in range(10)]

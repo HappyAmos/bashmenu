@@ -316,16 +316,17 @@ pacman:
 | `title_right_cap` | Decorative right cap after the title text in header border. | `]` (bracket) |
 | `shadow_char` | Drop shadow shade character for modal dialogs and popups. | `░` (`{ascii:176}`) |
 
-##### Divider Resolution Precedence, Placement & Width Semantics
-Dividers (`{divider}` macro, divider menu items, and editor footers) are completely independent of outer window borders (`window:`) and strictly follow a 4-tier style priority:
-1. **Active Theme Definition (`bashmenu.themes`)**: Explicit `divider:` block under the active theme (e.g. `char: "{ascii:205}", length: "{screen_width}"`). This takes highest priority and overrides all declared divider styles in both `bashmenu.yml` and `bashmenu.mnu`.
-2. **Plugin Definition (`bashmenu.yml`)**: If the active theme does not define a divider, divider configurations in `bashmenu.yml` (e.g. `settings.plugins.divider`, `settings.plugins.<name>.divider`, or `settings.divider`) are used.
-3. **Menu Definition (`bashmenu.mnu`)**: If neither the theme nor `bashmenu.yml` defines a divider, the engine uses the declared divider attributes on the item itself (e.g. `type: divider`, `char: ...`, `length: ...`) or menu-level configuration in `bashmenu.mnu`.
-4. **Default Fallback**: If no custom divider definition is declared anywhere, the engine defaults to `char: "{ascii:196}"` of length `{window_width}`.
+##### Divider Styling, Placement & Width Semantics
+Divider styling (`char` glyph, `length`, and color) is defined **strictly in the themes file** (`bashmenu.themes`) as the single source of truth. Individual menu items and plugin declarations simply place a divider using `{divider}` and automatically inherit the active theme's styling.
 
-###### Divider Placement & Presence Rules
-- **Menu Options (`bashmenu.mnu`)**: Dividers only appear in a menu if explicitly declared as an item (`type: divider`) in `bashmenu.mnu`. If a menu contains no divider items, **no dividers are rendered** in that menu.
-- **Plugins (`bashmenu.yml`)**: Plugin display areas and scripts render their dividers independently when configured in `bashmenu.yml` or outputting `{divider}`.
+1. **Theme Definition (`bashmenu.themes`)**: Defined under each theme's `divider:` block (specifying `char` and `length`).
+2. **Default Fallback**: If an active theme does not define a `divider:` block, the engine defaults to `char: "{ascii:196}"` of length `{window_width}`.
+3. **No Per-Item Style Overrides**: Declared divider options in `bashmenu.mnu` or `bashmenu.yml` do not specify `char` or `length`; their appearance is controlled globally by the active theme.
+
+###### Divider Placement & Strict `{divider}` Recognition
+- **Menu Options (`bashmenu.mnu`)**: Dividers are declared strictly using `type: "{divider}"` (or unquoted `type: {divider}`). The plain string `"divider"` is **not** recognized.
+- **Divider Presence**: Dividers only appear in a menu if explicitly declared as an item (`type: "{divider}"`). If a menu contains no divider items, **no dividers are rendered** in that menu.
+- **Plugins (`bashmenu.yml`)**: Plugin display areas place dividers using `pretext: "{divider}"` or `posttext: "{divider}"`.
 
 ###### Divider Widths: `{window_width}` vs `{screen_width}`
 - `{window_width}`: Standard shorter divider bounded within window borders and 2-character margins (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/`border_vertical_right`) with 2-character padding on each side, and **without** border tees.
@@ -349,7 +350,7 @@ Dividers (`{divider}` macro, divider menu items, and editor footers) are complet
 | `python` | Dispatches internal Python utility function | `action` |
 | `inject_block` | Installs/removes modular code segments | `template`, `target`, `block_id` |
 | `theme_selector`| Launches list of registered themes | *(automatic)* |
-| `divider` | Renders an aesthetic horizontal line separator | `length`, `char` |
+| `{divider}` | Renders an aesthetic horizontal line separator styled by the theme | *(automatic)* |
 | `back` | Navigates back to the preceding menu level| *(automatic)* |
 | `exit` | Shuts down the menu interface completely | *(automatic)* |
 

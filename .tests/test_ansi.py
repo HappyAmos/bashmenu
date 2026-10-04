@@ -662,7 +662,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         import menuedit
 
         # Test ItemEditModal save for divider
-        item_div = {"type": "divider", "char": "-", "length": "80"}
+        item_div = {"type": "{divider}"}
         modal = menuedit.ItemEditModal(item_div)
         class DummyInput:
             def __init__(self, val):
@@ -677,13 +677,13 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         modal.dismiss = lambda item: None
         modal.perform_save()
 
-        self.assertEqual(modal.item, {"type": "divider", "char": "#", "length": "{window_width}"})
+        self.assertEqual(modal.item, {"type": "{divider}"})
 
         # Test indenting under divider is disallowed
         menu_data = {
             "title": "Root Menu",
             "options": [
-                {"type": "divider", "char": "-", "length": "80"},
+                {"type": "{divider}"},
                 {"title": "Item A", "type": "command"},
             ],
         }
@@ -705,7 +705,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
 
         screen.action_indent_item()
         # Item A should NOT be indented under divider
-        self.assertEqual(screen.menu_data["options"][0]["type"], "divider")
+        self.assertEqual(screen.menu_data["options"][0]["type"], "{divider}")
         self.assertEqual(len(screen.menu_data["options"]), 2)
 
         # Test live divider preview update
@@ -724,7 +724,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
                 return DummyPreviewBox()
             return DummyInput("")
 
-        modal_prev = menuedit.ItemEditModal({"type": "divider", "char": "{ascii:196}", "length": "{window_width}"})
+        modal_prev = menuedit.ItemEditModal({"type": "{divider}"})
         modal_prev.query_one = mock_query_preview
         modal_prev.update_divider_preview()
         self.assertEqual(len(updated_preview), 1)
