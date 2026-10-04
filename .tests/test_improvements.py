@@ -1267,6 +1267,68 @@ class TestImprovements(unittest.TestCase):
         self.assertEqual(borders["border_tee_top"], "T")
         self.assertEqual(borders["border_tee_bottom"], "B")
 
+    def test_four_tier_divider_precedence_and_presence(self):
+        """Test full 4-tier divider precedence (Theme > YML plugins > MNU declarations > Default)
+        and presence rules (no dividers in menu unless declared in bashmenu.mnu).
+        """
+        # Tier 1: Theme overrides declared divider item in bashmenu.mnu
+        # pacman defines char: {ascii:205} (═) and length: {window_width}
+        cfg_pacman = {"theme": "pacman"}
+        item_declared = {"type": "divider", "char": "*", "length": "{screen_width}"}
+        res_t1 = bashmenu.get_effective_divider_config(cfg_pacman, item_conf=item_declared)
+        # Theme's char {ascii:205} and length {window_width} override item_declared's '*' and {screen_width}
+        self.assertEqual(res_t1["char"], "{ascii:205}")
+        self.assertEqual(res_t1["length"], "{window_width}")
+
+        # Tier 2: Plugin in bashmenu.yml overrides declared divider item when theme has no divider
+        cfg_plugin = {
+            "theme": "dracula",  # dracula has no divider block
+            "settings": {"plugins": {"myplug": {"divider": {"char": "#", "length": "{screen_width}"}}}},
+        }
+        res_t2 = bashmenu.get_effective_divider_config(cfg_plugin, item_conf=item_declared)
+        self.assertEqual(res_t2["char"], "#")
+        self.assertEqual(res_t2["length"], "{screen_width}")
+
+        # Tier 3: Declared divider item in bashmenu.mnu is used when neither theme nor plugin defines divider
+        cfg_empty = {"theme": "dracula"}
+        res_t3 = bashmenu.get_effective_divider_config(cfg_empty, item_conf=item_declared)
+        self.assertEqual(res_t3["char"], "*")
+        self.assertEqual(res_t3["length"], "{screen_width}")
+
+        # Tier 4: Default fallback when nothing is declared
+        res_t4 = bashmenu.get_effective_divider_config(cfg_empty, item_conf={"type": "divider"})
+        self.assertEqual(res_t4["char"], "{ascii:196}")
+        self.assertEqual(res_t4["length"], "{window_width}")
+
+        # Presence Test: If no dividers are declared in bashmenu.mnu, render NO dividers
+        mnu_no_div = {
+            "title": "Menu Without Dividers",
+            "options": [
+                {"label": "Item 1", "action": "echo 1"},
+                {"label": "Item 2", "action": "echo 2"},
+            ],
+        }
+        mv_no_div = bashmenu.MainMenuView(config=cfg_pacman, menu_data=mnu_no_div)
+        mv_no_div._size = type("Size", (), {"width": 80, "height": 24})()
+        rendered_no_div = mv_no_div.render().plain
+        # pacman divider char is ═ (ascii 205). It must NOT appear anywhere in the rendered menu!
+        self.assertNotIn("═", rendered_no_div)
+        self.assertNotIn("─", rendered_no_div)
+
+        # Presence Test: If dividers ARE declared in bashmenu.mnu, they DO render (styled by theme)
+        mnu_with_div = {
+            "title": "Menu With Divider",
+            "options": [
+                {"label": "Item 1", "action": "echo 1"},
+                {"type": "divider"},
+                {"label": "Item 2", "action": "echo 2"},
+            ],
+        }
+        mv_with_div = bashmenu.MainMenuView(config=cfg_pacman, menu_data=mnu_with_div)
+        mv_with_div._size = type("Size", (), {"width": 80, "height": 24})()
+        rendered_with_div = mv_with_div.render().plain
+        self.assertIn("═", rendered_with_div)
+
 
 if __name__ == "__main__":
     unittest.main()

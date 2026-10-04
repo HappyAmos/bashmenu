@@ -316,11 +316,16 @@ pacman:
 | `title_right_cap` | Decorative right cap after the title text in header border. | `]` (bracket) |
 | `shadow_char` | Drop shadow shade character for modal dialogs and popups. | `░` (`{ascii:176}`) |
 
-##### Divider Resolution Precedence & Width Semantics
-Dividers (`{divider}` macro, divider menu items, and editor footers) are completely independent of outer window borders (`window:`) and strictly follow a 3-tier priority:
-1. **Theme Definition (`bashmenu.themes`)**: Explicit `divider:` block under the active theme (e.g. `char: "{ascii:205}", length: "{screen_width}"`). This takes highest priority over plugins.
-2. **Plugin Definition (`bashmenu.yml`)**: If the theme does not define a divider, dividers configured in plugins (e.g. `settings.plugins.<name>.divider`, `user.divider`, or `settings.divider`) are used.
-3. **Default Fallback**: If neither the theme nor any plugin defines a divider, the engine defaults to `char: "{ascii:196}"` of length `{window_width}`.
+##### Divider Resolution Precedence, Placement & Width Semantics
+Dividers (`{divider}` macro, divider menu items, and editor footers) are completely independent of outer window borders (`window:`) and strictly follow a 4-tier style priority:
+1. **Active Theme Definition (`bashmenu.themes`)**: Explicit `divider:` block under the active theme (e.g. `char: "{ascii:205}", length: "{screen_width}"`). This takes highest priority and overrides all declared divider styles in both `bashmenu.yml` and `bashmenu.mnu`.
+2. **Plugin Definition (`bashmenu.yml`)**: If the active theme does not define a divider, divider configurations in `bashmenu.yml` (e.g. `settings.plugins.divider`, `settings.plugins.<name>.divider`, or `settings.divider`) are used.
+3. **Menu Definition (`bashmenu.mnu`)**: If neither the theme nor `bashmenu.yml` defines a divider, the engine uses the declared divider attributes on the item itself (e.g. `type: divider`, `char: ...`, `length: ...`) or menu-level configuration in `bashmenu.mnu`.
+4. **Default Fallback**: If no custom divider definition is declared anywhere, the engine defaults to `char: "{ascii:196}"` of length `{window_width}`.
+
+###### Divider Placement & Presence Rules
+- **Menu Options (`bashmenu.mnu`)**: Dividers only appear in a menu if explicitly declared as an item (`type: divider`) in `bashmenu.mnu`. If a menu contains no divider items, **no dividers are rendered** in that menu.
+- **Plugins (`bashmenu.yml`)**: Plugin display areas and scripts render their dividers independently when configured in `bashmenu.yml` or outputting `{divider}`.
 
 ###### Divider Widths: `{window_width}` vs `{screen_width}`
 - `{window_width}`: Standard shorter divider bounded within window borders and 2-character margins (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/`border_vertical_right`) with 2-character padding on each side, and **without** border tees.

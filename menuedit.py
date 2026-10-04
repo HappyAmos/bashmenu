@@ -552,11 +552,9 @@ def render_menu_item_preview(item: dict, config: dict | None = None, width: int 
     item_type = item.get("type", "command" if "command" in item else "submenu" if "submenu" in item else "unknown")
 
     if item_type == "divider":
-        char_val = item.get("char")
-        if not char_val or char_val == "{ascii:196}":
-            div_cfg = bashmenu.get_effective_divider_config(cfg)
-            char_val = div_cfg.get("char", "{ascii:196}")
-        length_val = item.get("length", "{window_width}")
+        div_cfg = bashmenu.get_effective_divider_config(cfg, item_conf=item)
+        char_val = div_cfg.get("char", "{ascii:196}")
+        length_val = div_cfg.get("length", "{window_width}")
         expanded_char = bashmenu.interpolate_placeholders(char_val, cfg)
         expanded_char = resolve_glyph_preview(expanded_char, cfg)
         if not expanded_char:
@@ -1029,9 +1027,14 @@ class ItemEditModal(ModalScreen[dict]):
             except Exception:  # noqa: BLE001
                 cfg = {}
 
-            if not raw_char or raw_char == "{ascii:196}":
-                div_cfg = bashmenu.get_effective_divider_config(cfg)
-                raw_char = div_cfg.get("char", "{ascii:196}")
+            item_tmp = {}
+            if raw_char:
+                item_tmp["char"] = raw_char
+            if raw_len:
+                item_tmp["length"] = raw_len
+            div_cfg = bashmenu.get_effective_divider_config(cfg, item_conf=item_tmp)
+            raw_char = div_cfg.get("char", "{ascii:196}")
+            raw_len = div_cfg.get("length", "{window_width}")
 
             expanded_char = bashmenu.interpolate_placeholders(raw_char, cfg)
             if not expanded_char:

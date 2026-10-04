@@ -511,9 +511,11 @@ and \fBborder_vertical\fR as shorthands), \fBborder_top_left\fR,
 \fBborder_tee_left\fR / \fBleft_tee\fR, \fBborder_tee_right\fR / \fBright_tee\fR,
 \fBborder_cross\fR, \fBtitle_left_cap\fR, \fBtitle_right_cap\fR, and \fBshadow_char\fR.
 Omitted keys fall back to standard single-line box drawing characters.
-Dividers strictly follow a 3-tier priority: theme divider definition overrides
-plugin divider definitions, which override the default {ascii:196}. Outer window
-borders never override dividers. Dividers of length \fB{window_width}\fR render
+Dividers strictly follow a 4-tier style priority: theme divider definitions
+override plugin divider definitions in bashmenu.yml, which override declared
+definitions in bashmenu.mnu, which fall back to {ascii:196}. Outer window
+borders never override dividers. Dividers only appear in a menu if declared as
+an option in bashmenu.mnu. Dividers of length \fB{window_width}\fR render
 within standard margins with vertical borders and no tees; dividers of length
 \fB{screen_width}\fR run border to border using left and right tees without margins.
 .SH MODULARITY & PLUGINS

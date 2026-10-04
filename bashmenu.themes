@@ -286,7 +286,7 @@ qbasic:
   indicator: "{nf:>:#e629:}"
   divider:
     char: "{ascii:196}"
-    length: "{window_width}"
+    length: "{screen_width}"
   window:
     border_horizontal: "{ascii:205}"
     border_vertical: "{ascii:186}"

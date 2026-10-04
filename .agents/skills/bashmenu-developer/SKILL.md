@@ -378,13 +378,19 @@ Textual interface.
       synchronizes `textual._border.BORDER_CHARS['thick']` and `['solid']` and clears Textual's
       box cache (`get_box.cache_clear()`), ensuring all modal dialogs across `bashmenu_ui.py`
       and panel borders in `menuedit.py` dynamically honor the active theme's borders.
-    - **Divider Resolution Precedence & Width Semantics**: Dividers are strictly independent
+    - **Divider Resolution Precedence, Placement & Width Semantics**: Dividers are strictly independent
       of window borders (`window.border_horizontal` must never bleed into or override dividers).
-      Dividers follow a strict 3-tier priority:
-      1. *Theme Definition (`bashmenu.themes`)*: Explicit `divider:` block under active theme (top priority).
-      2. *Plugin Definition (`bashmenu.yml`)*: Plugin divider configurations (`settings.plugins.<name>.divider`,
-         `settings.plugins.divider`, `user.divider`, `settings.divider`).
-      3. *Default Fallback*: `char: "{ascii:196}"` of length `{window_width}`.
+      Divider styling follows a strict 4-tier priority:
+      1. *Theme Definition (`bashmenu.themes`)*: Explicit `divider:` block under active theme (top priority,
+         overrides all declared styles in `bashmenu.yml` and `bashmenu.mnu`).
+      2. *Plugin Definition (`bashmenu.yml`)*: Plugin divider configurations (`settings.plugins.divider`,
+         `settings.plugins.<name>.divider`, `settings.divider`).
+      3. *Menu Declarations (`bashmenu.mnu`)*: Explicit divider item attributes (`char`, `length`) or
+         menu-level divider settings in `bashmenu.mnu`.
+      4. *Default Fallback*: `char: "{ascii:196}"` of length `{window_width}`.
+    - **Divider Presence**: Dividers only appear in a menu if explicitly declared as an option (`type: divider`)
+      in `bashmenu.mnu`. If no dividers are declared in `bashmenu.mnu`, no dividers are rendered in that menu,
+      unless dividers are defined in `bashmenu.yml` for plugins.
     - **Divider Width Modes**:
       * `{window_width}`: Standard shorter divider bounded within window borders and 2-space margins
         (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/

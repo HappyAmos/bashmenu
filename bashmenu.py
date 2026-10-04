@@ -639,60 +639,89 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     return res_text
 
 
-def get_effective_divider_config(config):
+def get_effective_divider_config(config=None, menu_data=None, item_conf=None):
     """Resolve effective divider configuration following priority:
-    1. Active theme in bashmenu.themes (highest priority)
-    2. Plugin configuration (settings.plugins.*.divider, settings.plugins.divider, user.divider, settings.divider)
-    3. Default: char='{ascii:196}', length='{window_width}'
-    Note: Window borders never override dividers.
+    1. Active theme in bashmenu.themes (highest priority - overrides all declared divider styles)
+    2. Plugin configuration in bashmenu.yml (settings.plugins.divider, settings.plugins.*.divider, settings.divider)
+    3. Declarations in bashmenu.mnu (item_conf attributes 'char'/'length', or menu_data divider definitions)
+    4. Default fallback: char='{ascii:196}', length='{window_width}'
+    Note: Outer window borders never override dividers.
     """
     if not isinstance(config, dict):
         config = {}
 
-    # 1. Theme file explicit divider definition
-    theme_name = get_config_value(config, "theme", "dracula")
-    theme_div = bashmenu_ui.get_theme_divider(theme_name, config=config)
-    if isinstance(theme_div, dict) and (theme_div.get("char") is not None or theme_div.get("length") is not None):
-        return theme_div
+    # Start with base default
+    result = {"char": "{ascii:196}", "length": "{window_width}"}
 
-    # 2. Plugin divider definition
+    # Tier 3: bashmenu.mnu definitions
+    if isinstance(menu_data, dict):
+        m_div = menu_data.get("divider") or menu_data.get("settings", {}).get("divider")
+        if isinstance(m_div, dict):
+            for k in ("char", "length"):
+                if m_div.get(k) is not None:
+                    result[k] = m_div[k]
+        elif isinstance(m_div, (str, int)):
+            result["char"] = str(m_div)
+    if isinstance(item_conf, dict):
+        for k in ("char", "length"):
+            if item_conf.get(k) is not None:
+                result[k] = item_conf[k]
+
+    # Tier 2: bashmenu.yml definitions (for plugins / settings)
     settings = config.get("settings", {})
     if isinstance(settings, dict):
         plugins = settings.get("plugins", {})
         if isinstance(plugins, dict):
-            if "divider" in plugins and isinstance(plugins["divider"], dict):
-                return plugins["divider"]
+            if "divider" in plugins:
+                p_div = plugins["divider"]
+                if isinstance(p_div, dict):
+                    for k in ("char", "length"):
+                        if p_div.get(k) is not None:
+                            result[k] = p_div[k]
+                elif isinstance(p_div, (str, int)):
+                    result["char"] = str(p_div)
             for plug in plugins.values():
                 if isinstance(plug, dict) and "divider" in plug:
                     p_div = plug["divider"]
                     if isinstance(p_div, dict):
-                        return p_div
-                    if isinstance(p_div, (str, int)):
-                        return {"char": str(p_div)}
+                        for k in ("char", "length"):
+                            if p_div.get(k) is not None:
+                                result[k] = p_div[k]
+                    elif isinstance(p_div, (str, int)):
+                        result["char"] = str(p_div)
+
+        settings_div = settings.get("divider")
+        if isinstance(settings_div, dict):
+            for k in ("char", "length"):
+                if settings_div.get(k) is not None:
+                    result[k] = settings_div[k]
+        elif isinstance(settings_div, (str, int)):
+            result["char"] = str(settings_div)
 
     user_div = get_config_value(config, "user.divider", None)
-    if isinstance(user_div, dict) and (user_div.get("char") is not None or user_div.get("length") is not None):
-        return user_div
-    if isinstance(user_div, (str, int)):
-        return {"char": str(user_div)}
-
-    settings_div = get_config_value(config, "settings.divider", None)
-    if isinstance(settings_div, dict) and (settings_div.get("char") is not None or settings_div.get("length") is not None):
-        return settings_div
-    if isinstance(settings_div, (str, int)):
-        return {"char": str(settings_div)}
-
-    # 3. Default fallback
-    return {"char": "{ascii:196}", "length": "{window_width}"}
-
-
-def resolve_divider_string(config, target_w=None, extra_vars=None, item_conf=None):
-    """Generate divider string based on configuration and target width."""
-    divider_conf = dict(get_effective_divider_config(config))
-    if isinstance(item_conf, dict):
+    if isinstance(user_div, dict):
         for k in ("char", "length"):
-            if item_conf.get(k) is not None:
-                divider_conf[k] = item_conf[k]
+            if user_div.get(k) is not None:
+                result[k] = user_div[k]
+    elif isinstance(user_div, (str, int)):
+        result["char"] = str(user_div)
+
+    # Tier 1 (Highest Priority): Active theme in bashmenu.themes
+    theme_name = get_config_value(config, "theme", "dracula")
+    theme_div = bashmenu_ui.get_theme_divider(theme_name, config=config)
+    if isinstance(theme_div, dict):
+        for k in ("char", "length"):
+            if theme_div.get(k) is not None:
+                result[k] = theme_div[k]
+    elif isinstance(theme_div, (str, int)):
+        result["char"] = str(theme_div)
+
+    return result
+
+
+def resolve_divider_string(config, target_w=None, extra_vars=None, item_conf=None, menu_data=None):
+    """Generate divider string based on configuration and target width."""
+    divider_conf = get_effective_divider_config(config, menu_data=menu_data, item_conf=item_conf)
 
     char = divider_conf.get("char")
     if not char:
@@ -1223,11 +1252,7 @@ class MainMenuView(Widget):
             item_style = highlight_style if is_selected else text_style
 
             if opt.get("type") == "divider":
-                item_div_conf = dict(get_effective_divider_config(self.config))
-                if opt.get("length") is not None:
-                    item_div_conf["length"] = opt["length"]
-                if opt.get("char") is not None:
-                    item_div_conf["char"] = opt["char"]
+                item_div_conf = get_effective_divider_config(self.config, menu_data=self.menu_data, item_conf=opt)
 
                 length_val = item_div_conf.get("length", "{window_width}")
                 if isinstance(length_val, dict):
@@ -1236,7 +1261,7 @@ class MainMenuView(Widget):
                     is_screen = "screen_width" in str(length_val)
 
                 if is_screen:
-                    div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars, item_conf=item_div_conf)
+                    div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars, item_conf=opt, menu_data=self.menu_data)
                     div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
                     line_rich = Text(f"{b_tee_l}", style=border_style)
                     line_rich.append_text(div_rich)
@@ -1250,7 +1275,7 @@ class MainMenuView(Widget):
                     target_div_w = avail_w
                     if str(length_val).isdigit():
                         target_div_w = min(avail_w, int(length_val))
-                    div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars, item_conf=item_div_conf)
+                    div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars, item_conf=opt, menu_data=self.menu_data)
                     div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
                     line_rich = Text(f"{b_v_left}  ", style=border_style)
                     line_rich.append_text(div_rich)
