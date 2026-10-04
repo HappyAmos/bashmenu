@@ -498,13 +498,19 @@ Supported Theme Elements: background, title, border, text, highlight, accent, fo
 .B Formatting Rule for Editor Compatibility:
 Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.
 .PP
-.B Window Border Customization (window:):
+.B Window Border & Divider Customization (window: and divider:):
 Themes can optionally customize outer window frame border characters using a
-top-level \fBwindow:\fR section. Authors can specify CP437 ASCII directives
-(e.g., {ascii:205}), Unicode characters, or Nerd Font glyphs. Supported keys:
-\fBborder_horizontal\fR, \fBborder_vertical\fR, \fBborder_top_left\fR,
+top-level \fBwindow:\fR section, and horizontal dividers using a top-level
+\fBdivider:\fR section. Authors can specify CP437 ASCII directives (e.g.,
+{ascii:205}, {ascii:221}), Unicode characters, or Nerd Font glyphs. Supported
+window border keys: \fBborder_horizontal_top\fR, \fBborder_horizontal_bottom\fR,
+\fBborder_vertical_left\fR, \fBborder_vertical_right\fR (with \fBborder_horizontal\fR
+and \fBborder_vertical\fR as shorthands), \fBborder_top_left\fR,
 \fBborder_top_right\fR, \fBborder_bottom_left\fR, and \fBborder_bottom_right\fR.
 Omitted keys fall back to standard single-line box drawing characters.
+Dividers strictly follow a 3-tier priority: theme divider definition overrides
+plugin divider definitions, which override the default {ascii:196}. Outer window
+borders never override dividers.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

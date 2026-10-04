@@ -1058,8 +1058,14 @@ class BashEditScreen(Screen):
             display_theme_colors=self.display_theme_colors,
             id="editor_widget",
         )
-        borders = bashmenu_ui.get_theme_window_borders(getattr(self, "theme_name", "dracula"))
-        div_char = borders.get("border_horizontal", "─")
+        theme_div = bashmenu_ui.get_theme_divider(getattr(self, "theme_name", "dracula"))
+        div_char = theme_div.get("char", "─") if theme_div else "─"
+        if "{" in div_char:
+            import bashmenu
+            div_char = bashmenu.interpolate_placeholders(div_char, getattr(self, "config", {}))
+            div_char = bashmenu.resolve_glyph(div_char, getattr(self, "config", {}))
+        if not div_char:
+            div_char = "─"
         with Vertical(id="editor_footer_area"):
             yield Label(div_char * 500, id="editor_divider")
             with Horizontal(id="editor_legend"):
@@ -1363,8 +1369,14 @@ class BashEditScreen(Screen):
                 btn_close = self.query_one("#btn_close_x", Label)
                 btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
 
-            borders = bashmenu_ui.get_theme_window_borders(getattr(self, "theme_name", "dracula"))
-            div_char = borders.get("border_horizontal", "─")
+            theme_div = bashmenu_ui.get_theme_divider(getattr(self, "theme_name", "dracula"))
+            div_char = theme_div.get("char", "─") if theme_div else "─"
+            if "{" in div_char:
+                import bashmenu
+                div_char = bashmenu.interpolate_placeholders(div_char, getattr(self, "config", {}))
+                div_char = bashmenu.resolve_glyph(div_char, getattr(self, "config", {}))
+            if not div_char:
+                div_char = "─"
             with contextlib.suppress(Exception):
                 self.query_one("#editor_divider", Label).update(div_char * 500)
 

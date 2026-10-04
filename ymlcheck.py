@@ -30,18 +30,34 @@ VALID_16_COLORS = {
 VALID_DEPTHS = {"256", "16", "8", "truecolor"}
 
 # Non-color structural attributes permitted in theme definitions
-VALID_NON_COLOR_KEYS = {"indicator", "prefix", "window"}
+VALID_NON_COLOR_KEYS = {"indicator", "prefix"}
 
 # Permitted window border keys in theme window: sections
 VALID_WINDOW_BORDER_KEYS = {
     "border_horizontal",
     "border_vertical",
+    "border_horizontal_top",
+    "border_horizontal_bottom",
+    "border_vertical_left",
+    "border_vertical_right",
+    "border_top",
+    "border_bottom",
+    "border_left",
+    "border_right",
     "border_top_left",
     "border_top_right",
     "border_bottom_left",
     "border_bottom_right",
     "window_border_horizontal",
     "window_border_vertical",
+    "window_border_horizontal_top",
+    "window_border_horizontal_bottom",
+    "window_border_vertical_left",
+    "window_border_vertical_right",
+    "window_border_top",
+    "window_border_bottom",
+    "window_border_left",
+    "window_border_right",
     "window_border_top_left",
     "window_border_top_right",
     "window_border_bottom_left",
@@ -116,6 +132,29 @@ def validate_window_section(window_data: Any, path: str) -> list[str]:
         elif not isinstance(val, (str, int)):
             errors.append(
                 f"'{subpath}': Window border character must be a string or integer, got {type(val).__name__}."
+            )
+    return errors
+
+
+def validate_divider_section(divider_data: Any, path: str) -> list[str]:
+    """Validate divider overrides in a theme."""
+    if isinstance(divider_data, (str, int)):
+        return []
+    if not isinstance(divider_data, dict):
+        return [f"'{path}': Section must contain key-value pairs or a character string."]
+
+    errors = []
+    for key, val in divider_data.items():
+        subpath = f"{path}.{key}"
+        if key not in ("char", "length"):
+            errors.append(f"'{subpath}': Unknown divider property '{key}'. Expected 'char' or 'length'.")
+        elif isinstance(val, dict):
+            # Handle inline YAML placeholder like length: {window_width}
+            if not any(k in val for k in ("window_width", "screen_width")):
+                errors.append(f"'{subpath}': Invalid mapping for divider property.")
+        elif not isinstance(val, (str, int)):
+            errors.append(
+                f"'{subpath}': Divider property must be a string or integer, got {type(val).__name__}."
             )
     return errors
 
@@ -209,6 +248,8 @@ def validate_theme_file(filepath: str) -> bool:
                 depth_str = str(depth_key)
                 if depth_str == "window":
                     errors.extend(validate_window_section(keys, f"{theme_name}.window"))
+                elif depth_str == "divider":
+                    errors.extend(validate_divider_section(keys, f"{theme_name}.divider"))
                 elif depth_str in VALID_NON_COLOR_KEYS:
                     errors.extend(validate_indicator_value(keys, f"{theme_name}.{depth_str}"))
                 else:
@@ -218,6 +259,8 @@ def validate_theme_file(filepath: str) -> bool:
             depth_str = str(depth_key)
             if depth_str == "window":
                 errors.extend(validate_window_section(keys, "root.window"))
+            elif depth_str == "divider":
+                errors.extend(validate_divider_section(keys, "root.divider"))
             elif depth_str in VALID_NON_COLOR_KEYS:
                 errors.extend(validate_indicator_value(keys, f"root.{depth_str}"))
             else:

@@ -961,28 +961,57 @@ class TestImprovements(unittest.TestCase):
         self.assertEqual(qbasic_borders["border_bottom_left"], "╚")
         self.assertEqual(qbasic_borders["border_bottom_right"], "╝")
 
-        # 3. Partial override test
+        # 3. Partial override and specific edge tests (half blocks)
         mock_theme_data = {
             "custom_theme": {
                 "window": {
                     "border_horizontal": "=",
                 }
-            }
+            },
+            "variant_theme": {
+                "window": {
+                    "border_horizontal_top": "▀",
+                    "border_horizontal_bottom": "▄",
+                    "border_vertical_left": "▌",
+                    "border_vertical_right": "▐",
+                    "border_top_left": "┌",
+                    "border_top_right": "┐",
+                    "border_bottom_left": "└",
+                    "border_bottom_right": "┘",
+                }
+            },
         }
         custom_borders = bashmenu_ui.get_theme_window_borders("custom_theme", raw_theme_data=mock_theme_data)
         self.assertEqual(custom_borders["border_horizontal"], "=")
+        self.assertEqual(custom_borders["border_horizontal_top"], "=")
+        self.assertEqual(custom_borders["border_horizontal_bottom"], "=")
         self.assertEqual(custom_borders["border_vertical"], "│")  # Unspecified falls back to default
 
+        variant_borders = bashmenu_ui.get_theme_window_borders("variant_theme", raw_theme_data=mock_theme_data)
+        self.assertEqual(variant_borders["border_horizontal_top"], "▀")
+        self.assertEqual(variant_borders["border_horizontal_bottom"], "▄")
+        self.assertEqual(variant_borders["border_vertical_left"], "▌")
+        self.assertEqual(variant_borders["border_vertical_right"], "▐")
+
     def test_ymlcheck_theme_window_validation(self):
-        """Test ymlcheck validation for theme window: sections."""
-        # Valid window section
+        """Test ymlcheck validation for theme window: and divider: sections."""
+        # Valid window section with top/bottom/left/right keys
         valid_section = {
-            "border_horizontal": "{ascii:205}",
-            "border_vertical": "{ascii:186}",
+            "border_horizontal_top": "{ascii:223}",
+            "border_horizontal_bottom": "{ascii:220}",
+            "border_vertical_left": "{ascii:221}",
+            "border_vertical_right": "{ascii:222}",
         }
         self.assertEqual(ymlcheck.validate_window_section(valid_section, "test.window"), [])
 
-        # Invalid key
+        # Valid divider section
+        valid_divider = {
+            "char": "{ascii:205}",
+            "length": "{window_width}",
+        }
+        self.assertEqual(ymlcheck.validate_divider_section(valid_divider, "test.divider"), [])
+
+        # Invalid window key
         invalid_section = {
             "invalid_border_key": "-",
         }
@@ -1019,17 +1048,45 @@ class TestImprovements(unittest.TestCase):
         self.assertEqual(tb.BORDER_CHARS["thick"][1], ("│", " ", "│"))
         self.assertEqual(tb.BORDER_CHARS["thick"][2], ("└", "─", "┘"))
 
-        # 2. Test menuedit preview divider falls back to theme border_horizontal
+        # 2. Test pacman theme: divider uses explicit divider char (═), window borders use blocks (█)
         div_item = {"type": "divider"}
-        preview_qbasic = menuedit.render_menu_item_preview(div_item, config={"theme": "qbasic"}, width=10)
-        self.assertEqual(preview_qbasic, "═" * 10)
+        preview_pacman = menuedit.render_menu_item_preview(div_item, config={"theme": "pacman"}, width=10)
+        self.assertEqual(preview_pacman, "═" * 10)
 
-        preview_dracula = menuedit.render_menu_item_preview(div_item, config={"theme": "dracula"}, width=10)
-        self.assertEqual(preview_dracula, "─" * 10)
+        # Confirm window border_horizontal does NOT bleed into divider
+        div_str_pacman = bashmenu.resolve_divider_string({"theme": "pacman"}, target_w=10)
+        self.assertIn("═" * 10, div_str_pacman)
+        self.assertNotIn("█", div_str_pacman)
 
-        # 3. Test bashmenu resolve_divider_string falls back to theme border_horizontal
-        div_str = bashmenu.resolve_divider_string({"theme": "qbasic"}, target_w=10)
-        self.assertIn("═" * 10, div_str)
+        # 3. Test divider priority: Theme > Plugin > Default
+        # Case A: Theme divider overrides plugin divider
+        cfg_theme_and_plugin = {
+            "theme": "pacman",  # pacman defines divider char: {ascii:205} (═)
+            "settings": {
+                "plugins": {
+                    "sample": {"divider": {"char": "#"}}
+                }
+            },
+        }
+        res_a = bashmenu.resolve_divider_string(cfg_theme_and_plugin, target_w=10)
+        self.assertIn("═" * 10, res_a)
+
+        # Case B: Plugin divider used when theme does not define divider
+        cfg_plugin_only = {
+            "theme": "dracula",  # dracula defines no divider
+            "settings": {
+                "plugins": {
+                    "sample": {"divider": {"char": "#"}}
+                }
+            },
+        }
+        res_b = bashmenu.resolve_divider_string(cfg_plugin_only, target_w=10)
+        self.assertIn("#" * 10, res_b)
+
+        # Case C: Default used when neither defines divider
+        cfg_default = {"theme": "dracula"}
+        res_c = bashmenu.resolve_divider_string(cfg_default, target_w=10)
+        self.assertIn("─" * 10, res_c)
 
     def test_bashedit_help_modal_and_ascii_stream(self):
         """Verify bashedit help modal uses markdown table and ASCII table streaming works."""

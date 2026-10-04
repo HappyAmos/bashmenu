@@ -601,6 +601,10 @@ _theme_styles_cache = {}
 DEFAULT_WINDOW_BORDER = {
     "border_horizontal": "─",
     "border_vertical": "│",
+    "border_horizontal_top": "─",
+    "border_horizontal_bottom": "─",
+    "border_vertical_left": "│",
+    "border_vertical_right": "│",
     "border_top_left": "┌",
     "border_top_right": "┐",
     "border_bottom_left": "└",
@@ -616,7 +620,9 @@ def get_theme_window_borders(
     """Retrieve and interpolate window border characters for the specified theme.
 
     Returns a dictionary containing border_horizontal, border_vertical,
-    border_top_left, border_top_right, border_bottom_left, border_bottom_right.
+    border_horizontal_top, border_horizontal_bottom, border_vertical_left,
+    border_vertical_right, border_top_left, border_top_right,
+    border_bottom_left, and border_bottom_right.
     Falls back to single-line box drawing characters for any undefined keys.
     """
     window_def = None
@@ -647,20 +653,78 @@ def get_theme_window_borders(
 
     import bashmenu
 
-    for key in DEFAULT_WINDOW_BORDER:
-        raw_val = window_def.get(key)
-        if raw_val is None:
-            raw_val = window_def.get(f"window_{key}")
-        if raw_val is not None:
-            val_str = str(raw_val)
-            if "{" in val_str:
-                val_str = bashmenu.interpolate_placeholders(val_str, config or {})
-                val_str = bashmenu.resolve_glyph(val_str, config or {})
-            val_clean = val_str.replace("\ufe0f", "").replace("\ufe0e", "")
-            if val_clean:
-                borders[key] = val_clean
+    # Helper to resolve raw value from window_def
+    def _resolve_val(val_raw):
+        if val_raw is None:
+            return None
+        val_str = str(val_raw)
+        if "{" in val_str:
+            val_str = bashmenu.interpolate_placeholders(val_str, config or {})
+            val_str = bashmenu.resolve_glyph(val_str, config or {})
+        val_clean = val_str.replace("\ufe0f", "").replace("\ufe0e", "")
+        return val_clean if val_clean else None
+
+    # Base horizontal & vertical fallbacks
+    h_base = _resolve_val(window_def.get("border_horizontal") or window_def.get("window_border_horizontal"))
+    v_base = _resolve_val(window_def.get("border_vertical") or window_def.get("window_border_vertical"))
+    if h_base:
+        borders["border_horizontal"] = h_base
+        borders["border_horizontal_top"] = h_base
+        borders["border_horizontal_bottom"] = h_base
+    if v_base:
+        borders["border_vertical"] = v_base
+        borders["border_vertical_left"] = v_base
+        borders["border_vertical_right"] = v_base
+
+    # Specific edge and corner overrides
+    aliases = {
+        "border_horizontal_top": ["border_horizontal_top", "border_top", "window_border_horizontal_top", "window_border_top"],
+        "border_horizontal_bottom": ["border_horizontal_bottom", "border_bottom", "window_border_horizontal_bottom", "window_border_bottom"],
+        "border_vertical_left": ["border_vertical_left", "border_left", "window_border_vertical_left", "window_border_left"],
+        "border_vertical_right": ["border_vertical_right", "border_right", "window_border_vertical_right", "window_border_right"],
+        "border_top_left": ["border_top_left", "window_border_top_left"],
+        "border_top_right": ["border_top_right", "window_border_top_right"],
+        "border_bottom_left": ["border_bottom_left", "window_border_bottom_left"],
+        "border_bottom_right": ["border_bottom_right", "window_border_bottom_right"],
+    }
+
+    for target_key, candidate_keys in aliases.items():
+        for ck in candidate_keys:
+            if ck in window_def:
+                res = _resolve_val(window_def[ck])
+                if res:
+                    borders[target_key] = res
+                    break
 
     return borders
+
+
+def get_theme_divider(
+    theme_name: str | dict = "dracula",
+    config: dict | None = None,
+    raw_theme_data: dict | None = None,
+) -> dict | None:
+    """Retrieve explicit divider configuration from bashmenu.themes for the given theme, if defined."""
+    if isinstance(theme_name, dict):
+        if "divider" in theme_name:
+            div = theme_name["divider"]
+            if isinstance(div, dict):
+                return dict(div)
+            if isinstance(div, (str, int)):
+                return {"char": str(div)}
+        theme_name = theme_name.get("theme_name", "dracula")
+
+    if not raw_theme_data:
+        raw_theme_data = load_themes_file()
+
+    theme_def = raw_theme_data.get(theme_name, {}) if isinstance(theme_name, str) and raw_theme_data else {}
+    if isinstance(theme_def, dict) and "divider" in theme_def:
+        div = theme_def["divider"]
+        if isinstance(div, dict):
+            return dict(div)
+        if isinstance(div, (str, int)):
+            return {"char": str(div)}
+    return None
 
 
 def apply_theme_to_textual_borders(
@@ -673,16 +737,18 @@ def apply_theme_to_textual_borders(
         import textual._border as tb
 
         borders = get_theme_window_borders(theme_name, config=config, raw_theme_data=raw_theme_data)
-        b_h = borders.get("border_horizontal", "─")
-        b_v = borders.get("border_vertical", "│")
+        b_h_top = borders.get("border_horizontal_top", borders.get("border_horizontal", "─"))
+        b_h_bot = borders.get("border_horizontal_bottom", borders.get("border_horizontal", "─"))
+        b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
+        b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
         b_tl = borders.get("border_top_left", "┌")
         b_tr = borders.get("border_top_right", "┐")
         b_bl = borders.get("border_bottom_left", "└")
         b_br = borders.get("border_bottom_right", "┘")
         new_box = (
-            (b_tl, b_h, b_tr),
-            (b_v, " ", b_v),
-            (b_bl, b_h, b_br),
+            (b_tl, b_h_top, b_tr),
+            (b_v_left, " ", b_v_right),
+            (b_bl, b_h_bot, b_br),
         )
         tb.BORDER_CHARS["thick"] = new_box
         tb.BORDER_CHARS["solid"] = new_box

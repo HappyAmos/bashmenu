@@ -269,34 +269,51 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 
-#### Window Border Customization (`window:`)
+#### Window Border & Divider Customization (`window:` and `divider:`)
 Themes can optionally override the outer window frame border characters using
-a top-level `window:` section. Authors may specify CP437 ASCII macros (e.g.,
-`{ascii:205}`), Unicode characters, or Nerd Font glyphs. Any omitted keys
-automatically fall back to standard single-line box drawing characters.
+a top-level `window:` section, and customize horizontal divider characters
+using a top-level `divider:` section. Authors may specify CP437 ASCII macros (e.g.,
+`{ascii:205}`, `{ascii:221}`), Unicode characters, or Nerd Font glyphs. Any omitted
+keys automatically fall back to standard single-line box drawing characters.
 
 ```yaml
-qbasic:
-  indicator: ">"
+pacman:
+  indicator: "{nf:):#f0baf:}"
+  divider:
+    char: "{ascii:205}"                 # ═ (Double horizontal divider)
+    length: "{window_width}"
   window:
-    border_horizontal: "{ascii:205}"    # ═ (Double horizontal)
-    border_vertical: "{ascii:186}"      # ║ (Double vertical)
-    border_top_left: "{ascii:201}"      # ╔ (Double top-left)
-    border_top_right: "{ascii:187}"     # ╗ (Double top-right)
-    border_bottom_left: "{ascii:200}"   # ╚ (Double bottom-left)
-    border_bottom_right: "{ascii:188}"  # ╝ (Double bottom-right)
+    border_horizontal_top: "{ascii:223}"    # ▀ (Upper half block)
+    border_horizontal_bottom: "{ascii:220}" # ▄ (Lower half block)
+    border_vertical_left: "{ascii:221}"     # ▌ (Left half block)
+    border_vertical_right: "{ascii:222}"    # ▐ (Right half block)
+    border_top_left: "┌"
+    border_top_right: "┐"
+    border_bottom_left: "└"
+    border_bottom_right: "┘"
   256:
     ...
 ```
 
 | Window Border Attribute | Description | Default Fallback |
 | :--- | :--- | :--- |
-| `border_horizontal` | Horizontal frame border character. | `─` (`{ascii:196}`) |
-| `border_vertical` | Vertical frame border character. | `│` (`{ascii:179}`) |
+| `border_horizontal_top` | Top horizontal frame border character. | `border_horizontal` / `─` (`{ascii:196}`) |
+| `border_horizontal_bottom` | Bottom horizontal frame border character. | `border_horizontal` / `─` (`{ascii:196}`) |
+| `border_vertical_left` | Left vertical frame border character. | `border_vertical` / `│` (`{ascii:179}`) |
+| `border_vertical_right` | Right vertical frame border character. | `border_vertical` / `│` (`{ascii:179}`) |
+| `border_horizontal` | Shorthand for both top & bottom horizontal frame borders. | `─` (`{ascii:196}`) |
+| `border_vertical` | Shorthand for both left & right vertical frame borders. | `│` (`{ascii:179}`) |
 | `border_top_left` | Top-left corner frame character. | `┌` (`{ascii:218}`) |
 | `border_top_right` | Top-right corner frame character. | `┐` (`{ascii:191}`) |
 | `border_bottom_left` | Bottom-left corner frame character. | `└` (`{ascii:192}`) |
 | `border_bottom_right` | Bottom-right corner frame character. | `┘` (`{ascii:217}`) |
+
+##### Divider Resolution Precedence
+Dividers (`{divider}` macro, divider menu items, and editor footers) are completely independent of outer window borders (`window:`) and strictly follow a 3-tier priority:
+1. **Theme Definition (`bashmenu.themes`)**: Explicit `divider:` block under the active theme (e.g. `char: "{ascii:205}"`). This takes highest priority over plugins.
+2. **Plugin Definition (`bashmenu.yml`)**: If the theme does not define a divider, dividers configured in plugins (e.g. `settings.plugins.<name>.divider`, `user.divider`, or `settings.divider`) are used.
+3. **Default Fallback**: If neither the theme nor any plugin defines a divider, the engine defaults to `char: "{ascii:196}"` of length `{window_width}`.
+
 
 ---
 

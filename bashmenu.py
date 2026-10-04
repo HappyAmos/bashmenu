@@ -628,19 +628,61 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     return res_text
 
 
+def get_effective_divider_config(config):
+    """Resolve effective divider configuration following priority:
+    1. Active theme in bashmenu.themes (highest priority)
+    2. Plugin configuration (settings.plugins.*.divider, settings.plugins.divider, user.divider, settings.divider)
+    3. Default: char='{ascii:196}', length='{window_width}'
+    Note: Window borders never override dividers.
+    """
+    if not isinstance(config, dict):
+        config = {}
+
+    # 1. Theme file explicit divider definition
+    theme_name = get_config_value(config, "theme", "dracula")
+    theme_div = bashmenu_ui.get_theme_divider(theme_name, config=config)
+    if isinstance(theme_div, dict) and (theme_div.get("char") is not None or theme_div.get("length") is not None):
+        return theme_div
+
+    # 2. Plugin divider definition
+    settings = config.get("settings", {})
+    if isinstance(settings, dict):
+        plugins = settings.get("plugins", {})
+        if isinstance(plugins, dict):
+            if "divider" in plugins and isinstance(plugins["divider"], dict):
+                return plugins["divider"]
+            for plug in plugins.values():
+                if isinstance(plug, dict) and "divider" in plug:
+                    p_div = plug["divider"]
+                    if isinstance(p_div, dict):
+                        return p_div
+                    if isinstance(p_div, (str, int)):
+                        return {"char": str(p_div)}
+
+    user_div = get_config_value(config, "user.divider", None)
+    if isinstance(user_div, dict) and (user_div.get("char") is not None or user_div.get("length") is not None):
+        return user_div
+    if isinstance(user_div, (str, int)):
+        return {"char": str(user_div)}
+
+    settings_div = get_config_value(config, "settings.divider", None)
+    if isinstance(settings_div, dict) and (settings_div.get("char") is not None or settings_div.get("length") is not None):
+        return settings_div
+    if isinstance(settings_div, (str, int)):
+        return {"char": str(settings_div)}
+
+    # 3. Default fallback
+    return {"char": "{ascii:196}", "length": "{window_width}"}
+
+
 def resolve_divider_string(config, target_w=None, extra_vars=None):
     """Generate divider string based on configuration and target width."""
-    divider_conf = get_config_value(config, "user.divider", None)
-    if divider_conf is None or not isinstance(divider_conf, dict):
-        divider_conf = get_config_value(config, "settings.divider", {})
-    if not isinstance(divider_conf, dict):
-        divider_conf = {}
+    divider_conf = get_effective_divider_config(config)
 
     char = divider_conf.get("char")
     if not char:
-        theme_name = get_config_value(config, "theme", "dracula")
-        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=config)
-        char = borders.get("border_horizontal", "{ascii:196}")
+        char = "{ascii:196}"
+
     char = interpolate_placeholders(char, config, extra_vars=extra_vars)
     char = resolve_glyph(char, config)
     if not char:
@@ -652,6 +694,8 @@ def resolve_divider_string(config, target_w=None, extra_vars=None):
         length = int(extra_vars["window_width"])
     else:
         length_spec = divider_conf.get("length", "{window_width}")
+        if isinstance(length_spec, dict) and any(k in length_spec for k in ("window_width", "screen_width")):
+            length_spec = "{window_width}"
         length_str = interpolate_placeholders(str(length_spec), config, extra_vars=extra_vars)
         try:
             length = int(length_str)
@@ -1090,8 +1134,10 @@ class MainMenuView(Widget):
 
         # Window borders resolved from theme
         borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
-        b_h = borders.get("border_horizontal", "─")
-        b_v = borders.get("border_vertical", "│")
+        b_h_top = borders.get("border_horizontal_top", borders.get("border_horizontal", "─"))
+        b_h_bot = borders.get("border_horizontal_bottom", borders.get("border_horizontal", "─"))
+        b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
+        b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
         b_tl = borders.get("border_top_left", "┌")
         b_tr = borders.get("border_top_right", "┐")
         b_bl = borders.get("border_bottom_left", "└")
@@ -1114,14 +1160,14 @@ class MainMenuView(Widget):
         left_b = max(2, (w - title_len) // 2)
         right_b = max(2, w - left_b - title_len)
 
-        top_bar = Text(b_tl + b_h * max(0, left_b - 1), style=border_style)
+        top_bar = Text(b_tl + b_h_top * max(0, left_b - 1), style=border_style)
         top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_str, default_style=title_style, theme=theme_styles))
-        top_bar.append(b_h * max(0, right_b - 1) + b_tr + "\n", style=border_style)
+        top_bar.append(b_h_top * max(0, right_b - 1) + b_tr + "\n", style=border_style)
         out.append_text(top_bar)
 
         # Top Margin Rows (2 blank lines below top border per .gemini specification)
-        out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
-        out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
+        out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
+        out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
 
         # 4. Scroll position calculation
         scroll_start = 0
@@ -1148,7 +1194,7 @@ class MainMenuView(Widget):
             is_selected = (idx == curr_row)
             item_style = highlight_style if is_selected else text_style
 
-            line_rich = Text(f"{b_v}  ", style=border_style)
+            line_rich = Text(f"{b_v_left}  ", style=border_style)
 
             if opt.get("type") == "divider":
                 div_str = resolve_divider_string(self.config, target_w=avail_w)
@@ -1158,7 +1204,7 @@ class MainMenuView(Widget):
                 used_w = get_visible_len(div_str, self.config)
                 fill_w = max(0, avail_w - used_w)
                 line_rich.append(" " * fill_w)
-                line_rich.append(f"  {b_v}\n", style=border_style)
+                line_rich.append(f"  {b_v_right}\n", style=border_style)
                 out.append_text(line_rich)
                 rendered_content_rows += 1
                 continue
@@ -1231,24 +1277,24 @@ class MainMenuView(Widget):
                 row_content.append(" " * pad_w, style=item_style)
 
             line_rich.append_text(row_content)
-            line_rich.append(f"  {b_v}\n", style=border_style)
+            line_rich.append(f"  {b_v_right}\n", style=border_style)
             out.append_text(line_rich)
             rendered_content_rows += 1
 
         # 6. Pad blank rows between menu options and plugins
         target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows
         while rendered_content_rows < target_blank_rows:
-            out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
+            out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
             rendered_content_rows += 1
 
         # 7. Rows reserved for the PluginBuffer widget overlay
         for _ in raw_plugin_lines:
-            out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
+            out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
             rendered_content_rows += 1
 
         # 8. Blank separation row above Help Keys & Status Gutter (when plugins are active)
         if separator_rows > 0:
-            out.append_text(Text(f"{b_v}  " + " " * avail_w + f"  {b_v}\n", style=border_style))
+            out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
             rendered_content_rows += 1
 
         # 9. Help Keys & Status Gutter Row (h - 2)
@@ -1306,13 +1352,13 @@ class MainMenuView(Widget):
         if hg_pad_w > 0:
             hg_content.append(" " * hg_pad_w, style=border_style)
 
-        hg_line = Text(f"{b_v}  ", style=border_style)
+        hg_line = Text(f"{b_v_left}  ", style=border_style)
         hg_line.append_text(hg_content)
-        hg_line.append(f"  {b_v}\n", style=border_style)
+        hg_line.append(f"  {b_v_right}\n", style=border_style)
         out.append_text(hg_line)
 
         # 9. Bottom Border Row (h - 1): └────────...────────┘
-        bot_bar = Text(b_bl + b_h * max(0, w - 2) + b_br, style=border_style)
+        bot_bar = Text(b_bl + b_h_bot * max(0, w - 2) + b_br, style=border_style)
         out.append_text(bot_bar)
 
         return out

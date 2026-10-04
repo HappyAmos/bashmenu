@@ -362,6 +362,16 @@ qbasic:
     scrollbar: [COLOR_CYAN, COLOR_BLUE]
 pacman:
   indicator: "{nf:):#f0baf:}"
+  divider: 
+    char: "{ascii:205}"
+    length: {window_width}
+  window:
+    border_horizontal: "{ascii:219}"
+    border_vertical: "{ascii:219}"
+    border_top_left: "{ascii:219}"
+    border_top_right: "{ascii:219}"
+    border_bottom_left: "{ascii:219}"
+    border_bottom_right: "{ascii:219}"
   256:
     background: COLOR_BLACK
     title: [226, -1]

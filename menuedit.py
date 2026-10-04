@@ -553,17 +553,14 @@ def render_menu_item_preview(item: dict, config: dict | None = None, width: int 
 
     if item_type == "divider":
         char_val = item.get("char")
-        if not char_val:
-            theme_name = cfg.get("theme", "dracula") if isinstance(cfg, dict) else "dracula"
-            borders = bashmenu_ui.get_theme_window_borders(theme_name, config=cfg)
-            char_val = borders.get("border_horizontal", "{ascii:196}")
+        if not char_val or char_val == "{ascii:196}":
+            div_cfg = bashmenu.get_effective_divider_config(cfg)
+            char_val = div_cfg.get("char", "{ascii:196}")
         length_val = item.get("length", "{window_width}")
         expanded_char = bashmenu.interpolate_placeholders(char_val, cfg)
         expanded_char = resolve_glyph_preview(expanded_char, cfg)
         if not expanded_char:
-            theme_name = cfg.get("theme", "dracula") if isinstance(cfg, dict) else "dracula"
-            borders = bashmenu_ui.get_theme_window_borders(theme_name, config=cfg)
-            expanded_char = borders.get("border_horizontal", "─")
+            expanded_char = "─"
 
         expanded_len = bashmenu.interpolate_placeholders(length_val, cfg, extra_vars={"window_width": width})
         try:
@@ -1032,11 +1029,13 @@ class ItemEditModal(ModalScreen[dict]):
             except Exception:  # noqa: BLE001
                 cfg = {}
 
+            if not raw_char or raw_char == "{ascii:196}":
+                div_cfg = bashmenu.get_effective_divider_config(cfg)
+                raw_char = div_cfg.get("char", "{ascii:196}")
+
             expanded_char = bashmenu.interpolate_placeholders(raw_char, cfg)
             if not expanded_char:
-                theme_name = cfg.get("theme", "dracula") if isinstance(cfg, dict) else "dracula"
-                borders = bashmenu_ui.get_theme_window_borders(theme_name, config=cfg)
-                expanded_char = borders.get("border_horizontal", "─")
+                expanded_char = "─"
 
             expanded_len = bashmenu.interpolate_placeholders(raw_len, cfg, extra_vars={"window_width": 60})
             try:
