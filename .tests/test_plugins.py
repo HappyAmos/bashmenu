@@ -311,6 +311,89 @@ class TestPluginSystem(unittest.TestCase):
             hex_c = bashmenu.get_hex_from_style(th_styles.get("background"))
             self.assertEqual(hex_c, expected_hex)
 
+    def test_plugin_screen_width_divider_and_tee_rendering(self):
+        """Verify that when theme divider length is {screen_width}, plugin buffer
+        expands to screen_div_w, indents regular lines, and MainMenuView renders
+        border tees on divider rows."""
+        # 1. PluginBuffer with synthwave theme (length is {screen_width})
+        cfg_synth = {"theme": "synthwave"}
+        pb = bashmenu.PluginBuffer(config=cfg_synth)
+        sample_lines = ["{divider}", "Quote of the day", "{divider}"]
+        with patch("bashmenu.get_plugin_outputs", return_value=sample_lines):
+            res = pb.render()
+            lines = res.plain.split("\n")
+            self.assertEqual(len(lines), 3)
+            # screen_div_w is 78 for default screen width 80
+            self.assertEqual(cell_len(lines[0]), 78)
+            # Divider line does NOT have 2 leading spaces
+            self.assertFalse(lines[0].startswith("  "))
+            # Non-divider line has 2 leading spaces for alignment
+            self.assertTrue(lines[1].startswith("  Quote of the day"))
+            self.assertEqual(cell_len(lines[1]), 78)
+            self.assertEqual(cell_len(lines[2]), 78)
+
+        # 2. MainMenuView rendering border tees for screen divider
+        mv = bashmenu.MainMenuView(config=cfg_synth, menu_data={"title": "Test", "options": []})
+        borders = bashmenu.bashmenu_ui.get_theme_window_borders("synthwave", config=cfg_synth)
+        b_tee_l = borders.get("left_tee") or "├"
+        b_tee_r = borders.get("right_tee") or "┤"
+
+        with (
+            patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)),
+            patch("bashmenu.get_plugin_outputs", return_value=sample_lines),
+        ):
+            rendered = mv.render().plain
+            rendered_lines = rendered.split("\n")
+            # Find lines starting and ending with the theme's border tees
+            tee_lines = [line for line in rendered_lines if line.startswith(b_tee_l) and line.endswith(b_tee_r)]
+            self.assertGreaterEqual(len(tee_lines), 2)
+            for tl in tee_lines:
+                self.assertEqual(cell_len(tl), 80)
+
+        # 3. MainMenuView with dracula (length is {window_width}) - no tees in plugin rows
+        cfg_dracula = {"theme": "dracula"}
+        mv_drac = bashmenu.MainMenuView(config=cfg_dracula, menu_data={"title": "Test", "options": []})
+        with (
+            patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)),
+            patch("bashmenu.get_plugin_outputs", return_value=sample_lines),
+        ):
+            rendered_drac = mv_drac.render().plain
+            drac_lines = rendered_drac.split("\n")
+            # No tee lines should be produced for plugins
+            drac_tee_lines = [line for line in drac_lines if line.startswith("├") or line.endswith("┤")]
+            self.assertEqual(len(drac_tee_lines), 0)
+
+        # 4. Geometry update verification
+        mock_pb = MagicMock()
+        mock_mv_synth = MagicMock()
+        mock_mv_synth.config = cfg_synth
+        mock_mv_synth.get_plugin_lines_and_limits.return_value = (sample_lines, 1, 15)
+
+        with (
+            patch.object(bashmenu.BashMenuScreen, "plugin_buffer", new_callable=PropertyMock, return_value=mock_pb),
+            patch.object(bashmenu.BashMenuScreen, "menu_view", new_callable=PropertyMock, return_value=mock_mv_synth),
+            patch.object(bashmenu.BashMenuScreen, "size", new_callable=PropertyMock, return_value=Size(80, 24)),
+        ):
+            screen_synth = bashmenu.BashMenuScreen(config=cfg_synth)
+            screen_synth._update_plugin_buffer_geometry()
+            self.assertEqual(mock_pb.styles.offset, (1, 18))
+            self.assertEqual(mock_pb.styles.width, 78)
+
+        # Dracula theme geometry
+        mock_mv_drac = MagicMock()
+        mock_mv_drac.config = cfg_dracula
+        mock_mv_drac.get_plugin_lines_and_limits.return_value = (sample_lines, 1, 15)
+
+        with (
+            patch.object(bashmenu.BashMenuScreen, "plugin_buffer", new_callable=PropertyMock, return_value=mock_pb),
+            patch.object(bashmenu.BashMenuScreen, "menu_view", new_callable=PropertyMock, return_value=mock_mv_drac),
+            patch.object(bashmenu.BashMenuScreen, "size", new_callable=PropertyMock, return_value=Size(80, 24)),
+        ):
+            screen_drac = bashmenu.BashMenuScreen(config=cfg_dracula)
+            screen_drac._update_plugin_buffer_geometry()
+            self.assertEqual(mock_pb.styles.offset, (3, 18))
+            self.assertEqual(mock_pb.styles.width, 74)
+
 
 if __name__ == "__main__":
     unittest.main()

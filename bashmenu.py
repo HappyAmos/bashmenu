@@ -616,8 +616,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
             placeholders[f"{{{k}}}"] = str(v)
 
     if "{divider}" in res_text:
-        tw = win_w if (extra_vars and "window_width" in extra_vars) else None
-        res_text = res_text.replace("{divider}", resolve_divider_string(config, target_w=tw, extra_vars=extra_vars))
+        res_text = res_text.replace("{divider}", resolve_divider_string(config, extra_vars=extra_vars))
 
     for k, v in placeholders.items():
         if k in res_text:
@@ -627,8 +626,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         key_path = match.group(1)
         val = get_config_value(config, key_path)
         if key_path in ("user.divider", "settings.divider") or (isinstance(val, dict) and ("char" in val or "length" in val)):
-            tw = win_w if (extra_vars and "window_width" in extra_vars) else None
-            return resolve_divider_string(config, target_w=tw, extra_vars=extra_vars)
+            return resolve_divider_string(config, extra_vars=extra_vars)
         return str(val) if val is not None else match.group(0)
 
     res_text = DOT_VAR_PATTERN.sub(replace_dot_var, res_text)
@@ -1013,10 +1011,35 @@ class PluginBuffer(Static):
         plugin_style = theme_styles.get("plugin", Style(color="cyan"))
         bg_style = theme_styles.get("background", Style())
 
-        buffer_w = max(20, self.size.width or 80)
+        div_cfg = get_effective_divider_config(cfg)
+        length_val = div_cfg.get("length", "{window_width}")
+        if isinstance(length_val, dict):
+            is_screen = any("screen_width" in str(k) for k in length_val)
+        else:
+            is_screen = "screen_width" in str(length_val)
+
+        has_screen_divider = is_screen and any(
+            any(tok in line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+            for line in raw_plugin_lines
+        )
+
+        screen_w = 0
+        with contextlib.suppress(Exception):
+            if self.screen and self.screen.size.width:
+                screen_w = self.screen.size.width
+        if not screen_w:
+            screen_w = max(40, self.size.width or 80)
+            avail_w = max(20, self.size.width or 80)
+            screen_div_w = max(20, screen_w - 2)
+        else:
+            screen_w = max(40, screen_w)
+            screen_div_w = max(20, screen_w - 2)
+            avail_w = max(20, screen_w - 6)
+
+        buffer_w = screen_div_w if has_screen_divider else avail_w
         max_rows = min(10, len(raw_plugin_lines))
         lines_to_display = raw_plugin_lines[:max_rows]
-        extra_vars = {"window_width": buffer_w, "window_height": max_rows}
+        extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": max_rows}
 
         out = Text()
         for idx, p_line in enumerate(lines_to_display):
@@ -1027,7 +1050,11 @@ class PluginBuffer(Static):
                 .replace("\ufe0e", "")
                 .rstrip("\r\n")
             )
-            p_line_interp = interpolate_placeholders(clean_line, self.config, extra_vars=extra_vars)
+            is_div_line = any(tok in clean_line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+            p_line_interp = interpolate_placeholders(clean_line, cfg, extra_vars=extra_vars)
+
+            if has_screen_divider and not is_div_line:
+                p_line_interp = f"  {p_line_interp}"
 
             if "\x1b[" in p_line_interp:
                 p_content_rich = Text.from_ansi(p_line_interp)
@@ -1141,6 +1168,13 @@ class MainMenuView(Widget):
         b_tee_r = borders.get("right_tee") or borders.get("border_tee_right") or b_v_right
         title_l_cap = borders.get("title_left_cap", " ") or " "
         title_r_cap = borders.get("title_right_cap", " ") or " "
+
+        div_cfg = get_effective_divider_config(self.config)
+        length_val = div_cfg.get("length", "{window_width}")
+        if isinstance(length_val, dict):
+            is_screen = any("screen_width" in str(k) for k in length_val)
+        else:
+            is_screen = "screen_width" in str(length_val)
 
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
@@ -1318,8 +1352,18 @@ class MainMenuView(Widget):
             rendered_content_rows += 1
 
         # 7. Rows reserved for the PluginBuffer widget overlay
-        for _ in raw_plugin_lines:
-            out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
+        for p_line in raw_plugin_lines:
+            clean_line = (
+                p_line.replace("\x00", "")
+                .replace("\ufe0f", "")
+                .replace("\ufe0e", "")
+                .rstrip("\r\n")
+            )
+            is_div_line = any(tok in clean_line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+            if is_screen and is_div_line:
+                out.append_text(Text(f"{b_tee_l}" + " " * screen_div_w + f"{b_tee_r}\n", style=border_style))
+            else:
+                out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
             rendered_content_rows += 1
 
         # 8. Blank separation row above Help Keys & Status Gutter (when plugins are active)
@@ -1890,9 +1934,16 @@ class BashMenuScreen(Screen):
         the PluginBuffer widget directly above the help/status gutter.
         """
         with contextlib.suppress(Exception):
-            w = max(40, self.size.width or 80)
+            screen_w = 0
+            with contextlib.suppress(Exception):
+                if self.screen and self.screen.size.width:
+                    screen_w = self.screen.size.width
+            if not screen_w:
+                screen_w = self.size.width or 80
+            w = max(40, screen_w)
             h = max(10, self.size.height or 24)
             avail_w = max(20, w - 6)
+            screen_div_w = max(20, w - 2)
             total_content_rows = max(1, h - 5)
             raw_plugin_lines, separator_rows, _ = self.menu_view.get_plugin_lines_and_limits(total_content_rows)
             plugin_count = len(raw_plugin_lines)
@@ -1910,9 +1961,23 @@ class BashMenuScreen(Screen):
                 pb.styles.display = "none"
             else:
                 pb.styles.display = "block"
+                div_cfg = get_effective_divider_config(self.menu_view.config)
+                length_val = div_cfg.get("length", "{window_width}")
+                if isinstance(length_val, dict):
+                    is_screen = any("screen_width" in str(k) for k in length_val)
+                else:
+                    is_screen = "screen_width" in str(length_val)
+
+                has_screen_divider = is_screen and any(
+                    any(tok in line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+                    for line in raw_plugin_lines
+                )
+
+                pb_offset_x = 1 if has_screen_divider else 3
+                pb_width = screen_div_w if has_screen_divider else avail_w
                 plugin_start_row = 3 + total_content_rows - plugin_count - separator_rows
-                pb.styles.offset = (3, plugin_start_row)
-                pb.styles.width = avail_w
+                pb.styles.offset = (pb_offset_x, plugin_start_row)
+                pb.styles.width = pb_width
                 pb.styles.height = plugin_count
                 pb.refresh()
 
