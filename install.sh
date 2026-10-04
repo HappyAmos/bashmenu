@@ -117,8 +117,19 @@ elif command -v dnf >/dev/null 2>&1; then
 
 elif command -v pacman >/dev/null 2>&1; then
     echo "  [+] Arch Linux detected (pacman)"
-    if [ ! -d "/var/lib/pacman" ]; then
-        run_root mkdir -p /var/lib/pacman
+    run_root mkdir -p /var/lib/pacman/local /var/lib/pacman/sync /var/cache/pacman/pkg 2>/dev/null || true
+    if [ -f "/etc/pacman.conf" ]; then
+        if grep -q "^#DisableSandbox" /etc/pacman.conf 2>/dev/null; then
+            run_root sed -i 's/^#DisableSandbox/DisableSandbox/' /etc/pacman.conf 2>/dev/null || true
+        elif ! grep -q "^DisableSandbox" /etc/pacman.conf 2>/dev/null; then
+            if grep -q "^\[options\]" /etc/pacman.conf 2>/dev/null; then
+                run_root sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf 2>/dev/null || true
+            fi
+        fi
+    fi
+    if [ -f "/etc/pacman.d/mirrorlist" ] && ! grep -q "^Server = " /etc/pacman.d/mirrorlist 2>/dev/null; then
+        run_root sed -i '0,/^#Server = /s/^#//' /etc/pacman.d/mirrorlist 2>/dev/null || \
+        run_root sh -c "echo 'Server = https://geo.mirror.pkgbuild.com/\$repo/os/\$arch' >> /etc/pacman.d/mirrorlist" 2>/dev/null || true
     fi
     if [ ! -d "/var/lib/pacman/sync" ] || [ -z "$(ls -A /var/lib/pacman/sync 2>/dev/null)" ]; then
         echo "  [+] Initializing Arch pacman databases..."

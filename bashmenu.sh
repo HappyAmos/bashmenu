@@ -446,7 +446,20 @@ install_apps() {
         run_as_root apt-get update -qq
         APT_UPDATED=true
     elif [ "$PKG_MANAGER" = "pacman" ] && [ "$PACMAN_UPDATED" = false ] && [ ${#packages_to_install[@]} -gt 0 ]; then
-        [ ! -d "/var/lib/pacman" ] && run_as_root mkdir -p /var/lib/pacman
+        run_as_root mkdir -p /var/lib/pacman/local /var/lib/pacman/sync /var/cache/pacman/pkg 2>/dev/null || true
+        if [ -f "/etc/pacman.conf" ]; then
+            if grep -q "^#DisableSandbox" /etc/pacman.conf 2>/dev/null; then
+                run_as_root sed -i 's/^#DisableSandbox/DisableSandbox/' /etc/pacman.conf 2>/dev/null || true
+            elif ! grep -q "^DisableSandbox" /etc/pacman.conf 2>/dev/null; then
+                if grep -q "^\[options\]" /etc/pacman.conf 2>/dev/null; then
+                    run_as_root sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf 2>/dev/null || true
+                fi
+            fi
+        fi
+        if [ -f "/etc/pacman.d/mirrorlist" ] && ! grep -q "^Server = " /etc/pacman.d/mirrorlist 2>/dev/null; then
+            run_as_root sed -i '0,/^#Server = /s/^#//' /etc/pacman.d/mirrorlist 2>/dev/null || \
+            run_as_root sh -c "echo 'Server = https://geo.mirror.pkgbuild.com/\$repo/os/\$arch' >> /etc/pacman.d/mirrorlist" 2>/dev/null || true
+        fi
         if [ ! -d "/var/lib/pacman/sync" ] || [ -z "$(ls -A /var/lib/pacman/sync 2>/dev/null)" ]; then
             echo "Running pacman -Sy to synchronize package databases..."
             if command -v pacman-key >/dev/null 2>&1 && [ ! -d "/etc/pacman.d/gnupg" ]; then
@@ -476,7 +489,7 @@ install_apps() {
                 run_as_root yum install -y "$pkg"
                 ;;
             "pacman")
-                [ ! -d "/var/lib/pacman" ] && run_as_root mkdir -p /var/lib/pacman
+                run_as_root mkdir -p /var/lib/pacman/local /var/lib/pacman/sync /var/cache/pacman/pkg 2>/dev/null || true
                 run_as_root pacman -S --noconfirm "$pkg"
                 ;;
             "zypper")
