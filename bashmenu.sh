@@ -762,21 +762,30 @@ if [ -f "$VENV_ACTIVATE" ]; then
     if "$VENV_PYTHON" -c "import yaml, textual, rich" >/dev/null 2>&1; then
         USE_VENV=true
     else
-        echo "Virtual environment is missing required packages (PyYAML, Textual, Rich). Recreating..." >&2
-        rm -rf "$VENV_DIR"
+        # If pyvenv.cfg doesn't include system packages, check if enabling it satisfies dependencies
+        if [ -f "${VENV_DIR}/pyvenv.cfg" ] && grep -q "include-system-site-packages = false" "${VENV_DIR}/pyvenv.cfg" 2>/dev/null; then
+            sed -i 's/include-system-site-packages = false/include-system-site-packages = true/' "${VENV_DIR}/pyvenv.cfg" 2>/dev/null || true
+            if "$VENV_PYTHON" -c "import yaml, textual, rich" >/dev/null 2>&1; then
+                USE_VENV=true
+            fi
+        fi
+        if [ "$USE_VENV" = false ]; then
+            echo "Virtual environment is missing required packages (PyYAML, Textual, Rich). Recreating..." >&2
+            rm -rf "$VENV_DIR"
+        fi
     fi
 fi
 
 if [ "$USE_VENV" = false ]; then
     echo "Setting up virtual environment at $VENV_DIR..." >&2
     VENV_CREATED=false
-    if command -v virtualenv >/dev/null 2>&1 && virtualenv "$VENV_DIR" >/dev/null 2>&1; then
+    if command -v virtualenv >/dev/null 2>&1 && virtualenv --system-site-packages "$VENV_DIR" >/dev/null 2>&1; then
         VENV_CREATED=true
-    elif python3 -m virtualenv "$VENV_DIR" >/dev/null 2>&1; then
+    elif python3 -m virtualenv --system-site-packages "$VENV_DIR" >/dev/null 2>&1; then
         VENV_CREATED=true
-    elif python3 -m venv "$VENV_DIR" >/dev/null 2>&1; then
+    elif python3 -m venv --system-site-packages "$VENV_DIR" >/dev/null 2>&1; then
         VENV_CREATED=true
-    elif [ "$IS_TERMUX" = true ] && python3 -m venv --without-pip "$VENV_DIR" >/dev/null 2>&1; then
+    elif [ "$IS_TERMUX" = true ] && python3 -m venv --system-site-packages --without-pip "$VENV_DIR" >/dev/null 2>&1; then
         VENV_CREATED=true
     fi
 
@@ -789,18 +798,24 @@ if [ "$USE_VENV" = false ]; then
         fi
 
         if [ -x "$VENV_PIP" ]; then
-            if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
-                if "$VENV_PIP" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1 || "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1; then
-                    USE_VENV=true
+            if ! "$VENV_PYTHON" -c "import yaml, textual, rich" >/dev/null 2>&1; then
+                if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
+                    if "$VENV_PIP" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1 || "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1; then
+                        USE_VENV=true
+                    else
+                        echo "Warning: Failed to install requirements inside virtual environment." >&2
+                    fi
                 else
-                    echo "Warning: Failed to install requirements inside virtual environment." >&2
+                    "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1 && USE_VENV=true
                 fi
             else
-                "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1 && USE_VENV=true
+                USE_VENV=true
             fi
         else
-            # Venv created without pip: check if system python has packages
-            if python3 -c "import yaml, textual, rich" >/dev/null 2>&1; then
+            # Venv created without pip: check if venv or system python has packages
+            if "$VENV_PYTHON" -c "import yaml, textual, rich" >/dev/null 2>&1; then
+                USE_VENV=true
+            elif python3 -c "import yaml, textual, rich" >/dev/null 2>&1; then
                 USE_VENV=false
             elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
                 pip_cmd=$(command -v pip3 || command -v pip)
