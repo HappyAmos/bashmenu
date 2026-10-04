@@ -15,9 +15,10 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
 # Save your current terminal location, then move to the script directory
-pushd "$SCRIPT_DIR" > /dev/null
+pushd "$SCRIPT_DIR" > /dev/null || exit 1
 
 if [ -f "${SCRIPT_DIR}/.venv/bin/activate" ]; then
+    # shellcheck source=/dev/null
     source "${SCRIPT_DIR}/.venv/bin/activate"
     python "${SCRIPT_DIR}/cheat.py" "$@"
     deactivate
@@ -26,4 +27,4 @@ else
 fi
 
 # Restore your original terminal location
-popd > /dev/null
+popd > /dev/null || exit 1

@@ -121,12 +121,13 @@ Textual interface.
    (`bashmenu.mnu`), templates, or launcher scripts. Always utilize
    expanding placeholder macros: `{home}`, `{bashmenu_dir}`,
    `{scripts_dir}`, `{templates_dir}`, and `{cache_dir}`.
-8. **Dependency & Virtualenv Hygiene:** Because `bashmenu` is built on
+8. **Dependency & Virtualenv Hygiene & Ruff Invariant:** Because `bashmenu` is built on
    Textual and Rich, `requirements.txt` must always declare `textual`
-   and `rich` alongside `PyYAML` and `ruff`. `bashmenu.sh` venv
-   verification commands must validate `yaml, ruff, textual, rich`
-   before marking the environment ready. Keep required system packages
-   to an absolute minimum (`python3` + venv/pip). Never mandate external
+   and `rich` alongside `PyYAML` and `ruff`. Never remove `ruff` from
+   `requirements.txt`. Run `ruff check .tests/` alongside test suites with every
+   Python modification. `bashmenu.sh` venv verification commands must validate
+   `yaml, ruff, textual, rich` before marking the environment ready. Keep required
+   system packages to an absolute minimum (`python3` + `curl`). Never mandate external
    CLI utilities like `glow`, `jq`, or `yq` in root shell scripts; always
    prefer in-house Python standard library fallbacks (`json`, `urllib.request`)
    to guarantee out-of-the-box compatibility on Termux (Android), Raspberry Pi,
@@ -134,7 +135,7 @@ Textual interface.
 9. **Test Suite Organization & Import Standard:** All unit and
    integration test scripts must strictly reside inside the `.tests/`
    directory (named `test_*.py`). Never place test scripts in the root
-   directory. Test files in `.tests/` must dynamically resolve the
+   or scripts directory. Test files in `.tests/` must dynamically resolve the
    project root using `sys.path.insert(0, os.path.abspath(os.path.join(
    os.path.dirname(__file__), "..")))`. Always verify tests using
    `python3 -m unittest discover -s .tests -p "test_*.py"`.
@@ -288,15 +289,51 @@ Textual interface.
     - If using Textual's `Markdown` widget anywhere, always pass `open_links=False` to prevent
       Textual's default `open_links=True` from unconditionally launching the system web
       browser on internal `#anchor` clicks.
-28. **Terminal Pager Interactive Link Following & In-Document Search (`scripts/pager.sh`):**
-    - In terminal pagers, support interactive link selection (`l` / `o`) using a keyboard-navigable
-      overlay that scans the rendered spool for both OSC 8 sequences and Markdown `[text](url)` links.
-    - When jumping to anchor headings from slugs (`#...`), implement normalized token matching
-      (e.g. alphanumeric word matching) because Markdown slugifiers strip periods and punctuation
-      (e.g., `3.1 Main Menu Engine` -> `#31-main-menu-engine`).
-    - Support forward searching (`/`) with next (`n`) and previous (`N`) navigation.
-    - In bash terminal raw mode (`read -rsn1`), newline/enter delimiter returns status 0 with an
-      empty string; explicitly map this to `\n` in raw character grabbers (`grab_char`).
+28. **Terminal Pager Standards & Spool Location (`scripts/pager.sh`):**
+    - Temporary spools must strictly reside inside `${CACHE_DIR:-${HOME}/.cache/bashmenu}/spool`
+      without falling back to `/tmp`. An immediate `trap 'cleanup' EXIT INT TERM HUP`
+      must be installed upon spool creation to guarantee spool deletion on all exit paths.
+    - The bottom status bar must use a balanced 3-segment row:
+      * Left: Position and line range (`TOP  1-23/100`).
+      * Center: Centered badge displaying `[ filename.ext ]` (for files) or `[ <stdin> ]`
+        (for piped streams).
+      * Right: Alert messages or key hints, dynamically condensed or suppressed on narrow
+        terminals to prevent badge overlap while guaranteeing line width equals `COLS`.
+    - Main invocation must be guarded with `if [ "${BASH_SOURCE[0]}" = "${0}" ]; then main "$@"; fi`
+      to enable safe sourcing in automated tests.
+    - Support interactive link selection (`l` / `o`), normalized heading jumps (`#...`),
+      forward searching (`/`, `n`, `N`), and safe character grabbing (`grab_char`).
+29. **Macro Interpolation Performance & Lazy Probes (`bashmenu.py`):**
+    - `interpolate_placeholders()` must short-circuit immediately if `not text or "{" not in text`,
+      bypassing regexes and string replacements for plain labels, dividers, and icons.
+    - Expensive system probes (such as sysfs battery scanning in `get_battery_info()` and
+      outbound socket probing in `get_primary_ip()`) must only be evaluated if their specific
+      placeholder token (`"{battery}"`, `"{localip}"`) is present in the target string.
+    - Never execute network socket probes (`get_primary_ip()`) at module import time.
+30. **Sub-Editor Lazy-Loading Standard (`bashmenu.py`):**
+    - Heavy standalone editors (`bashedit.py`, `menuedit.py`) must never be imported at
+      module top-level in `bashmenu.py`.
+    - Always import them on-demand inside their respective execution actions
+      (`action_open_editor`, `action_menu_editor`, `run_curses_editor`), saving ~150ms
+      of cold-start module import time.
+31. **Self-Healing Launcher Fast-Path (`bashmenu.sh`):**
+    - Use pure POSIX `awk`/`grep` as Layer 1 in `yaml_get()` for simple scalar settings
+      (`settings.cache_dir`, `settings.check_for_updates`) to eliminate ~200ms of Python
+      subshell bootstrap latency.
+    - Maintain a `.venv/.ready` stamp created upon successful environment verification.
+    - On normal launches without setup flags, bypass tool inspection loops and directly
+      execute Python.
+    - The fast path must self-heal (remove `.ready` and drop into full recovery setup) if:
+      * `requirements.txt` is newer than `.ready` (`requirements.txt -nt .ready`).
+      * A required system binary (`curl`, `python3`) is missing.
+      * Python fails to execute or exits due to broken virtualenv dependencies.
+      * The user explicitly invokes `--setup`.
+32. **ShellCheck Linting Protocol (`shellcheck`):**
+    - Frequently run `shellcheck` across all project shell scripts (`bashmenu.sh`,
+      `install.sh`, `uninstall.sh`, and `scripts/*.sh`).
+    - When lint warnings or potential POSIX/bash portability pitfalls are detected,
+      inspect the scripts, present the findings and proposed fixes clearly to the user,
+      and make repairs only upon explicit user approval.
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the

@@ -24,7 +24,6 @@ PAGER_VERSION="1.0.0"
 
 # Literal control bytes used throughout the renderer and key parser.
 ESC=$'\033'
-BEL=$'\a'
 
 # Tunables and state. Every global is declared here so the render loop stays
 # free of hidden allocations.
@@ -48,7 +47,6 @@ LAST_SHOWN=0
 DONE=0
 KEY=""
 MESSAGE=""
-FIT_LINE=""
 BAR_LINE=""
 HINTS=""
 FILES=()
@@ -220,93 +218,6 @@ clamp_top() {
 
 # -------------------------------------------------------------------- renderer
 
-fit_line() {
-    # Clip $1 to $2 visible columns and store the result in FIT_LINE.
-    # Preserves ANSI escapes and handles STRIP_COLORS.
-    local limit="$2"
-    [ "${limit}" -lt 1 ] && limit=1
-
-    # Fast path: unstyled lines or lines where raw byte length <= limit
-    if [ "${STRIP_COLORS}" = "0" ]; then
-        if [ "${#1}" -le "${limit}" ]; then
-            FIT_LINE="$1"
-            return 0
-        fi
-        case "$1" in
-            *"${ESC}"*) : ;;
-            *)  FIT_LINE="${1:0:${limit}}"
-                return 0 ;;
-        esac
-    fi
-
-    local rest="$1" out="" used=0 seq="" c="" text="" tlen=0 styled=0
-    while [ -n "${rest}" ]; do
-        if [ "${rest:0:1}" = "${ESC}" ]; then
-            seq="${ESC}"
-            rest="${rest:1}"
-            c="${rest:0:1}"
-            case "${c}" in
-                '[')
-                    rest="${rest:1}"
-                    seq="${seq}["
-                    while [ -n "${rest}" ]; do
-                        c="${rest:0:1}"
-                        rest="${rest:1}"
-                        seq="${seq}${c}"
-                        case "${c}" in
-                            [@-~]) break ;;
-                        esac
-                    done
-                    ;;
-                ']')
-                    rest="${rest:1}"
-                    seq="${seq}]"
-                    while [ -n "${rest}" ]; do
-                        c="${rest:0:1}"
-                        rest="${rest:1}"
-                        seq="${seq}${c}"
-                        [ "${c}" = "${BEL}" ] && break
-                        if [ "${c}" = "${ESC}" ]; then
-                            c="${rest:0:1}"
-                            rest="${rest:1}"
-                            seq="${seq}${c}"
-                            break
-                        fi
-                    done
-                    ;;
-                '') ;;
-                *)
-                    rest="${rest:1}"
-                    seq="${seq}${c}"
-                    ;;
-            esac
-            if [ "${STRIP_COLORS}" = "0" ]; then
-                out="${out}${seq}"
-                styled=1
-            fi
-        else
-            text="${rest%%"${ESC}"*}"
-            tlen="${#text}"
-            if [ $(( used + tlen )) -le "${limit}" ]; then
-                out="${out}${text}"
-                used=$(( used + tlen ))
-                if [ "${tlen}" = "${#rest}" ]; then
-                    rest=""
-                else
-                    rest="${rest#"${text}"}"
-                fi
-            else
-                out="${out}${text:0:$(( limit - used ))}"
-                used="${limit}"
-                rest=""
-            fi
-        fi
-    done
-
-    [ "${styled}" = "1" ] && out="${out}${ESC}[0m"
-    FIT_LINE="${out}"
-}
-
 build_bar() {
     # Compose the bottom command bar: position label and line range on the
     # left, centered badge (filename or <stdin>), message or shortcut hints
@@ -336,7 +247,7 @@ build_bar() {
     if [ "${HAVE_FILES}" -ge 1 ]; then
         fname="${FILES[0]##*/}"
         if [ "${HAVE_FILES}" -gt 1 ]; then
-            extra=" (+$((${HAVE_FILES} - 1)))"
+            extra=" (+$((HAVE_FILES - 1)))"
         fi
     elif [ -n "${ORIGINAL_FILE}" ]; then
         fname="${ORIGINAL_FILE##*/}"
@@ -653,7 +564,7 @@ open_in_editor() {
 
 prompt_search() {
     local query=""
-    printf '%s[%d;1H%s[7m/%s[K%s[0m' "${ESC}" "${ROWS}" "${ESC}" "${ESC}"
+    printf '%s[%d;1H%s[7m/%s[K%s[0m' "${ESC}" "${ROWS}" "${ESC}" "${ESC}" "${ESC}"
     while :; do
         if grab_char; then
             case "${GRAB}" in

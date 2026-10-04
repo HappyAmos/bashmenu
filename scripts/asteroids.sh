@@ -78,20 +78,19 @@ if [ ! -x "$ASTEROIDS_BIN" ] && ! command -v asteroids >/dev/null 2>&1; then
     git clone https://github.com/tsotchke/asteroids "$CACHE_DIR/asteroids"
 
     # Build asteroids
-    (
-        cd "$CACHE_DIR/asteroids" || exit 1
-        "$CC" -o asteroids asteroids.c -lm
-        chmod +x asteroids
-        if [ -w "$BIN_DIR" ]; then
-            mv asteroids "$ASTEROIDS_BIN"
-        elif command -v sudo >/dev/null 2>&1; then
-            sudo mv asteroids "$ASTEROIDS_BIN"
-        else
-            mkdir -p "$HOME/.local/bin"
-            mv asteroids "$HOME/.local/bin/asteroids"
-            ASTEROIDS_BIN="$HOME/.local/bin/asteroids"
-        fi
-    )
+    pushd "$CACHE_DIR/asteroids" >/dev/null || exit 1
+    "$CC" -o asteroids asteroids.c -lm
+    chmod +x asteroids
+    if [ -w "$BIN_DIR" ]; then
+        mv asteroids "$ASTEROIDS_BIN"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo mv asteroids "$ASTEROIDS_BIN"
+    else
+        mkdir -p "$HOME/.local/bin"
+        mv asteroids "$HOME/.local/bin/asteroids"
+        ASTEROIDS_BIN="$HOME/.local/bin/asteroids"
+    fi
+    popd >/dev/null || exit 1
 
     # Cleanup
     rm -rf "$CACHE_DIR/asteroids"

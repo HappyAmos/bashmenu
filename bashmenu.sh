@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck shell=bash
 # Version: 0.0.7
 # Author:  HA Bash Menu
 
@@ -53,13 +54,13 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
 BASHMENU_SCRIPT="${SCRIPT_DIR}/bashmenu.py"
 BASHMENU_SETTINGS="${SCRIPT_DIR}/bashmenu.yml"
-GLOW_INSTALLER="${SCRIPT_DIR}/scripts/install_glow.sh"
 ADDITIONAL_SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 
 # --------------------------------------------------------------------------
 # Multi-Platform Detection Engine
 # --------------------------------------------------------------------------
+# shellcheck disable=SC2034
 PLATFORM="unknown"
 IS_TERMUX=false
 IS_WSL=false
@@ -71,6 +72,7 @@ IS_RPI=false
 
 KERNEL="$(uname -s 2>/dev/null || echo "Unknown")"
 
+# shellcheck disable=SC2034
 case "$KERNEL" in
     Darwin)
         PLATFORM="macos"; IS_MAC=true ;;
@@ -651,7 +653,7 @@ else
     if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1; then
         echo "  [✗] python3 venv module is missing."
         pkg_name=$(get_package_name "venv")
-        if [ -n "$pkg_name" ] && [[ ! " ${MISSING_PACKAGES[*]} " =~ " ${pkg_name} " ]]; then
+        if [ -n "$pkg_name" ] && [[ ! " ${MISSING_PACKAGES[*]} " == *" ${pkg_name} "* ]]; then
             MISSING_PACKAGES+=("$pkg_name")
         fi
     fi
@@ -661,7 +663,7 @@ fi
 if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
     DEDUP_PACKAGES=()
     for pkg in "${MISSING_PACKAGES[@]}"; do
-        if [ -n "$pkg" ] && [[ ! " ${DEDUP_PACKAGES[*]} " =~ " ${pkg} " ]]; then
+        if [ -n "$pkg" ] && [[ ! " ${DEDUP_PACKAGES[*]} " == *" ${pkg} "* ]]; then
             DEDUP_PACKAGES+=("$pkg")
         fi
     done
