@@ -32,9 +32,22 @@ NERD_CACHE="$CACHE_DIR/glyphs.json"
 EMOJI_CACHE="$CACHE_DIR/emoji_list.json"
 
 # Create cache directory if it doesn't exist
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Resolve Python interpreter (virtualenv, project venv, or system)
+PYTHON_BIN=""
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python3" ]; then
+    PYTHON_BIN="${VIRTUAL_ENV}/bin/python3"
+elif [ -x "${PROJECT_ROOT}/.venv/bin/python3" ]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+fi
+
 mkdir -p "$CACHE_DIR" &>/dev/null
 
-# Helper function to download files using curl, wget, or python3
+# Helper function to download files using curl, wget, or python
 download_file() {
     local url="$1"
     local dest="$2"
@@ -42,12 +55,12 @@ download_file() {
         curl -sSL "$url" -o "$dest"
     elif command -v wget >/dev/null 2>&1; then
         wget -qO "$dest" "$url"
-    elif command -v python3 >/dev/null 2>&1; then
-        python3 -c "import urllib.request, sys; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" "$url" "$dest" 2>/dev/null || true
+    elif [ -n "$PYTHON_BIN" ]; then
+        "$PYTHON_BIN" -c "import urllib.request, sys; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" "$url" "$dest" 2>/dev/null || true
     fi
 }
 
-# Helper function to query glyphs using jq or python3
+# Helper function to query glyphs using jq or python
 query_glyphs() {
     local mode="$1"
     local term="$2"
@@ -69,8 +82,8 @@ query_glyphs() {
               "\(.key) - [\(.value.name)] - (:\(.value.slug):)"
             ' "$cache"
         fi
-    elif command -v python3 >/dev/null 2>&1; then
-        python3 -c '
+    elif [ -n "$PYTHON_BIN" ]; then
+        "$PYTHON_BIN" -c '
 import json, sys
 mode = sys.argv[1]
 term = sys.argv[2].lower()
@@ -81,13 +94,15 @@ try:
     if mode == "nerd":
         for k, v in data.items():
             if term in k.lower():
-                print(f"{v.get(\"char\", \"\")} - [{v.get(\"code\", \"\")}] - ({k})")
+                ch = v.get("char", "")
+                code = v.get("code", "")
+                print(f"{ch} - [{code}] - ({k})")
     elif mode == "emoji":
         for k, v in data.items():
-            name = (v.get("name") or "").lower()
-            slug = (v.get("slug") or "").lower()
-            if term in name or term in slug:
-                print(f"{k} - [{v.get(\"name\", \"\")}] - (:{v.get(\"slug\", \"\"):})")
+            name = v.get("name") or ""
+            slug = v.get("slug") or ""
+            if term in name.lower() or term in slug.lower():
+                print(f"{k} - [{name}] - (:{slug}:)")
 except Exception:
     pass
 ' "$mode" "$term" "$cache"

@@ -187,5 +187,22 @@ class TestPlatformDetection(unittest.TestCase):
             self.assertEqual(res.returncode, 0, f"{script_name} failed POSIX sh syntax: {res.stderr}")
 
 
+    def test_glyphs_script_query(self):
+        """Verify scripts/glyphs.sh executes and searches without f-string syntax error."""
+        glyphs_sh = os.path.join(SCRIPTS_DIR, "glyphs.sh")
+        self.assertTrue(os.path.isfile(glyphs_sh))
+        res = subprocess.run(
+            [glyphs_sh, "hat"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertNotIn("SyntaxError", res.stderr)
+        self.assertNotIn("SyntaxError", res.stdout)
+        self.assertIn("Searching for ['hat']:", res.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
