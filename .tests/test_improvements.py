@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
 import os
 import sys
 import unittest
+from unittest.mock import MagicMock, patch
 
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -1030,8 +1030,40 @@ class TestImprovements(unittest.TestCase):
         div_str = bashmenu.resolve_divider_string({"theme": "qbasic"}, target_w=10)
         self.assertIn("═" * 10, div_str)
 
+    def test_bashedit_help_modal_and_ascii_stream(self):
+        """Verify bashedit help modal uses markdown table and ASCII table streaming works."""
+        import bashedit
+
+        screen = bashedit.BashEditScreen()
+        pushed_screens = []
+        mock_app = MagicMock()
+        mock_app.push_screen = lambda scr, *args, **kwargs: pushed_screens.append(scr)
+
+        with patch.object(bashedit.BashEditScreen, "app", property(lambda s: mock_app)):
+            # 1. Test action_help_manual uses markdown table
+            screen.action_help_manual()
+            self.assertEqual(len(pushed_screens), 1)
+            help_modal = pushed_screens[0]
+            self.assertTrue(help_modal.is_markdown)
+            self.assertTrue(help_modal.is_help)
+            self.assertIn("| Keybinding / Shortcut | Description / Action |", help_modal.message)
+            self.assertIn("| `^A` / `F11` | View ASCII Character Table (`ascii.sh`) |", help_modal.message)
+
+            # 2. Test action_show_ascii_table pushes StreamOutputModalScreen
+            screen.action_show_ascii_table()
+            self.assertEqual(len(pushed_screens), 2)
+            stream_modal = pushed_screens[1]
+            self.assertEqual(stream_modal.modal_title, "ASCII Character Table")
+            self.assertIn("ascii.sh", stream_modal.command)
+
+        # 3. Test bindings in BashEditScreen
+        binding_keys = {b.key for b in bashedit.BashEditScreen.BINDINGS}
+        self.assertIn("ctrl+a", binding_keys)
+        self.assertIn("f11", binding_keys)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

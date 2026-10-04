@@ -211,6 +211,16 @@ Undo (Alt+U) or Redo (Alt+E) edit operations.
 .TP
 .B Ctrl+^, Alt+A
 Set or unset text selection mark.
+.TP
+.B Ctrl+P, Alt+M
+Show modal with available placeholders and macros.
+.TP
+.B Ctrl+A, F11
+Stream ASCII character table (ascii.sh) in modal viewer.
+.TP
+.B Alt+V, F10
+Stream terminal colors table (ncurses_colors.py) in modal viewer.
+.TP
 .B Alt+N
 Toggle line numbers gutter display.
 .TP
@@ -476,7 +486,7 @@ Renders custom theme-colored text. Available color names include: text, border, 
 Formatting tags within code backticks (`[b]code[/b]`) or fenced code blocks are automatically suppressed and rendered literally.
 .IP \(bu 2
 .B Backslash Tag Escaping:
-Preceding a tag bracket with a backslash (e.g. \\\[b] or \\\[/b]) escapes the parser, outputting literal bracketed tag text.
+Preceding a tag bracket with a backslash (e.g. \[rs][b] or \[rs][/b]) escapes the parser, outputting literal bracketed tag text.
 .IP \(bu 2
 .B no_formatting Directive:
 Modals and text formatting conversion utilities accept an optional no_formatting parameter to disable tag processing entirely.

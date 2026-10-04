@@ -147,6 +147,9 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `Alt+U` | Undo edit operation. |
 | `Alt+E` | Redo edit operation. |
 | `Ctrl+^` / `Alt+A` | Set or unset text selection mark. |
+| `Ctrl+P` / `Alt+M` | View available placeholders and macros modal. |
+| `Ctrl+A` / `F11` | Stream ASCII character table (`ascii.sh`). |
+| `Alt+V` / `F10` | Stream terminal colors table (`ncurses_colors.py`). |
 | `Alt+N` | Toggle line numbers gutter display. |
 | `Alt+P` / `Alt+W` | Toggle whitespace characters visibility. |
 | `F12` | Toggle Markdown rendering for active document. |

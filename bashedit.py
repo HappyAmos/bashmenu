@@ -973,6 +973,8 @@ class BashEditScreen(Screen):
         Binding("alt+t", "toggle_theme_colors", "Toggle Theme Colors", show=False),
         Binding("alt+v", "view_colors", "View Colors", show=False),
         Binding("f10", "view_colors", "View Colors", show=False),
+        Binding("ctrl+a", "show_ascii_table", "ASCII Table", show=False),
+        Binding("f11", "show_ascii_table", "ASCII Table", show=False),
         Binding("alt+]", "next_tab", "Next Tab", show=False),
         Binding("alt+[", "prev_tab", "Prev Tab", show=False),
         Binding("ctrl+tab", "next_tab", "Next Tab", show=False),
@@ -1070,6 +1072,7 @@ class BashEditScreen(Screen):
                 yield Label("^U Paste", id="lbl_paste", classes="footer_item", markup=False)
                 yield Label("^^ Mark", id="lbl_mark", classes="footer_item", markup=False)
                 yield Label("^P Macros", id="lbl_placeholders", classes="footer_item", markup=False)
+                yield Label("^A ASCII", id="lbl_ascii", classes="footer_item", markup=False)
                 yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
                 yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
                 yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
@@ -1163,6 +1166,8 @@ class BashEditScreen(Screen):
             self.action_toggle_mark()
         elif target_action == "lbl_placeholders":
             self.action_show_placeholders()
+        elif target_action == "lbl_ascii":
+            self.action_show_ascii_table()
         elif target_action == "lbl_colors":
             self.action_view_colors()
         elif target_action == "lbl_space":
@@ -1486,6 +1491,12 @@ class BashEditScreen(Screen):
             event.prevent_default()
             event.stop()
             self.action_view_colors()
+            return
+
+        if key_lower in ["ctrl+a", "ctrl_a", "f11"] or char_lower in ["\x01"]:
+            event.prevent_default()
+            event.stop()
+            self.action_show_ascii_table()
             return
 
         if key_lower in ["ctrl+p", "alt+m", "meta+m"]:
@@ -1859,33 +1870,44 @@ class BashEditScreen(Screen):
         self.update_status(f"Help bar {status}")
 
     def action_help_manual(self) -> None:
-        help_lines = [
-            "BashEdit Keybindings & Controls:",
+        table_lines = [
+            "# BashEdit Keybindings & Controls",
             "",
-            "• ^O / ^R / F5 / F7   : Open File Picker",
-            "• ^S / F2 / F3       : Save File",
-            "• Alt+S / ^Shift+S / F6: Save File As (Save Under New Name)",
-            "• ^E / F4 / [ + ]   : New Tab / New File",
-            "• Alt+] / Ctrl+Tab   : Next Tab",
-            "• Alt+[ / Shift+Tab  : Previous Tab",
-            "• ^P / Alt+M        : Show Available Placeholders & Macros",
-            "• Alt+V / F10        : View Terminal Colors (ncurses_colors.py)",
-            "• Alt+1             : Toggle Whitespace Display (spaces & tabs)",
-            "• ^N / Alt+N        : Toggle Line Numbers",
-            "• F12                : Toggle Markdown Rendering",
-            "• ^^ / Alt+A        : Toggle Mark Selection",
-            "• ^W                : Where Is (Search text)",
-            "• ^K / F8           : Cut Line or Selection",
-            "• ^C / Alt+6 / Alt+C: Copy Line or Selection",
-            "• ^U / F9           : Paste Cut Buffer",
-            "• ^Z / ^Y           : Undo / Redo",
-            "• ^X / ESC          : Exit Editor",
+            "| Keybinding / Shortcut | Description / Action |",
+            "| :--- | :--- |",
+            "| `^O` / `^R` / `F5` / `F7` | Open File Picker |",
+            "| `^S` / `F2` / `F3` | Save File |",
+            "| `Alt+S` / `^Shift+S` / `F6` | Save File As (Save Under New Name) |",
+            "| `^E` / `F4` / `[ + ]` | New Tab / New File |",
+            "| `Alt+]` / `Ctrl+Tab` | Next Tab |",
+            "| `Alt+[` / `Shift+Tab` | Previous Tab |",
+            "| `^P` / `Alt+M` | Show Available Placeholders & Macros |",
+            "| `^A` / `F11` | View ASCII Character Table (`ascii.sh`) |",
+            "| `Alt+V` / `F10` | View Terminal Colors (`ncurses_colors.py`) |",
+            "| `Alt+1` | Toggle Whitespace Display (spaces & tabs) |",
+            "| `^N` / `Alt+N` | Toggle Line Numbers |",
+            "| `F12` | Toggle Markdown Rendering |",
+            "| `^^` / `Alt+A` | Toggle Mark Selection |",
+            "| `^W` | Where Is (Search text) |",
+            "| `^K` / `F8` | Cut Line or Selection |",
+            "| `^C` / `Alt+6` / `Alt+C` | Copy Line or Selection |",
+            "| `^U` / `F9` | Paste Cut Buffer |",
+            "| `^Z` / `^Y` | Undo / Redo |",
+            "| `^X` / `ESC` | Exit Editor |",
         ]
         if self.display_theme_colors:
-            help_lines.append("• Alt+T              : Toggle Theme Color Display (Refresh)")
+            table_lines.append("| `Alt+T` | Toggle Theme Color Display (Refresh) |")
 
-        help_text = "\n".join(help_lines)
-        self.app.push_screen(bashmenu_ui.MessageModalScreen("BashEdit Manual", help_text, theme=self.theme_styles, is_help=True))
+        help_text = "\n".join(table_lines)
+        self.app.push_screen(
+            bashmenu_ui.MessageModalScreen(
+                "BashEdit Manual",
+                help_text,
+                theme=self.theme_styles,
+                is_help=True,
+                is_markdown=True,
+            )
+        )
 
     def action_save_file_as(self) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
@@ -1987,6 +2009,20 @@ class BashEditScreen(Screen):
                 pass
         script_cmd = f"{sys.executable} {script_path}"
         self.app.push_screen(bashmenu_ui.StreamOutputModalScreen("View Terminal Colors", script_cmd, theme=self.theme_styles))
+
+    def action_show_ascii_table(self) -> None:
+        """Stream ASCII character table modal."""
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "ascii.sh")
+        if not os.path.exists(script_path):
+            try:
+                import bashmenu
+                app_obj = getattr(self, "app", None)
+                cfg = getattr(app_obj, "config", {}) if app_obj else {}
+                script_path = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
+            except Exception:  # noqa: BLE001, S110
+                pass
+        script_cmd = f'bash "{script_path}"'
+        self.app.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", script_cmd, theme=self.theme_styles))
 
     def action_show_placeholders(self) -> None:
         self.app.push_screen(
