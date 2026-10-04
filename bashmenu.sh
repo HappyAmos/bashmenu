@@ -94,28 +94,49 @@ case "$KERNEL" in
         PLATFORM="unknown" ;;
 esac
 
-# Virtualenv activation path based on platform directory structure
-if [ -d "${VENV_DIR}/Scripts" ] || [ "$IS_WINDOWS" = true ]; then
-    VENV_ACTIVATE="${VENV_DIR}/Scripts/activate"
-else
-    VENV_ACTIVATE="${VENV_DIR}/bin/activate"
-fi
+# Resolve venv python and pip paths across OS layouts
+resolve_venv_paths() {
+    if [ -d "${VENV_DIR}/Scripts" ] || [ "$IS_WINDOWS" = true ]; then
+        VENV_ACTIVATE="${VENV_DIR}/Scripts/activate"
+        VENV_PYTHON="${VENV_DIR}/Scripts/python.exe"
+        [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/Scripts/python"
+        VENV_PIP="${VENV_DIR}/Scripts/pip.exe"
+        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/Scripts/pip"
+    else
+        VENV_ACTIVATE="${VENV_DIR}/bin/activate"
+        VENV_PYTHON="${VENV_DIR}/bin/python3"
+        [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/bin/python"
+        VENV_PIP="${VENV_DIR}/bin/pip"
+        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/bin/pip3"
+    fi
+}
+resolve_venv_paths
+READY_STAMP="${VENV_DIR}/.ready"
 
 # Define standard CLI tools required (glow eliminated via rich.sh | pager.sh)
 REQUIRED_TOOLS=("python3" "curl")
 MISSING_PACKAGES=()
 
-# Multi-layer in-house YAML value extractor (Python -> yq -> pure POSIX awk/grep)
+# Multi-layer in-house YAML value extractor (pure POSIX awk/grep -> Python -> yq)
 yaml_get() {
   local key="$1"
   local file="$2"
   [ ! -f "$file" ] && return 0
 
-  # Layer 1: Python PyYAML check
+  # Layer 1: Fast pure POSIX awk/grep for bootstrap scalar keys
+  local leaf_key="${key##*.}"
+  local val
+  val=$(grep -E "^[[:space:]]*${leaf_key}:" "$file" 2>/dev/null | head -n 1 | awk -F': ' '{print $2}' | tr -d '"'\'' ' || true)
+  if [ -n "$val" ] && [ "$val" != "null" ]; then
+      echo "$val"
+      return 0
+  fi
+
+  # Layer 2: Python PyYAML check
   local py_cmd=""
-  if [ -f "${VENV_DIR}/bin/python3" ] && "${VENV_DIR}/bin/python3" -c "import yaml" &>/dev/null; then
+  if [ -x "${VENV_DIR}/bin/python3" ] && "${VENV_DIR}/bin/python3" -c "import yaml" &>/dev/null; then
       py_cmd="${VENV_DIR}/bin/python3"
-  elif [ -f "${VENV_DIR}/Scripts/python.exe" ] && "${VENV_DIR}/Scripts/python.exe" -c "import yaml" &>/dev/null; then
+  elif [ -x "${VENV_DIR}/Scripts/python.exe" ] && "${VENV_DIR}/Scripts/python.exe" -c "import yaml" &>/dev/null; then
       py_cmd="${VENV_DIR}/Scripts/python.exe"
   elif command -v python3 &>/dev/null && python3 -c "import yaml" &>/dev/null; then
       py_cmd="python3"
@@ -127,19 +148,14 @@ yaml_get() {
       "$py_cmd" -c "import yaml, sys; data=yaml.safe_load(open('$file')) or {}; keys='$key'.split('.'); [data := data.get(k, {}) for k in keys if isinstance(data, dict)]; print(data if not isinstance(data, dict) else '')" 2>/dev/null && return 0
   fi
 
-  # Layer 2: yq if installed
+  # Layer 3: yq if installed
   if command -v yq &>/dev/null; then
-      local val
       val=$(yq -r ".$key" "$file" 2>/dev/null || yq ".$key" "$file" 2>/dev/null || true)
       if [ -n "$val" ] && [ "$val" != "null" ]; then
           echo "$val"
           return 0
       fi
   fi
-
-  # Layer 3: Pure POSIX awk/grep fallback for bootstrap scalar keys
-  local leaf_key="${key##*.}"
-  grep -E "^[[:space:]]*${leaf_key}:" "$file" 2>/dev/null | head -n 1 | awk -F': ' '{print $2}' | tr -d '"'\'' ' || true
 }
 
 # Resolve configurable cache directory
@@ -548,6 +564,7 @@ for arg in "$@"; do
             echo "Cache Dir:    $CACHE_DIR"
             echo "Venv Dir:     $VENV_DIR"
             echo "Venv Active:  $VENV_ACTIVATE"
+            echo "Ready Stamp:  $( [ -f "$READY_STAMP" ] && echo "yes" || echo "no" )"
             exit 0
             ;;
         --install-bm)
@@ -571,6 +588,33 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Fast-path launch: directly start Python if virtual environment was previously verified
+if [ "$SETUP_ONLY" = false ]; then
+    if [ -f "$READY_STAMP" ]; then
+        # Invalidate stamp if requirements.txt was modified or pulled
+        if [ -f "${SCRIPT_DIR}/requirements.txt" ] && [ "${SCRIPT_DIR}/requirements.txt" -nt "$READY_STAMP" ]; then
+            rm -f "$READY_STAMP"
+        # Invalidate stamp if venv Python or system tools are missing
+        elif [ ! -x "$VENV_PYTHON" ] || ! command -v curl >/dev/null 2>&1; then
+            rm -f "$READY_STAMP"
+        else
+            export VIRTUAL_ENV="${VENV_DIR}"
+            "$VENV_PYTHON" "$BASHMENU_SCRIPT" "$@"
+            APP_STATUS=$?
+            if [ $APP_STATUS -eq 0 ] || [ $APP_STATUS -eq 130 ]; then
+                exit $APP_STATUS
+            fi
+            # If execution failed, check if environment dependencies were damaged
+            if ! "$VENV_PYTHON" -c "import yaml, textual, rich" >/dev/null 2>&1; then
+                echo "Virtual environment dependencies missing or damaged. Running recovery setup..." >&2
+                rm -f "$READY_STAMP"
+            else
+                exit $APP_STATUS
+            fi
+        fi
+    fi
+fi
 
 # ==========================================================================
 # Dependency Checking Phase
@@ -739,22 +783,6 @@ elif [ "$PKG_MANAGER" = "apk" ]; then
     fi
 fi
 
-# Resolve venv python and pip paths across OS layouts
-resolve_venv_paths() {
-    if [ -d "${VENV_DIR}/Scripts" ] || [ "$IS_WINDOWS" = true ]; then
-        VENV_ACTIVATE="${VENV_DIR}/Scripts/activate"
-        VENV_PYTHON="${VENV_DIR}/Scripts/python.exe"
-        [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/Scripts/python"
-        VENV_PIP="${VENV_DIR}/Scripts/pip.exe"
-        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/Scripts/pip"
-    else
-        VENV_ACTIVATE="${VENV_DIR}/bin/activate"
-        VENV_PYTHON="${VENV_DIR}/bin/python3"
-        [ ! -f "$VENV_PYTHON" ] && VENV_PYTHON="${VENV_DIR}/bin/python"
-        VENV_PIP="${VENV_DIR}/bin/pip"
-        [ ! -f "$VENV_PIP" ] && VENV_PIP="${VENV_DIR}/bin/pip3"
-    fi
-}
 resolve_venv_paths
 
 USE_VENV=false
@@ -861,8 +889,11 @@ if [ "$SETUP_ONLY" = true ]; then
         echo "Error: Python environment is missing required dependencies (PyYAML)." >&2
         exit 1
     fi
+    touch "$READY_STAMP" 2>/dev/null || true
     echo "  [✓] BashMenu environment, virtualenv, and shortcuts successfully configured."
     exit 0
 fi
+
+touch "$READY_STAMP" 2>/dev/null || true
 
 exec "$PYTHON_BIN" "$BASHMENU_SCRIPT" "$@"

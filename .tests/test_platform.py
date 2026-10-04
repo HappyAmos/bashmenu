@@ -189,6 +189,55 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertIn("BashMenu environment, virtualenv, and shortcuts successfully configured", res.stdout)
 
+    def test_ready_stamp_lifecycle(self):
+        """Verify .ready stamp is reported in check-env and created by setup."""
+        ready_file = os.path.join(REPO_ROOT, ".venv", ".ready")
+        was_present = os.path.exists(ready_file)
+        try:
+            # Ensure stamp is present
+            with open(ready_file, "a"):
+                pass
+            res_yes = subprocess.run(
+                [BASHMENU_SH, "--check-env"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            self.assertEqual(res_yes.returncode, 0)
+            self.assertIn("Ready Stamp:  yes", res_yes.stdout)
+
+            # Remove stamp and verify check-env reports no
+            if os.path.exists(ready_file):
+                os.remove(ready_file)
+            res_no = subprocess.run(
+                [BASHMENU_SH, "--check-env"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            self.assertEqual(res_no.returncode, 0)
+            self.assertIn("Ready Stamp:  no", res_no.stdout)
+
+            # Run setup to recreate stamp
+            res_setup = subprocess.run(
+                [BASHMENU_SH, "--setup"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            self.assertEqual(res_setup.returncode, 0)
+            self.assertTrue(os.path.exists(ready_file))
+        finally:
+            if was_present and not os.path.exists(ready_file):
+                with open(ready_file, "a"):
+                    pass
+
     def test_posix_trampoline(self):
         """Verify executing bashmenu.sh with /bin/sh auto-elevates to Bash cleanly."""
         res = subprocess.run(
