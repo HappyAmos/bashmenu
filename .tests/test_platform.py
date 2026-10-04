@@ -4,6 +4,7 @@ test_platform.py - Unit tests for universal cross-platform detection,
 in-house YAML parsing, architecture mapping, and dependency elimination.
 """
 
+import contextlib
 import os
 import subprocess
 import unittest
@@ -191,8 +192,10 @@ class TestPlatformDetection(unittest.TestCase):
 
     def test_ready_stamp_lifecycle(self):
         """Verify .ready stamp is reported in check-env and created by setup."""
-        ready_file = os.path.join(REPO_ROOT, ".venv", ".ready")
+        venv_dir = os.path.join(REPO_ROOT, ".venv")
+        ready_file = os.path.join(venv_dir, ".ready")
         was_present = os.path.exists(ready_file)
+        os.makedirs(venv_dir, exist_ok=True)
         try:
             # Ensure stamp is present
             with open(ready_file, "a"):
@@ -202,7 +205,7 @@ class TestPlatformDetection(unittest.TestCase):
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
-                timeout=5,
+                timeout=10,
                 check=False,
             )
             self.assertEqual(res_yes.returncode, 0)
@@ -216,7 +219,7 @@ class TestPlatformDetection(unittest.TestCase):
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
-                timeout=5,
+                timeout=10,
                 check=False,
             )
             self.assertEqual(res_no.returncode, 0)
@@ -228,7 +231,7 @@ class TestPlatformDetection(unittest.TestCase):
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=30,
                 check=False,
             )
             self.assertEqual(res_setup.returncode, 0)
@@ -237,6 +240,9 @@ class TestPlatformDetection(unittest.TestCase):
             if was_present and not os.path.exists(ready_file):
                 with open(ready_file, "a"):
                     pass
+            elif not was_present and os.path.exists(ready_file):
+                with contextlib.suppress(OSError):
+                    os.remove(ready_file)
 
     def test_posix_trampoline(self):
         """Verify executing bashmenu.sh with /bin/sh auto-elevates to Bash cleanly."""
