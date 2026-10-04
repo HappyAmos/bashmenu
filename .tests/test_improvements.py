@@ -165,9 +165,9 @@ class TestImprovements(unittest.TestCase):
 
     def test_help_modal_link_clicked(self):
         import asyncio
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
+
         from textual.app import App
-        from textual.widgets import Static
 
         sample_md = (
             "# Help Menu\n\n"
@@ -185,7 +185,7 @@ class TestImprovements(unittest.TestCase):
 
         async def run_modal_links():
             app = ModalApp()
-            async with app.run_test() as pilot:
+            async with app.run_test() as _:
                 modal = app.screen
                 self.assertIsInstance(modal, bashmenu_ui.MessageModalScreen)
                 msg_widget = modal.query_one("#message")

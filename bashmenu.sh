@@ -1,6 +1,29 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Version: 0.0.7
 # Author:  HA Bash Menu
+
+# --------------------------------------------------------------------------
+# POSIX /bin/sh Trampoline: Auto-elevate to Bash or guide the user
+# --------------------------------------------------------------------------
+if [ -z "$BASH_VERSION" ]; then
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    else
+        echo "Error: Bash is required to run BashMenu, but is not installed." >&2
+        if command -v apk >/dev/null 2>&1; then
+            echo "Alpine Linux detected. Install Bash using: apk add bash" >&2
+        elif command -v pkg >/dev/null 2>&1; then
+            echo "FreeBSD/Termux detected. Install Bash using: pkg install bash" >&2
+        elif command -v pacman >/dev/null 2>&1; then
+            echo "Arch Linux detected. Install Bash using: pacman -S bash" >&2
+        elif command -v dnf >/dev/null 2>&1; then
+            echo "Fedora/RHEL detected. Install Bash using: dnf install bash" >&2
+        elif command -v apt-get >/dev/null 2>&1; then
+            echo "Debian/Ubuntu detected. Install Bash using: apt-get install -y bash" >&2
+        fi
+        exit 1
+    fi
+fi
 
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
@@ -236,9 +259,8 @@ install_man_page() {
     fi
 }
 
-# Install 'bm' command symlink pointing to bashmenu.sh
+# Install 'bm' and 'bashmenu' command symlinks pointing to bashmenu.sh
 install_bm() {
-    local shortcut_name="bm"
     local target_dir=""
 
     if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
@@ -252,19 +274,26 @@ install_bm() {
     fi
 
     mkdir -p "$target_dir" 2>/dev/null || true
-    local target_file="${target_dir}/${shortcut_name}"
     local real_script_path="${SCRIPT_DIR}/bashmenu.sh"
+    local installed_any=false
 
-    echo "Installing symlink '$shortcut_name' shortcut pointing to: $real_script_path"
+    for shortcut_name in "bm" "bashmenu"; do
+        local target_file="${target_dir}/${shortcut_name}"
+        echo "Installing symlink '$shortcut_name' shortcut pointing to: $real_script_path"
+        ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
 
-    ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
+        if [ -L "$target_file" ] || [ -f "$target_file" ]; then
+            echo "  [✓] Successfully installed '$shortcut_name' shortcut at $target_file"
+            installed_any=true
+        else
+            echo "  [✗] Failed to create shortcut at $target_file" >&2
+        fi
+    done
 
-    if [ -L "$target_file" ] || [ -f "$target_file" ]; then
-        echo "  [✓] Successfully installed '$shortcut_name' shortcut at $target_file"
-
+    if [ "$installed_any" = true ]; then
         if [[ ":$PATH:" != *":$target_dir:"* ]]; then
             echo "  [!] Notice: $target_dir is not currently in your PATH environment variable."
-            for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+            for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
                 if [ -f "$rc" ] && ! grep -q "$target_dir" "$rc"; then
                     echo "export PATH=\"$target_dir:\$PATH\"" >> "$rc"
                     echo "  [+] Added $target_dir to $rc"
@@ -273,7 +302,6 @@ install_bm() {
         fi
         return 0
     else
-        echo "  [✗] Failed to create shortcut at $target_file" >&2
         return 1
     fi
 }
@@ -453,8 +481,13 @@ Options:
   --install-bm             Install 'bm' command shortcut [/.local/bin/bm]
   --install-cheat          Install 'cheat' command shortcut [/.local/bin/cheat]
   --install-man            Install bashmenu.1 man page [/.local/share/man/man1/bashmenu.1]
+  --setup                  Run non-interactive setup (venv, deps, shortcuts) and exit
+  -y, --yes                Automatically answer yes to dependency installation prompts
 EOF
 }
+
+SETUP_ONLY=false
+AUTO_YES=false
 
 # Handle standalone CLI flags
 for arg in "$@"; do
@@ -486,6 +519,13 @@ for arg in "$@"; do
         --install-man|--install-manpage)
             install_man_page
             exit $?
+            ;;
+        --setup)
+            SETUP_ONLY=true
+            AUTO_YES=true
+            ;;
+        -y|--yes)
+            AUTO_YES=true
             ;;
     esac
 done
@@ -545,8 +585,12 @@ fi
 # Trigger installation if elements are missing
 if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
     echo "Found missing dependencies: ${MISSING_PACKAGES[*]}"
-    read -p "Would you like to install the missing tools? [y/N]: " -n 1 -r
-    echo ""
+    if [ "$AUTO_YES" = true ]; then
+        REPLY="y"
+    else
+        read -p "Would you like to install the missing tools? [y/N]: " -n 1 -r
+        echo ""
+    fi
     if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         # 1. Handle package manager updates
         if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
@@ -576,24 +620,31 @@ if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
     fi
 fi
 
-# Check if 'bm' shortcut is missing and prompt user if interactive session
-if ! is_installed "bm"; then
-    if [ -t 0 ]; then
-        read -p "Global 'bm' command shortcut is not installed. Install it now? [y/N]: " -n 1 -r
-        echo ""
-        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-            install_bm
+# Check if shortcuts or man page need installation
+if [ "$SETUP_ONLY" = true ]; then
+    install_bm
+    install_cheat
+    install_man_page
+else
+    # Check if 'bm' shortcut is missing and prompt user if interactive session
+    if ! is_installed "bm"; then
+        if [ -t 0 ]; then
+            read -p "Global 'bm' command shortcut is not installed. Install it now? [y/N]: " -n 1 -r
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                install_bm
+            fi
         fi
     fi
-fi
 
-# Check if man page is missing and prompt user if interactive session
-if ! is_man_installed "bashmenu"; then
-    if [ -t 0 ]; then
-        read -p "Man page 'bashmenu.1' is not installed. Install it now? [y/N]: " -n 1 -r
-        echo ""
-        if [[ "$REPLY" =~ ^[Yy]$ ]]; then
-            install_man_page
+    # Check if man page is missing and prompt user if interactive session
+    if ! is_man_installed "bashmenu"; then
+        if [ -t 0 ]; then
+            read -p "Man page 'bashmenu.1' is not installed. Install it now? [y/N]: " -n 1 -r
+            echo ""
+            if [[ "$REPLY" =~ ^[Yy]$ ]]; then
+                install_man_page
+            fi
         fi
     fi
 fi
@@ -716,6 +767,11 @@ if [ "$USE_VENV" = true ] && [ -f "$VENV_ACTIVATE" ]; then
     PYTHON_BIN="python3"
 else
     PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
+
+if [ "$SETUP_ONLY" = true ]; then
+    echo "  [✓] BashMenu environment, virtualenv, and shortcuts successfully configured."
+    exit 0
 fi
 
 exec "$PYTHON_BIN" "$BASHMENU_SCRIPT" "$@"

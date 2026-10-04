@@ -146,5 +146,46 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertNotIn("\n    break\n", content)
 
 
+    def test_setup_flag(self):
+        """Verify bashmenu.sh --setup runs non-interactively and exits cleanly."""
+        res = subprocess.run(
+            [BASHMENU_SH, "--setup"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("BashMenu environment, virtualenv, and shortcuts successfully configured", res.stdout)
+
+    def test_posix_trampoline(self):
+        """Verify executing bashmenu.sh with /bin/sh auto-elevates to Bash cleanly."""
+        res = subprocess.run(
+            ["sh", BASHMENU_SH, "--check-env"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("Platform:", res.stdout)
+
+    def test_install_and_uninstall_scripts_syntax(self):
+        """Verify install.sh and uninstall.sh pass strict POSIX /bin/sh syntax check."""
+        for script_name in ("install.sh", "uninstall.sh"):
+            script_path = os.path.join(REPO_ROOT, script_name)
+            self.assertTrue(os.path.isfile(script_path), f"{script_name} must exist")
+            res = subprocess.run(
+                ["sh", "-n", script_path],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            self.assertEqual(res.returncode, 0, f"{script_name} failed POSIX sh syntax: {res.stderr}")
+
+
 if __name__ == "__main__":
     unittest.main()

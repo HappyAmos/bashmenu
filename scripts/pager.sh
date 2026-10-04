@@ -58,6 +58,16 @@ LAST_SEARCH=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# Detect Python interpreter (virtualenv, project .venv, or system)
+PYTHON_BIN=""
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python3" ]; then
+    PYTHON_BIN="${VIRTUAL_ENV}/bin/python3"
+elif [ -x "${PROJECT_ROOT}/.venv/bin/python3" ]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3)"
+fi
+
 # ------------------------------------------------------------------ utilities
 
 die() {
@@ -662,8 +672,8 @@ search_next() {
 
 choose_link() {
     local links_raw=""
-    if command -v python3 >/dev/null 2>&1; then
-        links_raw="$(python3 -c '
+    if [ -n "${PYTHON_BIN}" ]; then
+        links_raw="$("${PYTHON_BIN}" -c '
 import sys, re
 with open(sys.argv[1], "rb") as f:
     raw_lines = f.readlines()
@@ -811,7 +821,8 @@ for url, text, line in consolidated:
     if [[ "${chosen_url}" == \#* ]]; then
         local target_anchor="${chosen_url#\#}"
         local dest_line=""
-        dest_line="$(python3 -c '
+        if [ -n "${PYTHON_BIN}" ]; then
+            dest_line="$("${PYTHON_BIN}" -c '
 import sys, re
 spool = sys.argv[1]
 anchor = sys.argv[2]
@@ -892,6 +903,7 @@ if not best_line:
 if best_line:
     print(best_line)
 ' "${SPOOL}" "${target_anchor}" "${chosen_text}" "${source_line}" 2>/dev/null)"
+        fi
 
         if [ -n "${dest_line}" ] && [ "${dest_line}" -gt 0 ] 2>/dev/null; then
             TOP_LINE="${dest_line}"
@@ -905,8 +917,8 @@ if best_line:
             "${webopen}" "${chosen_url}" >/dev/null 2>&1 &
         elif command -v xdg-open >/dev/null 2>&1; then
             xdg-open "${chosen_url}" >/dev/null 2>&1 &
-        else
-            python3 -m webbrowser "${chosen_url}" >/dev/null 2>&1 &
+        elif [ -n "${PYTHON_BIN}" ]; then
+            "${PYTHON_BIN}" -m webbrowser "${chosen_url}" >/dev/null 2>&1 &
         fi
         MESSAGE="opened ${chosen_url}"
     else

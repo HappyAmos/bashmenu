@@ -44,6 +44,8 @@ if not hasattr(curses, "LINES"):
 if not hasattr(curses, "update_lines_cols"):
     curses.update_lines_cols = lambda: None
 
+BASH_BIN = shutil.which("bash") or "/bin/bash"
+
 
 def string_representer(dumper, data):
     """
@@ -489,7 +491,15 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         if cached and (now_ts - cached[0] < _CMD_CACHE_TTL):
             return cached[1]
         try:
-            res = subprocess.run(cmd_str, shell=True, capture_output=True, text=True, timeout=3, check=False)
+            res = subprocess.run(
+                cmd_str,
+                shell=True,
+                executable=BASH_BIN,
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
             output = res.stdout.strip() if res and res.stdout else ""
             _cmd_substitution_cache[cmd_str] = (now_ts, output)
             return output
@@ -802,6 +812,7 @@ def _fetch_plugin_worker(name, script_cmd, now):
             res = subprocess.run(
                 script_cmd,
                 shell=True,
+                executable=BASH_BIN,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -1714,7 +1725,7 @@ def process_item_action(screen, item, config):
                     try:
                         if not is_quiet:
                             print(f"\n--- Running Command: {curr_action} ---\n")
-                        subprocess.run(curr_action, shell=True, check=False)
+                        subprocess.run(curr_action, shell=True, executable=BASH_BIN, check=False)
                         if not is_quiet:
                             print("\n--------------------------------------------------")
                             input("Execution complete. Press [ENTER] to return...")

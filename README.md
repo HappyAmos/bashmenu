@@ -63,13 +63,35 @@ Contains a few personal scripts as examples.
 
 ## ⚡ Quick Start
 
-Launch the menu interface directly:
+### Universal One-Line Install (Recommended)
+
+Run the universal installer (supports Debian, Ubuntu, Alpine Linux, Fedora, Arch, FreeBSD, macOS, and Termux):
 
 ```bash
-./bashmenu.sh
+sh -c "$(wget -qO- https://raw.githubusercontent.com/HappyAmos/bashmenu/main/install.sh 2>/dev/null || curl -fsSL https://raw.githubusercontent.com/HappyAmos/bashmenu/main/install.sh)"
 ```
 
-Automatically adds a launcher script ~/.local/bin/bm and adds it to your path.
+Once installed, launch anytime from anywhere in your terminal:
+
+```bash
+bashmenu
+# or simply
+bm
+```
+
+To completely uninstall at any time:
+
+```bash
+~/.local/share/bashmenu/uninstall.sh
+```
+
+### Manual Clone (Developers)
+
+```bash
+git clone https://github.com/HappyAmos/bashmenu.git
+cd bashmenu
+./bashmenu.sh
+```
 
 ---
 
