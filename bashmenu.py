@@ -66,9 +66,7 @@ for d_name in ["Dumper", "SafeDumper", "CDumper", "CSafeDumper"]:
     except AttributeError:
         pass
 
-import bashedit
 import bashmenu_ui
-import menuedit
 
 # Absolute path resolution
 BASHMENU_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -152,7 +150,10 @@ show_confirm_box = bashmenu_ui.show_confirm_box
 show_toggle_box = bashmenu_ui.show_toggle_box
 show_input_box = bashmenu_ui.show_input_box
 show_file_picker = bashmenu_ui.show_file_picker
-run_curses_editor = bashedit.run_curses_editor
+def run_curses_editor(*args, **kwargs):
+    import bashedit
+
+    return bashedit.run_curses_editor(*args, **kwargs)
 get_visible_len = bashmenu_ui.get_visible_len
 get_char_width = bashmenu_ui.get_char_width
 get_display_width = bashmenu_ui.get_display_width
@@ -225,15 +226,23 @@ def split_gutter_badges(gutter_str):
     return [b for b in badges if b]
 
 
+_primary_ip = None
+
+
 def get_primary_ip():
-    """Retrieve primary outbound IPv4 address."""
+    """Retrieve primary outbound IPv4 address with caching."""
+    global _primary_ip, PRIMARY_IP
+    if _primary_ip is not None:
+        return _primary_ip
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.settimeout(0.1)
             s.connect(("1.1.1.1", 80))
-            return s.getsockname()[0]
+            _primary_ip = s.getsockname()[0]
     except OSError:
-        return "127.0.0.1"
+        _primary_ip = "127.0.0.1"
+    PRIMARY_IP = _primary_ip
+    return _primary_ip
 
 
 _last_battery_time = 0.0
@@ -296,7 +305,7 @@ def get_battery_info():
     return _cached_battery
 
 
-PRIMARY_IP = get_primary_ip()
+PRIMARY_IP = "127.0.0.1"
 
 DEFAULT_CONFIG = {
     "version": __version__,
@@ -468,7 +477,7 @@ DOT_VAR_PATTERN = re.compile(r"\{([a-zA-Z0-9_\-]+(?:\.[a-zA-Z0-9_\-]+)+)\}")
 
 def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     """Interpolate placeholders like {user}, {battery}, {window_width}, {scripts_dir}."""
-    if not text or not isinstance(text, str):
+    if not text or not isinstance(text, str) or "{" not in text:
         return text if text is not None else ""
 
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -573,7 +582,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{termux_storage}": TERMUX_STORAGE_PATH,
         "{appdata}": APPDATA_PATH,
         "{userprofile}": USERPROFILE_PATH,
-        "{battery}": get_battery_info(),
+        "{battery}": get_battery_info() if "{battery}" in res_text else "",
         "{window_width}": str(win_w),
         "{window_height}": str(win_h),
         "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p"),
@@ -588,7 +597,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{utc_seconds}": str(int(now.timestamp())),
         "{user-mode}": "Root" if os.geteuid() == 0 else "User",
         "{version}": __version__,
-        "{localip}": PRIMARY_IP,
+        "{localip}": get_primary_ip() if "{localip}" in res_text else PRIMARY_IP,
     }
 
     if extra_vars:
@@ -1493,6 +1502,8 @@ def process_item_action(screen, item, config):
         display_colors = item.get("display_theme_colors", False) or "--display-theme-colors" in str(item.get("action", ""))
 
         def launch_editor(fpath):
+            import bashedit
+
             screen.app.push_screen(
                 bashedit.BashEditScreen(
                     file_path=fpath,
@@ -1909,6 +1920,8 @@ class BashMenuScreen(Screen):
         curr_opts = self.menu_view.current_menu().get("options", [])
         sel_item = curr_opts[curr_row] if (0 <= curr_row < len(curr_opts)) else None
         title_chain = _get_active_title_chain(self)
+
+        import menuedit
 
         self.app.push_screen(
             menuedit.MenuEditScreen(

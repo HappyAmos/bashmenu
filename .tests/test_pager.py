@@ -725,6 +725,29 @@ class TestPagerScript(unittest.TestCase):
             )
             self.assertIn("[ doc.md ]", bar_text)
 
+    def test_spool_directory_uses_cache_dir(self):
+        """Verify pager.sh creates and cleans up spools in CACHE_DIR/spool."""
+        with tempfile.TemporaryDirectory() as custom_cache:
+            custom_env = os.environ.copy()
+            custom_env["CACHE_DIR"] = custom_cache
+
+            res = subprocess.run(
+                ["bash", PAGER_SCRIPT],
+                input="Test content for spool\n",
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=PROJECT_ROOT,
+                env=custom_env,
+            )
+            self.assertEqual(res.returncode, 0)
+            self.assertEqual(res.stdout, "Test content for spool\n")
+
+            spool_dir = os.path.join(custom_cache, "spool")
+            self.assertTrue(os.path.isdir(spool_dir))
+            # Verify temporary spool files are cleaned up on exit
+            self.assertEqual(os.listdir(spool_dir), [])
+
 
 if __name__ == "__main__":
     unittest.main()

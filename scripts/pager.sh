@@ -1077,8 +1077,11 @@ parse_args() {
 main() {
     parse_args "$@"
 
-    SPOOL="$(mktemp "${TMPDIR:-/tmp}/pager.XXXXXX")" \
+    local spool_dir="${CACHE_DIR:-${HOME}/.cache/bashmenu}/spool"
+    mkdir -p "${spool_dir}" 2>/dev/null || die "cannot create spool directory: ${spool_dir}"
+    SPOOL="$(mktemp "${spool_dir}/pager.XXXXXX")" \
         || die "cannot create a temporary spool file"
+    trap 'cleanup' EXIT INT TERM HUP
 
     if [ "${HAVE_FILES}" -ge 1 ]; then
         local f=""
