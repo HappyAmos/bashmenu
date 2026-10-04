@@ -66,8 +66,10 @@ if command -v apk >/dev/null 2>&1; then
     command -v bash >/dev/null 2>&1 || missing_apk="$missing_apk bash"
     command -v git >/dev/null 2>&1 || missing_apk="$missing_apk git"
     command -v python3 >/dev/null 2>&1 || missing_apk="$missing_apk python3"
-    if ! python3 -m venv --help >/dev/null 2>&1; then
-        missing_apk="$missing_apk py3-virtualenv py3-pip"
+    command -v virtualenv >/dev/null 2>&1 || missing_apk="$missing_apk py3-virtualenv"
+    command -v pip3 >/dev/null 2>&1 || missing_apk="$missing_apk py3-pip"
+    if ! command -v python3 >/dev/null 2>&1 || ! python3 -c "import yaml" >/dev/null 2>&1; then
+        missing_apk="$missing_apk py3-yaml"
     fi
     if [ -n "$missing_apk" ]; then
         echo "  [+] Installing missing prerequisites:$missing_apk"

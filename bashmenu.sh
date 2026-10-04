@@ -684,11 +684,16 @@ if [ ! -f "$BASHMENU_SCRIPT" ]; then
     exit 1
 fi
 
-# ENHANCED DEBIAN ENVIRONMENT RECOVERY PASS:
+# ENHANCED DEBIAN & ALPINE ENVIRONMENT RECOVERY PASS:
 if ! python3 -c "import venv, ensurepip" >/dev/null 2>&1 && [ "$PKG_MANAGER" = "apt" ]; then
     echo "python3-venv is missing from the environment. Attempting immediate resolution..." >&2
     if install_apps "python3-venv"; then
         echo "python3-venv resolved." >&2
+    fi
+elif [ "$PKG_MANAGER" = "apk" ]; then
+    if ! command -v virtualenv >/dev/null 2>&1 || ! command -v pip3 >/dev/null 2>&1; then
+        echo "Alpine virtualenv/pip packages missing. Resolving..." >&2
+        install_apps "py3-virtualenv" "py3-pip"
     fi
 fi
 
@@ -723,7 +728,11 @@ fi
 if [ "$USE_VENV" = false ]; then
     echo "Setting up virtual environment at $VENV_DIR..." >&2
     VENV_CREATED=false
-    if python3 -m venv "$VENV_DIR" >/dev/null 2>&1; then
+    if command -v virtualenv >/dev/null 2>&1 && virtualenv "$VENV_DIR" >/dev/null 2>&1; then
+        VENV_CREATED=true
+    elif python3 -m virtualenv "$VENV_DIR" >/dev/null 2>&1; then
+        VENV_CREATED=true
+    elif python3 -m venv "$VENV_DIR" >/dev/null 2>&1; then
         VENV_CREATED=true
     elif [ "$IS_TERMUX" = true ] && python3 -m venv --without-pip "$VENV_DIR" >/dev/null 2>&1; then
         VENV_CREATED=true
@@ -731,6 +740,12 @@ if [ "$USE_VENV" = false ]; then
 
     if [ "$VENV_CREATED" = true ]; then
         resolve_venv_paths
+        if [ ! -x "$VENV_PIP" ]; then
+            # Attempt to bootstrap pip via ensurepip
+            "$VENV_PYTHON" -m ensurepip --default-pip >/dev/null 2>&1 || true
+            resolve_venv_paths
+        fi
+
         if [ -x "$VENV_PIP" ]; then
             if [ -f "${SCRIPT_DIR}/requirements.txt" ]; then
                 if "$VENV_PIP" install -r "${SCRIPT_DIR}/requirements.txt" >/dev/null 2>&1 || "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1; then
@@ -742,12 +757,18 @@ if [ "$USE_VENV" = false ]; then
                 "$VENV_PIP" install PyYAML textual rich >/dev/null 2>&1 && USE_VENV=true
             fi
         else
-            # Venv created without pip (e.g. Termux without ensurepip): check if system python has packages
+            # Venv created without pip: check if system python has packages
             if python3 -c "import yaml, textual, rich" >/dev/null 2>&1; then
                 USE_VENV=false
             elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
                 pip_cmd=$(command -v pip3 || command -v pip)
+                "$pip_cmd" install --break-system-packages PyYAML textual rich >/dev/null 2>&1 || \
                 "$pip_cmd" install PyYAML textual rich >/dev/null 2>&1 || true
+                python3 -c "import yaml, textual, rich" >/dev/null 2>&1 && USE_VENV=false
+            fi
+            if [ "$PKG_MANAGER" = "apk" ] && ! python3 -c "import yaml" >/dev/null 2>&1; then
+                install_apps "py3-yaml" "py3-rich" "py3-pip"
+                python3 -c "import yaml" >/dev/null 2>&1 && USE_VENV=false
             fi
         fi
     else
@@ -755,7 +776,11 @@ if [ "$USE_VENV" = false ]; then
         if ! python3 -c "import yaml, textual, rich" >/dev/null 2>&1; then
             if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
                 pip_cmd=$(command -v pip3 || command -v pip)
+                "$pip_cmd" install --break-system-packages PyYAML textual rich >/dev/null 2>&1 || \
                 "$pip_cmd" install PyYAML textual rich >/dev/null 2>&1 || true
+            fi
+            if [ "$PKG_MANAGER" = "apk" ] && ! python3 -c "import yaml" >/dev/null 2>&1; then
+                install_apps "py3-yaml" "py3-rich" "py3-pip"
             fi
         fi
     fi
@@ -764,12 +789,21 @@ fi
 if [ "$USE_VENV" = true ] && [ -f "$VENV_ACTIVATE" ]; then
     # shellcheck source=/dev/null
     source "$VENV_ACTIVATE"
-    PYTHON_BIN="python3"
+    PYTHON_BIN="$VENV_PYTHON"
 else
     PYTHON_BIN="${PYTHON_BIN:-python3}"
 fi
 
+# Fallback check for yaml on Alpine
+if ! "$PYTHON_BIN" -c "import yaml" >/dev/null 2>&1 && [ "$PKG_MANAGER" = "apk" ]; then
+    install_apps "py3-yaml"
+fi
+
 if [ "$SETUP_ONLY" = true ]; then
+    if ! "$PYTHON_BIN" -c "import yaml" >/dev/null 2>&1; then
+        echo "Error: Python environment is missing required dependencies (PyYAML)." >&2
+        exit 1
+    fi
     echo "  [✓] BashMenu environment, virtualenv, and shortcuts successfully configured."
     exit 0
 fi
