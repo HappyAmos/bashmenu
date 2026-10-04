@@ -217,7 +217,7 @@ a main `options` list. Each option dictionary supports several attributes:
 | `type` | The action option type (see Section 5 for complete list). |
 | `label` | The row label string. Can use bracketed placeholders. |
 | `icon` | Icon tag using `{nf:[char]:[nerd-font hex]:[emoji]}` syntax. |
-| `action` | Shell command, script, or editor file path. Can use dynamic directives like `{param}` or `{file_picker}`. |
+| `action` | Shell command, script, or editor file path. Can use dynamic directives like `{param}`, `{file_picker}`, or `{dir_picker}`. |
 | `template` | Source template path for dynamic block injection. |
 | `target` | Destination path for dynamic block injection. |
 | `block_id` | Unique tag for dynamic block boundary markers. |
@@ -297,7 +297,7 @@ substituting the placeholder in the action string prior to execution:
 
 | Directive | Description | Supported Attributes |
 | :--- | :--- | :--- |
-| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text) |
+| `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks) |
 | `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
 | `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |
 | `{dir_picker}` | Launches a visual directory chooser dialog. | `title`, `start_dir` |
@@ -320,8 +320,9 @@ These variables are dynamically resolved using active configuration and environm
 | `{version}` | Script version (e.g., `0.0.1`). |
 | `{home}` | User's absolute home directory path. |
 | `{bashmenu_dir}` | Application root directory path. |
-| `{templates_dir}` | Templates folder path (`settings.templates_dir`). |
-| `{scripts_dir}` | Scripts folder path (`settings.scripts_dir`). |
+| `{templates_dir}` / `{templates}` | Templates folder path (`settings.templates_dir`). |
+| `{scripts_dir}` / `{scripts}` | Scripts folder path (`settings.scripts_dir`). |
+| `{cache_dir}` / `{cache}` | Cache folder path (`settings.cache_dir`, default `~/.cache/bashmenu`). Sets `$CACHE_DIR`. |
 | `{bash_aliases}` | Path to `~/.bash_aliases`. |
 | `{bashrc}` | Path to `~/.bashrc`. |
 | `{zshrc}` | Path to `~/.zshrc`. |
@@ -339,16 +340,21 @@ These variables are dynamically resolved using active configuration and environm
 | `{userprofile}` | Path to Windows `%USERPROFILE%` directory. |
 | `{divider}` | Themed horizontal divider line (defaults to `{ascii:196}` of width `{window_width}`). |
 | `{date_time_12}` | 12-hour formatted date-time (e.g., `2026-09-15 03:00:00 PM`). |
+| `{date_time_12_short}` | Short 12-hour formatted date-time (e.g., `2026-09-15 03:00 PM`). |
 | `{date_time_24}` | 24-hour formatted date-time (e.g., `2026-09-15 15:00:00`). |
+| `{date_time_24_short}` | Short 24-hour formatted date-time (e.g., `2026-09-15 15:00`). |
 | `{date}` | Current date formatted as `YYYY-MM-DD`. |
 | `{time_12}` | 12-hour formatted time (e.g., `03:00:00 PM`). |
+| `{time_12_short}` | Short 12-hour formatted time (e.g., `03:00 PM`). |
 | `{time_24}` | 24-hour formatted time (e.g., `15:00:00`). |
+| `{time_24_short}` | Short 24-hour formatted time (e.g., `15:00`). |
 | `{battery}` | Current battery percentage (e.g., `84%`, or `N/A` if no battery is detected). Performance-optimized with a 5-second cache to prevent rendering lag. |
+| `{localip}` | Primary outbound IPv4 address (e.g., `192.168.1.50`). Evaluated on demand via UDP socket probe with TTL cache. |
 | `{utc_seconds}` | Current UTC time in seconds since epoch. |
 | `{window_width}` | Current active window width in character columns. |
 | `{window_height}` | Current active window height in character lines. |
 | `{ascii:decimal}` | Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`). |
-| `{settings.dot_key}` | Resolves any nested configuration path from `bashmenu.yml`. |
+| `{<key.path>}` / `{settings.dot_key}` / `{user.dot_key}` | Resolves any nested configuration path from `bashmenu.yml` (e.g. `{settings.cache_dir}`, `{user.editor}`, `{user.divider}`). |
 | `{command:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces, 30.0s cache, and 3.0s execution timeout). |
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution

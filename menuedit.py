@@ -88,13 +88,15 @@ ITEM_EDIT_HELP_TEXT = """\
   Usage:   One editor field writes the type-specific key:
            command->command, script->script, editor->file,
            toggle/config->key, python->python, else->action.
-  Example: command: "{scripts_dir}/backup.sh"
+           Can embed dynamic directives: {param}, {file_picker},
+           {dir_picker}.
+  Example: command: "{scripts_dir}/backup.sh {param}"
 
 [bold cyan]Message / Prompt Text[/bold cyan]  (message | prompt)
   Purpose: Text shown to the user, or the prompt displayed
-           before an input/confirm step.
+           before an input/confirm step or {param} modal.
   Usage:   message/info/popup store as message; others as prompt.
-  Example: message: "Backups enabled for {host}."
+  Example: prompt: "Enter hostname or IP to test:"
 
 [bold cyan]Template Path[/bold cyan]  (template)  [inject_block]
   Purpose: Source file whose contents are injected.
@@ -168,8 +170,8 @@ ITEM_EDIT_HELP_TEXT = """\
   Example: no_formatting: true
 
 [bold cyan]masked[/bold cyan]
-  Purpose: Mask typed input with asterisks for secrets.
-  Usage:   Boolean; applies to input prompt items.
+  Purpose: Mask typed input with asterisks for secrets/passwords.
+  Usage:   Boolean; applies to {param} modals and input prompt items.
   Example: masked: true
 
 [bold cyan]refresh[/bold cyan]
@@ -187,6 +189,28 @@ ITEM_EDIT_HELP_TEXT = """\
            in-memory when the value is false.
   Usage:   Boolean; script and plugin items.
   Example: external: true
+
+[bold magenta]── 4. Dynamic Action Directives ──[/bold magenta]
+
+[bold cyan]{param}[/bold cyan]
+  Purpose: Prompts for a single-line parameter in an input modal.
+  Usage:   Substituted into action string. Uses item 'title',
+           'prompt', and honors 'masked: true'.
+  Example: action: "ping -c 4 {param}"
+
+[bold cyan]{file_picker} / {file_picker_new}[/bold cyan]
+  Purpose: Launches an interactive visual file browser modal.
+  Usage:   Substituted into action string. Uses 'title' and
+           'start_dir'. '{file_picker_new}' allows creating new
+           files by pressing 'n' or 'N'.
+  Example: action: "{scripts_dir}/view_doc.sh {file_picker}"
+
+[bold cyan]{dir_picker} / {dir_picker_new}[/bold cyan]
+  Purpose: Launches an interactive visual directory chooser modal.
+  Usage:   Substituted into action string. Uses 'title' and
+           'start_dir'. '{dir_picker_new}' allows creating new
+           folders by pressing 'n' or 'N'.
+  Example: action: "ls -la {dir_picker}"
 """
 
 

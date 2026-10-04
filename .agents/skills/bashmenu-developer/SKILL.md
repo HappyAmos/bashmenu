@@ -334,6 +334,28 @@ Textual interface.
     - When lint warnings or potential POSIX/bash portability pitfalls are detected,
       inspect the scripts, present the findings and proposed fixes clearly to the user,
       and make repairs only upon explicit user approval.
+33. **Documentation Parity & Macro Registry Invariant:**
+    - There must always be 100% parity across all project documentation and modal
+      help screens whenever placeholders, macros, directives, or attributes are
+      introduced, updated, or modified.
+    - Full synchronization must strictly encompass all six documentation tiers:
+      1. `bashmenu_ui.py`: `PLACEHOLDER_SECTIONS` and `PLACEHOLDER_HELP_TEXT`
+         (displayed in `bashedit.py` via `^P`/`Alt+M` and `menuedit.py` via `^P`/`F4`).
+      2. `menuedit.py`: `ITEM_EDIT_HELP_TEXT` (modal item property inspector guide
+         invoked via `F1`/`?`).
+      3. `bashedit.py`: `action_help_manual` (`F1`/`Ctrl+G`/`Alt+H`) keybinding help list.
+      4. `bashmenu.py`: `action_help` in-app help modal (`F1`, which renders `bashmenu.md`).
+      5. `bashmenu.md`: Complete Markdown reference documentation (Sections 6.1 and 6.2).
+      6. `bashmenu.1`: Linux system man page (`DYNAMIC DIRECTIVES & SYSTEM PLACEHOLDERS`).
+    - Every dynamic input directive (`{param}`, `{file_picker}`, `{file_picker_new}`,
+      `{dir_picker}`, `{dir_picker_new}`) and all supported attributes (`title`, `prompt`,
+      `masked: true/false`, `start_dir`) must be documented in all six tiers.
+    - All directory aliases (`{scripts}`, `{templates}`, `{cache}`) must be documented
+      alongside canonical paths (`{scripts_dir}`, `{templates_dir}`, `{cache_dir}`).
+    - Hardware and network placeholders (`{battery}`, `{localip}`) must be documented with
+      their caching characteristics and on-demand evaluation behavior.
+    - Every newly added macro must include automated assertion coverage in
+      `.tests/test_improvements.py` (`test_placeholder_documentation_parity`).
 
 ## Documentation Guidelines
 1. **Project Man Page:** Document the core functionality of the

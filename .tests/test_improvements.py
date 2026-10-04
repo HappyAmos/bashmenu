@@ -882,6 +882,64 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_checks())
 
+    def test_placeholder_documentation_parity(self):
+        """Verify that all key placeholders and directives have documentation parity."""
+        import menuedit
+
+        # 1. UI placeholder sections verification
+        all_ui_placeholders = [
+            ph for _, items in bashmenu_ui.PLACEHOLDER_SECTIONS for ph, _ in items
+        ]
+        essential_placeholders = [
+            "{param}",
+            "{file_picker}",
+            "{file_picker_new}",
+            "{dir_picker}",
+            "{dir_picker_new}",
+            "{user}",
+            "{home}",
+            "{bashmenu_dir}",
+            "{scripts_dir}",
+            "{scripts}",
+            "{templates_dir}",
+            "{templates}",
+            "{cache_dir}",
+            "{cache}",
+            "{battery}",
+            "{localip}",
+            "{date_time_12}",
+            "{date_time_12_short}",
+            "{date_time_24}",
+            "{date_time_24_short}",
+            "{window_width}",
+            "{window_height}",
+            "{divider}",
+            "{ascii:<code_num>}",
+            "{command:<cmd>}",
+            "{nf:<char>:<hex>:<emoji>}",
+            "{<key.path>}",
+        ]
+        for ep in essential_placeholders:
+            self.assertIn(ep, all_ui_placeholders, f"Missing {ep} in PLACEHOLDER_SECTIONS")
+            self.assertIn(ep, bashmenu_ui.PLACEHOLDER_HELP_TEXT, f"Missing {ep} in PLACEHOLDER_HELP_TEXT")
+
+        # 2. Menu editor help text verification
+        for directive in ["{param}", "{file_picker}", "{dir_picker}"]:
+            self.assertIn(directive, menuedit.ITEM_EDIT_HELP_TEXT, f"Missing {directive} in menuedit ITEM_EDIT_HELP_TEXT")
+
+        # 3. Markdown manual verification
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        with open(os.path.join(base_dir, "bashmenu.md"), "r", encoding="utf-8") as f:
+            md_content = f.read()
+        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}"]:
+            self.assertIn(ep, md_content, f"Missing {ep} in bashmenu.md")
+
+        # 4. Man page verification
+        with open(os.path.join(base_dir, "bashmenu.1"), "r", encoding="utf-8") as f:
+            man_content = f.read()
+        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}"]:
+            self.assertIn(ep, man_content, f"Missing {ep} in bashmenu.1")
+
 
 if __name__ == "__main__":
     unittest.main()

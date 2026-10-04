@@ -330,7 +330,9 @@ These directives prompt the user inside modal dialogs, replacing the placeholder
 with the chosen value prior to action execution.
 .TP
 .B {param}
-Prompts for a single-line text value using a modal input box.
+Prompts for a single-line text value using a modal input box. Supports
+\fBtitle\fR (modal header), \fBprompt\fR (body prompt text), and
+\fBmasked\fR (boolean to mask input with asterisks for secrets/passwords).
 .TP
 .B {file_picker}
 Launches a visual file chooser dialog box.
@@ -368,8 +370,11 @@ User's absolute home directory path.
 .B {bashmenu_dir}
 Application script directory.
 .TP
-.B {templates_dir}, {scripts_dir}
+.B {templates_dir}, {templates}, {scripts_dir}, {scripts}
 Templates and scripts folders paths.
+.TP
+.B {cache_dir}, {cache}
+Cache folder paths (defaults to ~/.cache/bashmenu). Sets $CACHE_DIR.
 .TP
 .B {bashrc}, {zshrc}, {profile}, {bash_profile}, {zprofile}, {shell_profile}
 User shell profile configuration paths with intelligent existence fallback.
@@ -402,7 +407,12 @@ Current date (YYYY-MM-DD).
 Short 12-hour and 24-hour current time (excludes seconds; optimal for performance).
 .TP
 .B {battery}
-Current battery percentage (e.g. 84% or N/A). Includes a 5-second performance cache.
+Current battery percentage (e.g. 84% or N/A). Includes a 5-second
+performance cache.
+.TP
+.B {localip}
+Primary outbound IPv4 address (e.g. 192.168.1.50). Evaluated on demand
+via UDP socket probe with TTL cache.
 .TP
 .B {utc_seconds}
 Current UTC epoch seconds.
@@ -413,8 +423,9 @@ Current active window width (columns) and height (lines) in characters.
 .B {ascii:decimal}
 Prints character corresponding to decimal code (uses CP437 for extended ASCII, e.g. {ascii:168} resolves to ¿).
 .TP
-.B {settings.dot_key}
-Dot-notation configuration lookup from bashmenu.yml (e.g., {settings.status_gutter}).
+.B {<key.path>}, {settings.dot_key}, {user.dot_key}
+Dot-notation configuration lookup from bashmenu.yml (e.g.,
+{settings.cache_dir}, {user.editor}, {user.divider}).
 .TP
 .B {command:shell_cmd}
 Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL and a 3.0-second safety execution timeout.

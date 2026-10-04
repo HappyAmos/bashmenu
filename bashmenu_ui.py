@@ -75,6 +75,16 @@ def is_formatting_tag(content: str) -> bool:
 
 PLACEHOLDER_SECTIONS = [
     (
+        "Interactive Input Directives",
+        [
+            ("{param}", "Prompts for text input modal (masked=true supported)"),
+            ("{file_picker}", "Launches visual file chooser dialog"),
+            ("{file_picker_new}", "File chooser allowing creation of new files ('n')"),
+            ("{dir_picker}", "Launches visual directory chooser dialog"),
+            ("{dir_picker_new}", "Directory chooser allowing creation of new folders ('n')"),
+        ],
+    ),
+    (
         "System & Path Placeholders",
         [
             ("{user}", "Current logged-in username"),
@@ -84,8 +94,11 @@ PLACEHOLDER_SECTIONS = [
             ("{home}", "User home directory path (~ / /home/username)"),
             ("{bashmenu_dir}", "Application root directory"),
             ("{scripts_dir}", "Scripts directory path"),
+            ("{scripts}", "Alias for {scripts_dir}"),
             ("{templates_dir}", "Templates directory path"),
+            ("{templates}", "Alias for {templates_dir}"),
             ("{cache_dir}", "Cache directory path"),
+            ("{cache}", "Alias for {cache_dir}"),
             ("{bashrc}", "Path to ~/.bashrc profile file"),
             ("{bash_aliases}", "Path to ~/.bash_aliases file"),
             ("{zshrc}", "Path to ~/.zshrc configuration file"),
