@@ -348,29 +348,56 @@ def validate_config_file(filepath: str) -> bool:
     return True
 
 
-def _validate_menu_options(options: list[Any], path: str, errors: list[str]) -> None:
-    if not isinstance(options, list):
-        errors.append(f"'{path}': Must be a list of menu options.")
+def _validate_menu_items(items: list[Any], path: str, errors: list[str]) -> None:
+    if not isinstance(items, list):
+        errors.append(f"'{path}': Must be a list of menu items.")
         return
 
-    for idx, opt in enumerate(options):
-        opt_path = f"{path}[{idx}]"
-        if not isinstance(opt, dict):
-            errors.append(f"'{opt_path}': Menu option must be a dictionary.")
+    for idx, raw in enumerate(items):
+        item_path = f"{path}[{idx}]"
+        if raw == "{divider}":
+            continue
+        if not isinstance(raw, dict):
+            errors.append(f"'{item_path}': Menu item must be a dictionary or '{{divider}}'.")
             continue
 
-        opt_type = opt.get("type", "command")
-        is_div = opt_type == "{divider}" or (isinstance(opt_type, dict) and "divider" in opt_type)
-        if not is_div and opt_type not in VALID_OPTION_TYPES and "submenu" not in opt:
-            errors.append(f"'{opt_path}': Unknown option type '{opt_type}'.")
+        if "{divider}" in raw:
+            continue
 
-        if opt_type == "submenu" or "submenu" in opt:
-            sub = opt.get("submenu")
-            if isinstance(sub, dict):
-                sub_opts = sub.get("options", [])
-                _validate_menu_options(sub_opts, f"{opt_path}.submenu.options", errors)
-            elif sub is not None:
-                errors.append(f"'{opt_path}.submenu': Must be a dictionary containing options.")
+        if len(raw) == 1 and "label" not in raw:
+            label = next(iter(raw))
+            props = raw[label]
+            if props is None:
+                continue
+            if not isinstance(props, dict):
+                errors.append(f"'{item_path}.{label}': Item properties must be a dictionary.")
+                continue
+
+            item_type = props.get("type", "command")
+            is_div = item_type == "{divider}" or (isinstance(item_type, dict) and "divider" in item_type)
+            if not is_div and item_type not in VALID_OPTION_TYPES and "submenu" not in props:
+                errors.append(f"'{item_path}.{label}': Unknown item type '{item_type}'.")
+
+            if item_type == "submenu" or "submenu" in props:
+                sub = props.get("submenu")
+                if isinstance(sub, dict):
+                    sub_items = sub.get("items", sub.get("options", []))
+                    _validate_menu_items(sub_items, f"{item_path}.{label}.submenu.items", errors)
+                elif sub is not None:
+                    errors.append(f"'{item_path}.{label}.submenu': Must be a dictionary containing items.")
+        else:
+            opt_type = raw.get("type", "command")
+            is_div = opt_type == "{divider}" or (isinstance(opt_type, dict) and "divider" in opt_type)
+            if not is_div and opt_type not in VALID_OPTION_TYPES and "submenu" not in raw:
+                errors.append(f"'{item_path}': Unknown option type '{opt_type}'.")
+
+            if opt_type == "submenu" or "submenu" in raw:
+                sub = raw.get("submenu")
+                if isinstance(sub, dict):
+                    sub_items = sub.get("items", sub.get("options", []))
+                    _validate_menu_items(sub_items, f"{item_path}.submenu.items", errors)
+                elif sub is not None:
+                    errors.append(f"'{item_path}.submenu': Must be a dictionary containing items.")
 
 
 def validate_menu_file(filepath: str) -> bool:
@@ -386,10 +413,11 @@ def validate_menu_file(filepath: str) -> bool:
         return False
 
     errors = []
-    if "options" not in data:
-        errors.append("Root dictionary missing required 'options' list.")
+    if "items" not in data and "options" not in data:
+        errors.append("Root dictionary missing required 'items' list.")
     else:
-        _validate_menu_options(data["options"], "options", errors)
+        items = data.get("items", data.get("options"))
+        _validate_menu_items(items, "items", errors)
 
     if errors:
         print(f"\n[ERROR] Found {len(errors)} menu validation issue(s):\n")

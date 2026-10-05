@@ -394,6 +394,98 @@ class TestPluginSystem(unittest.TestCase):
             self.assertEqual(mock_pb.styles.offset, (3, 18))
             self.assertEqual(mock_pb.styles.width, 74)
 
+    def test_plugin_table_layout(self):
+        """Test declarative multi-column table layout in settings.plugins."""
+        config = {
+            "theme": "dracula",
+            "settings": {
+                "plugins": {
+                    "layout": {
+                        "type": "table",
+                        "width": "100%",
+                        "headers": ["System", "Weather"],
+                        "rows": [
+                            ["uptime", "weather"]
+                        ],
+                    },
+                    "uptime": {
+                        "script": "uptime.sh",
+                        "sleep": 30,
+                    },
+                    "weather": {
+                        "script": "weather.sh",
+                        "sleep": 300,
+                    },
+                }
+            }
+        }
+        import time
+        now = time.time()
+        with patch("bashmenu._plugin_lock"):
+            bashmenu._plugin_output_cache["uptime"] = {"time": now, "lines": ["Up 2 hours"]}
+            bashmenu._plugin_output_cache["weather"] = {"time": now, "lines": ["72F Sunny"]}
+
+        pb = bashmenu.PluginBuffer(config=config)
+        with patch.object(bashmenu.PluginBuffer, "size", new_callable=PropertyMock, return_value=Size(80, 10)):
+            rendered = pb.render()
+            plain = rendered.plain
+            self.assertIn("System", plain)
+            self.assertIn("Weather", plain)
+            self.assertIn("Up 2 hours", plain)
+            self.assertIn("72F Sunny", plain)
+            lines = [l for l in plain.split("\n") if l.strip()]
+            self.assertTrue(all(cell_len(l) == pb.size.width for l in lines))
+
+    def test_plugin_table_layout_entries_and_standalone(self):
+        """Test entries: 2 chunking and standalone plugin line stretching."""
+        import time
+        now = time.time()
+        config = {
+            "theme": "dracula",
+            "settings": {
+                "plugins": {
+                    "layout": {
+                        "type": "table",
+                        "entries": 2,
+                        "width": "100%",
+                    },
+                    "otd": {
+                        "script": "otd.sh",
+                        "standalone": True,
+                        "pretext": "{divider}",
+                        "posttext": "{divider}",
+                    },
+                    "uptime": {
+                        "script": "uptime.sh",
+                    },
+                    "weather": {
+                        "script": "weather.sh",
+                    },
+                    "disk": {
+                        "script": "disk.sh",
+                    },
+                }
+            }
+        }
+        with patch("bashmenu._plugin_lock"):
+            bashmenu._plugin_output_cache["otd"] = {"time": now, "lines": ["Quote of the day: Be kind."]}
+            bashmenu._plugin_output_cache["uptime"] = {"time": now, "lines": ["Up 5 hours"]}
+            bashmenu._plugin_output_cache["weather"] = {"time": now, "lines": ["68F Clear"]}
+            bashmenu._plugin_output_cache["disk"] = {"time": now, "lines": ["Disk: 50% free"]}
+
+        pb = bashmenu.PluginBuffer(config=config)
+        with patch.object(bashmenu.PluginBuffer, "size", new_callable=PropertyMock, return_value=Size(80, 10)):
+            rendered = pb.render()
+            plain = rendered.plain
+            # otd should be present as standalone line
+            self.assertIn("Quote of the day: Be kind.", plain)
+            # 2-column table for uptime and weather
+            self.assertIn("Up 5 hours", plain)
+            self.assertIn("68F Clear", plain)
+            # 3rd plugin disk constructs its own table
+            self.assertIn("Disk: 50% free", plain)
+
 
 if __name__ == "__main__":
     unittest.main()
+

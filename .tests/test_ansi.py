@@ -267,6 +267,111 @@ class TestAnsiParsing(unittest.TestCase):
         stripped_no_fmt = strip_formatting_tags("[b]bold[/b]", no_formatting=True)
         self.assertEqual(stripped_no_fmt, "[b]bold[/b]")
 
+    def test_bbcode_tables_and_lists(self):
+        """Test BBCode [table] and [list] formatting, borders, numbering, escaping, and nesting."""
+        from bashmenu_ui import formatting_to_rich_text, strip_formatting_tags
+
+        # 1. Unordered list
+        ul_bb = "[list][*]Entry A[*]Entry B[/list]"
+        ul_stripped = strip_formatting_tags(ul_bb)
+        self.assertIn("• Entry A", ul_stripped)
+        self.assertIn("• Entry B", ul_stripped)
+
+        # 1b. Unordered list with closing [/*]
+        ul_close_bb = "[list][*]Alpha[/*][*]Beta[/*][/list]"
+        ul_close_stripped = strip_formatting_tags(ul_close_bb)
+        self.assertIn("• Alpha", ul_close_stripped)
+        self.assertIn("• Beta", ul_close_stripped)
+
+        # 2. Ordered list
+        ol_bb = "[list=1][*]First[*]Second[/list]"
+        ol_stripped = strip_formatting_tags(ol_bb)
+        self.assertIn("1. First", ol_stripped)
+        self.assertIn("2. Second", ol_stripped)
+
+        # 3. Table with headers and data rows
+        tbl_bb = (
+            "[table]"
+            "[tr][th]Header 1[/th][th]Header 2[/th][/tr]"
+            "[tr][td]Row 1, cell 1[/td][td]Row 1, cell 2[/td][/tr]"
+            "[tr][td]Row 2, cell 1[/td][td]Row 2, cell 2[/td][/tr]"
+            "[/table]"
+        )
+        tbl_stripped = strip_formatting_tags(tbl_bb)
+        lines = tbl_stripped.split("\n")
+        self.assertEqual(len(lines), 6)  # top, header, sep, row 1, row 2, bot
+        self.assertTrue(lines[0].startswith("┌") and lines[0].endswith("┐"))
+        self.assertIn("Header 1", lines[1])
+        self.assertIn("Header 2", lines[1])
+        self.assertTrue(lines[2].startswith("├") and lines[2].endswith("┤"))
+        self.assertIn("Row 1, cell 1", lines[3])
+        self.assertIn("Row 2, cell 2", lines[4])
+        self.assertTrue(lines[5].startswith("└") and lines[5].endswith("┘"))
+
+        # Verify all lines have identical character display width
+        line_lens = {len(line) for line in lines}
+        self.assertEqual(len(line_lens), 1)
+
+        # 4. Nested formatting inside table cell
+        nested_tbl = "[table][tr][th]Status[/th][/tr][tr][td][color=green]Active[/color][/td][/tr][/table]"
+        rt_nested = formatting_to_rich_text(nested_tbl)
+        self.assertIn("Active", rt_nested.plain)
+        # Check alignment is preserved despite tags
+        stripped_nested = strip_formatting_tags(nested_tbl)
+        nested_lines = stripped_nested.split("\n")
+        self.assertEqual(len({len(line) for line in nested_lines}), 1)
+
+        # 5. Suppression inside backticks and backslash escaping
+        code_tbl = "`[table][tr][td]code[/td][/tr][/table]`"
+        self.assertEqual(strip_formatting_tags(code_tbl), code_tbl)
+
+        code_list = "`[list][*]item[/list]`"
+        self.assertEqual(strip_formatting_tags(code_list), code_list)
+
+        escaped_tbl = r"\[table]\[tr]\[td]val\[/td]\[/tr]\[/table]"
+        self.assertEqual(strip_formatting_tags(escaped_tbl), "[table][tr][td]val[/td][/tr][/table]")
+
+        # 6. no_formatting flag
+        self.assertEqual(strip_formatting_tags(tbl_bb, no_formatting=True), tbl_bb)
+        self.assertEqual(strip_formatting_tags(ul_bb, no_formatting=True), ul_bb)
+
+        # 7. Percentage and full width tables [table width=100%]
+        tbl_full = "[table width=100%][tr][th]Col A[/th][th]Col B[/th][/tr][tr][td]Data 1[/td][td]Data 2[/td][/tr][/table]"
+        full_stripped = strip_formatting_tags(tbl_full, avail_width=74)
+        full_lines = full_stripped.split("\n")
+        self.assertEqual(len({len(line) for line in full_lines}), 1)
+        self.assertEqual(len(full_lines[0]), 74)
+
+        # 3 columns 33/33/33
+        tbl_3col = "[table width=100%][tr][th]C1[/th][th]C2[/th][th]C3[/th][/tr][tr][td]A[/td][td]B[/td][td]C[/td][/tr][/table]"
+        stripped_3col = strip_formatting_tags(tbl_3col, avail_width=74)
+        lines_3col = stripped_3col.split("\n")
+        self.assertEqual(len({len(line) for line in lines_3col}), 1)
+        self.assertEqual(len(lines_3col[0]), 74)
+
+        # 4 columns 25/25/25/25
+        tbl_4col = "[table width=100%][tr][th]1[/th][th]2[/th][th]3[/th][th]4[/th][/tr][tr][td]A[/td][td]B[/td][td]C[/td][td]D[/td][/tr][/table]"
+        stripped_4col = strip_formatting_tags(tbl_4col, avail_width=74)
+        lines_4col = stripped_4col.split("\n")
+        self.assertEqual(len({len(line) for line in lines_4col}), 1)
+        self.assertEqual(len(lines_4col[0]), 74)
+
+        # Explicit integer width [table width=60]
+        tbl_60 = "[table width=60][tr][td]Left[/td][td]Right[/td][/tr][/table]"
+        stripped_60 = strip_formatting_tags(tbl_60)
+        lines_60 = stripped_60.split("\n")
+        self.assertEqual(len({len(line) for line in lines_60}), 1)
+        self.assertEqual(len(lines_60[0]), 60)
+
+        # 8. In-cell text wrapping
+        tbl_wrap = "[table width=40][tr][td]This is a long sentence that must wrap within the cell width[/td][td]Short[/td][/tr][/table]"
+        stripped_wrap = strip_formatting_tags(tbl_wrap)
+        lines_wrap = stripped_wrap.split("\n")
+        self.assertEqual(len({len(line) for line in lines_wrap}), 1)
+        self.assertEqual(len(lines_wrap[0]), 40)
+        self.assertGreater(len(lines_wrap), 3)
+
+
     def test_cache_dir_placeholders_and_resolution(self):
         """Test that {cache_dir}, {cache}, and {settings.cache_dir} resolve properly in interpolate_placeholders."""
         config = {"settings": {"cache_dir": "{home}/custom_cache/bashmenu"}}

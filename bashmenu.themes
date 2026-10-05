@@ -36,6 +36,7 @@ dracula:
     plugin: [212, -1]
     window_close_button: [203, -1]
     scrollbar: [61, 236]
+    whitespace: [239, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -59,6 +60,7 @@ dracula:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_BLUE, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -82,6 +84,7 @@ dracula:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_BLUE, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
 nord:
   indicator: "{nf:#:\uef66:}"
   divider:
@@ -123,6 +126,7 @@ nord:
     plugin: [146, -1]
     window_close_button: [203, -1]
     scrollbar: [60, 236]
+    whitespace: [239, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_CYAN, -1]
@@ -146,6 +150,7 @@ nord:
     plugin: [COLOR_CYAN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_CYAN, -1]
@@ -169,6 +174,7 @@ nord:
     plugin: [COLOR_CYAN, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
 cyberpunk:
   indicator: "{nf:>:#f07c0:}"
   divider:
@@ -210,6 +216,7 @@ cyberpunk:
     plugin: [201, -1]
     window_close_button: [208, -1]
     scrollbar: [51, 236]
+    whitespace: [240, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -233,6 +240,7 @@ cyberpunk:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -256,6 +264,7 @@ cyberpunk:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
 gruvbox:
   indicator: "{nf:&:#f0c6b:}"
   divider:
@@ -297,6 +306,7 @@ gruvbox:
     plugin: [142, -1]
     window_close_button: [208, -1]
     scrollbar: [214, 237]
+    whitespace: [243, -1]
   16:
     background: -1
     title: [COLOR_YELLOW, -1]
@@ -320,6 +330,7 @@ gruvbox:
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: -1
     title: [COLOR_YELLOW, -1]
@@ -343,6 +354,7 @@ gruvbox:
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [COLOR_GREEN, -1]
 qbasic:
   indicator: "{nf:>:#e629:}"
   divider:
@@ -386,6 +398,7 @@ qbasic:
     plugin: [226, 19]
     window_close_button: [203, 19]
     scrollbar: [51, 19]
+    whitespace: [60, 19]
   16:
     background: COLOR_BLUE
     title: [COLOR_YELLOW, COLOR_BLUE]
@@ -409,6 +422,7 @@ qbasic:
     plugin: [COLOR_YELLOW, COLOR_BLUE]
     window_close_button: [COLOR_BRIGHT_RED, COLOR_BLUE]
     scrollbar: [COLOR_CYAN, COLOR_BLUE]
+    whitespace: [COLOR_CYAN, COLOR_BLUE]
   8:
     background: COLOR_BLUE
     title: [COLOR_YELLOW, COLOR_BLUE]
@@ -432,6 +446,7 @@ qbasic:
     plugin: [COLOR_YELLOW, COLOR_BLUE]
     window_close_button: [COLOR_RED, COLOR_BLUE]
     scrollbar: [COLOR_CYAN, COLOR_BLUE]
+    whitespace: [COLOR_CYAN, COLOR_BLUE]
 pacman:
   indicator: "{nf:):#f0baf:}"
   divider: 
@@ -475,6 +490,7 @@ pacman:
     plugin: [255, -1]
     window_close_button: [196, -1]
     scrollbar: [226, 235]
+    whitespace: [239, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -498,6 +514,7 @@ pacman:
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -521,6 +538,7 @@ pacman:
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
 industry:
   indicator: "{nf:#:#f0b46:}"
   divider:
@@ -562,6 +580,7 @@ industry:
     plugin: [67, 234]
     window_close_button: [203, 234]
     scrollbar: [220, 236]
+    whitespace: [240, 234]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -585,6 +604,7 @@ industry:
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -608,6 +628,7 @@ industry:
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [COLOR_WHITE, -1]
 matrix:
   indicator: "{nf:->:#f0628:}"
   divider:
@@ -649,6 +670,7 @@ matrix:
     plugin: [22, -1]
     window_close_button: [196, -1]
     scrollbar: [46, 22]
+    whitespace: [22, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -672,6 +694,7 @@ matrix:
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_GREEN, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -695,6 +718,7 @@ matrix:
     plugin: [COLOR_GREEN, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_GREEN, COLOR_BLACK]
+    whitespace: [COLOR_GREEN, -1]
 monochrome:
   indicator: "{nf:>:#eee9:}"
   divider:
@@ -736,6 +760,7 @@ monochrome:
     plugin: [245, -1]
     window_close_button: [255, -1]
     scrollbar: [250, 238]
+    whitespace: [239, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_WHITE, -1]
@@ -759,6 +784,7 @@ monochrome:
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_WHITE, -1]
     scrollbar: [COLOR_WHITE, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_WHITE, -1]
@@ -782,6 +808,7 @@ monochrome:
     plugin: [COLOR_WHITE, -1]
     window_close_button: [COLOR_WHITE, -1]
     scrollbar: [COLOR_WHITE, COLOR_BLACK]
+    whitespace: [COLOR_WHITE, -1]
 synthwave:
   indicator: "{nf:>:#f147d:}"
   divider:
@@ -823,6 +850,7 @@ synthwave:
     plugin: [207, -1]
     window_close_button: [207, -1]
     scrollbar: [201, 236]
+    whitespace: [238, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -846,6 +874,7 @@ synthwave:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -869,6 +898,7 @@ synthwave:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
 amber_crt:
   indicator: "{nf:>:#f0379:}"
   divider:
@@ -910,6 +940,7 @@ amber_crt:
     plugin: [172, -1]
     window_close_button: [214, -1]
     scrollbar: [214, 234]
+    whitespace: [130, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -933,6 +964,7 @@ amber_crt:
     plugin: [COLOR_YELLOW, -1]
     window_close_button: [COLOR_YELLOW, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_YELLOW, -1]
@@ -956,6 +988,7 @@ amber_crt:
     plugin: [COLOR_YELLOW, -1]
     window_close_button: [COLOR_YELLOW, -1]
     scrollbar: [COLOR_YELLOW, COLOR_BLACK]
+    whitespace: [COLOR_YELLOW, -1]
 hotdog_stand:
   indicator: "{nf:o.O:#e251:}"
   divider:
@@ -997,6 +1030,7 @@ hotdog_stand:
     plugin: [255, 196]
     window_close_button: [255, 196]
     scrollbar: [226, 88]
+    whitespace: [130, 196]
   16:
     background: COLOR_RED
     title: [COLOR_YELLOW, COLOR_RED]
@@ -1020,6 +1054,7 @@ hotdog_stand:
     plugin: [COLOR_WHITE, COLOR_RED]
     window_close_button: [COLOR_WHITE, COLOR_RED]
     scrollbar: [COLOR_YELLOW, COLOR_RED]
+    whitespace: [COLOR_YELLOW, COLOR_RED]
   8:
     background: COLOR_RED
     title: [COLOR_YELLOW, COLOR_RED]
@@ -1043,6 +1078,7 @@ hotdog_stand:
     plugin: [COLOR_WHITE, COLOR_RED]
     window_close_button: [COLOR_WHITE, COLOR_RED]
     scrollbar: [COLOR_YELLOW, COLOR_RED]
+    whitespace: [COLOR_YELLOW, COLOR_RED]
 tokyo_night:
   indicator: "{nf:*:#f0766:}"
   divider:
@@ -1084,6 +1120,7 @@ tokyo_night:
     plugin: [183, -1]
     window_close_button: [210, -1]
     scrollbar: [117, 236]
+    whitespace: [66, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_BLUE, -1]
@@ -1107,6 +1144,7 @@ tokyo_night:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_BLUE, -1]
@@ -1130,6 +1168,7 @@ tokyo_night:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_CYAN, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
 everforest:
   indicator: "{nf:^:#f06aa:}"
   divider:
@@ -1171,6 +1210,7 @@ everforest:
     plugin: [175, -1]
     window_close_button: [167, -1]
     scrollbar: [142, 237]
+    whitespace: [108, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -1194,6 +1234,7 @@ everforest:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_GREEN, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_GREEN, -1]
@@ -1217,6 +1258,7 @@ everforest:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_GREEN, COLOR_BLACK]
+    whitespace: [COLOR_GREEN, -1]
 rose_pine:
   indicator: "{nf:*:#f0851:}"
   divider:
@@ -1258,6 +1300,7 @@ rose_pine:
     plugin: [183, -1]
     window_close_button: [203, -1]
     scrollbar: [175, 236]
+    whitespace: [109, -1]
   16:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -1281,6 +1324,7 @@ rose_pine:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_BRIGHT_RED, -1]
     scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
+    whitespace: [8, -1]
   8:
     background: COLOR_BLACK
     title: [COLOR_MAGENTA, -1]
@@ -1304,3 +1348,4 @@ rose_pine:
     plugin: [COLOR_MAGENTA, -1]
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
+    whitespace: [COLOR_CYAN, -1]

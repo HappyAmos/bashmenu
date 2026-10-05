@@ -250,6 +250,16 @@ Textual interface.
       (e.g., `[16, 16]` on dark background or `[19, 19]` on `qbasic`), select a neutral primary 8
       color value (`white` on dark backgrounds, `black` on light backgrounds) for contrast.
     - Fall back to the neutral primary 8 color if the paired color lacks adequate contrast.
+    - **Whitespace Character Stylization (`whitespace` / `whitespace_color`):**
+      * When `show_whitespace` is toggled (`Alt+1`), non-visible whitespace characters (space `'·'`,
+        tab `'→'` plus tabstop padding, carriage return `'↵'`, and newline `'↵'`) must be stylized
+        using the theme's `whitespace` (or `whitespace_color`) palette token.
+      * If no whitespace style is defined, it falls back to a standalone default (`dim white` /
+        `Style(color="white", dim=True)`), without falling back to theme gutter or shadow.
+      * This ensures whitespace markers appear in a subtle, slightly darker/dimmer shade than
+        standard text without competing for contrast.
+      * Whitespace styles are applied before selection highlights (`sel_style`) and cursor inversions
+        (`reverse bold`), guaranteeing that cursor movement and text selections remain clearly visible.
 23. **Headless Execution & Shell Script Source Guarding:**
     Main shell scripts (`bashmenu.sh`) must provide source guards
     (`if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`) and non-interactive inspection flags
@@ -354,6 +364,10 @@ Textual interface.
       alongside canonical paths (`{scripts_dir}`, `{templates_dir}`, `{cache_dir}`).
     - Hardware and network placeholders (`{battery}`, `{localip}`) must be documented with
       their caching characteristics and on-demand evaluation behavior.
+    - Configuration placeholders support the explicit namespace `{app.<key>}` (e.g. `{app.theme}`,
+      `{app.settings.tabstop}`, `{app.user.postal_code}`) in addition to shorthand forms
+      (`{theme}`, `{settings.<key>}`, `{user.<key>}`). `bashmenu.yml` includes a documented
+      header comment preserved across `save_config()` writes.
     - Every newly added macro must include automated assertion coverage in
       `.tests/test_improvements.py` (`test_placeholder_documentation_parity`).
 34. **Theme Window Border & Divider Customization (`window:` and `divider:` in `bashmenu.themes`):**
@@ -395,7 +409,98 @@ Textual interface.
         `border_vertical_right`) with 2 spaces on each side, and **without** border tees.
       * `{screen_width}`: Full-width divider running from left border to right border (`w - 2`),
         overriding all margins. Connects directly to `left_tee` (`border_tee_left`) on the left and
-        `right_tee` (`border_tee_right`) on the right without margin spaces.
+        `right_tee` (`border_tee_right`) on the right without margin spaces. Themes defining
+        `{screen_width}` dividers must set the divider foreground color to match the border color.
+    - **Dynamic PluginBuffer Geometry & Text Alignment**:
+      * When a theme defines `{screen_width}` dividers, `PluginBuffer` dynamically expands to
+        `screen_div_w = max(20, w - 2)` and shifts left to `x = 1` (immediately inside the border).
+      * Plugin dividers (`pretext: "{divider}"` / `posttext: "{divider}"`) seamlessly span border-to-border.
+      * Regular plugin text lines are indented with 2 leading spaces (`"  "`), maintaining strict visual
+        alignment with menu option columns.
+35. **Menu Definition Schema (`bashmenu.mnu`) & Serialization Standards**:
+    - **`items:` Key Hierarchy**: `items:` replaces `options:` across all menu files and submenus.
+    - **Label-as-Key Item Structure**: Each menu entry is declared with its label as the parent key:
+      ```yaml
+      items:
+        - '{divider}':
+        - Applications:
+            icon: '{nf:󰖟}'
+            type: submenu
+            submenu:
+              title: Applications
+              items:
+                - Web Browser:
+                    action: '{scripts_dir}/webopen.sh'
+      ```
+    - **Lean Defaults Invariant**: Prune redundant default flags when authoring and serializing:
+      omit `stream: false`, `masked: false`, `show_whitespace: false`, `refresh: false`,
+      `no_formatting: false`, `external: false`, `alt_buffer: false`, non-editor `tabstop`,
+      and duplicate `command` keys.
+    - **Runtime Normalization (`normalize_menu_items`)**:
+      `normalize_menu_items()` in `bashmenu.py` canonicalizes both new label-as-key items and
+      legacy dicts into internal dictionary representations (`label`, `type`, `action`, `submenu`),
+      and aliases `items` into `options` for internal UI compatibility.
+    - **Strict Divider Representation**: Dividers are represented as scalar `'{divider}'` or
+      single-key mapping `'- \'{divider}\':'`. Plain `"divider"` is never recognized.
+    - **Centralized Serialization (`dump_menu_yaml`)**:
+      Both `bashmenu.py` and `menuedit.py` serialize menu data via `bashmenu.dump_menu_yaml()`,
+      utilizing `IndentedDumper` to ensure clean 2-space indented sequences under `items:`.
+    - **Validation (`ymlcheck.py`)**: `ymlcheck.py -m <file>` validates `items:` blocks,
+      ensuring valid label keys, proper submenu recursion, and strict `{divider}` syntax.
+36. **Modal Drop Shadow Architecture (`ModalFrame` & `ShadowWidget`):**
+    - **Classic DOS/TUI Drop Shadow Geometry**:
+      Modal dialogs are framed with an authentic 2-cell right shadow and 1-row bottom shadow:
+      * Right shadow: 2 columns wide, offset 1 row down from top (`y = start_y + 1` to `start_y + box_h`).
+      * Bottom shadow: 1 row high, offset 2 columns right from left edge (`x = start_x + 2` to `start_x + box_w + 2`).
+    - **Theme Integration & Shading Character**:
+      * The shadow character is retrieved from `window.shadow_char` or `DEFAULT_WINDOW_BORDER` (default `░`).
+      * Foreground and background colors are applied from each theme's `shadow: [fg, bg]` definition.
+      * Modals also apply a dimmed screen backdrop (`screen.styles.background = f"{css_shadow} 60%"`).
+    - **Widget Hierarchy & Selector Invariants**:
+      * Modals wrap their `#dialog` inside `ModalFrame(id="modal_frame")` and `Horizontal(id="dialog_hrow")`,
+        placing `ShadowWidget(id="shadow_right")` beside `#dialog` and `ShadowWidget(id="shadow_bottom")`
+        beneath.
+      * All widget IDs (`#dialog`, `#title`, `#message`, `#buttons`, `#btn_ok`, `#scroll_container`,
+        `#form_scroll`) remain direct query targets via `screen.query_one()`.
+    - **Dynamic Resizing & Geometry Syncing**:
+      * `ModalFrame.sync_shadows()` reads `dialog.outer_size` and dynamically syncs `shadow_right.styles.height`
+        to `outer_size.height - 1` and `shadow_bottom.styles.width` to `outer_size.width`.
+      * Size changes are reactively observed via `watch(dialog, "size")` and `on_resize()`.
+    - **Universal Modal Coverage (Including Help Screens)**:
+      * All modal dialogs without exception render drop shadows.
+      * For expanded help modals (`is_help=True`, `MessageModalScreen.help_modal`), `#modal_frame` is sized
+        to `95% width` and `95% height` with `#dialog_hrow` at `1fr 1fr` and `#dialog` at `1fr 100%`,
+        ensuring full-screen documentation (main menu `F1`, editor manual `F1`/`Ctrl+G`, placeholder
+        reference `Ctrl+P`/`F4`, item properties guide `F1`) displays clean drop shadows without overflowing
+        the terminal viewport.
+37. **Status and Help Gutter Wrapping & 50% Width Invariant (`MainMenuView`):**
+    - **50% Width Limit**: Neither the status gutter (right-aligned) nor the help
+      gutter (left-aligned) should ever exceed 50% of the screen width
+      (`max_gutter_w = max(5, avail_w // 2)`).
+    - **Pipe Delimiter Wrapping (`wrap_gutter_items`)**: Both gutters treat text
+      between pipe symbols (`|`) as atomic single words/badges. When adding an item
+      exceeds 50% width, overlapping text drops to the next line.
+    - **Two-Line Maximum Height**: Neither gutter should ever exceed two lines.
+      Two lines is the maximum height allowed for the gutters (`max_lines=2`). Overflow
+      beyond two lines is discarded.
+    - **Dynamic Row Allocation & Screen Height Preservation**:
+      * `gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))`.
+      * `total_content_rows = max(1, h - 4 - gutter_rows)`.
+      * Total rendered lines strictly equals terminal height `h`.
+38. **BBCode Rich Tags, Tables, and Lists (`bashmenu_ui.py`):**
+    - **Formatting Tags**: Supports bracketed BBCode tags:
+      * Inline styling: `[b]...[/b]`, `[u]...[/u]`, `[dim]...[/dim]`, `[reverse]...[/reverse]`, `[color=...]...[/color]`.
+      * Structural tables: `[table]...[/table]`, `[tr]...[/tr]`, `[th]...[/th]`, `[td]...[/td]`. Renders tables using Unicode box-drawing borders (`┌─┬─┐`, `│ │ │`, `├─┼─┤`, `└─┴─┘`).
+      * Table width & column distribution: `[table width=100%]` (or `width=full`) automatically divides available width equally across columns (e.g. 50/50 for 2 cols, 33/33/33 for 3 cols, 25/25/25/25 for 4 cols). Explicit integer widths (`width=60`) are also supported.
+      * In-cell text wrapping: When column widths are constrained, cell text automatically wraps at word boundaries, increasing row height dynamically without breaking border alignment. When no width is defined, columns auto-fit to the longest string. Headers (`[th]`) are automatically bolded.
+      * Structural lists: Unordered `[list][*]...[/list]` (bullet glyphs `• `), ordered `[list=1][*]...[/list]` (numbers `1. `, `2. `), and alphabetical `[list=a][*]...[/list]`. Closing `[/*]` tags are optionally accepted.
+    - **Declarative Plugin Dashboard Layout (`settings.plugins.layout`)**:
+      * Supports `type: table`, `width: "100%"`, `entries: N` (default 2), `headers: [...]`, and optional explicit `rows: [["plugin_a", "plugin_b"]]` under `settings.plugins` in `bashmenu.yml` to render plugins in a multi-column dashboard.
+      * Multi-table chunking: If `entries: 2` is set and a 3rd plugin is encountered, a new table is constructed, spanning the screen on its own or grouping with subsequent plugins.
+      * Standalone plugins: Plugins configured with `standalone: true` or `span: full` (e.g. Quote of the Day or system banners) render on their own line stretching across the screen without table borders.
+      * Each plugin retains its own independent `sleep` interval and background thread polling without blocking the TUI.
+    - **Backtick Suppression & Escaping**: Tags inside inline backticks (`` `[b]code[/b]` ``) or fenced code blocks are automatically suppressed and rendered literally. Backslash prefixing (`\[table]`) escapes parsing.
+    - **`no_formatting` Flag**: Passing `no_formatting=True` to formatting conversion functions bypasses BBCode processing entirely.
 
 
 ## Documentation Guidelines

@@ -63,9 +63,22 @@ def is_formatting_tag(content: str) -> bool:
         "reverse",
         "/reverse",
         "/color",
+        "table",
+        "/table",
+        "tr",
+        "/tr",
+        "th",
+        "/th",
+        "td",
+        "/td",
+        "list",
+        "list=1",
+        "/list",
+        "*",
+        "/*",
     ]:
         return True
-    if content_clean.startswith("color=") and "]" not in content_clean:
+    if content_clean.startswith(("color=", "list=", "table")) and "]" not in content_clean:
         return True
     content_clean = content_clean.removeprefix("/")
     with contextlib.suppress(Exception):
@@ -129,6 +142,7 @@ PLACEHOLDER_SECTIONS = [
             ("{localip}", "Primary outbound IPv4 address"),
             ("{user-mode}", "Privilege level (User or Root)"),
             ("{version}", "BashMenu application version"),
+            ("{theme}", "Active color theme name (or {app.theme})"),
         ],
     ),
     (
@@ -160,6 +174,7 @@ PLACEHOLDER_SECTIONS = [
             ("{ascii:<code_num>}", "CP437 ASCII character byte (e.g. {ascii:196} -> ─)"),
             ("{command:<cmd>}", "Executes shell command and inserts output"),
             ("{nf:<char>:<hex>:<emoji>}", "Adaptive Nerd Font / Unicode / Emoji glyph"),
+            ("{app.<key.path>}", "Configuration key in bashmenu.yml (e.g. {app.theme})"),
             ("{<key.path>}", "Refers to nested key in bashmenu.yml (e.g. {user.postal_code})"),
         ],
     ),
@@ -330,23 +345,256 @@ def get_display_width(s: str, config=None) -> int:
     return total
 
 
-TAG_PATTERN = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
+TAG_PATTERN = re.compile(r"\[(/?[a-zA-Z_0-9=\*\s%]+)\]")
 
 
-def get_visible_len(text, config=None) -> int:
+def wrap_cell_content(c_text: str, max_w: int, config=None) -> list[str]:
+    """
+    Split cell text into lines and wrap any line exceeding max_w into multiple lines,
+    preserving BBCode tags and word boundaries.
+    """
+    if max_w <= 0:
+        return [""]
+    raw_lines = c_text.split("\n")
+    final_lines = []
+    for line in raw_lines:
+        line_vis = get_visible_len(line, config)
+        if line_vis <= max_w:
+            final_lines.append(line)
+            continue
+
+        words = line.split(" ")
+        cur_line = []
+        cur_len = 0
+        for w in words:
+            w_vis = get_visible_len(w, config)
+            if w_vis > max_w:
+                if cur_line:
+                    final_lines.append(" ".join(cur_line))
+                    cur_line = []
+                    cur_len = 0
+                chunk = w
+                while get_visible_len(chunk, config) > max_w:
+                    sub = chunk[:max_w]
+                    final_lines.append(sub)
+                    chunk = chunk[max_w:]
+                if chunk:
+                    cur_line.append(chunk)
+                    cur_len = get_visible_len(chunk, config)
+                continue
+
+            if not cur_line:
+                cur_line.append(w)
+                cur_len = w_vis
+            elif cur_len + 1 + w_vis <= max_w:
+                cur_line.append(w)
+                cur_len += 1 + w_vis
+            else:
+                final_lines.append(" ".join(cur_line))
+                cur_line = [w]
+                cur_len = w_vis
+
+        if cur_line:
+            final_lines.append(" ".join(cur_line))
+
+    return final_lines or [""]
+
+
+def process_bbcode_structural_tags(
+    text: str, config=None, theme=None, no_formatting: bool = False, avail_width: int | None = None
+) -> str:
+    """
+    Preprocess structural BBCode tags ([table]...[/table], [list]...[/list]) into
+    aligned ASCII/Unicode table borders and bullet/numbered lists before inline styling.
+    Suppresses processing inside backtick code spans/blocks and respects backslash escaping.
+    """
+    if not isinstance(text, str) or no_formatting:
+        return text if text is not None else ""
+
+    text_lower = text.lower()
+    if "[table" not in text_lower and "[list" not in text_lower:
+        return text
+
+    code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
+
+    def is_inside_code(start: int, end: int) -> bool:
+        return any(r_start <= start and end <= r_end for r_start, r_end in code_ranges)
+
+    def replace_list(match):
+        start, end = match.span()
+        if is_inside_code(start, end):
+            return match.group(0)
+        if start > 0 and text[start - 1] == "\\":
+            return match.group(0)
+
+        list_type = match.group(1) or ""
+        content = match.group(2)
+        raw_items = re.split(r"\[\*\]", content)
+        items = []
+        for it in raw_items:
+            it = re.sub(r"\[/\*\]\s*$", "", it).strip()
+            if it:
+                items.append(it)
+
+        lt = list_type.strip().lower()
+        lines = []
+        for idx, it in enumerate(items, 1):
+            if lt == "1":
+                prefix = f"  {idx}. "
+            elif lt == "a":
+                prefix = f"  {chr(ord('a') + (idx - 1) % 26)}. "
+            elif list_type.strip() == "A":
+                prefix = f"  {chr(ord('A') + (idx - 1) % 26)}. "
+            else:
+                prefix = "  • "
+
+            indent = " " * len(prefix)
+            sublines = it.split("\n")
+            lines.append(f"{prefix}{sublines[0].strip()}")
+            for sl in sublines[1:]:
+                lines.append(f"{indent}{sl.strip()}")
+        return "\n".join(lines)
+
+    text = re.sub(r"\[list(?:=([0-9a-zA-Z]+))?\](.*?)\[/list\]", replace_list, text, flags=re.DOTALL | re.IGNORECASE)
+
+    code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
+
+    def replace_table(match):
+        start, end = match.span()
+        if is_inside_code(start, end):
+            return match.group(0)
+        if start > 0 and text[start - 1] == "\\":
+            return match.group(0)
+
+        eff_avail_w = avail_width
+        if eff_avail_w is None and isinstance(config, dict):
+            eff_avail_w = config.get("avail_width") or config.get("window_width")
+        if not eff_avail_w:
+            with contextlib.suppress(Exception):
+                import shutil
+                eff_avail_w = max(20, shutil.get_terminal_size((80, 24)).columns - 6)
+        if not eff_avail_w:
+            eff_avail_w = 74
+
+        attrs = match.group(1) or ""
+        table_content = match.group(2)
+        tr_matches = re.findall(r"\[tr(?:\s+[^\]]*)?\](.*?)\[/tr\]", table_content, flags=re.DOTALL | re.IGNORECASE)
+        if not tr_matches:
+            return ""
+
+        rows = []
+        for tr in tr_matches:
+            cells = []
+            for cell_match in re.finditer(r"\[(th|td)(?:\s+[^\]]*)?\](.*?)\[/\1\]", tr, flags=re.DOTALL | re.IGNORECASE):
+                tag = cell_match.group(1).lower()
+                c_text = cell_match.group(2).strip()
+                if tag == "th":
+                    c_text = f"[b]{c_text}[/b]"
+                cells.append((tag, c_text))
+            if cells:
+                rows.append(cells)
+
+        if not rows:
+            return ""
+
+        num_cols = max(len(r) for r in rows)
+        overhead = 3 * num_cols + 1
+
+        # Check for width attribute on [table width=...]
+        target_w = None
+        w_match = re.search(r"width\s*=\s*['\"]?([0-9]+%?|full)['\"]?", attrs, re.IGNORECASE)
+        if w_match:
+            w_val = w_match.group(1).lower()
+            if w_val in ("100%", "full"):
+                target_w = eff_avail_w
+            elif w_val.endswith("%"):
+                with contextlib.suppress(ValueError):
+                    pct = int(w_val[:-1])
+                    target_w = max(10, int(eff_avail_w * (pct / 100.0)))
+            else:
+                with contextlib.suppress(ValueError):
+                    target_w = int(w_val)
+
+        if target_w is not None:
+            # Distribute width equally across columns (e.g. 50/50, 33/33/33, 25/25/25/25)
+            avail_content = max(num_cols, target_w - overhead)
+            base_col_w = avail_content // num_cols
+            remainder = avail_content % num_cols
+            col_widths = [base_col_w + (1 if c_idx < remainder else 0) for c_idx in range(num_cols)]
+        else:
+            # Auto-fit based on longest string in each column
+            col_widths = [0] * num_cols
+            for r in rows:
+                for c_idx in range(len(r)):
+                    _, c_text = r[c_idx]
+                    vis_len = get_visible_len(c_text, config)
+                    col_widths[c_idx] = max(col_widths[c_idx], vis_len)
+            col_widths = [max(1, w) for w in col_widths]
+
+            # If unconstrained table exceeds eff_avail_w, constrain and wrap text
+            if overhead + sum(col_widths) > eff_avail_w:
+                avail_content = max(num_cols, eff_avail_w - overhead)
+                base_col_w = avail_content // num_cols
+                remainder = avail_content % num_cols
+                col_widths = [base_col_w + (1 if c_idx < remainder else 0) for c_idx in range(num_cols)]
+
+        top_border = "┌─" + "─┬─".join("─" * w for w in col_widths) + "─┐"
+        sep_border = "├─" + "─┼─".join("─" * w for w in col_widths) + "─┤"
+        bot_border = "└─" + "─┴─".join("─" * w for w in col_widths) + "─┘"
+
+        table_lines = [top_border]
+        for r_idx, r in enumerate(rows):
+            cell_lines_per_col = []
+            for c_idx in range(num_cols):
+                if c_idx < len(r):
+                    _, c_text = r[c_idx]
+                    clines = wrap_cell_content(c_text, col_widths[c_idx], config)
+                else:
+                    clines = [""]
+                cell_lines_per_col.append(clines)
+
+            row_height = max(len(clines) for clines in cell_lines_per_col)
+            for h in range(row_height):
+                padded_cells = []
+                for c_idx in range(num_cols):
+                    clines = cell_lines_per_col[c_idx]
+                    line_text = clines[h] if h < len(clines) else ""
+                    vis_len = get_visible_len(line_text, config)
+                    pad = " " * max(0, col_widths[c_idx] - vis_len)
+                    padded_cells.append(line_text + pad)
+                table_lines.append("│ " + " │ ".join(padded_cells) + " │")
+
+            is_current_th = any(tag == "th" for tag, _ in r)
+            is_next_td = (r_idx + 1 < len(rows)) and any(tag == "td" for tag, _ in rows[r_idx + 1])
+            if is_current_th and is_next_td:
+                table_lines.append(sep_border)
+
+        table_lines.append(bot_border)
+        return "\n".join(table_lines)
+
+    text = re.sub(r"\[table(?:\s+([^\]]*))?\](.*?)\[/table\]", replace_table, text, flags=re.DOTALL | re.IGNORECASE)
+    return text
+
+
+def get_visible_len(text, config=None, avail_width: int | None = None) -> int:
     """
     Return the visible length of a string by stripping formatting tags [tag].
+    For multi-line strings, returns the maximum line width.
     """
     if not text:
         return 0
     if not isinstance(text, str):
         text = str(text)
 
-    clean_text = strip_formatting_tags(text)
+    clean_text = strip_formatting_tags(text, avail_width=avail_width)
+    if "\n" in clean_text:
+        return max((get_display_width(line, config) for line in clean_text.split("\n")), default=0)
     return get_display_width(clean_text, config)
 
 
-def parse_formatting_to_segments(text, base_attr=0, theme=None, no_formatting: bool = False):
+def parse_formatting_to_segments(
+    text, base_attr=0, theme=None, no_formatting: bool = False, avail_width: int | None = None
+):
     """
     Parse console bracket formatting tags [b], [u], [dim], [reverse], [color=...] and
     return a list of (text, attr) segments for backward compatibility.
@@ -357,8 +605,9 @@ def parse_formatting_to_segments(text, base_attr=0, theme=None, no_formatting: b
     if no_formatting:
         return [(text, base_attr)]
 
+    text = process_bbcode_structural_tags(text, no_formatting=no_formatting, avail_width=avail_width)
     code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
-    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\*\s%]+)\]")
     segments = []
     current_attr = base_attr
     attr_stack = [current_attr]
@@ -414,6 +663,7 @@ def formatting_to_rich_text(
     default_style: Style | None = None,
     theme: dict | None = None,
     no_formatting: bool = False,
+    avail_width: int | None = None,
 ) -> Text:
     """
     Convert custom bracket formatting ([b], [u], [dim], [color=name]) into a Rich Text object.
@@ -425,8 +675,9 @@ def formatting_to_rich_text(
     if no_formatting:
         return Text(text, style=default_style or Style())
 
+    text = process_bbcode_structural_tags(text, theme=theme, no_formatting=no_formatting, avail_width=avail_width)
     code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
-    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\s]+)\]")
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\*\s%]+)\]")
     rich_text = Text()
 
     if isinstance(default_style, str):
@@ -503,7 +754,7 @@ def formatting_to_rich_text(
     return rich_text
 
 
-def strip_formatting_tags(text: str, no_formatting: bool = False) -> str:
+def strip_formatting_tags(text: str, no_formatting: bool = False, avail_width: int | None = None) -> str:
     """
     Strip all bracketed formatting tags [b], [color=...], etc.
     """
@@ -512,8 +763,9 @@ def strip_formatting_tags(text: str, no_formatting: bool = False) -> str:
     if no_formatting:
         return text
 
+    text = process_bbcode_structural_tags(text, no_formatting=no_formatting, avail_width=avail_width)
     code_ranges = [m.span() for m in re.finditer(r"```[\s\S]*?```|`[^`\n]+`", text)]
-    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=]+)\]")
+    tag_pattern = re.compile(r"\[(/?[a-zA-Z_0-9=\*\s%]+)\]")
     result = []
     last_idx = 0
 
@@ -875,6 +1127,13 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("plugin", Style(color="cyan", bgcolor=bg_color))
     styles.setdefault("window_close_button", Style(color="red", bold=True, bgcolor=bg_color))
     styles.setdefault("scrollbar", Style(color="cyan", bgcolor=bg_color or "grey19"))
+    default_ws = (
+        styles.get("whitespace")
+        or styles.get("whitespace_color")
+        or Style(color="white", dim=True, bgcolor=bg_color)
+    )
+    styles.setdefault("whitespace", default_ws)
+    styles.setdefault("whitespace_color", default_ws)
     styles["indicator"] = indicator
     styles["theme_name"] = theme_name
     styles["window_borders"] = borders
@@ -990,6 +1249,32 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_shadow = parse_css_color(shadow_style.bgcolor.name)
             if css_shadow and hasattr(screen, "styles"):
                 screen.styles.background = f"{css_shadow} 60%"
+
+    with contextlib.suppress(Exception):
+        borders = theme_dict.get("window_borders") or get_theme_window_borders(
+            theme_dict.get("theme_name", "dracula")
+        )
+        shadow_char = borders.get("shadow_char", "░")
+        shadow_style = theme_dict.get("shadow")
+        css_shadow_fg = None
+        css_shadow_bg = None
+        if shadow_style:
+            if shadow_style.color and shadow_style.color.name:
+                css_shadow_fg = parse_css_color(shadow_style.color.name)
+            if shadow_style.bgcolor and shadow_style.bgcolor.name:
+                css_shadow_bg = parse_css_color(shadow_style.bgcolor.name)
+
+        for s_id in ["#shadow_right", "#shadow_bottom"]:
+            for sw in screen.query(s_id):
+                if hasattr(sw, "update_char"):
+                    sw.update_char(shadow_char)
+                if css_shadow_fg:
+                    sw.styles.color = css_shadow_fg
+                if css_shadow_bg:
+                    sw.styles.background = css_shadow_bg
+        mf = screen.query_one("#modal_frame")
+        if hasattr(mf, "sync_shadows"):
+            mf.sync_shadows()
     with contextlib.suppress(Exception):
         dialog = screen.query_one("#dialog")
         border_style = theme_dict.get("border") or theme_dict.get("accent")
@@ -1140,6 +1425,76 @@ def load_themes_file(filepath: str | None = None) -> dict:
 # ==============================================================================
 
 
+class ShadowWidget(Static):
+    """Widget rendering drop shadow with shadow character and theme colors."""
+
+    def __init__(self, shadow_char: str = "░", **kwargs):
+        super().__init__(**kwargs)
+        self.shadow_char = shadow_char
+
+    def update_char(self, char: str) -> None:
+        self.shadow_char = char or "░"
+        self.refresh()
+
+    def render(self) -> str:
+        w = self.size.width
+        h = self.size.height
+        if w <= 0 or h <= 0:
+            return ""
+        line = self.shadow_char * w
+        return "\n".join([line] * h)
+
+
+class ModalFrame(Vertical):
+    """Container holding a modal dialog and its classic drop shadows."""
+
+    DEFAULT_CSS = """
+    ModalFrame {
+        width: auto;
+        height: auto;
+    }
+    #dialog_hrow {
+        width: auto;
+        height: auto;
+    }
+    #shadow_right {
+        width: 2;
+        height: 1;
+        margin-top: 1;
+    }
+    #shadow_bottom {
+        width: 100%;
+        height: 1;
+        margin-left: 2;
+    }
+    """
+
+    def on_mount(self) -> None:
+        self.call_after_refresh(self.sync_shadows)
+        with contextlib.suppress(Exception):
+            d = self.query_one("#dialog")
+            self.watch(d, "size", self._on_dialog_size, init=False)
+
+    def _on_dialog_size(self, old_val, new_val) -> None:
+        self.sync_shadows()
+
+    def on_resize(self, event) -> None:
+        self.sync_shadows()
+
+    def sync_shadows(self) -> None:
+        with contextlib.suppress(Exception):
+            d = self.query_one("#dialog")
+            h = d.outer_size.height
+            w = d.outer_size.width
+            if h > 0 and w > 0:
+                with contextlib.suppress(Exception):
+                    sr = self.query_one("#shadow_right")
+                    sr.styles.height = max(1, h - 1)
+                with contextlib.suppress(Exception):
+                    sb = self.query_one("#shadow_bottom")
+                    sb.styles.width = w
+
+
 class MessageModalScreen(ModalScreen[None]):
     """Modal screen to display popup messages."""
 
@@ -1156,9 +1511,19 @@ class MessageModalScreen(ModalScreen[None]):
         background: $surface;
         padding: 1 2;
     }
-    MessageModalScreen.help_modal #dialog {
+    MessageModalScreen.help_modal #modal_frame {
         width: 95%;
         height: 95%;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    MessageModalScreen.help_modal #dialog_hrow {
+        width: 1fr;
+        height: 1fr;
+    }
+    MessageModalScreen.help_modal #dialog {
+        width: 1fr;
+        height: 100%;
         max-width: 100%;
         max-height: 100%;
     }
@@ -1248,7 +1613,7 @@ class MessageModalScreen(ModalScreen[None]):
             self.add_class("help_modal")
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
+        def _render_dialog():
             with Horizontal(id="title_bar"):
                 yield Label(self.modal_title or "", id="title")
                 yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
@@ -1266,6 +1631,13 @@ class MessageModalScreen(ModalScreen[None]):
             with Horizontal(id="buttons"):
                 yield Button("OK", variant="primary", id="btn_ok")
             yield Label("[ENTER/ESC] Close", id="footer")
+
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    yield from _render_dialog()
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def handle_link(self, href: str) -> None:
         if not href:
@@ -1467,21 +1839,25 @@ class ConfirmModalScreen(ModalScreen[str]):
         self.theme = theme or {}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label(self.modal_title or "", id="title")
-                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            content = (
-                self.message
-                if isinstance(self.message, Text)
-                else formatting_to_rich_text(str(self.message), theme=self.theme)
-            )
-            yield Static(content, id="message")
-            with Horizontal(id="buttons"):
-                yield Button("Yes", variant="primary", id="btn_yes")
-                yield Button("No", variant="default", id="btn_no")
-                yield Button("Cancel", variant="default", id="btn_cancel")
-            yield Label("[Y] Yes | [N] No | [C / ESC] Cancel", id="footer")
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label(self.modal_title or "", id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    content = (
+                        self.message
+                        if isinstance(self.message, Text)
+                        else formatting_to_rich_text(str(self.message), theme=self.theme)
+                    )
+                    yield Static(content, id="message")
+                    with Horizontal(id="buttons"):
+                        yield Button("Yes", variant="primary", id="btn_yes")
+                        yield Button("No", variant="default", id="btn_no")
+                        yield Button("Cancel", variant="default", id="btn_cancel")
+                    yield Label("[Y] Yes | [N] No | [C / ESC] Cancel", id="footer")
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
@@ -1594,21 +1970,25 @@ class ToggleModalScreen(ModalScreen[str]):
         self.theme = theme or {}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label(self.modal_title or "", id="title")
-                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            content = (
-                self.message
-                if isinstance(self.message, Text)
-                else formatting_to_rich_text(str(self.message), theme=self.theme)
-            )
-            yield Static(content, id="message")
-            with Horizontal(id="buttons"):
-                yield Button("True", variant="success", id="btn_true")
-                yield Button("False", variant="error", id="btn_false")
-                yield Button("Cancel", variant="default", id="btn_cancel")
-            yield Label("[T] True | [F] False | [C / ESC] Cancel", id="footer")
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label(self.modal_title or "", id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    content = (
+                        self.message
+                        if isinstance(self.message, Text)
+                        else formatting_to_rich_text(str(self.message), theme=self.theme)
+                    )
+                    yield Static(content, id="message")
+                    with Horizontal(id="buttons"):
+                        yield Button("True", variant="success", id="btn_true")
+                        yield Button("False", variant="error", id="btn_false")
+                        yield Button("Cancel", variant="default", id="btn_cancel")
+                    yield Label("[T] True | [F] False | [C / ESC] Cancel", id="footer")
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
@@ -1728,26 +2108,30 @@ class InputModalScreen(ModalScreen[str]):
         self.masked = masked
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label(self.modal_title or "", id="title")
-                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            if self.prompt:
-                content = (
-                    self.prompt
-                    if isinstance(self.prompt, Text)
-                    else formatting_to_rich_text(str(self.prompt), theme=self.theme)
-                )
-                yield Static(content, id="prompt")
-            yield Input(
-                value=self.default_text,
-                password=self.masked,
-                id="input",
-            )
-            with Horizontal(id="buttons"):
-                yield Button("OK", variant="primary", id="btn_ok")
-                yield Button("Cancel", variant="default", id="btn_cancel")
-            yield Label("[ENTER] OK | [ESC] Cancel", id="footer")
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label(self.modal_title or "", id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    if self.prompt:
+                        content = (
+                            self.prompt
+                            if isinstance(self.prompt, Text)
+                            else formatting_to_rich_text(str(self.prompt), theme=self.theme)
+                        )
+                        yield Static(content, id="prompt")
+                    yield Input(
+                        value=self.default_text,
+                        password=self.masked,
+                        id="input",
+                    )
+                    with Horizontal(id="buttons"):
+                        yield Button("OK", variant="primary", id="btn_ok")
+                        yield Button("Cancel", variant="default", id="btn_cancel")
+                    yield Label("[ENTER] OK | [ESC] Cancel", id="footer")
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         self.query_one("#input", Input).focus()
@@ -1784,14 +2168,16 @@ class FilePickerModalScreen(ModalScreen[str]):
         background: rgba(0, 0, 0, 0.6);
     }
     #dialog {
-        width: 80;
-        height: 24;
+        width: 76;
+        height: 22;
+        max-width: 95%;
+        max-height: 95%;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
     }
     FilePickerModalScreen.save_modal #dialog {
-        height: 28;
+        height: 26;
     }
     FilePickerModalScreen.save_modal #options_list {
         height: 10;
@@ -1833,7 +2219,7 @@ class FilePickerModalScreen(ModalScreen[str]):
         margin-bottom: 1;
     }
     #options_list {
-        height: 14;
+        height: 12;
         border: solid $accent;
     }
     #save_filename_container {
@@ -1890,26 +2276,30 @@ class FilePickerModalScreen(ModalScreen[str]):
         self.entries = []
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                title_str = self.modal_title or ("Save File As" if self.mode == "save" else "File Picker")
-                yield Label(title_str, id="title")
-                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            yield Label(f"Path: {self.current_path}", id="path_label")
-            yield OptionList(id="options_list")
-            if self.mode == "save":
-                with Vertical(id="save_filename_container"):
-                    yield Label("File Name:", id="save_filename_label")
-                    yield Input(value=self.default_val or "", placeholder="Enter file name...", id="filename_input")
-                with Horizontal(id="save_buttons"):
-                    yield Button("Save", variant="primary", id="btn_save")
-                    yield Button("Cancel", variant="default", id="btn_cancel")
-            footer_text = (
-                "[ENTER] Save/Navigate | [ESC] Cancel"
-                if self.mode == "save"
-                else ("[ENTER] Open/Select | [N] New | [ESC] Cancel" if self.allow_new else "[ENTER] Open/Select | [ESC] Cancel")
-            )
-            yield Label(footer_text, id="footer")
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        title_str = self.modal_title or ("Save File As" if self.mode == "save" else "File Picker")
+                        yield Label(title_str, id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    yield Label(f"Path: {self.current_path}", id="path_label")
+                    yield OptionList(id="options_list")
+                    if self.mode == "save":
+                        with Vertical(id="save_filename_container"):
+                            yield Label("File Name:", id="save_filename_label")
+                            yield Input(value=self.default_val or "", placeholder="Enter file name...", id="filename_input")
+                        with Horizontal(id="save_buttons"):
+                            yield Button("Save", variant="primary", id="btn_save")
+                            yield Button("Cancel", variant="default", id="btn_cancel")
+                    footer_text = (
+                        "[ENTER] Save/Navigate | [ESC] Cancel"
+                        if self.mode == "save"
+                        else ("[ENTER] Open/Select | [N] New | [ESC] Cancel" if self.allow_new else "[ENTER] Open/Select | [ESC] Cancel")
+                    )
+                    yield Label(footer_text, id="footer")
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         if self.mode == "save":
@@ -2136,12 +2526,16 @@ class ThemePickerModalScreen(ModalScreen[str]):
         self.theme_keys = []
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label("Select Color Theme", id="title")
-                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            yield OptionList(id="options_list")
-            yield Label("[ENTER] Select Theme | [ESC] Cancel", id="footer")
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label("Select Color Theme", id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    yield OptionList(id="options_list")
+                    yield Label("[ENTER] Select Theme | [ESC] Cancel", id="footer")
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         themes_data = load_themes_file()
@@ -2180,9 +2574,17 @@ class StreamOutputModalScreen(ModalScreen[None]):
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
-    #dialog {
+    StreamOutputModalScreen #modal_frame {
         width: 80%;
         height: 80%;
+    }
+    StreamOutputModalScreen #dialog_hrow {
+        width: 1fr;
+        height: 1fr;
+    }
+    StreamOutputModalScreen #dialog {
+        width: 1fr;
+        height: 100%;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -2247,12 +2649,16 @@ class StreamOutputModalScreen(ModalScreen[None]):
         self.process = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label(f" Output: {self.modal_title} ", id="title")
-                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            yield RichLog(id="log", highlight=True, markup=not self.no_formatting)
-            yield Label(" Executing... Please wait ", id="footer")
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label(f" Output: {self.modal_title} ", id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    yield RichLog(id="log", highlight=True, markup=not self.no_formatting)
+                    yield Label(" Executing... Please wait ", id="footer")
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         log = self.query_one("#log", RichLog)

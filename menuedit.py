@@ -223,8 +223,10 @@ class ItemTypePickerModal(ModalScreen[str]):
         background: rgba(0, 0, 0, 0.6);
     }
     #dialog {
-        width: 78;
+        width: 76;
         height: 20;
+        max-width: 95%;
+        max-height: 95%;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -303,15 +305,19 @@ class ItemTypePickerModal(ModalScreen[str]):
         self.theme = theme or {}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label("Select Item Type", id="title")
-                yield Label(bashmenu_ui.format_close_button_label(self.theme), id="btn_close_x", classes="btn_close_x")
-            yield OptionList(id="option_list")
-            with Horizontal(id="footer"):
-                yield Label("[ENTER] Select", id="lbl_picker_select", classes="footer_item", markup=False)
-                yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[ESC / C] Cancel", id="lbl_picker_cancel", classes="footer_item", markup=False)
+        with bashmenu_ui.ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label("Select Item Type", id="title")
+                        yield Label(bashmenu_ui.format_close_button_label(self.theme), id="btn_close_x", classes="btn_close_x")
+                    yield OptionList(id="option_list")
+                    with Horizontal(id="footer"):
+                        yield Label("[ENTER] Select", id="lbl_picker_select", classes="footer_item", markup=False)
+                        yield Label("|", classes="footer_sep", markup=False)
+                        yield Label("[ESC / C] Cancel", id="lbl_picker_cancel", classes="footer_item", markup=False)
+                yield bashmenu_ui.ShadowWidget(id="shadow_right")
+            yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
@@ -613,9 +619,18 @@ class ItemEditModal(ModalScreen[dict]):
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
+    ItemEditModal #modal_frame {
+        width: auto;
+        height: 85%;
+        max-height: 34;
+    }
+    ItemEditModal #dialog_hrow {
+        width: auto;
+        height: 1fr;
+    }
     #dialog {
         width: 86;
-        height: 85%;
+        height: 100%;
         max-height: 34;
         border: thick $accent;
         background: $surface;
@@ -839,97 +854,101 @@ class ItemEditModal(ModalScreen[dict]):
         else:
             initial_mode_idx = 2
 
-        with Vertical(id="dialog"):
-            with Horizontal(id="title_bar"):
-                yield Label(self.get_title_bar_text(), id="title")
-                yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+        with bashmenu_ui.ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label(self.get_title_bar_text(), id="title")
+                        yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
 
-            with VerticalScroll(id="form_scroll"):
-                yield Label("Item Type:", classes="field_label", id="lbl_type_header")
-                with Horizontal(classes="field_row", id="row_item_type"):
-                    yield Label(self.get_type_display_str(), id="lbl_current_type")
-                    yield Button("Change Type [CTRL+T]", id="btn_change_type", variant="primary")
+                    with VerticalScroll(id="form_scroll"):
+                        yield Label("Item Type:", classes="field_label", id="lbl_type_header")
+                        with Horizontal(classes="field_row", id="row_item_type"):
+                            yield Label(self.get_type_display_str(), id="lbl_current_type")
+                            yield Button("Change Type [CTRL+T]", id="btn_change_type", variant="primary")
 
-                with Vertical(id="container_divider"):
-                    yield Label("Repeating Character (char):", classes="field_label")
-                    yield Input(value=str(char_val), id="inp_char")
-                    yield Label("Length Directive (length):", classes="field_label")
-                    yield Input(value=str(length_val), id="inp_length")
-                    yield Label("Preview:", classes="field_label")
-                    yield Static("", id="lbl_divider_preview", classes="divider_preview_box")
+                        with Vertical(id="container_divider"):
+                            yield Label("Repeating Character (char):", classes="field_label")
+                            yield Input(value=str(char_val), id="inp_char")
+                            yield Label("Length Directive (length):", classes="field_label")
+                            yield Input(value=str(length_val), id="inp_length")
+                            yield Label("Preview:", classes="field_label")
+                            yield Static("", id="lbl_divider_preview", classes="divider_preview_box")
 
-                with Vertical(id="container_standard"):
-                    yield Label("Title / Label:", classes="field_label")
-                    yield Input(value=str(title_val), id="inp_title")
+                        with Vertical(id="container_standard"):
+                            yield Label("Title / Label:", classes="field_label")
+                            yield Input(value=str(title_val), id="inp_title")
 
-                    yield Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):", classes="field_label")
-                    yield Input(value=str(icon_val), id="inp_icon")
+                            yield Label("Icon / Glyph ({nf:<char>:<hex>:<emoji>}):", classes="field_label")
+                            yield Input(value=str(icon_val), id="inp_icon")
 
-                    yield Label(self.get_action_label_text(), classes="field_label", id="lbl_action")
-                    with Horizontal(classes="field_row"):
-                        yield Input(value=str(action_val), id="inp_action")
-                        yield Button("Browse", id="btn_browse_action", variant="primary")
+                            yield Label(self.get_action_label_text(), classes="field_label", id="lbl_action")
+                            with Horizontal(classes="field_row"):
+                                yield Input(value=str(action_val), id="inp_action")
+                                yield Button("Browse", id="btn_browse_action", variant="primary")
 
-                    yield Label("Message / Prompt Text:", classes="field_label")
-                    yield Input(value=str(prompt_val), id="inp_prompt")
+                            yield Label("Message / Prompt Text:", classes="field_label")
+                            yield Input(value=str(prompt_val), id="inp_prompt")
 
-                    yield Label("Template Path (inject_block):", classes="field_label")
-                    with Horizontal(classes="field_row"):
-                        yield Input(value=str(template_val), id="inp_template")
-                        yield Button("Browse", id="btn_browse_template", variant="primary")
+                            yield Label("Template Path (inject_block):", classes="field_label")
+                            with Horizontal(classes="field_row"):
+                                yield Input(value=str(template_val), id="inp_template")
+                                yield Button("Browse", id="btn_browse_template", variant="primary")
 
-                    yield Label("Target Path (inject_block):", classes="field_label")
-                    with Horizontal(classes="field_row"):
-                        yield Input(value=str(target_val), id="inp_target")
-                        yield Button("Browse", id="btn_browse_target", variant="primary")
+                            yield Label("Target Path (inject_block):", classes="field_label")
+                            with Horizontal(classes="field_row"):
+                                yield Input(value=str(target_val), id="inp_target")
+                                yield Button("Browse", id="btn_browse_target", variant="primary")
 
-                    yield Label("Block ID (inject_block):", classes="field_label")
-                    yield Input(value=str(block_id_val), id="inp_block_id")
+                            yield Label("Block ID (inject_block):", classes="field_label")
+                            yield Input(value=str(block_id_val), id="inp_block_id")
 
-                    yield Label("Start Directory ({file_picker} / {dir_picker}):", classes="field_label")
-                    with Horizontal(classes="field_row"):
-                        yield Input(value=str(start_dir_val), id="inp_start_dir")
-                        yield Button("Browse", id="btn_browse_start_dir", variant="primary")
+                            yield Label("Start Directory ({file_picker} / {dir_picker}):", classes="field_label")
+                            with Horizontal(classes="field_row"):
+                                yield Input(value=str(start_dir_val), id="inp_start_dir")
+                                yield Button("Browse", id="btn_browse_start_dir", variant="primary")
 
-                    yield Label("Tabstop:", classes="field_label")
-                    yield Input(value=str(tabstop_val), id="inp_tabstop")
+                            yield Label("Tabstop:", classes="field_label")
+                            yield Input(value=str(tabstop_val), id="inp_tabstop")
 
-                    yield Label("Execution Mode:", classes="field_label")
-                    yield ExecModeContainer(selected_mode_idx=initial_mode_idx, id="exec_mode_container")
+                            yield Label("Execution Mode:", classes="field_label")
+                            yield ExecModeContainer(selected_mode_idx=initial_mode_idx, id="exec_mode_container")
 
-                    chk_alt = Checkbox(
-                        "Run in Alternate Screen Buffer (alt_buffer=true)",
-                        value=bool(self.item.get("alt_buffer", True)),
-                        id="chk_alt_buffer",
-                    )
-                    chk_alt.display = initial_mode_idx != 0
-                    yield chk_alt
-                    yield Checkbox("Disable Formatting (no_formatting=true)", value=bool(self.item.get("no_formatting", False)), id="chk_no_formatting")
-                    yield Checkbox("Mask Input (masked=true)", value=bool(self.item.get("masked", False)), id="chk_masked")
-                    yield Checkbox("Refresh Environment (refresh=true)", value=bool(self.item.get("refresh", False)), id="chk_refresh")
-                    yield Checkbox("Show Whitespace in Editor (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_show_whitespace")
-                    yield Checkbox("External Execution (external=true)", value=bool(self.item.get("external", False)), id="chk_external")
+                            chk_alt = Checkbox(
+                                "Run in Alternate Screen Buffer (alt_buffer=true)",
+                                value=bool(self.item.get("alt_buffer", True)),
+                                id="chk_alt_buffer",
+                            )
+                            chk_alt.display = initial_mode_idx != 0
+                            yield chk_alt
+                            yield Checkbox("Disable Formatting (no_formatting=true)", value=bool(self.item.get("no_formatting", False)), id="chk_no_formatting")
+                            yield Checkbox("Mask Input (masked=true)", value=bool(self.item.get("masked", False)), id="chk_masked")
+                            yield Checkbox("Refresh Environment (refresh=true)", value=bool(self.item.get("refresh", False)), id="chk_refresh")
+                            yield Checkbox("Show Whitespace in Editor (show_whitespace=true)", value=bool(self.item.get("show_whitespace", False)), id="chk_show_whitespace")
+                            yield Checkbox("External Execution (external=true)", value=bool(self.item.get("external", False)), id="chk_external")
 
-                    yield Label("Preview:", classes="field_label")
-                    yield Static("", id="lbl_item_preview", classes="divider_preview_box")
+                            yield Label("Preview:", classes="field_label")
+                            yield Static("", id="lbl_item_preview", classes="divider_preview_box")
 
-            with Horizontal(id="buttons"):
-                yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
-                yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
+                    with Horizontal(id="buttons"):
+                        yield Button("Save Changes [CTRL+S]", variant="primary", id="btn_save")
+                        yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
 
-            with Vertical(id="footer"):
-                with Horizontal(classes="footer_row"):
-                    yield Label("[F1] Help", id="lbl_modal_help", classes="footer_item", markup=False)
-                    yield Label("|", classes="footer_sep", markup=False)
-                    yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
-                    yield Label("|", classes="footer_sep", markup=False)
-                    yield Label("[CTRL+T] Type", id="lbl_modal_type", classes="footer_item", markup=False)
-                with Horizontal(classes="footer_row"):
-                    yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
-                    yield Label("|", classes="footer_sep", markup=False)
-                    yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
-                    yield Label("|", classes="footer_sep", markup=False)
-                    yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
+                    with Vertical(id="footer"):
+                        with Horizontal(classes="footer_row"):
+                            yield Label("[F1] Help", id="lbl_modal_help", classes="footer_item", markup=False)
+                            yield Label("|", classes="footer_sep", markup=False)
+                            yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
+                            yield Label("|", classes="footer_sep", markup=False)
+                            yield Label("[CTRL+T] Type", id="lbl_modal_type", classes="footer_item", markup=False)
+                        with Horizontal(classes="footer_row"):
+                            yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
+                            yield Label("|", classes="footer_sep", markup=False)
+                            yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
+                            yield Label("|", classes="footer_sep", markup=False)
+                            yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
+                yield bashmenu_ui.ShadowWidget(id="shadow_right")
+            yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
@@ -1138,7 +1157,7 @@ class ItemEditModal(ModalScreen[dict]):
                     self.item[primary_key] = new_action
 
             if item_type == "submenu":
-                self.item.setdefault("submenu", {"title": new_title or "Submenu", "options": []})
+                self.item.setdefault("submenu", {"title": new_title or "Submenu", "items": [], "options": []})
             elif orig_type == "submenu":
                 self.item.pop("submenu", None)
 
@@ -1491,6 +1510,12 @@ class MenuEditScreen(Screen):
         super().__init__()
         self.menu_file_path = menu_file_path or bashmenu.MENU_FILE
         self.menu_data, _ = bashmenu.load_yaml_file(self.menu_file_path)
+        if isinstance(self.menu_data, dict):
+            norm_items = bashmenu.normalize_menu_items(self.menu_data.get("items", self.menu_data.get("options", [])))
+            self.menu_data["items"] = norm_items
+            self.menu_data["options"] = norm_items
+        elif not self.menu_data:
+            self.menu_data = {"version": "0.0.1", "title": "Main Menu", "items": [], "options": []}
         self.selected_item = selected_item
         self.title_chain = title_chain or []
         self.raw_theme = theme
@@ -1834,7 +1859,7 @@ class MenuEditScreen(Screen):
         root_title = self.menu_data.get("title", "Root Menu")
         tree.root.label = f"[MNU] {root_title}"
 
-        opts = self.menu_data.get("options", [])
+        opts = self.menu_data.get("items", self.menu_data.get("options", []))
         self._build_tree_branch(tree.root, opts)
         tree.root.expand()
 
@@ -1876,7 +1901,7 @@ class MenuEditScreen(Screen):
             node = parent_node.add(node_label, data=item)
 
             if item_type == "submenu" or "submenu" in item:
-                sub_opts = item.get("submenu", {}).get("options", [])
+                sub_opts = item.get("submenu", {}).get("items", item.get("submenu", {}).get("options", []))
                 self._build_tree_branch(node, sub_opts)
                 node.expand()
 
@@ -1989,8 +2014,8 @@ class MenuEditScreen(Screen):
                 lines.append(f"[dim]Flags: {', '.join(flags)}[/dim]")
 
             if "submenu" in item:
-                sub_opts = item.get("submenu", {}).get("options", [])
-                lines.append(f"[bold magenta]Submenu Options:[/bold magenta] {len(sub_opts)} items")
+                sub_opts = item.get("submenu", {}).get("items", item.get("submenu", {}).get("options", []))
+                lines.append(f"[bold magenta]Submenu Items:[/bold magenta] {len(sub_opts)} items")
 
             known_keys = {
                 "type",
@@ -2026,6 +2051,7 @@ class MenuEditScreen(Screen):
                 "display_theme_colors",
                 "tabstop",
                 "submenu",
+                "items",
                 "options",
                 "char",
                 "length",
@@ -2107,7 +2133,7 @@ class MenuEditScreen(Screen):
                         item[new_pk] = val
 
                 if selected_type == "submenu":
-                    item.setdefault("submenu", {"title": item.get("title") or item.get("label") or "Submenu", "options": []})
+                    item.setdefault("submenu", {"title": item.get("title") or item.get("label") or "Submenu", "items": [], "options": []})
                 elif orig_type == "submenu":
                     item.pop("submenu", None)
 
@@ -2140,7 +2166,7 @@ class MenuEditScreen(Screen):
             else:
                 new_item = {"type": selected_type, "title": f"New {selected_type}"}
                 if selected_type == "submenu":
-                    new_item["submenu"] = {"title": f"New {selected_type}", "options": []}
+                    new_item["submenu"] = {"title": f"New {selected_type}", "items": [], "options": []}
 
             def edit_cb(final_item):
                 if final_item:
@@ -2153,8 +2179,10 @@ class MenuEditScreen(Screen):
                         parent_data = cursor_node.data
                         if isinstance(parent_data, dict):
                             if "submenu" in parent_data:
+                                parent_data.setdefault("submenu", {}).setdefault("items", []).append(final_item)
                                 parent_data.setdefault("submenu", {}).setdefault("options", []).append(final_item)
                             else:
+                                parent_data.setdefault("items", []).append(final_item)
                                 parent_data.setdefault("options", []).append(final_item)
                     else:
                         res = self._find_item_parent_list(cursor_node.data)
@@ -2162,6 +2190,7 @@ class MenuEditScreen(Screen):
                             opts, idx = res
                             opts.insert(idx + 1, final_item)
                         else:
+                            self.menu_data.setdefault("items", []).append(final_item)
                             self.menu_data.setdefault("options", []).append(final_item)
 
                     self.modified = True
@@ -2183,9 +2212,9 @@ class MenuEditScreen(Screen):
                 parent = node.parent
                 if parent and isinstance(parent.data, dict):
                     opts = (
-                        parent.data.get("submenu", {}).get("options")
+                        parent.data.get("submenu", {}).get("items", parent.data.get("submenu", {}).get("options"))
                         if "submenu" in parent.data
-                        else parent.data.get("options")
+                        else parent.data.get("items", parent.data.get("options"))
                     )
                     if isinstance(opts, list) and node.data in opts:
                         opts.remove(node.data)
@@ -2204,19 +2233,20 @@ class MenuEditScreen(Screen):
                 if el is item_data:
                     return opts, idx
                 if isinstance(el, dict) and ("submenu" in el or el.get("type") == "submenu"):
-                    sub_opts = el.get("submenu", {}).get("options", [])
+                    sub_opts = el.get("submenu", {}).get("items", el.get("submenu", {}).get("options", []))
                     res = search(sub_opts)
                     if res:
                         return res
             return None
 
-        root_opts = self.menu_data.get("options", [])
+        root_opts = self.menu_data.get("items", self.menu_data.get("options", []))
         return search(root_opts)
 
     def _save_menu_quietly(self) -> None:
         with contextlib.suppress(Exception):
+            content = bashmenu.dump_menu_yaml(self.menu_data)
             with open(self.menu_file_path, "w", encoding="utf-8") as f:
-                yaml.dump(self.menu_data, f, sort_keys=False, default_flow_style=False)
+                f.write(content)
             self.modified = False
 
     def action_move_up(self) -> None:
@@ -2281,9 +2311,14 @@ class MenuEditScreen(Screen):
                     prev_sibling["type"] = "submenu"
                     prev_sibling["submenu"] = {
                         "title": prev_sibling.get("title") or prev_sibling.get("label", "Submenu"),
+                        "items": [],
                         "options": [],
                     }
-                prev_sibling.setdefault("submenu", {}).setdefault("options", []).append(opts.pop(idx))
+                sub_dict = prev_sibling.setdefault("submenu", {})
+                moved_item = opts.pop(idx)
+                sub_dict.setdefault("items", []).append(moved_item)
+                if "options" in sub_dict:
+                    sub_dict["options"] = sub_dict["items"]
                 self.selected_item = target_item
                 self.modified = True
                 self.populate_tree(target_item=target_item)
@@ -2316,7 +2351,7 @@ class MenuEditScreen(Screen):
     def action_save_menu(self) -> None:
         try:
             with open(self.menu_file_path, "w", encoding="utf-8") as f:
-                yaml.dump(self.menu_data, f, sort_keys=False, default_flow_style=False)
+                f.write(bashmenu.dump_menu_yaml(self.menu_data))
             self.modified = False
             self.app.push_screen(bashmenu_ui.MessageModalScreen("Save Menu", "Menu saved successfully to disk.", theme=self.theme_styles))
         except (yaml.YAMLError, OSError) as e:

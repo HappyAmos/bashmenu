@@ -161,6 +161,10 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 ### 4.1 Settings Store (`bashmenu.yml`)
 The settings file stores nested key-value pairs used throughout the menu.
+All entries can be referenced dynamically using the explicit `{app.<key>}`
+placeholder namespace (e.g. `{app.theme}`, `{app.settings.tabstop}`,
+`{app.user.postal_code}`) or shorthand shortcuts (`{theme}`,
+`{settings.<key>}`, `{user.<key>}`).
 Example:
 ```yaml
 theme: dracula
@@ -193,9 +197,40 @@ The `settings.plugins` setting specifies plugin scripts located in the configure
 | `pretext` | Text or placeholder rendered immediately before the plugin script output. |
 | `posttext` | Text or placeholder rendered immediately after the plugin script output. |
 
+#### Multi-Column Plugin Dashboard Layout:
+Plugins can be arranged horizontally into columns spanning the full width of the interface using a declarative `layout` configuration under `settings.plugins`:
+```yaml
+settings:
+  plugins:
+    layout:
+      type: table
+      width: "100%"          # Automatically divides available width equally across columns (e.g. 50/50, 33/33/33)
+      entries: 2             # Maximum entries per table row (default: 2)
+      headers: ["System", "Weather"]  # Optional column headers
+      # rows: [ ["uptime", "weather"] ] # Optional explicit row grouping
+    otd:
+      script: "otd.sh"
+      sleep: 300
+      standalone: true       # Renders on its own line stretching across the screen without table borders
+      pretext: '{user.divider}'
+      posttext: '{user.divider}'
+    uptime:
+      script: "uptime.sh"
+      sleep: 30
+    weather:
+      script: "curl -s 'wttr.in?format=3'"
+      sleep: 300
+    disk:
+      script: "disk.sh"
+      sleep: 60
+```
+- **Automatic Multi-Table Chunking (`entries: N`)**: When `entries: 2` is set and `rows` is omitted, plugins are automatically grouped into 2-column tables. If a 3rd plugin is encountered, a new table is constructed, spanning the screen on its own or grouping with subsequent plugins.
+- **Standalone Plugins (`standalone: true` or `span: full`)**: Full-width plugins (such as quote-of-the-day or system banners) can stretch across the entire screen on their own without table borders, sitting above or below multi-column tables.
+- **Asynchronous Execution**: Each plugin continues running asynchronously in its own background worker thread honoring its own `sleep` interval without blocking the user interface. Content within each cell automatically wraps cleanly when lines exceed the column width.
+
 Dividers can be defined under `user.divider` (or `settings.divider`) with full specifications including `char` (e.g., `{ascii:196}` or `-`) and `length` (e.g., `{window_width}` or `40`). Using `{user.divider}` or `{divider}` in `pretext` or `posttext` expands to a styled divider line matching the active theme's configured divider color.
 
-The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). The engine parses, interpolates, and renders as many non-empty badges as can fit within the remaining terminal width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
+The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). Neither the status gutter nor the left-aligned help gutter ever exceeds 50% of the screen width. Badges and help action items are delimited by pipe symbols (`|`) and treated as atomic units. When text exceeds 50% of the screen width, overlapping items drop to the next line. Neither gutter ever exceeds two lines, with two lines being the maximum allowed height.
 
 Available status gutter placeholders (badges) include:
 
@@ -266,6 +301,7 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 | `button_cancel` | Modal dialog cancel action button color. |
 | `button_success` | Modal dialog success action button color. |
 | `scrollbar` | Scroll bar thumb (foreground) and track (background) colors. |
+| `whitespace` | Non-visible whitespace characters (spaces, tabs, newlines) display color in the text editor. |
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 
@@ -416,12 +452,13 @@ These variables are dynamically resolved using active configuration and environm
 | `{time_24}` | 24-hour formatted time (e.g., `15:00:00`). |
 | `{time_24_short}` | Short 24-hour formatted time (e.g., `15:00`). |
 | `{battery}` | Current battery percentage (e.g., `84%`, or `N/A` if no battery is detected). Performance-optimized with a 5-second cache to prevent rendering lag. |
+| `{theme}` | Active color theme name from `bashmenu.yml` (e.g., `tokyo_night`, `dracula`). |
 | `{localip}` | Primary outbound IPv4 address (e.g., `192.168.1.50`). Evaluated on demand via UDP socket probe with TTL cache. |
 | `{utc_seconds}` | Current UTC time in seconds since epoch. |
 | `{window_width}` | Current active window width in character columns. |
 | `{window_height}` | Current active window height in character lines. |
 | `{ascii:decimal}` | Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`). |
-| `{<key.path>}` / `{settings.dot_key}` / `{user.dot_key}` | Resolves any nested configuration path from `bashmenu.yml` (e.g. `{settings.cache_dir}`, `{user.editor}`, `{user.divider}`). |
+| `{app.<key.path>}` / `{<key.path>}` | Resolves any configuration path from `bashmenu.yml` using the explicit `{app.<key>}` namespace (e.g., `{app.theme}`, `{app.settings.tabstop}`, `{app.user.postal_code}`) or shorthand format (e.g., `{settings.cache_dir}`, `{user.editor}`). |
 | `{command:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces, 30.0s cache, and 3.0s execution timeout). |
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
@@ -473,6 +510,9 @@ The application includes a rich formatting parser allowing developers to use inl
 | `[dim]text[/dim]` | Renders text with **dimmed** contrast (Rich `Style(dim=True)`). |
 | `[reverse]text[/reverse]` | Renders text in **reversed** foreground/background contrast (Rich `Style(reverse=True)`). |
 | `[color=color_name]text[/color]` | Renders text in a custom theme color. |
+| `[table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]` | Renders an aligned Unicode box-drawing table (`┌─┬─┐`, `│ │ │`, `├─┼─┤`, `└─┴─┘`) with auto-sized or percentage column widths (e.g. 50/50, 33/33/33), bold headers, and in-cell text wrapping. |
+| `[list][*]Item 1[*]Item 2[/list]` | Renders an unordered bulleted list (`• Item 1`). Closing `[/*]` tags are optional. |
+| `[list=1][*]Item 1[*]Item 2[/list]` | Renders an ordered numbered list (`1. Item 1`, `2. Item 2`). |
 
 #### Theme Colors Available:
 

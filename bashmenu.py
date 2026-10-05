@@ -226,6 +226,67 @@ def split_gutter_badges(gutter_str):
     return [b for b in badges if b]
 
 
+def truncate_to_visible_len(text, max_w, config=None):
+    """Truncate text so its display width does not exceed max_w."""
+    if not text or max_w <= 0:
+        return ""
+    if get_visible_len(text, config) <= max_w:
+        return text
+    low, high = 1, len(text)
+    best = 0
+    while low <= high:
+        mid = (low + high) // 2
+        if get_visible_len(text[:mid], config) <= max_w:
+            best = mid
+            low = mid + 1
+        else:
+            high = mid - 1
+    return text[:best]
+
+
+def wrap_gutter_items(items, max_w, max_lines=2, config=None):
+    """Wrap a list of gutter badge/action items separated by ' | ' into at most max_lines,
+    treating each item as an atomic token and ensuring each line does not exceed max_w.
+    """
+    if not items:
+        return []
+
+    lines = []
+    current_line = []
+
+    for item in items:
+        item_str = str(item).strip()
+        if not item_str:
+            continue
+
+        if not current_line:
+            candidate = item_str
+        else:
+            candidate = " | ".join(current_line) + " | " + item_str
+
+        cand_len = get_visible_len(candidate, config)
+        if cand_len <= max_w:
+            current_line.append(item_str)
+        else:
+            # Overlapping item drops to the next line
+            if len(lines) < max_lines - 1:
+                if current_line:
+                    lines.append(" | ".join(current_line))
+                    current_line = []
+                if get_visible_len(item_str, config) <= max_w:
+                    current_line.append(item_str)
+                else:
+                    current_line.append(truncate_to_visible_len(item_str, max_w, config))
+            else:
+                # Already reached maximum allowed lines (max_lines); stop accepting more items
+                break
+
+    if current_line and len(lines) < max_lines:
+        lines.append(" | ".join(current_line))
+
+    return lines[:max_lines]
+
+
 _primary_ip = None
 
 
@@ -375,24 +436,45 @@ def deep_merge(dict1, dict2):
 
 
 def get_config_value(config, key_path, default=None):
-    """Retrieve value from nested dict using dot-notation string."""
-    if not key_path or not isinstance(key_path, str):
+    """Retrieve value from nested dict using dot-notation string.
+    Supports optional 'app.' or 'bashmenu.' namespace prefixes.
+    """
+    if not key_path or not isinstance(key_path, str) or not isinstance(config, dict):
         return default
     keys = key_path.split(".")
     curr = config
+    found = True
     for k in keys:
         if isinstance(curr, dict) and k in curr:
             curr = curr[k]
         else:
-            return default
-    return curr
+            found = False
+            break
+    if found:
+        return curr
+
+    # If not found directly, check for 'app.' or 'bashmenu.' alias prefix
+    if len(keys) > 1 and keys[0] in ("app", "bashmenu"):
+        sub_curr = config
+        for k in keys[1:]:
+            if isinstance(sub_curr, dict) and k in sub_curr:
+                sub_curr = sub_curr[k]
+            else:
+                return default
+        return sub_curr
+
+    return default
 
 
 def set_config_value(config, key_path, value):
-    """Set value in nested dict using dot-notation string."""
-    if not key_path or not isinstance(key_path, str):
+    """Set value in nested dict using dot-notation string.
+    Supports optional 'app.' or 'bashmenu.' namespace prefixes.
+    """
+    if not key_path or not isinstance(key_path, str) or not isinstance(config, dict):
         return False
     keys = key_path.split(".")
+    if len(keys) > 1 and keys[0] in ("app", "bashmenu") and keys[0] not in config:
+        keys = keys[1:]
     curr = config
     for k in keys[:-1]:
         if k not in curr or not isinstance(curr[k], dict):
@@ -609,7 +691,17 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{user-mode}": "Root" if os.geteuid() == 0 else "User",
         "{version}": __version__,
         "{localip}": get_primary_ip() if "{localip}" in res_text else PRIMARY_IP,
+        "{theme}": str(get_config_value(config, "theme", "dracula")),
+        "{app.theme}": str(get_config_value(config, "theme", "dracula")),
     }
+
+    if isinstance(config, dict):
+        for ck, cv in config.items():
+            if not isinstance(cv, (dict, list)):
+                if f"{{{ck}}}" not in placeholders:
+                    placeholders[f"{{{ck}}}"] = str(cv)
+                if f"{{app.{ck}}}" not in placeholders:
+                    placeholders[f"{{app.{ck}}}"] = str(cv)
 
     if extra_vars:
         for k, v in extra_vars.items():
@@ -625,7 +717,12 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     def replace_dot_var(match):
         key_path = match.group(1)
         val = get_config_value(config, key_path)
-        if key_path in ("user.divider", "settings.divider") or (isinstance(val, dict) and ("char" in val or "length" in val)):
+        if key_path in (
+            "user.divider",
+            "settings.divider",
+            "app.user.divider",
+            "app.settings.divider",
+        ) or (isinstance(val, dict) and ("char" in val or "length" in val)):
             return resolve_divider_string(config, extra_vars=extra_vars)
         return str(val) if val is not None else match.group(0)
 
@@ -642,8 +739,12 @@ def is_divider(opt) -> bool:
     Only strictly recognizes '{divider}' (quoted or unquoted YAML '{divider}'),
     never plain 'divider'.
     """
+    if opt == "{divider}":
+        return True
     if not isinstance(opt, dict):
         return False
+    if "{divider}" in opt:
+        return True
     t = opt.get("type")
     return t == "{divider}" or bool(isinstance(t, dict) and "divider" in t)
 
@@ -713,7 +814,13 @@ def load_yaml_file(filename):
         return None, f"Error reading '{filename}': {exc}"
 
 
-_config_has_load_error = False
+CONFIG_HEADER = """# ==============================================================================
+# BashMenu Configuration (bashmenu.yml)
+# All keys defined in this file can be referenced via placeholders using the
+# '{app.<key>}' namespace (e.g. {app.theme}, {app.settings.tabstop}, {app.user.postal_code}),
+# or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
+# ==============================================================================
+"""
 
 
 def save_config(config):
@@ -721,8 +828,9 @@ def save_config(config):
     if _config_has_load_error:
         return
     try:
+        content = yaml.dump(config, default_flow_style=False, sort_keys=False)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            f.write(CONFIG_HEADER + content)
     except Exception:  # noqa: BLE001, S110
         pass
 
@@ -750,7 +858,7 @@ def build_dynamic_theme_submenu():
     Construct a menu structure dictionary populated with available color themes.
     """
     themes = bashmenu_ui.load_themes_file()
-    options = [
+    items = [
         {
             "type": "{divider}",
         }
@@ -758,54 +866,206 @@ def build_dynamic_theme_submenu():
     if themes:
         for theme_key in themes:
             formatted_name = theme_key.replace("_", " ").title()
-            options.append({
+            items.append({
                 "title": formatted_name,
                 "label": formatted_name,
                 "set_theme": theme_key,
                 "icon": "{nf::#f0301:🎨}",
             })
-    options.append({
+    items.append({
         "type": "{divider}",
     })
-    options.append({
+    items.append({
         "title": "Back to Options & Settings",
         "label": "Back to Options & Settings",
         "type": "back",
         "icon": "{nf::#f048}",
     })
-    return {"title": "Select Color Theme", "options": options}
+    return {"title": "Select Color Theme", "items": items, "options": items}
 
 
 def inject_dynamic_menus(menu_item):
     """
-    Recursively replace 'theme_selector' options with dynamic theme submenus.
+    Recursively replace 'theme_selector' items with dynamic theme submenus.
     """
     if not isinstance(menu_item, dict):
         return
-    options = menu_item.get("options", [])
-    for idx, opt in enumerate(options):
+    items = menu_item.get("items", menu_item.get("options", []))
+    for idx, opt in enumerate(items):
         if not isinstance(opt, dict):
             continue
         if opt.get("type") == "theme_selector":
-            options[idx]["title"] = opt.get("title", opt.get("label", "Change Theme"))
-            options[idx]["submenu"] = build_dynamic_theme_submenu()
+            title = opt.get("title", opt.get("label", "Change Theme"))
+            items[idx]["title"] = title
+            items[idx]["label"] = title
+            items[idx]["submenu"] = build_dynamic_theme_submenu()
         elif "submenu" in opt:
             inject_dynamic_menus(opt["submenu"])
+
+
+def normalize_menu_items(items):
+    """Normalize menu items list from either the new format (list of {label: props} or '{divider}')
+    or legacy format (list of {label: ..., type: ...}).
+    Returns a canonical list of item dicts with 'label', 'type', etc.
+    """
+    if not isinstance(items, list):
+        return []
+    normalized = []
+    for raw in items:
+        if raw is None:
+            continue
+        if is_divider(raw):
+            normalized.append({"type": "{divider}"})
+            continue
+        if isinstance(raw, str):
+            normalized.append({"label": raw, "type": "command", "action": raw})
+            continue
+        if not isinstance(raw, dict):
+            continue
+
+        if "label" in raw and ("type" in raw or "action" in raw or "submenu" in raw or len(raw) > 1):
+            item = dict(raw)
+            if "submenu" in item and isinstance(item["submenu"], dict):
+                sub = dict(item["submenu"])
+                sub_items = normalize_menu_items(sub.get("items", sub.get("options", [])))
+                sub["items"] = sub_items
+                sub["options"] = sub_items
+                item["submenu"] = sub
+            normalized.append(item)
+            continue
+
+        if len(raw) == 1:
+            lbl = next(iter(raw))
+            val = raw[lbl]
+            if val is None:
+                item = {"label": lbl}
+            elif isinstance(val, dict):
+                item = dict(val)
+                item["label"] = lbl
+                if "submenu" in item and isinstance(item["submenu"], dict):
+                    sub = dict(item["submenu"])
+                    sub_items = normalize_menu_items(sub.get("items", sub.get("options", [])))
+                    sub["items"] = sub_items
+                    sub["options"] = sub_items
+                    item["submenu"] = sub
+            else:
+                item = {"label": lbl, "action": str(val)}
+            normalized.append(item)
+        else:
+            item = dict(raw)
+            if "submenu" in item and isinstance(item["submenu"], dict):
+                sub = dict(item["submenu"])
+                sub_items = normalize_menu_items(sub.get("items", sub.get("options", [])))
+                sub["items"] = sub_items
+                sub["options"] = sub_items
+                item["submenu"] = sub
+            normalized.append(item)
+
+    return normalized
 
 
 def load_menu():
     """Load menu structure definition from bashmenu.mnu."""
     data, err = load_yaml_file(MENU_FILE)
     if err:
+        err_items = [
+            {"label": f"Error: {err}"},
+            {"label": "Exit Utility", "type": "exit"},
+        ]
         return {
             "title": "YAML Configuration Error",
-            "options": [
-                {"label": f"Error: {err}"},
-                {"label": "Exit Utility", "type": "exit"},
-            ],
+            "items": err_items,
+            "options": err_items,
         }, err
+    if isinstance(data, dict):
+        norm_items = normalize_menu_items(data.get("items", data.get("options", [])))
+        data["items"] = norm_items
+        data["options"] = norm_items
     inject_dynamic_menus(data)
     return data, None
+
+
+DEFAULT_MENU_PRUNES = {
+    "stream": False,
+    "masked": False,
+    "show_whitespace": False,
+    "refresh": False,
+    "no_formatting": False,
+    "external": False,
+    "alt_buffer": False,
+}
+
+
+class IndentedDumper(yaml.SafeDumper):
+    """YAML safe dumper that indents sequences under mapping keys."""
+
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow=False, indentless=False)
+
+
+def _represent_none(dumper, data):
+    return dumper.represent_scalar("tag:yaml.org,2002:null", "")
+
+
+IndentedDumper.add_representer(type(None), _represent_none)
+
+
+def serialize_menu_item_for_save(item):
+    """Serialize a normalized item dictionary into clean label-as-key mapping."""
+    if not isinstance(item, dict):
+        if item == "{divider}":
+            return {"{divider}": None}
+        return item
+
+    if item.get("type") == "{divider}" or "{divider}" in item:
+        return {"{divider}": None}
+
+    label = item.get("label") or item.get("title") or "Unnamed"
+    props = {}
+    item_type = item.get("type", "command")
+
+    for k, v in item.items():
+        if k in ("label", "title") and k == ("label" if "label" in item else "title"):
+            continue
+        if k in DEFAULT_MENU_PRUNES and v == DEFAULT_MENU_PRUNES[k]:
+            continue
+        if k == "tabstop" and item_type != "editor":
+            continue
+        if k == "command" and v == item.get("action"):
+            continue
+        if k == "submenu" and isinstance(v, dict):
+            sub = {"title": v.get("title", label)}
+            sub_items = v.get("items", v.get("options", []))
+            sub["items"] = [serialize_menu_item_for_save(x) for x in sub_items]
+            props["submenu"] = sub
+        else:
+            props[k] = v
+
+    if not props:
+        return {label: None}
+    return {label: props}
+
+
+def serialize_menu_data(menu_data):
+    """Serialize menu data dictionary into clean items schema."""
+    if not isinstance(menu_data, dict):
+        return menu_data
+    items = menu_data.get("items", menu_data.get("options", []))
+    res = {
+        "version": menu_data.get("version", "0.0.1"),
+        "title": menu_data.get("title", "Bash Menu"),
+        "items": [serialize_menu_item_for_save(x) for x in items],
+    }
+    for k, v in menu_data.items():
+        if k not in ("version", "title", "items", "options"):
+            res[k] = v
+    return res
+
+
+def dump_menu_yaml(menu_data) -> str:
+    """Dump menu data dictionary into YAML string formatted per clean items schema."""
+    clean = serialize_menu_data(menu_data)
+    return yaml.dump(clean, Dumper=IndentedDumper, sort_keys=False, default_flow_style=False, allow_unicode=True)
 
 
 ANSI_ESCAPE_RE = re.compile(
@@ -1003,8 +1263,12 @@ class PluginBuffer(Static):
             if self.screen and self.screen.menu_view and self.screen.menu_view.config:
                 cfg = self.screen.menu_view.config
 
+        plugins_dict = cfg.get("settings", {}).get("plugins", {})
+        layout = plugins_dict.get("layout") if isinstance(plugins_dict, dict) else None
+        is_table_layout = isinstance(layout, dict) and layout.get("type") == "table"
+
         raw_plugin_lines = get_plugin_outputs(cfg)
-        if not raw_plugin_lines:
+        if not is_table_layout and not raw_plugin_lines:
             return Text()
 
         theme_styles = bashmenu_ui.init_theme_colors(cfg.get("theme", "dracula"))
@@ -1041,6 +1305,131 @@ class PluginBuffer(Static):
         lines_to_display = raw_plugin_lines[:max_rows]
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": max_rows}
 
+        plugins_dict = cfg.get("settings", {}).get("plugins", {})
+        layout = plugins_dict.get("layout") if isinstance(plugins_dict, dict) else None
+        if isinstance(layout, dict) and layout.get("type") == "table":
+            width_spec = layout.get("width", "100%")
+            headers = layout.get("headers", [])
+            max_entries = layout.get("entries") or layout.get("columns") or 2
+            try:
+                max_entries = max(1, int(max_entries))
+            except (ValueError, TypeError):
+                max_entries = 2
+
+            raw_rows = layout.get("rows")
+            if raw_rows and isinstance(raw_rows, list):
+                rows = [list(r) if isinstance(r, (list, tuple)) else [r] for r in raw_rows]
+            else:
+                # Group plugins automatically according to max_entries, honoring standalone/span
+                rows = []
+                cur_row = []
+                for p_name, p_val in plugins_dict.items():
+                    if p_name in ("layout", "_layout") or not isinstance(p_val, dict):
+                        continue
+                    is_standalone = p_val.get("standalone") or (p_val.get("span") in ("full", 1))
+                    if is_standalone:
+                        if cur_row:
+                            rows.append(cur_row)
+                            cur_row = []
+                        rows.append([p_name])
+                    else:
+                        cur_row.append(p_name)
+                        if len(cur_row) >= max_entries:
+                            rows.append(cur_row)
+                            cur_row = []
+                if cur_row:
+                    rows.append(cur_row)
+
+            rendered_blocks = []
+            has_content = False
+
+            for r in rows:
+                if not r:
+                    continue
+
+                # Check if this row is a single standalone plugin
+                if len(r) == 1:
+                    p_name = r[0]
+                    p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
+                    is_standalone = p_cfg.get("standalone") or (p_cfg.get("span") in ("full", 1))
+                    if is_standalone:
+                        with _plugin_lock:
+                            cache_entry = _plugin_output_cache.get(p_name)
+                        lines = cache_entry["lines"] if cache_entry else []
+                        pre = p_cfg.get("pretext")
+                        post = p_cfg.get("posttext")
+                        if lines:
+                            has_content = True
+                            full_lines = ([pre] if pre else []) + list(lines) + ([post] if post else [])
+                        elif pre or post:
+                            full_lines = ([pre] if pre else []) + ([post] if post else [])
+                        else:
+                            full_lines = []
+
+                        if full_lines:
+                            block_text = "\n".join(full_lines)
+                            interp = interpolate_placeholders(block_text, cfg, extra_vars=extra_vars)
+                            rt = bashmenu_ui.formatting_to_rich_text(
+                                interp, default_style=plugin_style, theme=theme_styles, avail_width=buffer_w
+                            )
+                            rendered_blocks.append(rt)
+                        continue
+
+                # Multi-cell or non-standalone single cell: construct a table for this row
+                row_has_data = False
+                row_cells = []
+                for p_name in r:
+                    with _plugin_lock:
+                        cache_entry = _plugin_output_cache.get(p_name)
+                    lines = cache_entry["lines"] if cache_entry else []
+                    p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
+                    pre = p_cfg.get("pretext")
+                    post = p_cfg.get("posttext")
+                    if lines:
+                        row_has_data = True
+                        has_content = True
+                        full_lines = ([pre] if pre else []) + list(lines) + ([post] if post else [])
+                    elif pre or post:
+                        full_lines = ([pre] if pre else []) + ([post] if post else [])
+                    else:
+                        full_lines = []
+                    cell_text = "\n".join(full_lines)
+                    row_cells.append(f"[td]{cell_text}[/td]")
+
+                if row_has_data or headers:
+                    table_parts = [f"[table width={width_spec}]"]
+                    if headers and len(headers) == len(r):
+                        table_parts.append("[tr]" + "".join(f"[th]{h}[/th]" for h in headers) + "[/tr]")
+                    table_parts.append("[tr]" + "".join(row_cells) + "[/tr]")
+                    table_parts.append("[/table]")
+                    table_bb = "".join(table_parts)
+                    table_interp = interpolate_placeholders(table_bb, cfg, extra_vars=extra_vars)
+                    rt = bashmenu_ui.formatting_to_rich_text(
+                        table_interp, default_style=plugin_style, theme=theme_styles, avail_width=buffer_w
+                    )
+                    rendered_blocks.append(rt)
+
+            if not has_content or not rendered_blocks:
+                return Text()
+
+            # Combine all rendered blocks
+            all_lines = []
+            for b in rendered_blocks:
+                all_lines.extend(b.split("\n"))
+
+            rt_lines = all_lines[:10]
+            out = Text()
+            for idx, r_line in enumerate(rt_lines):
+                if r_line.cell_len > buffer_w:
+                    r_line.truncate(buffer_w)
+                pad_w = max(0, buffer_w - r_line.cell_len)
+                if pad_w > 0:
+                    r_line.append(" " * pad_w, style=bg_style)
+                out.append_text(r_line)
+                if idx < len(rt_lines) - 1:
+                    out.append("\n")
+            return out
+
         out = Text()
         for idx, p_line in enumerate(lines_to_display):
             clean_line = (
@@ -1060,7 +1449,7 @@ class PluginBuffer(Static):
                 p_content_rich = Text.from_ansi(p_line_interp)
             else:
                 p_content_rich = bashmenu_ui.formatting_to_rich_text(
-                    p_line_interp, default_style=plugin_style, theme=theme_styles
+                    p_line_interp, default_style=plugin_style, theme=theme_styles, avail_width=buffer_w
                 )
 
             if p_content_rich.cell_len > buffer_w:
@@ -1091,6 +1480,10 @@ class MainMenuView(Widget):
     def __init__(self, config=None, menu_data=None, **kwargs):
         super().__init__(**kwargs)
         self.config = config or load_config()[0]
+        if menu_data and isinstance(menu_data, dict):
+            norm_items = normalize_menu_items(menu_data.get("items", menu_data.get("options", [])))
+            menu_data["items"] = norm_items
+            menu_data["options"] = norm_items
         self.menu_data = menu_data or load_menu()[0]
         self.menu_stack = [self.menu_data]
         self.selected_rows = [0]
@@ -1104,7 +1497,7 @@ class MainMenuView(Widget):
         return self.selected_rows[-1]
 
     def set_current_row(self, row: int) -> None:
-        opts = self.current_menu().get("options", [])
+        opts = self.current_menu().get("items", self.current_menu().get("options", []))
         if opts:
             self.selected_rows[-1] = max(0, min(row, len(opts) - 1))
             self.refresh()
@@ -1135,7 +1528,7 @@ class MainMenuView(Widget):
 
         curr_menu = self.current_menu()
         curr_row = self.current_row()
-        options = curr_menu.get("options", [])
+        options = curr_menu.get("items", curr_menu.get("options", []))
 
         theme_name = self.config.get("theme", "dracula")
         theme_styles = bashmenu_ui.init_theme_colors(theme_name)
@@ -1179,11 +1572,31 @@ class MainMenuView(Widget):
         # 1. Printable dimensions (2-character margins on left and right inside border)
         avail_w = max(20, w - 6)
         screen_div_w = max(20, w - 2)
-        # Content rows available for menu options & plugins (excludes top border, 2-row top margin, help/status gutter row, and bottom border)
-        total_content_rows = max(1, h - 5)
+        max_gutter_w = max(5, avail_w // 2)
+
+        # Status and help gutters wrapping (max 50% screen width, max 2 lines)
+        if self.show_shortcuts:
+            full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back"
+        else:
+            full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back"
+        raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
+        help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config)
+
+        status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
+        raw_badges = split_gutter_badges(status_gutter_raw)
+        init_extra_vars = {"window_width": avail_w, "screen_width": screen_div_w}
+        all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars).strip() for b in raw_badges if b.strip()]
+        all_badges = [b for b in all_badges if b]
+        status_lines = wrap_gutter_items(all_badges, max_gutter_w, max_lines=2, config=self.config)
+
+        gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))
+
+        # Content rows available for menu options & plugins (excludes top border, 2-row top margin, gutter rows, and bottom border)
+        total_content_rows = max(1, h - 4 - gutter_rows)
 
         # 2. Plugin lines and row allocation
         raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
+        self.visible_option_rows = visible_option_rows
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
 
         # 3. Header border line: ┌──[ Title ]──┐
@@ -1371,67 +1784,34 @@ class MainMenuView(Widget):
             out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
             rendered_content_rows += 1
 
-        # 9. Help Keys & Status Gutter Row (h - 2)
-        help_variants = [
-            "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back",
-            "[UP/DN]: Nav | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back",
-            "[UP/DN]: Nav | [F1]: Help | [ESC]: Back",
-            "[F1]: Help",
-            "",
-        ] if self.show_shortcuts else [
-            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back",
-            "[UP/DN]: Nav | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back",
-            "[UP/DN]: Nav | [F1]: Help | [ESC]: Back",
-            "[F1]: Help",
-            "",
-        ]
+        # 9. Help Keys & Status Gutter Rows (up to 2 rows)
+        for r in range(gutter_rows):
+            h_text = help_lines[r] if r < len(help_lines) else ""
+            s_text = status_lines[r] if r < len(status_lines) else ""
+            h_len = get_visible_len(h_text, self.config)
+            s_len = get_visible_len(s_text, self.config)
+            footer_spaces = max(0, avail_w - h_len - s_len)
 
-        status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
-        raw_badges = split_gutter_badges(status_gutter_raw)
-        all_badges = [interpolate_placeholders(b, self.config, extra_vars=extra_vars) for b in raw_badges if b.strip()]
-        gutter_str = f"{' | '.join(all_badges)}" if all_badges else ""
+            hg_content = Text()
+            if h_text:
+                hg_content.append_text(bashmenu_ui.formatting_to_rich_text(h_text, default_style=help_text_style, theme=theme_styles))
+            if footer_spaces > 0:
+                hg_content.append(" " * footer_spaces, style=border_style)
+            if s_text:
+                hg_content.append_text(bashmenu_ui.formatting_to_rich_text(s_text, default_style=gutter_style, theme=theme_styles))
 
-        gutter_w = get_visible_len(gutter_str, self.config)
+            if hg_content.cell_len > avail_w:
+                hg_content.truncate(avail_w)
+            hg_pad_w = max(0, avail_w - hg_content.cell_len)
+            if hg_pad_w > 0:
+                hg_content.append(" " * hg_pad_w, style=border_style)
 
-        chosen_help = ""
-        for hv in help_variants:
-            hv_w = get_visible_len(hv, self.config)
-            if hv_w + (gutter_w + 2 if gutter_w else 0) <= avail_w:
-                chosen_help = hv
-                break
+            hg_line = Text(f"{b_v_left}  ", style=border_style)
+            hg_line.append_text(hg_content)
+            hg_line.append(f"  {b_v_right}\n", style=border_style)
+            out.append_text(hg_line)
 
-        if not chosen_help and help_variants:
-            chosen_help = help_variants[-2]
-            ch_w = get_visible_len(chosen_help, self.config)
-            avail_gutter_w = max(0, avail_w - ch_w - 2)
-            while all_badges and get_visible_len(f"{' | '.join(all_badges)}", self.config) > avail_gutter_w:
-                all_badges.pop()
-            gutter_str = f"{' | '.join(all_badges)}" if all_badges else ""
-            gutter_w = get_visible_len(gutter_str, self.config)
-
-        help_w = get_visible_len(chosen_help, self.config)
-        footer_spaces = max(0, avail_w - help_w - gutter_w)
-
-        hg_content = Text()
-        if chosen_help:
-            hg_content.append_text(bashmenu_ui.formatting_to_rich_text(chosen_help, default_style=help_text_style, theme=theme_styles))
-        if footer_spaces > 0:
-            hg_content.append(" " * footer_spaces, style=border_style)
-        if gutter_str:
-            hg_content.append_text(bashmenu_ui.formatting_to_rich_text(gutter_str, default_style=gutter_style, theme=theme_styles))
-
-        if hg_content.cell_len > avail_w:
-            hg_content.truncate(avail_w)
-        hg_pad_w = max(0, avail_w - hg_content.cell_len)
-        if hg_pad_w > 0:
-            hg_content.append(" " * hg_pad_w, style=border_style)
-
-        hg_line = Text(f"{b_v_left}  ", style=border_style)
-        hg_line.append_text(hg_content)
-        hg_line.append(f"  {b_v_right}\n", style=border_style)
-        out.append_text(hg_line)
-
-        # 9. Bottom Border Row (h - 1): └────────...────────┘
+        # 10. Bottom Border Row (h - 1): └────────...────────┘
         bot_bar = Text(b_bl + b_h_bot * max(0, w - 2) + b_br, style=border_style)
         out.append_text(bot_bar)
 
@@ -1440,12 +1820,14 @@ class MainMenuView(Widget):
     def on_click(self, event) -> None:
         rendered_row = event.y - 3
         curr_menu = self.current_menu()
-        options = curr_menu.get("options", [])
+        options = curr_menu.get("items", curr_menu.get("options", []))
         if not options:
             return
 
-        total_content_rows = max(1, (self.size.height or 24) - 5)
-        _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
+        visible_option_rows = getattr(self, "visible_option_rows", None)
+        if visible_option_rows is None:
+            total_content_rows = max(1, (self.size.height or 24) - 5)
+            _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
 
         scroll_start = 0
         curr_row = self.current_row()
@@ -1472,7 +1854,7 @@ class MainMenuView(Widget):
     def on_mouse_move(self, event) -> None:
         rendered_row = event.y - 3
         curr_menu = self.current_menu()
-        options = curr_menu.get("options", [])
+        options = curr_menu.get("items", curr_menu.get("options", []))
         if not options:
             return
 
@@ -1498,7 +1880,7 @@ def _get_active_title_chain(screen) -> list[str]:
         mv = getattr(screen, "menu_view", None)
         if mv:
             for m, r in zip(mv.menu_stack, mv.selected_rows):
-                opts = m.get("options", [])
+                opts = m.get("items", m.get("options", []))
                 if 0 <= r < len(opts):
                     opt = opts[r]
                     t = opt.get("title") or opt.get("label")
@@ -1520,7 +1902,7 @@ def process_item_action(screen, item, config):
     elif "submenu" in item:
         sub_menu = item["submenu"]
         screen.menu_view.menu_stack.append(sub_menu)
-        sub_options = sub_menu.get("options", [])
+        sub_options = sub_menu.get("items", sub_menu.get("options", []))
         start_idx = 0
         while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
             start_idx += 1
@@ -1545,7 +1927,7 @@ def process_item_action(screen, item, config):
         item["submenu"] = build_dynamic_theme_submenu()
         sub_menu = item["submenu"]
         screen.menu_view.menu_stack.append(sub_menu)
-        sub_options = sub_menu.get("options", [])
+        sub_options = sub_menu.get("items", sub_menu.get("options", []))
         start_idx = 0
         while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
             start_idx += 1
@@ -1993,7 +2375,7 @@ class BashMenuScreen(Screen):
 
     def on_key(self, event: Key) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("options", [])
+        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
         shortcut_chars = "123456789abcdefghijklmnopqrstuvwxyz"
 
         shortcut_map = {}
@@ -2017,7 +2399,7 @@ class BashMenuScreen(Screen):
 
     def action_move_up(self) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("options", [])
+        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
         if not opts:
             return
         orig = mv.current_row()
@@ -2028,7 +2410,7 @@ class BashMenuScreen(Screen):
 
     def action_move_down(self) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("options", [])
+        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
         if not opts:
             return
         orig = mv.current_row()
@@ -2039,7 +2421,7 @@ class BashMenuScreen(Screen):
 
     def action_move_home(self) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("options", [])
+        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
         idx = 0
         while idx < len(opts) and is_divider(opts[idx]):
             idx += 1
@@ -2047,7 +2429,7 @@ class BashMenuScreen(Screen):
 
     def action_move_end(self) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("options", [])
+        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
         idx = len(opts) - 1
         while idx >= 0 and is_divider(opts[idx]):
             idx -= 1
@@ -2055,7 +2437,7 @@ class BashMenuScreen(Screen):
 
     def action_select_option(self) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("options", [])
+        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
         curr_row = mv.current_row()
         if 0 <= curr_row < len(opts):
             item = opts[curr_row]

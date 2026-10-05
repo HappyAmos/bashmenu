@@ -240,8 +240,11 @@ The special setting
 .I settings.status_gutter
 defines which system badges are displayed in the bottom right corner (the status
 gutter). This value is specified as a string of badges separated by pipe symbols
-(|). The engine will fit as many of these badges as possible based on the
-terminal's available width. It features responsive two-line wrapping, allowing badges that overflow the bottom line to intelligently wrap up to the line above without truncating or colliding with the left-aligned help footer.
+(|). Neither the status gutter nor the left-aligned help gutter ever exceeds
+50% of the screen width. Badges and help action items are delimited by pipe
+symbols (|) and treated as atomic units. When text exceeds 50% of the screen
+width, overlapping items drop to the next line. Neither gutter ever exceeds two
+lines, with two lines being the maximum allowed height.
 Available badges include:
 .I {user}, {username}
 (current user),
@@ -420,6 +423,9 @@ Short 12-hour and 24-hour current time (excludes seconds; optimal for performanc
 Current battery percentage (e.g. 84% or N/A). Includes a 5-second
 performance cache.
 .TP
+.B {theme}
+Active color theme name from bashmenu.yml (e.g. tokyo_night, dracula).
+.TP
 .B {localip}
 Primary outbound IPv4 address (e.g. 192.168.1.50). Evaluated on demand
 via UDP socket probe with TTL cache.
@@ -433,9 +439,10 @@ Current active window width (columns) and height (lines) in characters.
 .B {ascii:decimal}
 Prints character corresponding to decimal code (uses CP437 for extended ASCII, e.g. {ascii:168} resolves to ¿).
 .TP
-.B {<key.path>}, {settings.dot_key}, {user.dot_key}
-Dot-notation configuration lookup from bashmenu.yml (e.g.,
-{settings.cache_dir}, {user.editor}, {user.divider}).
+.B {app.<key.path>}, {<key.path>}, {settings.dot_key}, {user.dot_key}
+Configuration key lookup from bashmenu.yml using explicit app namespace (e.g.,
+{app.theme}, {app.settings.tabstop}, {app.user.postal_code}) or shorthand format
+({settings.cache_dir}, {user.editor}, {user.divider}).
 .TP
 .B {command:shell_cmd}
 Dynamic shell command execution placeholder. Runs shell_cmd via the system shell, trims trailing whitespace/newlines, and replaces the tag with the command output. Fully supports nested curly braces (e.g., {command:hostname -I | awk '{print $1}'}). Features a 30.0-second performance cache TTL and a 3.0-second safety execution timeout.
@@ -479,6 +486,15 @@ Renders reversed contrast text (Rich Style(reverse=True)).
 .TP
 .B [color=color_name]text[/color]
 Renders custom theme-colored text. Available color names include: text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, and divider.
+.TP
+.B [table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]
+Renders an aligned box-drawing Unicode table with dynamically fitted or percentage-based column widths (e.g. 50/50, 33/33/33), bold headers, in-cell word wrapping, and optional row separators.
+.TP
+.B [list][*]Item 1[*]Item 2[/list]
+Renders an unordered bulleted list (using bullet glyphs). Closing [/*] tags are optional.
+.TP
+.B [list=1][*]Item 1[*]Item 2[/list]
+Renders an ordered numbered list (1., 2., etc.). Also supports alphabetical lists ([list=a]).
 .PP
 .B Formatting Rules & Feature Flags:
 .IP \(bu 2
@@ -493,7 +509,12 @@ Modals and text formatting conversion utilities accept an optional no_formatting
 .SS Color Themes Specification (bashmenu.themes)
 Color themes configure the visual color scheme for the main menu, visual menu editor, text editor, and modal screens. Themes are defined under top-level theme names (dracula, nord, cyberpunk, gruvbox, qbasic, pacman, industry, matrix, monochrome, synthwave, amber_crt, hotdog_stand) for 256, 16, and 8 color modes using single-line compact lists [fg, bg].
 .PP
-Supported Theme Elements: background, title, border, text, highlight, accent, footer, help_text (configures help text in bottom gutter and modal footers), plugin (configures text color of background plugin feeds), gutter, selection, status_bar, shortcut_key, shortcut_label, divider, button_primary, button_error, button_cancel, button_success, and scrollbar.
+Supported Theme Elements: background, title, border, text, highlight, accent,
+footer, help_text (configures help text in bottom gutter and modal footers),
+plugin (configures text color of background plugin feeds), gutter, selection,
+status_bar, shortcut_key, shortcut_label, divider, button_primary, button_error,
+button_cancel, button_success, scrollbar, and whitespace (configures
+non-visible whitespace character color in the text editor).
 .PP
 .B Formatting Rule for Editor Compatibility:
 Theme definitions maintain compact single-line flow-style bracket lists (e.g. title: [201, -1]). This enables bashedit.py's --display-theme-colors feature to accurately parse inline bracketed color values and render live color swatch previews.

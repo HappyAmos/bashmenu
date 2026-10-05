@@ -343,6 +343,11 @@ class EditorWidget(Widget):
         gutter_style = theme_dict.get("gutter") or theme_dict.get("help_text") or "dim cyan"
         lineno_style = theme_dict.get("gutter") or theme_dict.get("text") or "dim white"
         sel_style = theme_dict.get("selection") or "reverse bold magenta"
+        ws_style = (
+            theme_dict.get("whitespace")
+            or theme_dict.get("whitespace_color")
+            or "dim white"
+        )
 
         if self.show_markdown:
             content_width = max(1, width)
@@ -383,24 +388,33 @@ class EditorWidget(Widget):
 
             # Format line content with optional whitespace rendering
             disp_text = line_text
+            ws_indices = set()
             if self.show_whitespace:
                 out_chars = []
                 col = 0
                 for char in line_text:
                     if char == " ":
+                        ws_indices.add(len(out_chars))
                         out_chars.append("·")
                         col += 1
                     elif char == "\t":
                         tab_width = self.tabstop - (col % self.tabstop)
-                        out_chars.append("→" + " " * (tab_width - 1))
+                        ws_indices.add(len(out_chars))
+                        out_chars.append("→")
+                        for _ in range(tab_width - 1):
+                            ws_indices.add(len(out_chars))
+                            out_chars.append(" ")
                         col += tab_width
                     elif char == "\r":
+                        ws_indices.add(len(out_chars))
                         out_chars.append("↵")
                         col += 1
                     else:
                         out_chars.append(char)
                         col += 1
-                disp_text = "".join(out_chars) + "↵"
+                ws_indices.add(len(out_chars))
+                out_chars.append("↵")
+                disp_text = "".join(out_chars)
 
             content_width = max(1, width - lineno_width)
             sx = self.left_col
@@ -408,6 +422,25 @@ class EditorWidget(Widget):
 
             # Render line text with selection / cursor
             line_rich = Text(visible_segment)
+
+            if self.show_whitespace and ws_indices:
+                sorted_indices = sorted(ws_indices)
+                start_i = None
+                end_i = None
+                for idx in sorted_indices:
+                    rel_idx = idx - sx
+                    if 0 <= rel_idx < len(visible_segment):
+                        if start_i is None:
+                            start_i = rel_idx
+                            end_i = rel_idx + 1
+                        elif rel_idx == end_i:
+                            end_i = rel_idx + 1
+                        else:
+                            line_rich.stylize(ws_style, start_i, end_i)
+                            start_i = rel_idx
+                            end_i = rel_idx + 1
+                if start_i is not None:
+                    line_rich.stylize(ws_style, start_i, end_i)
 
             if self.display_theme_colors:
                 for start_idx, end_idx, st in self.get_line_color_spans(visible_segment):
@@ -943,6 +976,7 @@ class BashEditScreen(Screen):
         Binding("f9", "paste_buffer", "Paste", show=False),
         Binding("ctrl+w", "search_text", "WhereIs"),
         Binding("ctrl+x", "exit_editor", "Exit"),
+        Binding("escape", "exit_editor", "Exit", show=False),
         Binding("alt+1", "toggle_whitespace", "Whitespace"),
         Binding("meta+1", "toggle_whitespace", "Whitespace", show=False),
         Binding("m-1", "toggle_whitespace", "Whitespace", show=False),
@@ -1084,7 +1118,7 @@ class BashEditScreen(Screen):
                 yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
                 yield Label("F12 MD", id="lbl_markdown", classes="footer_item", markup=False)
                 yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
-                yield Label("^X Exit", id="lbl_exit", classes="footer_item", markup=False)
+                yield Label("^X/ESC Exit", id="lbl_exit", classes="footer_item", markup=False)
             yield Label("  Line 1/1, Col 1  ", id="editor_status")
 
     def on_click(self, event) -> None:
@@ -1480,6 +1514,8 @@ class BashEditScreen(Screen):
                 ed.mark_active = False
                 ed.refresh()
                 self.update_status("Mark Unset")
+            else:
+                self.action_exit_editor()
             return
 
         # Handle raw ASCII 0x1e (RS) sent by some terminal emulators for Control+^

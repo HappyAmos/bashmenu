@@ -128,6 +128,39 @@ class TestPagerScript(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_interactive_escape_key_exit(self):
+        """Verify pressing ESC exits the pager cleanly."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            tf.write("Line 1\nLine 2\n")
+            temp_path = tf.name
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+            time.sleep(0.15)
+            # Send standalone Escape character
+            os.write(master, b"\x1b")
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
     def test_interactive_ansi_color_and_strip(self):
         """Verify ANSI escapes are rendered normally and stripped with -c."""
         # Test 1: Color preserved

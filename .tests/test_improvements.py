@@ -916,6 +916,8 @@ class TestImprovements(unittest.TestCase):
             "{command:<cmd>}",
             "{nf:<char>:<hex>:<emoji>}",
             "{<key.path>}",
+            "{theme}",
+            "{app.<key.path>}",
         ]
         for ep in essential_placeholders:
             self.assertIn(ep, all_ui_placeholders, f"Missing {ep} in PLACEHOLDER_SECTIONS")
@@ -929,13 +931,13 @@ class TestImprovements(unittest.TestCase):
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         with open(os.path.join(base_dir, "bashmenu.md"), "r", encoding="utf-8") as f:
             md_content = f.read()
-        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}"]:
+        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}", "{theme}", "{app.<key.path>}"]:
             self.assertIn(ep, md_content, f"Missing {ep} in bashmenu.md")
 
         # 4. Man page verification
         with open(os.path.join(base_dir, "bashmenu.1"), "r", encoding="utf-8") as f:
             man_content = f.read()
-        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}"]:
+        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}", "{theme}", "{app.<key.path>}"]:
             self.assertIn(ep, man_content, f"Missing {ep} in bashmenu.1")
 
     def test_theme_window_borders(self):
@@ -1159,6 +1161,18 @@ class TestImprovements(unittest.TestCase):
         screen.on_key(te.Key("ctrl+s", "\x13"))
         self.assertEqual(ed.lines, lines_before)
 
+        # 8. Escape key with mark_active unsets mark
+        ed.mark_active = True
+        exit_called = []
+        screen.action_exit_editor = lambda: exit_called.append(True)
+        screen.on_key(te.Key("escape", "\x1b"))
+        self.assertFalse(ed.mark_active)
+        self.assertEqual(exit_called, [])
+
+        # 9. Escape key without mark_active triggers action_exit_editor
+        screen.on_key(te.Key("escape", "\x1b"))
+        self.assertEqual(exit_called, [True])
+
     def test_title_caps_rendering_and_styling(self):
         """Test title caps default to brackets, use title/cap style, and decorate titles."""
         # 1. Default window borders default to '[' and ']'
@@ -1321,6 +1335,345 @@ class TestImprovements(unittest.TestCase):
         mv_with_div._size = type("Size", (), {"width": 80, "height": 24})()
         rendered_with_div = mv_with_div.render().plain
         self.assertIn("═", rendered_with_div)
+
+    def test_bashedit_whitespace_character_styling(self):
+        """Test that bashedit stylizes whitespace characters with theme whitespace/gutter style."""
+        import bashedit
+        import bashmenu_ui
+
+        custom_ws = bashmenu_ui.Style(color="magenta")
+        theme = {
+            "whitespace": custom_ws,
+            "text": bashmenu_ui.Style(color="white"),
+            "gutter": bashmenu_ui.Style(color="cyan", dim=True),
+        }
+        ed = bashedit.EditorWidget(
+            lines=["hello world", "\ttest"],
+            show_whitespace=True,
+            theme=theme,
+        )
+        ed._size = type("Size", (), {"width": 80, "height": 5})()
+        rendered = ed.render()
+        plain_lines = rendered.plain.splitlines()
+
+        # Line 0: " 1 hello·world↵"
+        self.assertIn("hello·world↵", plain_lines[0])
+        # Line 1: " 2 →       test↵"
+        self.assertIn("→", plain_lines[1])
+        self.assertIn("test↵", plain_lines[1])
+
+        # Verify that custom_ws style is applied to the whitespace spans
+        ws_spans = [span for span in rendered.spans if span.style == custom_ws]
+        self.assertTrue(len(ws_spans) >= 4)
+
+        # Test show_whitespace=False does not render whitespace glyphs
+        ed_no_ws = bashedit.EditorWidget(
+            lines=["hello world", "\ttest"],
+            show_whitespace=False,
+            theme=theme,
+        )
+        ed_no_ws._size = type("Size", (), {"width": 80, "height": 5})()
+        rendered_no_ws = ed_no_ws.render()
+        self.assertNotIn("·", rendered_no_ws.plain)
+        self.assertNotIn("↵", rendered_no_ws.plain)
+
+        # Test init_theme_colors provides whitespace and whitespace_color
+        dracula_styles = bashmenu_ui.init_theme_colors("dracula")
+        self.assertIn("whitespace", dracula_styles)
+        self.assertIn("whitespace_color", dracula_styles)
+        self.assertEqual(dracula_styles["whitespace"], dracula_styles["whitespace_color"])
+
+        # Test standalone default when no whitespace style is defined (must not fall back to gutter)
+        theme_no_ws = {
+            "text": bashmenu_ui.Style(color="white"),
+            "gutter": bashmenu_ui.Style(color="cyan", dim=True),
+        }
+        ed_fallback = bashedit.EditorWidget(
+            lines=["hello world"],
+            show_whitespace=True,
+            theme=theme_no_ws,
+        )
+        ed_fallback._size = type("Size", (), {"width": 80, "height": 5})()
+        rendered_fb = ed_fallback.render()
+        dim_white_spans = [s for s in rendered_fb.spans if s.style == "dim white"]
+        self.assertTrue(any(s.start == 8 for s in dim_white_spans))
+        self.assertTrue(any(s.start == 14 for s in dim_white_spans))
+        for s in rendered_fb.spans:
+            if s.style == theme_no_ws["gutter"] and s.start < 15:
+                self.assertTrue(s.end <= 3)
+
+    def test_modal_drop_shadows_and_theming(self):
+        """Verify modal dialogs render classic drop shadows with theme shadow_char and colors."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu_ui
+        import menuedit
+
+        async def run_shadow_tests():
+            theme_dict = bashmenu_ui.init_theme_colors("dracula")
+
+            # 1. Normal MessageModalScreen contains ModalFrame and shadow widgets
+            app1 = App()
+            msg_modal = bashmenu_ui.MessageModalScreen("Alert", "Something happened", theme=theme_dict)
+            async with app1.run_test(size=(80, 24)) as pilot:
+                await app1.push_screen(msg_modal)
+                await pilot.pause()
+                frame = msg_modal.query_one("#modal_frame")
+                self.assertIsNotNone(frame)
+                sr = msg_modal.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = msg_modal.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertIsNotNone(sr)
+                self.assertIsNotNone(sb)
+                self.assertEqual(sr.shadow_char, "░")
+                self.assertEqual(sb.shadow_char, "░")
+                dialog = msg_modal.query_one("#dialog")
+                # Right shadow width should be 2, bottom shadow height should be 1
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+                # Right shadow height should match dialog height - 1
+                self.assertEqual(sr.region.height, max(1, dialog.outer_size.height - 1))
+                # Bottom shadow width should match dialog width
+                self.assertEqual(sb.region.width, dialog.outer_size.width)
+                # Right shadow starts 1 row down from dialog top
+                self.assertEqual(sr.region.y, dialog.region.y + 1)
+                # Bottom shadow starts 2 columns right from dialog left
+                self.assertEqual(sb.region.x, dialog.region.x + 2)
+
+            # 2. ConfirmModalScreen drop shadow
+            app2 = App()
+            confirm_modal = bashmenu_ui.ConfirmModalScreen("Confirm", "Proceed?", theme=theme_dict)
+            async with app2.run_test(size=(80, 24)) as pilot:
+                await app2.push_screen(confirm_modal)
+                await pilot.pause()
+                sr = confirm_modal.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = confirm_modal.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+
+            # 3. Help modal (full size help screen) also renders drop shadow
+            app3 = App()
+            help_modal = bashmenu_ui.MessageModalScreen("Help", "Help text", is_help=True, theme=theme_dict)
+            async with app3.run_test(size=(80, 24)) as pilot:
+                await app3.push_screen(help_modal)
+                await pilot.pause()
+                sr = help_modal.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = help_modal.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertIsNotNone(sr)
+                self.assertIsNotNone(sb)
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+
+            # 4. Main menu help modal (F1 / action_help)
+            import bashedit
+            import bashmenu
+
+            app_bm = App()
+            bms = bashmenu.BashMenuScreen()
+            bms.theme_styles = theme_dict
+            async with app_bm.run_test(size=(80, 24)) as pilot:
+                await app_bm.push_screen(bms)
+                await pilot.pause()
+                bms.action_help()
+                await pilot.pause()
+                bm_help = app_bm.screen
+                self.assertIsInstance(bm_help, bashmenu_ui.MessageModalScreen)
+                sr = bm_help.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = bm_help.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+
+            # 5. BashEdit help (action_help_manual) and placeholders (action_show_placeholders)
+            app_be = App()
+            bed = bashedit.BashEditScreen()
+            bed.theme_styles = theme_dict
+            async with app_be.run_test(size=(80, 24)) as pilot:
+                await app_be.push_screen(bed)
+                await pilot.pause()
+                bed.action_help_manual()
+                await pilot.pause()
+                be_help = app_be.screen
+                self.assertIsInstance(be_help, bashmenu_ui.MessageModalScreen)
+                sr = be_help.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = be_help.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+                be_help.dismiss(None)
+                await pilot.pause()
+
+                bed.action_show_placeholders()
+                await pilot.pause()
+                be_placeholders = app_be.screen
+                self.assertIsInstance(be_placeholders, bashmenu_ui.MessageModalScreen)
+                sr2 = be_placeholders.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb2 = be_placeholders.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr2.region.width, 2)
+                self.assertEqual(sb2.region.height, 1)
+
+            # 6. menuedit.ItemEditModal, placeholder help, properties help, and ItemTypePickerModal
+            app_me = App()
+            item = {"type": "command", "title": "Test Item", "command": "echo test"}
+            edit_modal = menuedit.ItemEditModal(item, theme=theme_dict)
+            async with app_me.run_test(size=(90, 30)) as pilot:
+                await app_me.push_screen(edit_modal)
+                await pilot.pause()
+                sr = edit_modal.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = edit_modal.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+
+                edit_modal.action_show_placeholders()
+                await pilot.pause()
+                me_placeholders = app_me.screen
+                self.assertIsInstance(me_placeholders, bashmenu_ui.MessageModalScreen)
+                sr_ph = me_placeholders.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb_ph = me_placeholders.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr_ph.region.width, 2)
+                self.assertEqual(sb_ph.region.height, 1)
+                me_placeholders.dismiss(None)
+                await pilot.pause()
+
+                edit_modal.action_show_help()
+                await pilot.pause()
+                me_props = app_me.screen
+                self.assertIsInstance(me_props, bashmenu_ui.MessageModalScreen)
+                sr_hp = me_props.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb_hp = me_props.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr_hp.region.width, 2)
+                self.assertEqual(sb_hp.region.height, 1)
+
+            # 7. ItemTypePickerModal drop shadow
+            app_tp = App()
+            picker = menuedit.ItemTypePickerModal(theme=theme_dict)
+            async with app_tp.run_test(size=(80, 24)) as pilot:
+                await app_tp.push_screen(picker)
+                await pilot.pause()
+                sr = picker.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                sb = picker.query_one("#shadow_bottom", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr.region.width, 2)
+                self.assertEqual(sb.region.height, 1)
+
+            # 8. Custom shadow_char in theme
+            custom_theme = bashmenu_ui.init_theme_colors("dracula").copy()
+            custom_theme["window_borders"] = custom_theme.get("window_borders", {}).copy()
+            custom_theme["window_borders"]["shadow_char"] = "▒"
+            app_c = App()
+            input_modal = bashmenu_ui.InputModalScreen("Title", "Prompt", theme=custom_theme)
+            async with app_c.run_test(size=(80, 24)) as pilot:
+                await app_c.push_screen(input_modal)
+                await pilot.pause()
+                sr = input_modal.query_one("#shadow_right", bashmenu_ui.ShadowWidget)
+                self.assertEqual(sr.shadow_char, "▒")
+
+        asyncio.run(run_shadow_tests())
+
+    def test_app_namespace_and_theme_placeholders(self):
+        """Verify {theme}, {app.theme}, and app. namespace configuration placeholders."""
+        import copy
+
+        cfg = {
+            "version": "1.2.3",
+            "theme": "tokyo_night",
+            "user": {
+                "postal_code": 49079,
+                "custom_val": "hello_world",
+            },
+            "settings": {
+                "tabstop": 4,
+                "ping_target": "8.8.8.8",
+            },
+        }
+
+        # 1. get_config_value with and without app. / bashmenu. prefixes
+        self.assertEqual(bashmenu.get_config_value(cfg, "theme"), "tokyo_night")
+        self.assertEqual(bashmenu.get_config_value(cfg, "app.theme"), "tokyo_night")
+        self.assertEqual(bashmenu.get_config_value(cfg, "bashmenu.theme"), "tokyo_night")
+        self.assertEqual(bashmenu.get_config_value(cfg, "settings.tabstop"), 4)
+        self.assertEqual(bashmenu.get_config_value(cfg, "app.settings.tabstop"), 4)
+        self.assertEqual(bashmenu.get_config_value(cfg, "user.postal_code"), 49079)
+        self.assertEqual(bashmenu.get_config_value(cfg, "app.user.postal_code"), 49079)
+
+        # 2. set_config_value with app. prefix
+        cfg_copy = copy.deepcopy(cfg)
+        self.assertTrue(bashmenu.set_config_value(cfg_copy, "app.theme", "nord"))
+        self.assertEqual(cfg_copy["theme"], "nord")
+        self.assertTrue(bashmenu.set_config_value(cfg_copy, "app.settings.tabstop", 8))
+        self.assertEqual(cfg_copy["settings"]["tabstop"], 8)
+
+        # 3. interpolate_placeholders expands {theme}, {app.theme}, {app.version}, and nested keys
+        res = bashmenu.interpolate_placeholders("Current theme: {theme} | App: {app.theme}", cfg)
+        self.assertEqual(res, "Current theme: tokyo_night | App: tokyo_night")
+
+        res_nested = bashmenu.interpolate_placeholders("Postal: {app.user.postal_code} | Tab: {app.settings.tabstop}", cfg)
+        self.assertEqual(res_nested, "Postal: 49079 | Tab: 4")
+
+        # 4. bashmenu.yml header comment and CONFIG_HEADER persistence
+        self.assertIn("BashMenu Configuration (bashmenu.yml)", bashmenu.CONFIG_HEADER)
+        self.assertIn("{app.<key>}", bashmenu.CONFIG_HEADER)
+        with open(bashmenu.CONFIG_FILE, "r", encoding="utf-8") as f:
+            yml_disk = f.read()
+        self.assertIn("# BashMenu Configuration (bashmenu.yml)", yml_disk)
+        self.assertIn("theme: tokyo_night", yml_disk)
+
+    def test_gutter_50_percent_width_and_two_line_wrapping(self):
+        """Verify status gutter and help gutter never exceed 50% screen width,
+        wrap across pipe delimiters, and never exceed 2 lines.
+        """
+        import bashmenu
+        import bashmenu_ui
+
+        # 1. wrap_gutter_items logic test
+        items = ["Item One", "Item Two", "Item Three", "Item Four", "Item Five", "Item Six"]
+        max_w = 30
+        lines = bashmenu.wrap_gutter_items(items, max_w, max_lines=2)
+        self.assertLessEqual(len(lines), 2)
+        for line in lines:
+            vis_len = bashmenu_ui.get_visible_len(line)
+            self.assertLessEqual(vis_len, max_w, f"Line '{line}' exceeds max_w {max_w}")
+
+        # Overlapping items drop to line 2
+        self.assertIn("Item One", lines[0])
+        self.assertIn("Item Two", lines[0])
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith("Item Three") or "Item Three" in lines[1])
+
+        # 2. MainMenuView.render test with long status gutter
+        cfg = {
+            "theme": "dracula",
+            "settings": {
+                "status_gutter": "Badge 1 | Badge 2 | Long Badge 3 | Badge 4 | Badge 5 | Badge 6",
+            },
+        }
+        mnu = {
+            "title": "Gutter Test Menu",
+            "options": [{"title": "Option 1"}, {"title": "Option 2"}],
+        }
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+
+        w = 80
+        h = 24
+        from unittest.mock import PropertyMock, patch
+
+        from textual.geometry import Size
+
+        with patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(w, h)):
+            rendered = mv.render()
+            plain_lines = rendered.plain.split("\n")
+
+        self.assertEqual(len(plain_lines), h, f"Rendered lines ({len(plain_lines)}) must equal screen height ({h})")
+
+        # The footer row(s) are before the bottom border (h - 1)
+        # On row h - 2 and h - 3, inspect borders and width
+        for row_idx in range(h):
+            row_str = plain_lines[row_idx]
+            self.assertEqual(bashmenu_ui.get_visible_len(row_str), w, f"Row {row_idx} width must equal screen width {w}")
+
+        # Footer lines: neither left (help) nor right (status) exceeds 50% width (w // 2 = 40)
+        footer_row = plain_lines[h - 2]
+        # Format is "│  " + content + "  │"
+        inner_content = footer_row[3:-3]
+        self.assertEqual(len(inner_content), w - 6)
 
 
 if __name__ == "__main__":

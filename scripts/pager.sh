@@ -24,6 +24,7 @@ PAGER_VERSION="1.0.0"
 
 # Literal control bytes used throughout the renderer and key parser.
 ESC=$'\033'
+READ_TIMEOUT="0.05"
 
 # Tunables and state. Every global is declared here so the render loop stays
 # free of hidden allocations.
@@ -402,14 +403,19 @@ render() {
 
 grab_char() {
     # Read a single character from the controlling terminal into GRAB.
+    # Accepts an optional timeout in seconds ($1).
     # Returns 1 when the read timed out or the terminal went away.
     GRAB=""
-    local st=0
-    IFS= read -rsn1 GRAB < /dev/tty || st=$?
+    local st=0 timeout="${1:-}"
+    if [ -n "${timeout}" ]; then
+        IFS= read -rsn1 -t "${timeout}" GRAB < /dev/tty 2>/dev/null || st=$?
+    else
+        IFS= read -rsn1 GRAB < /dev/tty || st=$?
+    fi
     if [ "${st}" -eq 0 ] && [ -z "${GRAB}" ]; then
         GRAB=$'\n'
     fi
-    [ -n "${GRAB}" ]
+    [ "${st}" -eq 0 ] && [ -n "${GRAB}" ]
 }
 
 read_key() {
@@ -447,7 +453,7 @@ read_key() {
         *) KEY="${c}"; return 0 ;;
     esac
 
-    if ! grab_char; then
+    if ! grab_char "${READ_TIMEOUT}"; then
         KEY="ESCAPE"
         return 0
     fi
@@ -455,7 +461,7 @@ read_key() {
 
     case "${c2}" in
         '['|'O')
-            if ! grab_char; then
+            if ! grab_char "${READ_TIMEOUT}"; then
                 KEY="ESCAPE"
                 return 0
             fi
@@ -470,7 +476,7 @@ read_key() {
                 '') KEY="ESCAPE" ;;
                 [0-9])
                     body="${c3}"
-                    while grab_char; do
+                    while grab_char "${READ_TIMEOUT}"; do
                         c3="${GRAB}"
                         body="${body}${c3}"
                         case "${c3}" in
