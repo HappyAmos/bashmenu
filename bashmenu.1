@@ -571,6 +571,26 @@ Plugins support optional
 and
 .I posttext
 lines (such as {user.divider}) rendered before and after script output lines.
+.IP \(bu 2
+.B Declarative Multi-Column Table Layout & Entries Chunking:
+Plugins can be arranged horizontally in equal-width columns (e.g. 50/50, 33/33/33) across the terminal window by specifying a
+.I layout
+dictionary under
+.I settings.plugins
+with
+.I type: table
+and
+.I width: "100%".
+The
+.I entries
+setting (default: 2) sets the maximum plugins per table row. When a third or additional plugin is encountered, a new table is constructed automatically. Long text within cells wraps cleanly at word boundaries.
+.IP \(bu 2
+.B Standalone Plugins (standalone: true or span: full):
+Full-width plugins such as Quote of the Day or system status banners can stretch across the entire screen on their own line without table borders by setting
+.I standalone: true
+or
+.I span: full,
+rendering cleanly above or below multi-column tables.
 .PP
 .B Creating & Registering a Custom Plugin:
 To create a custom plugin, write an executable script in
