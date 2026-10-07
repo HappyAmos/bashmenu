@@ -69,6 +69,22 @@ cheat -l git
 cheat -s git
 ```
 
+### Print Configured Directory
+
+Print the configured cheatsheets directory path:
+
+```bash
+cheat -d
+# or
+cheat --directory
+```
+
+You can also use this to quickly navigate to your cheatsheets directory in your shell:
+
+```bash
+cd "$(cheat -d)"
+```
+
 ## Cheatsheet Format
 
 Add YAML frontmatter tags to `.md` files to enable tag matching:

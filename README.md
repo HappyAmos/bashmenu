@@ -41,6 +41,8 @@ Contains a few personal scripts as examples.
 
 | File/Folder       | Description                                                   |
 |:----------------- |:------------------------------------------------------------- |
+| `install.sh`      | Universal POSIX installation script with package detection.  |
+| `uninstall.sh`    | Pure POSIX uninstaller removing files, symlinks, and cache.   |
 | `bashmenu.sh`     | Wrapper launcher. Auto-creates and repairs virtualenv.        |
 | `bashmenu.py`     | Core TUI rendering engine and main menu rendering window.     |
 | `bashmenu_ui.py`  | Shared UI library: modal screens, theme engine, formatters.   |

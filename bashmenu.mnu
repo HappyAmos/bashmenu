@@ -186,7 +186,7 @@ items:
               quiet: true
           - Space:
               type: command
-              command: /home/andrew/github/space/space
+              command: /home/andrew/github/spacetrader/spacetrader
               interactive: true
               quiet: true
               alt_buffer: true

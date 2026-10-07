@@ -592,9 +592,95 @@ class EditorWidget(Widget):
         event.prevent_default()
         event.stop()
 
+    def delete_selection(self) -> bool:
+        """Delete active selection range if present. Return True if deleted."""
+        sel = self.get_selection_range()
+        if not sel:
+            return False
+        (sy, sx), (ey, ex) = sel
+        if sy == ey:
+            line = self.lines[sy]
+            s_idx, e_idx = min(sx, ex), max(sx, ex)
+            self.lines[sy] = line[:s_idx] + line[e_idx:]
+        else:
+            self.lines[sy] = self.lines[sy][:sx] + (self.lines[ey][ex:] if ex > 0 else "")
+            del self.lines[sy + 1 : ey + 1]
+        self.mark_active = False
+        self.cursor_y = sy
+        self.cursor_x = min(sx, len(self.lines[min(sy, len(self.lines) - 1)]))
+        self.modified = True
+        self.clamp_cursor()
+        self.refresh()
+        return True
+
+    def move_word_left(self):
+        """Move cursor left to the beginning of the previous word."""
+        if self.cursor_x == 0:
+            if self.cursor_y > 0:
+                self.cursor_y -= 1
+                self.cursor_x = len(self.lines[self.cursor_y])
+        else:
+            line = self.lines[self.cursor_y]
+            x = self.cursor_x
+            while x > 0 and line[x - 1].isspace():
+                x -= 1
+            if x > 0:
+                if line[x - 1].isalnum() or line[x - 1] == "_":
+                    while x > 0 and (line[x - 1].isalnum() or line[x - 1] == "_"):
+                        x -= 1
+                else:
+                    while x > 0 and not (line[x - 1].isalnum() or line[x - 1].isspace()):
+                        x -= 1
+            self.cursor_x = x
+        self.clamp_cursor()
+        self.refresh()
+
+    def move_word_right(self):
+        """Move cursor right to the beginning of the next word."""
+        line = self.lines[self.cursor_y]
+        if self.cursor_x >= len(line):
+            if self.cursor_y < len(self.lines) - 1:
+                self.cursor_y += 1
+                self.cursor_x = 0
+        else:
+            x = self.cursor_x
+            if x < len(line):
+                if line[x].isalnum() or line[x] == "_":
+                    while x < len(line) and (line[x].isalnum() or line[x] == "_"):
+                        x += 1
+                elif not line[x].isspace():
+                    while x < len(line) and not (line[x].isalnum() or line[x].isspace()):
+                        x += 1
+                while x < len(line) and line[x].isspace():
+                    x += 1
+            self.cursor_x = x
+        self.clamp_cursor()
+        self.refresh()
+
+    def move_paragraph_up(self):
+        """Move cursor up to the preceding blank line or start of document."""
+        y = self.cursor_y - 1
+        while y > 0 and self.lines[y].strip():
+            y -= 1
+        self.cursor_y = max(0, y)
+        self.clamp_cursor()
+        self.refresh()
+
+    def move_paragraph_down(self):
+        """Move cursor down to the next blank line or end of document."""
+        y = self.cursor_y + 1
+        last = len(self.lines) - 1
+        while y < last and self.lines[y].strip():
+            y += 1
+        self.cursor_y = min(last, y)
+        self.clamp_cursor()
+        self.refresh()
+
     def insert_char(self, char: str):
         self.push_undo()
         self._color_span_cache.clear()
+        if self.mark_active and self.get_selection_range():
+            self.delete_selection()
         line = self.lines[self.cursor_y]
         self.lines[self.cursor_y] = line[: self.cursor_x] + char + line[self.cursor_x :]
         self.cursor_x += len(char)
@@ -605,6 +691,8 @@ class EditorWidget(Widget):
     def insert_newline(self):
         self.push_undo()
         self._color_span_cache.clear()
+        if self.mark_active and self.get_selection_range():
+            self.delete_selection()
         line = self.lines[self.cursor_y]
         left_part = line[: self.cursor_x]
         right_part = line[self.cursor_x :]
@@ -619,6 +707,8 @@ class EditorWidget(Widget):
     def backspace(self):
         self.push_undo()
         self._color_span_cache.clear()
+        if self.delete_selection():
+            return
         if self.cursor_x > 0:
             line = self.lines[self.cursor_y]
             self.lines[self.cursor_y] = line[: self.cursor_x - 1] + line[self.cursor_x :]
@@ -638,6 +728,8 @@ class EditorWidget(Widget):
     def delete_char(self):
         self.push_undo()
         self._color_span_cache.clear()
+        if self.delete_selection():
+            return
         line = self.lines[self.cursor_y]
         if self.cursor_x < len(line):
             self.lines[self.cursor_y] = line[: self.cursor_x] + line[self.cursor_x + 1 :]
@@ -694,7 +786,6 @@ class EditorWidget(Widget):
 
         copied_str = "\n".join(self.cutbuffer)
         set_system_clipboard(copied_str)
-        self.mark_active = False
         self.refresh()
         return "Selection Copied"
 
@@ -744,6 +835,8 @@ class EditorWidget(Widget):
 
     def paste_buffer(self) -> str:
         """Paste text from system clipboard (or local cutbuffer fallback) at cursor position."""
+        if self.mark_active and self.get_selection_range():
+            self.delete_selection()
         clip = get_system_clipboard()
         if clip is not None and clip != "":
             clip_lines = clip.splitlines()
@@ -933,19 +1026,27 @@ class BashEditScreen(Screen):
         color: $text-muted;
     }
     #editor_legend {
-        height: 1;
+        height: 2;
         width: 100%;
         background: $surface;
         color: $accent;
-        align: center middle;
+    }
+    .footer_row {
+        height: 1;
+        width: 100%;
+        align: left middle;
     }
     .footer_item {
-        padding: 0 1;
+        padding: 0 0;
+        margin-right: 1;
         color: $accent;
     }
     .footer_item:hover {
         text-style: underline;
         color: $text;
+    }
+    .footer_item_last {
+        margin-right: 0;
     }
     #editor_divider {
         height: 1;
@@ -968,14 +1069,14 @@ class BashEditScreen(Screen):
         Binding("alt+s", "save_file_as", "Save As", show=False),
         Binding("meta+s", "save_file_as", "Save As", show=False),
         Binding("f6", "save_file_as", "Save As", show=False),
-        Binding("ctrl+k", "cut_line", "Cut"),
-        Binding("f8", "cut_line", "Cut", show=False),
-        Binding("ctrl+u", "paste_buffer", "Paste"),
-        Binding("ctrl+v", "paste_buffer", "Paste", show=False),
+        Binding("ctrl+x", "cut_line", "Cut"),
+        Binding("ctrl+shift+x", "cut_line", "Cut", show=False),
+        Binding("ctrl+c", "copy_selection", "Copy"),
+        Binding("ctrl+shift+c", "copy_selection", "Copy", show=False),
+        Binding("ctrl+v", "paste_buffer", "Paste"),
         Binding("ctrl+shift+v", "paste_buffer", "Paste", show=False),
-        Binding("f9", "paste_buffer", "Paste", show=False),
         Binding("ctrl+w", "search_text", "WhereIs"),
-        Binding("ctrl+x", "exit_editor", "Exit"),
+        Binding("ctrl+q", "exit_editor", "Exit"),
         Binding("escape", "exit_editor", "Exit", show=False),
         Binding("alt+1", "toggle_whitespace", "Whitespace"),
         Binding("meta+1", "toggle_whitespace", "Whitespace", show=False),
@@ -983,13 +1084,6 @@ class BashEditScreen(Screen):
         Binding("m+1", "toggle_whitespace", "Whitespace", show=False),
         Binding("ctrl+p", "show_placeholders", "Placeholders"),
         Binding("alt+m", "show_placeholders", "Placeholders", show=False),
-        Binding("ctrl+6", "toggle_mark", "Mark"),
-        Binding("alt+a", "toggle_mark", "Mark", show=False),
-        Binding("ctrl+c", "copy_selection", "Copy", show=False),
-        Binding("ctrl+shift+c", "copy_selection", "Copy", show=False),
-        Binding("alt+6", "copy_selection", "Copy", show=False),
-        Binding("§", "copy_selection", "Copy", show=False),
-        Binding("alt+c", "copy_selection", "Copy", show=False),
         Binding("ctrl+z", "undo", "Undo"),
         Binding("ctrl+y", "redo", "Redo"),
         Binding("ctrl+n", "toggle_lineno", "Line Numbers"),
@@ -1102,23 +1196,25 @@ class BashEditScreen(Screen):
             div_char = "─"
         with Vertical(id="editor_footer_area"):
             yield Label(div_char * 500, id="editor_divider")
-            with Horizontal(id="editor_legend"):
-                yield Label("^O Open", id="lbl_open", classes="footer_item lbl_open", markup=False)
-                yield Label("^S Save", id="lbl_save", classes="footer_item lbl_save", markup=False)
-                yield Label("Alt+S SaveAs", id="lbl_save_as", classes="footer_item lbl_save_as", markup=False)
-                yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
-                yield Label("^K Cut", id="lbl_cut", classes="footer_item", markup=False)
-                yield Label("Alt+6 Copy", id="lbl_copy", classes="footer_item", markup=False)
-                yield Label("^U Paste", id="lbl_paste", classes="footer_item", markup=False)
-                yield Label("^^ Mark", id="lbl_mark", classes="footer_item", markup=False)
-                yield Label("^P Macros", id="lbl_placeholders", classes="footer_item", markup=False)
-                yield Label("^A ASCII", id="lbl_ascii", classes="footer_item", markup=False)
-                yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
-                yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
-                yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
-                yield Label("F12 MD", id="lbl_markdown", classes="footer_item", markup=False)
-                yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
-                yield Label("^X/ESC Exit", id="lbl_exit", classes="footer_item", markup=False)
+            with Vertical(id="editor_legend"):
+                with Horizontal(id="footer_row_1", classes="footer_row"):
+                    yield Label("^O Open", id="lbl_open", classes="footer_item lbl_open", markup=False)
+                    yield Label("^S Save", id="lbl_save", classes="footer_item lbl_save", markup=False)
+                    yield Label("Alt+S SaveAs", id="lbl_save_as", classes="footer_item lbl_save_as", markup=False)
+                    yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
+                    yield Label("^X Cut", id="lbl_cut", classes="footer_item", markup=False)
+                    yield Label("^C Copy", id="lbl_copy", classes="footer_item", markup=False)
+                    yield Label("^V Paste", id="lbl_paste", classes="footer_item", markup=False)
+                    yield Label("^Z Undo", id="lbl_undo", classes="footer_item footer_item_last", markup=False)
+                with Horizontal(id="footer_row_2", classes="footer_row"):
+                    yield Label("^P Macros", id="lbl_placeholders", classes="footer_item", markup=False)
+                    yield Label("^A ASCII", id="lbl_ascii", classes="footer_item", markup=False)
+                    yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
+                    yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
+                    yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
+                    yield Label("F12 MD", id="lbl_markdown", classes="footer_item", markup=False)
+                    yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
+                    yield Label("^Q/ESC Exit", id="lbl_exit", classes="footer_item footer_item_last", markup=False)
             yield Label("  Line 1/1, Col 1  ", id="editor_status")
 
     def on_click(self, event) -> None:
@@ -1202,6 +1298,8 @@ class BashEditScreen(Screen):
             self.action_copy_selection()
         elif target_action == "lbl_paste":
             self.action_paste_buffer()
+        elif target_action == "lbl_undo":
+            self.action_undo()
         elif target_action == "lbl_mark":
             self.action_toggle_mark()
         elif target_action == "lbl_placeholders":
@@ -1465,9 +1563,62 @@ class BashEditScreen(Screen):
                 ed._color_span_cache.clear()
                 ed.refresh()
 
+    def update_legend_layout(self, width: int | None = None) -> None:
+        """Distribute footer keyboard shortcut labels equally across both footer rows.
+        
+        Calculates available screen width and dynamically sets right margins on items
+        so that keyboard shortcuts and descriptions span the full width without breaking.
+        """
+        w = width
+        if w is None or w <= 0:
+            if hasattr(self, "size") and self.size and self.size.width:
+                w = self.size.width
+            elif hasattr(self, "app") and self.app and hasattr(self.app, "size") and self.app.size:
+                w = self.app.size.width
+            else:
+                w = 80
+
+        with contextlib.suppress(Exception):
+            legend = self.query_one("#editor_legend")
+            rows = list(legend.query(".footer_row"))
+            for row in rows:
+                items = list(row.query(".footer_item"))
+                if not items:
+                    continue
+                num_items = len(items)
+                if num_items == 1:
+                    items[0].styles.margin = (0, 0, 0, 0)
+                    continue
+
+                item_lens = []
+                for it in items:
+                    t = str(it.renderable) if hasattr(it, "renderable") else ""
+                    item_lens.append(len(t) if t else len(getattr(it, "content", "")))
+
+                tot_text = sum(item_lens)
+                num_gaps = num_items - 1
+                rem = max(0, w - tot_text)
+                base_gap = rem // num_gaps
+                extra = rem % num_gaps
+
+                for i, it in enumerate(items):
+                    if i < num_gaps:
+                        gap = base_gap + (1 if i < extra else 0)
+                        it.styles.margin = (0, gap, 0, 0)
+                    else:
+                        it.styles.margin = (0, 0, 0, 0)
+
+    def on_resize(self, event=None) -> None:
+        """Adjust footer keyboard shortcut spacing responsively on terminal resize."""
+        w = None
+        if event is not None and hasattr(event, "size") and event.size:
+            w = event.size.width
+        self.update_legend_layout(width=w)
+
     def on_mount(self) -> None:
         self.query_one("#editor_widget", EditorWidget).focus()
         self.apply_theme()
+        self.update_legend_layout()
 
     def update_status(self, msg: str | None = None):
         ed = self.query_one("#editor_widget", EditorWidget)
@@ -1477,8 +1628,25 @@ class BashEditScreen(Screen):
             pos_info = f"[MD View] Line {cur_line}/{total_lines}"
         else:
             pos_info = f"Line {ed.cursor_y + 1}/{len(ed.lines)}, Col {ed.cursor_x + 1}"
+        sel_info = ""
+        if ed.mark_active and not ed.show_markdown:
+            sel = ed.get_selection_range()
+            if sel:
+                (sy, sx), (ey, ex) = sel
+                if sy == ey:
+                    count = abs(ex - sx)
+                    if count > 0:
+                        sel_info = f" [{count} char selected]" if count == 1 else f" [{count} chars selected]"
+                else:
+                    count = abs(ey - sy) + 1
+                    sel_info = f" [{count} lines selected]"
         mod = " *" if ed.modified else ""
-        text = f"  {pos_info}{mod} | {msg}  " if msg else f"  {pos_info}{mod}  "
+        if msg:
+            text = f"  {pos_info}{sel_info}{mod} | {msg}  "
+        elif sel_info:
+            text = f"  {pos_info}{sel_info}{mod}  "
+        else:
+            text = f"  {pos_info}{mod}  "
         self.query_one("#editor_status", Label).update(text)
 
     def on_key(self, event: Key) -> None:
@@ -1518,16 +1686,10 @@ class BashEditScreen(Screen):
                 self.action_exit_editor()
             return
 
-        # Handle raw ASCII 0x1e (RS) sent by some terminal emulators for Control+^
-        if event.character == "\x1e" or key_lower == "rs":
-            self.action_toggle_mark()
-            return
-
-        # Handle section sign (§ / \u00a7) sent by some terminal emulators when no key binding fires
-        if char_lower in ["§", "\u00a7"] or key_lower in ["§", "section"]:
+        if key_lower in ["ctrl+q", "ctrl_q"] or char_lower in ["\x11"]:
             event.prevent_default()
             event.stop()
-            self.action_copy_selection()
+            self.action_exit_editor()
             return
 
         if key_lower in ["f1", "ctrl+g", "alt+h", "meta+h"]:
@@ -1563,6 +1725,12 @@ class BashEditScreen(Screen):
             self.action_show_placeholders()
             return
 
+        if key_lower in ["ctrl+x", "ctrl+shift+x", "ctrl_x", "ctrl_shift_x"] or char_lower in ["\x18"]:
+            event.prevent_default()
+            event.stop()
+            self.action_cut_line()
+            return
+
         if key_lower in ["ctrl+c", "ctrl+shift+c", "ctrl_c", "ctrl_shift_c"] or char_lower in ["\x03"]:
             event.prevent_default()
             event.stop()
@@ -1575,16 +1743,16 @@ class BashEditScreen(Screen):
             self.action_paste_buffer()
             return
 
-        if key_lower in ["ctrl+k", "ctrl+shift+k"] or char_lower in ["\x0b"]:
+        if key_lower in ["ctrl+z", "ctrl_z"] or char_lower in ["\x1a"]:
             event.prevent_default()
             event.stop()
-            self.action_cut_line()
+            self.action_undo()
             return
 
-        if key_lower in ["ctrl+u", "ctrl+shift+u"] or char_lower in ["\x15"]:
+        if key_lower in ["ctrl+y", "ctrl_y", "ctrl+shift+z", "ctrl_shift_z"] or char_lower in ["\x19"]:
             event.prevent_default()
             event.stop()
-            self.action_paste_buffer()
+            self.action_redo()
             return
 
         if key_lower == "f12":
@@ -1626,14 +1794,129 @@ class BashEditScreen(Screen):
                 self.update_status("Markdown preview active (Press F12 to edit)")
             return
 
-        # Navigation keys
+        # Shift + Directional keys (Desktop selection extension)
+        def anchor_selection():
+            if not ed.mark_active:
+                ed.mark_active = True
+                ed.mark_y = ed.cursor_y
+                ed.mark_x = ed.cursor_x
+
+        if key_lower in ["ctrl+shift+left", "ctrl_shift_left"]:
+            anchor_selection()
+            ed.move_word_left()
+            self.update_status()
+            return
+
+        if key_lower in ["ctrl+shift+right", "ctrl_shift_right"]:
+            anchor_selection()
+            ed.move_word_right()
+            self.update_status()
+            return
+
+        if key_lower in ["ctrl+shift+up", "ctrl_shift_up"]:
+            anchor_selection()
+            ed.move_paragraph_up()
+            self.update_status()
+            return
+
+        if key_lower in ["ctrl+shift+down", "ctrl_shift_down"]:
+            anchor_selection()
+            ed.move_paragraph_down()
+            self.update_status()
+            return
+
+        if key_lower in ["shift+left", "shift_left"]:
+            anchor_selection()
+            ed.cursor_x = max(0, ed.cursor_x - 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+
+        if key_lower in ["shift+right", "shift_right"]:
+            anchor_selection()
+            ed.cursor_x = min(len(ed.lines[ed.cursor_y]), ed.cursor_x + 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+
+        if key_lower in ["shift+up", "shift_up"]:
+            anchor_selection()
+            ed.cursor_y = max(0, ed.cursor_y - 1)
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+
+        if key_lower in ["shift+down", "shift_down"]:
+            anchor_selection()
+            if ed.cursor_y < len(ed.lines) - 1:
+                ed.cursor_y += 1
+                ed.clamp_cursor()
+            else:
+                ed.scroll_lines_down(1)
+            ed.refresh()
+            self.update_status()
+            return
+
+        if key_lower in ["shift+home", "shift_home"]:
+            anchor_selection()
+            ed.cursor_x = 0
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+
+        if key_lower in ["shift+end", "shift_end"]:
+            anchor_selection()
+            ed.cursor_x = len(ed.lines[ed.cursor_y])
+            ed.clamp_cursor()
+            ed.refresh()
+            self.update_status()
+            return
+
+        # Ctrl + Directional keys (Desktop word / paragraph jumping)
+        if key_lower in ["ctrl+left", "ctrl_left"]:
+            if ed.mark_active:
+                ed.mark_active = False
+            ed.move_word_left()
+            self.update_status()
+            return
+
+        if key_lower in ["ctrl+right", "ctrl_right"]:
+            if ed.mark_active:
+                ed.mark_active = False
+            ed.move_word_right()
+            self.update_status()
+            return
+
+        if key_lower in ["ctrl+up", "ctrl_up"]:
+            if ed.mark_active:
+                ed.mark_active = False
+            ed.move_paragraph_up()
+            self.update_status()
+            return
+
+        if key_lower in ["ctrl+down", "ctrl_down"]:
+            if ed.mark_active:
+                ed.mark_active = False
+            ed.move_paragraph_down()
+            self.update_status()
+            return
+
+        # Standard navigation keys (Clear active selection when moved without Shift)
         if event.key == "up":
+            if ed.mark_active:
+                ed.mark_active = False
             ed.cursor_y = max(0, ed.cursor_y - 1)
             ed.clamp_cursor()
             ed.refresh()
             self.update_status()
             return
         if event.key == "down":
+            if ed.mark_active:
+                ed.mark_active = False
             if ed.cursor_y < len(ed.lines) - 1:
                 ed.cursor_y += 1
                 ed.clamp_cursor()
@@ -1643,35 +1926,47 @@ class BashEditScreen(Screen):
             self.update_status()
             return
         if event.key == "left":
+            if ed.mark_active:
+                ed.mark_active = False
             ed.cursor_x = max(0, ed.cursor_x - 1)
             ed.clamp_cursor()
             ed.refresh()
             self.update_status()
             return
         if event.key == "right":
+            if ed.mark_active:
+                ed.mark_active = False
             ed.cursor_x = min(len(ed.lines[ed.cursor_y]), ed.cursor_x + 1)
             ed.clamp_cursor()
             ed.refresh()
             self.update_status()
             return
         if event.key == "home":
+            if ed.mark_active:
+                ed.mark_active = False
             ed.cursor_x = 0
             ed.clamp_cursor()
             ed.refresh()
             self.update_status()
             return
         if event.key == "end":
+            if ed.mark_active:
+                ed.mark_active = False
             ed.cursor_x = len(ed.lines[ed.cursor_y])
             ed.clamp_cursor()
             ed.refresh()
             self.update_status()
             return
         if event.key in ("pageup", "page_up"):
+            if ed.mark_active:
+                ed.mark_active = False
             page_size = max(1, (ed.size.height or 20) - 2)
             ed.scroll_lines_up(page_size)
             self.update_status()
             return
         if event.key in ("pagedown", "page_down"):
+            if ed.mark_active:
+                ed.mark_active = False
             page_size = max(1, (ed.size.height or 20) - 2)
             ed.scroll_lines_down(page_size)
             self.update_status()
@@ -1706,8 +2001,7 @@ class BashEditScreen(Screen):
 
         # Ignore modifier combinations, function keys & action shortcut keys so Textual bindings process them as actions
         if (
-            event.character in ["§", "\u00a7", "\x03", "\x16", "\x0b", "\x15"]
-            or (event.character and ord(event.character[0]) < 32)
+            (event.character and ord(event.character[0]) < 32)
             or event.key.startswith("ctrl+")
             or event.key.startswith("alt+")
             or event.key.startswith("meta+")
@@ -1716,24 +2010,16 @@ class BashEditScreen(Screen):
             in [
                 "escape",
                 "esc",
-                "ctrl+6",
-                "ctrl+caret",
-                "ctrl+circumflex",
-                "ctrl+^",
-                "ctrl+shift+6",
-                "ctrl+rs",
-                "ctrl+at",
-                "ctrl+space",
-                "alt+6",
-                "meta+6",
-                "alt+c",
                 "ctrl+c",
                 "ctrl+v",
+                "ctrl+x",
+                "ctrl+q",
+                "ctrl+z",
+                "ctrl+y",
                 "ctrl+shift+c",
                 "ctrl+shift+v",
-                "rs",
-                "§",
-                "section",
+                "ctrl+shift+x",
+                "ctrl+shift+z",
             ]
         ):
             return
@@ -1944,7 +2230,7 @@ class BashEditScreen(Screen):
         self.update_status(f"Whitespace display {status}")
 
     def action_toggle_help(self) -> None:
-        legend = self.query_one("#editor_legend", Label)
+        legend = self.query_one("#editor_legend")
         legend.display = not legend.display
         status = "enabled" if legend.display else "disabled"
         self.update_status(f"Help bar {status}")
@@ -1967,13 +2253,15 @@ class BashEditScreen(Screen):
             "| `Alt+1` | Toggle Whitespace Display (spaces & tabs) |",
             "| `^N` / `Alt+N` | Toggle Line Numbers |",
             "| `F12` | Toggle Markdown Rendering |",
-            "| `^^` / `Alt+A` | Toggle Mark Selection |",
+            "| `Shift+Arrows` / `Shift+Home/End` | Select Text Range (Desktop Selection) |",
+            "| `Ctrl+Left` / `Ctrl+Right` | Move Word Left / Right |",
+            "| `Ctrl+Up` / `Ctrl+Down` | Move Paragraph Up / Down |",
             "| `^W` | Where Is (Search text) |",
-            "| `^K` / `F8` | Cut Line or Selection |",
-            "| `^C` / `Alt+6` / `Alt+C` | Copy Line or Selection |",
-            "| `^U` / `F9` | Paste Cut Buffer |",
+            "| `^X` | Cut Selection or Line |",
+            "| `^C` | Copy Selection or Line |",
+            "| `^V` | Paste Buffer / Clipboard |",
             "| `^Z` / `^Y` | Undo / Redo |",
-            "| `^X` / `ESC` | Exit Editor |",
+            "| `^Q` / `ESC` | Exit Editor |",
         ]
         if self.display_theme_colors:
             table_lines.append("| `Alt+T` | Toggle Theme Color Display (Refresh) |")

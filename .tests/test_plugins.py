@@ -485,6 +485,72 @@ class TestPluginSystem(unittest.TestCase):
             # 3rd plugin disk constructs its own table
             self.assertIn("Disk: 50% free", plain)
 
+    def test_plugin_section_divider_config(self):
+        """Test get_plugin_divider_config resolution under different settings."""
+        # 1. divider: True (uses theme's length)
+        cfg1 = {"theme": "dracula", "settings": {"plugins": {"divider": True}}}
+        has_div, is_screen = bashmenu.get_plugin_divider_config(cfg1)
+        self.assertTrue(has_div)
+        self.assertFalse(is_screen)  # dracula is {window_width}
+
+        # 2. divider: True with screen theme
+        cfg2 = {"theme": "synthwave", "settings": {"plugins": {"divider": True}}}
+        has_div, is_screen = bashmenu.get_plugin_divider_config(cfg2)
+        self.assertTrue(has_div)
+        self.assertTrue(is_screen)  # synthwave has {screen_width}
+
+        # 3. Explicit 'screen' and 'window'
+        cfg3 = {"theme": "dracula", "settings": {"plugins": {"divider": "screen"}}}
+        self.assertEqual(bashmenu.get_plugin_divider_config(cfg3), (True, True))
+
+        cfg4 = {"theme": "synthwave", "settings": {"plugins": {"divider": "window"}}}
+        self.assertEqual(bashmenu.get_plugin_divider_config(cfg4), (True, False))
+
+        # 4. top_divider and layout.divider fallbacks
+        cfg5 = {"settings": {"plugins": {"top_divider": True}}}
+        has_div, _ = bashmenu.get_plugin_divider_config(cfg5)
+        self.assertTrue(has_div)
+
+        cfg6 = {"settings": {"plugins": {"layout": {"divider": True}}}}
+        has_div, _ = bashmenu.get_plugin_divider_config(cfg6)
+        self.assertTrue(has_div)
+
+        # 5. Disabled / missing
+        cfg7 = {"settings": {"plugins": {"divider": False}}}
+        self.assertEqual(bashmenu.get_plugin_divider_config(cfg7), (False, False))
+
+    def test_plugin_section_divider_rendering(self):
+        """Test that MenuView renders the divider above plugins when divider: True."""
+        cfg = {
+            "theme": "dracula",
+            "settings": {
+                "plugins": {
+                    "divider": True,
+                    "test_plugin": {"script": "dummy.sh"},
+                }
+            }
+        }
+        mnu = {"title": "Menu", "options": [{"title": "Option 1"}]}
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=mnu)
+
+        sample_lines = ["Plugin output line 1", "Plugin output line 2"]
+        with (
+            patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)),
+            patch("bashmenu.get_plugin_outputs", return_value=sample_lines),
+        ):
+            # get_plugin_lines_and_limits accounts for top_div_rows
+            lines, sep, opt_rows = mv.get_plugin_lines_and_limits(19)
+            self.assertEqual(len(lines), 2)
+            self.assertEqual(sep, 1)
+            # 19 total - 2 plugins - 1 sep - 1 top_div = 15 opt_rows
+            self.assertEqual(opt_rows, 15)
+
+            rendered = mv.render().plain
+            rendered_lines = rendered.split("\n")
+            # Should have horizontal divider line within window borders
+            div_lines = [l for l in rendered_lines if "──" in l and ("│" in l or "├" in l)]
+            self.assertGreater(len(div_lines), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

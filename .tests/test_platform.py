@@ -137,12 +137,32 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertIn('"${SCRIPT_DIR}/pager.sh"', content)
 
     def test_otd_uses_python_inhouse(self):
-        """Verify otd.sh has in-house python implementation."""
+        """Verify otd.sh has in-house python implementation with text wrapping."""
         otd_sh = os.path.join(SCRIPTS_DIR, "otd.sh")
         with open(otd_sh, "r") as f:
             content = f.read()
         self.assertIn("urllib.request", content)
         self.assertIn("json", content)
+        self.assertIn("textwrap", content)
+
+    def test_otd_sh_wrapping_execution(self):
+        """Verify scripts/otd.sh wraps long output to COLUMNS."""
+        otd_sh = os.path.join(SCRIPTS_DIR, "otd.sh")
+        env = dict(os.environ, COLUMNS="40")
+        res = subprocess.run(
+            ["bash", otd_sh],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+            env=env,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertIn("On This Day", res.stdout)
+        # Any non-URL line should respect the wrap width (40 chars)
+        for line in res.stdout.splitlines():
+            if not line.startswith("http") and "[b]" not in line and not line.startswith("On This Day"):
+                self.assertLessEqual(len(line), 40, f"Line '{line}' exceeded width 40")
 
     def test_hostname_sh_execution(self):
         """Verify scripts/hostname.sh executes and returns hostname information."""

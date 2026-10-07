@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: install_node.sh
+# DESCRIPTION: Cross-platform installer for Node.js and npm via system package
+#              managers, winget, or nvm.
+# ==============================================================================
 
 # Detect OS
 OS_TYPE=$(uname -s)

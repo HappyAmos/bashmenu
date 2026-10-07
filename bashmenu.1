@@ -12,6 +12,12 @@ interpolates configurations and system environment variables, and supports
 custom Nerd Fonts, visual file chooser dialogs, and modular code templates.
 .SH COMPONENT FILES
 .TP
+.I install.sh
+Universal POSIX installation script with package manager detection.
+.TP
+.I uninstall.sh
+Universal POSIX uninstallation script removing installed files and links.
+.TP
 .I bashmenu.sh
 Launcher wrapper script. Handles Python virtual environment setup and repairs.
 .TP
@@ -47,8 +53,26 @@ Exhaustive terminal manual page for HA Bash Menu.
 .SS Provided Utility Scripts (scripts/)
 These custom utility scripts are stored inside the scripts directory:
 .TP
+.I scripts/ascii.sh
+Standard and Extended ASCII viewing utility.
+.TP
+.I scripts/asteroids.sh
+Terminal Asteroids game runner and automatic source build installer.
+.TP
+.I scripts/bsdgames.sh
+Interactive menu runner for classic BSD games (adventure, atc, tetris).
+.TP
+.I scripts/cheat.py
+Python CLI cheatsheet search engine supporting tags and full-text search.
+.TP
+.I scripts/cheat.sh
+Cheatsheet lookup utility wrapper for rich.sh and pager.sh.
+.TP
 .I scripts/dnsconfig.sh
 Configures IPv4 and IPv6 DNS addresses for active connections.
+.TP
+.I scripts/games.sh
+Interactive menu runner for terminal games (ninvaders, greed, nsnake).
 .TP
 .I scripts/get_api_key.sh
 Securely retrieves and formats credentials or keys.
@@ -61,6 +85,9 @@ Curses preview dialog box utility for Unicode emojis and icons.
 .TP
 .I scripts/gorillas.py
 QBasic Gorillas clone TUI game implemented as a Textual Screen.
+.TP
+.I scripts/hostname.sh
+Discovers and displays system hostname, FQDN, kernel, and OS identity.
 .TP
 .I scripts/install_basics.sh
 Cross-platform basic tools installer wrapper.
@@ -92,14 +119,23 @@ Visual tester for ncurses color support.
 .I scripts/otd.sh
 Fetches a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq.
 .TP
+.I scripts/pager.sh
+Interactive full-screen terminal text pager supporting ANSI colors and links.
+.TP
+.I scripts/ping.sh
+Cross-platform ping wrapper with unprivileged TCP handshake latency fallback.
+.TP
+.I scripts/rich.sh
+Markdown file rendering wrapper utilizing Python Rich piped into pager.sh.
+.TP
+.I scripts/serverup.sh
+Cross-platform server ping and uptime availability check script.
+.TP
 .I scripts/system_update.sh
 Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
 .TP
 .I scripts/unicode.sh
 Interactive Unicode Block Explorer script.
-.TP
-.I scripts/ascii.sh
-Standard and Extended ASCII viewing utility.
 .TP
 .I scripts/webopen.sh
 Cross-platform web browser launcher wrapper script. Supports --gui for graphical browsers and --tty or tty for console/terminal browsers (such as lynx, links, brow6el).
@@ -127,6 +163,9 @@ Display the markdown help manual using the glow terminal pager.
 Launch menuedit.py visual menu tree editor.
 .TP
 .B F5
+Refresh menu, reload configuration, menu files, and plugin outputs.
+.TP
+.B F6
 Toggle visibility of option shortcut key badges.
 .TP
 .B ENTER
@@ -174,43 +213,50 @@ Exit editor or cancel dialogs (prompts to save if modifications exist).
 .B Menu Focus Synchronization & Property Inspector Previews:
 When launching menuedit.py from bashmenu.py (via F4 or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in bashmenu.py, so pressing e or ENTER immediately opens the ItemEditModal dialog for that exact item. The Property Inspector side panel features a real-time visual Preview section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the ItemEditModal dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (Switch:focus { background: transparent; }), and the help text footer explicitly displays [ESC / C] Cancel.
 .SS Built-in Text Editor (bashedit.py)
-The application features a built-in, Nano-style text editor for editing files.
+The application features a built-in text editor supporting tabs and desktop
+shortcuts.
 .TP
-.B Ctrl+X
+.B Ctrl+Q, ESC
 Exit editor (prompts to save if modifications exist).
 .TP
-.B Ctrl+O, F3
-WriteOut (saves the active file).
+.B Ctrl+O, Ctrl+R, F5, F7
+Open file via file picker modal into current or new tab.
 .TP
-.B Ctrl+R, F5
-Read File (opens file picker modal to select file to insert/open).
+.B Ctrl+S, F2, F3
+Save active file buffer.
 .TP
-.B Ctrl+S, F6
+.B Alt+S, Ctrl+Shift+S, F6
 Save As (prompts for destination file path).
 .TP
-.B Ctrl+N, F4
-Create a new empty document.
+.B Ctrl+E, F4, [ + ]
+Create a new empty document tab.
 .TP
-.B Ctrl+G, F1
-Toggle bottom Nano-style shortcut keys help bar.
+.B Alt+], Ctrl+Tab / Alt+[, Shift+Tab
+Switch to next or previous document tab.
 .TP
-.B Ctrl+K, F8
-Cut line or active selection block.
+.B Ctrl+W
+Where Is (search text within active buffer).
 .TP
-.B Ctrl+U, F9
-Paste (uncut) cutbuffer text.
+.B Shift+Arrows, Shift+Home, Shift+End
+Select text range (standard desktop text selection).
+.TP
+.B Ctrl+Left, Ctrl+Right
+Skip cursor by word left or right.
+.TP
+.B Ctrl+Up, Ctrl+Down
+Skip cursor by paragraph up or down.
+.TP
+.B Ctrl+X
+Cut line or active selection block to clipboard.
 .TP
 .B Ctrl+C
-Show cursor position or copy selection block.
+Copy line or active selection block to clipboard.
 .TP
-.B Alt+6
-Copy line or selection block.
+.B Ctrl+V
+Paste cutbuffer or system clipboard text at cursor.
 .TP
-.B Alt+U, Alt+E
-Undo (Alt+U) or Redo (Alt+E) edit operations.
-.TP
-.B Ctrl+^, Alt+A
-Set or unset text selection mark.
+.B Ctrl+Z, Ctrl+Y
+Undo or redo edit operations.
 .TP
 .B Ctrl+P, Alt+M
 Show modal with available placeholders and macros.
@@ -221,17 +267,17 @@ Stream ASCII character table (ascii.sh) in modal viewer.
 .B Alt+V, F10
 Stream terminal colors table (ncurses_colors.py) in modal viewer.
 .TP
-.B Alt+N
-Toggle line numbers gutter display.
-.TP
-.B Alt+P, Alt+W
+.B Alt+1
 Toggle whitespace visibility (spaces as dots, tabs as arrows).
 .TP
-.B F12
-Toggle Markdown rendering for active document.
+.B Ctrl+N, Alt+N
+Toggle line numbers gutter display.
 .TP
-.B F2
-Launch external $EDITOR (e.g. vim or nano).
+.B F12
+Toggle Markdown rendering for active document buffer.
+.TP
+.B F1, Ctrl+G
+View BashEdit keybindings manual modal dialog.
 .SH CONFIGURATION & SCHEMA SPECIFICATIONS
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.

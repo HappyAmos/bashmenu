@@ -11,14 +11,16 @@ Dependencies:
 Usage:
     python cheat.py [query]
     python cheat.py -l [query]
+    python cheat.py -d
 """
 
 import argparse
+import contextlib
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import yaml
 
@@ -33,7 +35,7 @@ def get_config_path() -> Path:
     # Resolve directory containing this script
     script_dir = Path(__file__).resolve().parent
     config_file = script_dir / ".cheat.yml"
-    
+
     if config_file.is_file():
         return config_file
 
@@ -42,7 +44,7 @@ def get_config_path() -> Path:
         config_file.write_text("dir: ~/cheat\n", encoding="utf-8")
         print(f"Created default configuration file at: {config_file}")
         return config_file
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         sys.exit(f"Error: No .cheat.yml found, and failed to create one at {config_file}: {e}")
 
 
@@ -70,7 +72,7 @@ def get_root_directory(config_path: Path) -> Path:
             sys.exit(f"Error: Invalid directory in {config_path}: {root}")
 
         return root
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         sys.exit(f"Error reading config file {config_path}: {e}")
 
 
@@ -95,13 +97,13 @@ def display_markdown(file_path: Path) -> None:
 
     if cmd:
         try:
-            res = subprocess.run(cmd)
+            res = subprocess.run(cmd, check=False)
             if res.returncode != 0:
                 sys.exit(res.returncode)
             return
         except KeyboardInterrupt:
             sys.exit(130)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     # Fall back to stdout print if rich.sh fails to run
@@ -109,7 +111,7 @@ def display_markdown(file_path: Path) -> None:
         print(file_path.read_text(encoding="utf-8"))
     except KeyboardInterrupt:
         sys.exit(130)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         sys.exit(f"Error reading {file_path}: {e}")
 
 
@@ -125,7 +127,7 @@ def extract_tags_from_frontmatter(file_path: Path) -> list[str]:
     """
     try:
         content = file_path.read_text(encoding="utf-8").lstrip()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return []
 
     # Frontmatter must begin with '---' delimiter
@@ -137,7 +139,7 @@ def extract_tags_from_frontmatter(file_path: Path) -> list[str]:
     if len(parts) < 3:
         return []
 
-    try:
+    with contextlib.suppress(Exception):
         frontmatter = yaml.safe_load(parts[1])
         if isinstance(frontmatter, dict):
             tags = frontmatter.get("tags", [])
@@ -147,8 +149,6 @@ def extract_tags_from_frontmatter(file_path: Path) -> list[str]:
             # String of tags: tags: tag1, tag2
             if isinstance(tags, str):
                 return [t.strip().lower() for t in tags.split(",") if t.strip()]
-    except Exception:
-        pass
 
     return []
 
@@ -171,8 +171,7 @@ def print_file_list(files: list[Path], root_dir: Path) -> None:
         tags = extract_tags_from_frontmatter(file)
         tags_str = f"[{', '.join(tags)}]" if tags else ""
         entries.append((rel_path, tags_str))
-        if len(rel_path) > max_len:
-            max_len = len(rel_path)
+        max_len = max(max_len, len(rel_path))
 
     col_width = max_len + 4
 
@@ -208,12 +207,24 @@ def main():
         default=False,
         help="Search cheatsheets and list matching files with tags."
     )
+    parser.add_argument(
+        "-d", "--directory",
+        action="store_true",
+        help="Print the configured cheatsheets directory path."
+    )
 
     args = parser.parse_args()
 
     # Parse configuration and target cheatsheets root directory
     config_path = get_config_path()
     root_dir = get_root_directory(config_path)
+
+    # -----------------------------------------------------------------
+    # DIRECTORY PATH MODE (-d / --directory)
+    # -----------------------------------------------------------------
+    if args.directory:
+        print(root_dir)
+        return
 
     # Recursively find and sort all Markdown files in root directory
     md_files = sorted(
@@ -234,8 +245,8 @@ def main():
             list_query = args.query.lower()
 
         # Strip .md extension if provided by user query
-        if list_query and list_query.endswith(".md"):
-            list_query = list_query[:-3]
+        if list_query:
+            list_query = list_query.removesuffix(".md")
 
         # Case 1: Unfiltered list mode -> output all files with tags
         if not list_query:
@@ -250,7 +261,7 @@ def main():
         matching_files = []
         for file in md_files:
             rel_path_str = str(file.relative_to(root_dir).with_suffix("")).lower()
-            
+
             # Priority 1: Filename or relative path match
             if file.stem.lower() == list_query or rel_path_str == list_query:
                 matching_files.append(file)
@@ -263,12 +274,10 @@ def main():
                 continue
 
             # Priority 3: Full-text content match
-            try:
+            with contextlib.suppress(Exception):
                 content = file.read_text(encoding="utf-8")
                 if list_query in content.lower():
                     matching_files.append(file)
-            except Exception:
-                continue
 
         if not matching_files:
             sys.exit(f"No markdown file matched '{list_query}' under {root_dir}")
@@ -283,9 +292,7 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    query = args.query.lower()
-    if query.endswith(".md"):
-        query = query[:-3]
+    query = args.query.lower().removesuffix(".md")
 
     # Priority 1a: Fast exact relative path lookup (<root>/<query>.md)
     exact_match = root_dir / f"{query}.md"
@@ -309,13 +316,11 @@ def main():
 
     # Priority 3: Full-text content match
     for file in md_files:
-        try:
+        with contextlib.suppress(Exception):
             content = file.read_text(encoding="utf-8")
             if query in content.lower():
                 display_markdown(file)
                 return
-        except Exception:
-            continue
 
     sys.exit(f"No markdown file matched '{query}' under {root_dir}")
 

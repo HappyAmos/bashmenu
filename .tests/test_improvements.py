@@ -399,6 +399,133 @@ class TestImprovements(unittest.TestCase):
         self.assertIn("height: 2;", menuedit.MenuEditScreen.DEFAULT_CSS)
         self.assertIn(".footer_row", menuedit.MenuEditScreen.DEFAULT_CSS)
 
+    def test_bashedit_two_line_footer_layout(self):
+        """Verify bashedit footer help bar is 2 lines and items fit without exceeding screen width."""
+        import asyncio
+
+        from textual.app import App
+        from textual.containers import Horizontal
+
+        import bashedit
+
+        self.assertIn("height: 2;", bashedit.BashEditScreen.DEFAULT_CSS)
+        self.assertIn(".footer_row", bashedit.BashEditScreen.DEFAULT_CSS)
+
+        class TestEditorApp(App):
+            def compose(self):
+                yield bashedit.BashEditScreen()
+
+        app = TestEditorApp()
+
+        async def run_checks():
+            async with app.run_test(size=(80, 24)):
+                screen = app.query_one(bashedit.BashEditScreen)
+                legend = screen.query_one("#editor_legend")
+                self.assertIsNotNone(legend)
+                rows = list(legend.query(".footer_row"))
+                self.assertEqual(len(rows), 2)
+                for r in rows:
+                    self.assertIsInstance(r, Horizontal)
+                    self.assertLessEqual(r.virtual_size.width, 80)
+
+                # Check all 16 labels are present and correctly partitioned
+                row1_ids = [w.id for w in rows[0].query(".footer_item")]
+                row2_ids = [w.id for w in rows[1].query(".footer_item")]
+                self.assertEqual(len(row1_ids), 8)
+                self.assertEqual(len(row2_ids), 8)
+                self.assertEqual(row1_ids, [
+                    "lbl_open", "lbl_save", "lbl_save_as", "lbl_search",
+                    "lbl_cut", "lbl_copy", "lbl_paste", "lbl_undo",
+                ])
+                self.assertEqual(row2_ids, [
+                    "lbl_placeholders", "lbl_ascii", "lbl_colors", "lbl_space",
+                    "lbl_lineno", "lbl_markdown", "lbl_help", "lbl_exit",
+                ])
+
+        asyncio.run(run_checks())
+
+    def test_bashedit_footer_legend_dynamic_spacing(self):
+        """Verify update_legend_layout dynamically expands margins across full window width."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashedit
+
+        class EditApp(App):
+            def compose(self):
+                yield bashedit.BashEditScreen()
+
+        async def run_checks():
+            app = EditApp()
+            async with app.run_test(size=(120, 30)):
+                screen = app.query_one(bashedit.BashEditScreen)
+                rows = list(screen.query(".footer_row"))
+                self.assertEqual(len(rows), 2)
+
+                # Test default mount at 120 width
+                margins_r0 = [it.styles.margin.right for it in rows[0].query(".footer_item")]
+                margins_r1 = [it.styles.margin.right for it in rows[1].query(".footer_item")]
+                self.assertEqual(margins_r0[-1], 0)
+                self.assertEqual(margins_r1[-1], 0)
+                self.assertTrue(all(m > 1 for m in margins_r0[:-1]))
+                self.assertTrue(all(m > 1 for m in margins_r1[:-1]))
+
+                # Test dynamic update at 80 width
+                screen.update_legend_layout(width=80)
+                margins_80_r0 = [it.styles.margin.right for it in rows[0].query(".footer_item")]
+                margins_80_r1 = [it.styles.margin.right for it in rows[1].query(".footer_item")]
+                self.assertEqual(margins_80_r0, [3, 3, 3, 2, 2, 2, 2, 0])
+                self.assertEqual(margins_80_r1, [1, 1, 1, 1, 1, 1, 1, 0])
+
+                # Test dynamic update at 160 width
+                screen.update_legend_layout(width=160)
+                margins_160_r0 = [it.styles.margin.right for it in rows[0].query(".footer_item")]
+                margins_160_r1 = [it.styles.margin.right for it in rows[1].query(".footer_item")]
+                self.assertEqual(margins_160_r0, [14, 14, 14, 14, 14, 14, 13, 0])
+                self.assertEqual(margins_160_r1, [13, 13, 13, 12, 12, 12, 12, 0])
+
+        asyncio.run(run_checks())
+
+    def test_rich_help_modal_screen(self):
+        """Verify RichHelpModalScreen modal initialization, contents, and rendering."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu_ui
+
+        # Test constant structures
+        self.assertGreater(len(bashmenu_ui.RICH_REFERENCE_SECTIONS), 0)
+        self.assertIn("Text Styling & Font Weight Tags", bashmenu_ui.RICH_REFERENCE_HELP_TEXT)
+        self.assertIn("Theme Color Tags (Adaptive)", bashmenu_ui.RICH_REFERENCE_HELP_TEXT)
+        self.assertIn("Standard Named & Hex Colors", bashmenu_ui.RICH_REFERENCE_HELP_TEXT)
+        self.assertIn("Structural Layout Tags", bashmenu_ui.RICH_REFERENCE_HELP_TEXT)
+        self.assertIn("Parser Directives & Escaping", bashmenu_ui.RICH_REFERENCE_HELP_TEXT)
+
+        # Test modal mounting in textual app
+        class TestApp(App):
+            def compose(self):
+                yield bashmenu_ui.Label("Main")
+
+        async def run_checks():
+            app = TestApp()
+            async with app.run_test(size=(80, 24)) as pilot:
+                modal = bashmenu_ui.RichHelpModalScreen()
+                app.push_screen(modal)
+                await pilot.pause()
+
+                self.assertEqual(modal.modal_title, "Rich Text & BBCode Tags Reference")
+                self.assertTrue(modal.is_help)
+                self.assertFalse(modal.no_formatting)
+                self.assertIn("Text Styling & Font Weight Tags", modal.message)
+
+                # Verify Rich Text renderable produced
+                rt = bashmenu_ui.formatting_to_rich_text(modal.message)
+                self.assertGreater(len(rt.plain), 0)
+
+        asyncio.run(run_checks())
+
     def test_menuedit_input_modal_help_and_footer_clicks(self):
         """Verify ItemEditModal F1 shortcut, help modal, and clickable footer items."""
         import menuedit
@@ -1638,6 +1765,18 @@ class TestImprovements(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         self.assertTrue(lines[1].startswith("Item Three") or "Item Three" in lines[1])
 
+        # Bottom-up wrap_gutter_items logic test (status gutter)
+        lines_bu = bashmenu.wrap_gutter_items(items, max_w, max_lines=2, bottom_up=True)
+        self.assertLessEqual(len(lines_bu), 2)
+        for line in lines_bu:
+            vis_len = bashmenu_ui.get_visible_len(line)
+            self.assertLessEqual(vis_len, max_w, f"Line '{line}' exceeds max_w {max_w}")
+        # Bottom line filled first from end of items
+        self.assertIn("Item Five", lines_bu[1])
+        self.assertIn("Item Six", lines_bu[1])
+        # Top line has overflow items
+        self.assertTrue("Item Three" in lines_bu[0] or "Item Four" in lines_bu[0])
+
         # 2. MainMenuView.render test with long status gutter
         cfg = {
             "theme": "dracula",
@@ -1674,6 +1813,238 @@ class TestImprovements(unittest.TestCase):
         # Format is "│  " + content + "  │"
         inner_content = footer_row[3:-3]
         self.assertEqual(len(inner_content), w - 6)
+
+        # 3. MainMenuView.render test with single-line status gutter (anchors to bottom line h - 2)
+        cfg_single = {
+            "theme": "dracula",
+            "settings": {
+                "status_gutter": "Single Status Badge",
+            },
+        }
+        mv_single = bashmenu.MainMenuView(config=cfg_single, menu_data=mnu)
+        with patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(w, h)):
+            rendered_single = mv_single.render()
+            plain_lines_single = rendered_single.plain.split("\n")
+
+        # Bottom gutter row (h - 2) must contain the single status badge
+        self.assertIn("Single Status Badge", plain_lines_single[h - 2])
+        # Top gutter row (h - 3) must NOT contain the single status badge
+        self.assertNotIn("Single Status Badge", plain_lines_single[h - 3])
+
+    def test_scripts_documentation_parity(self):
+        """Verify all scripts in scripts/ and root installers are documented in bashmenu.md and bashmenu.1."""
+        proj_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        scripts_dir = os.path.join(proj_dir, "scripts")
+
+        with open(os.path.join(proj_dir, "bashmenu.md"), encoding="utf-8") as f:
+            md_content = f.read()
+
+        with open(os.path.join(proj_dir, "bashmenu.1"), encoding="utf-8") as f:
+            man_content = f.read()
+
+        # Check root installer scripts
+        for root_script in ["install.sh", "uninstall.sh"]:
+            self.assertIn(root_script, md_content, f"{root_script} must be documented in bashmenu.md")
+            self.assertIn(root_script, man_content, f"{root_script} must be documented in bashmenu.1")
+
+        # Check all scripts in scripts/
+        for fname in os.listdir(scripts_dir):
+            if (
+                fname.startswith(".")
+                or fname.endswith((".yml", ".pyc", ".md"))
+                or fname == "__pycache__"
+                or os.path.getsize(os.path.join(scripts_dir, fname)) == 0
+            ):
+                continue
+            script_ref = f"scripts/{fname}"
+            self.assertIn(script_ref, md_content, f"{script_ref} must be documented in bashmenu.md")
+            self.assertIn(script_ref, man_content, f"{script_ref} must be documented in bashmenu.1")
+
+    def test_bashedit_desktop_selection_and_word_skipping(self):
+        """Verify EditorWidget word-skipping, paragraph-skipping, selection deletion and replacement."""
+        import bashedit
+
+        ed = bashedit.EditorWidget(lines=["hello world foo", "", "second paragraph"])
+
+        # Word jumping
+        ed.cursor_y, ed.cursor_x = 0, 0
+        ed.move_word_right()
+        self.assertEqual((ed.cursor_y, ed.cursor_x), (0, 6))
+        ed.move_word_right()
+        self.assertEqual((ed.cursor_y, ed.cursor_x), (0, 12))
+        ed.move_word_left()
+        self.assertEqual((ed.cursor_y, ed.cursor_x), (0, 6))
+
+        # Paragraph jumping (stops at blank lines separating paragraphs)
+        ed.move_paragraph_down()
+        self.assertEqual(ed.cursor_y, 1)
+        ed.move_paragraph_down()
+        self.assertEqual(ed.cursor_y, 2)
+        ed.move_paragraph_up()
+        self.assertEqual(ed.cursor_y, 1)
+        ed.move_paragraph_up()
+        self.assertEqual(ed.cursor_y, 0)
+
+        # Selection range and deletion
+        ed.cursor_y, ed.cursor_x = 0, 0
+        ed.mark_active = True
+        ed.mark_y, ed.mark_x = 0, 0
+        ed.cursor_x = 5  # "hello"
+        sel = ed.get_selection_range()
+        self.assertEqual(sel, ((0, 0), (0, 5)))
+        ed.delete_selection()
+        self.assertFalse(ed.mark_active)
+        self.assertEqual(ed.lines[0], " world foo")
+        self.assertEqual(ed.cursor_x, 0)
+
+        # Typing replaces selection
+        ed.lines = ["hello world"]
+        ed.mark_active = True
+        ed.mark_y, ed.mark_x = 0, 0
+        ed.cursor_y, ed.cursor_x = 0, 5
+        ed.insert_char("brave")
+        self.assertEqual(ed.lines[0], "brave world")
+        self.assertFalse(ed.mark_active)
+
+        # Copy selection preserves mark
+        ed.lines = ["quick brown fox"]
+        ed.mark_active = True
+        ed.mark_y, ed.mark_x = 0, 0
+        ed.cursor_y, ed.cursor_x = 0, 5
+        res = ed.copy_selection()
+        self.assertEqual(res, "Selection Copied")
+        self.assertEqual(ed.cutbuffer, ["quick"])
+        self.assertTrue(ed.mark_active)
+
+        # Cut selection removes mark and text
+        res = ed.cut_line()
+        self.assertEqual(res, "Selection Cut")
+        self.assertEqual(ed.lines[0], " brown fox")
+        self.assertFalse(ed.mark_active)
+
+    def test_bashedit_screen_desktop_shortcuts(self):
+        """Verify BashEditScreen on_key routing for Shift-selection, word-skip, Ctrl+X/C/V/Z/Y/Q."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashedit
+
+        class TestApp(App):
+            def compose(self):
+                yield bashedit.BashEditScreen()
+
+        app = TestApp()
+
+        async def run_checks():
+            async with app.run_test() as pilot:
+                screen = app.query_one(bashedit.BashEditScreen)
+                ed = screen.query_one("#editor_widget", bashedit.EditorWidget)
+                ed.lines = ["first line of text", "second line"]
+                ed.cursor_y, ed.cursor_x = 0, 0
+
+                # Ctrl+Right skips to next word
+                await pilot.press("ctrl+right")
+                self.assertEqual(ed.cursor_x, 6)
+
+                # Shift+Right selects text
+                await pilot.press("shift+right")
+                self.assertTrue(ed.mark_active)
+                self.assertEqual(ed.mark_x, 6)
+                self.assertEqual(ed.cursor_x, 7)
+                status_text = str(screen.query_one("#editor_status").render())
+                self.assertIn("1 char selected", status_text)
+
+                # Ctrl+C copies selection
+                await pilot.press("ctrl+c")
+                self.assertEqual(ed.cutbuffer, ["l"])
+                self.assertTrue(ed.mark_active)
+
+                # Escape unsets selection
+                await pilot.press("escape")
+                self.assertFalse(ed.mark_active)
+
+        asyncio.run(run_checks())
+
+    def test_plugins_top_level_table_layout(self):
+        """Verify PluginBuffer resolves table layout configured directly under settings.plugins."""
+        import bashmenu
+
+        test_config = {
+            "settings": {
+                "plugins": {
+                    "type": "table",
+                    "width": "100%",
+                    "entries": 3,
+                    "headers": "",
+                    "otd": {
+                        "script": "otd.sh",
+                        "standalone": True,
+                        "pretext": "{divider}",
+                        "posttext": "{divider}",
+                    },
+                    "p1": {"script": "p1.sh"},
+                    "p2": {"script": "p2.sh"},
+                    "p3": {"script": "p3.sh"},
+                }
+            }
+        }
+        with bashmenu._plugin_lock:
+            bashmenu._plugin_output_cache["otd"] = {"lines": ["Historical Quote"], "time": 9999999999}
+            bashmenu._plugin_output_cache["p1"] = {"lines": ["Cell 1"], "time": 9999999999}
+            bashmenu._plugin_output_cache["p2"] = {"lines": ["Cell 2"], "time": 9999999999}
+            bashmenu._plugin_output_cache["p3"] = {"lines": ["Cell 3"], "time": 9999999999}
+
+        w = bashmenu.PluginBuffer(config=test_config)
+        rendered = w.render().plain
+        self.assertIn("Historical Quote", rendered)
+        self.assertIn("┌", rendered)
+        self.assertIn("Cell 1", rendered)
+        self.assertIn("Cell 2", rendered)
+        self.assertIn("Cell 3", rendered)
+        self.assertIn("┘", rendered)
+
+    def test_main_menu_f5_refresh_and_f6_shortcuts(self):
+        """Verify F5 reloads config/menu/plugins and F6 toggles shortcuts."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu
+
+        class TestApp(App):
+            def compose(self):
+                yield bashmenu.BashMenuScreen()
+
+        app = TestApp()
+
+        async def run_checks():
+            async with app.run_test() as pilot:
+                screen = app.query_one(bashmenu.BashMenuScreen)
+                mv = screen.menu_view
+
+                # Check F5 and F6 bindings are defined
+                binding_keys = {b.key: b.action for b in screen.BINDINGS}
+                self.assertEqual(binding_keys.get("f5"), "refresh_menu")
+                self.assertEqual(binding_keys.get("f6"), "toggle_shortcuts")
+
+                # Test F6 toggles shortcuts
+                initial_shortcuts = mv.show_shortcuts
+                await pilot.press("f6")
+                self.assertEqual(mv.show_shortcuts, not initial_shortcuts)
+                await pilot.press("f6")
+                self.assertEqual(mv.show_shortcuts, initial_shortcuts)
+
+                # Populate fake plugin cache
+                with bashmenu._plugin_lock:
+                    bashmenu._plugin_output_cache["test_p"] = {"lines": ["Old Data"], "time": 9999999999}
+
+                # Test F5 reloads environment and clears plugin cache
+                await pilot.press("f5")
+                with bashmenu._plugin_lock:
+                    self.assertNotIn("test_p", bashmenu._plugin_output_cache)
+
+        asyncio.run(run_checks())
 
 
 if __name__ == "__main__":

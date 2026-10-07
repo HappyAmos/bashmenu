@@ -197,6 +197,86 @@ def format_placeholder_help_text(col1_width: int = 28) -> str:
 PLACEHOLDER_HELP_TEXT = format_placeholder_help_text(28)
 
 
+RICH_REFERENCE_SECTIONS = [
+    (
+        "Text Styling & Font Weight Tags",
+        [
+            (r"\[b\]text\[/b\]", "Renders text in bold font weight", "[b]Bold text preview[/b]"),
+            (r"\[u\]text\[/u\]", "Renders text with an underline", "[u]Underlined text preview[/u]"),
+            (r"\[dim\]text\[/dim\]", "Renders text with reduced/dimmed contrast", "[dim]Dimmed text preview[/dim]"),
+            (r"\[reverse\]text\[/reverse\]", "Inverts foreground and background colors", "[reverse] Inverted video preview [/reverse]"),
+        ],
+    ),
+    (
+        "Theme Color Tags (Adaptive)",
+        [
+            (r"\[color=accent\]...\[/color\]", "Active theme accent / badge highlight color", "[color=accent]Accent status indicator[/color]"),
+            (r"\[color=title\]...\[/color\]", "Active theme window title and header color", "[color=title]Title header element[/color]"),
+            (r"\[color=highlight\]...\[/color\]", "Active theme selection highlight color", "[color=highlight]Selected item highlight[/color]"),
+            (r"\[color=shortcut_key\]...\[/color\]", "Direct action keyboard shortcut badge color", "[color=shortcut_key]Shortcut badge [1][/color]"),
+            (r"\[color=help_text\]...\[/color\]", "Help prompt and footer guidance text color", "[color=help_text]Footer help text[/color]"),
+            (r"\[color=plugin\]...\[/color\]", "Plugin output buffer text color", "[color=plugin]Plugin feed data[/color]"),
+            (r"\[color=border\]...\[/color\]", "Outer window border frame color", "[color=border]Window border style[/color]"),
+            (r"\[color=divider\]...\[/color\]", "Horizontal rule and separator divider color", "[color=divider]Divider line[/color]"),
+            (r"\[color=text\]...\[/color\]", "Default foreground text body color", "[color=text]Default body copy[/color]"),
+            (r"\[color=footer\]...\[/color\]", "Bottom status bar and footer color", "[color=footer]Footer status gutter[/color]"),
+        ],
+    ),
+    (
+        "Standard Named & Hex Colors",
+        [
+            (r"\[color=red\]...\[/color\]", "Standard red foreground color", "[color=red]Alert / Red text[/color]"),
+            (r"\[color=green\]...\[/color\]", "Standard green foreground color", "[color=green]Success / Green text[/color]"),
+            (r"\[color=yellow\]...\[/color\]", "Standard yellow foreground color", "[color=yellow]Warning / Yellow text[/color]"),
+            (r"\[color=blue\]...\[/color\]", "Standard blue foreground color", "[color=blue]Notice / Blue text[/color]"),
+            (r"\[color=magenta\]...\[/color\]", "Standard magenta foreground color", "[color=magenta]Magenta text[/color]"),
+            (r"\[color=cyan\]...\[/color\]", "Standard cyan foreground color", "[color=cyan]Cyan text[/color]"),
+            (r"\[color=white\]...\[/color\]", "Standard white foreground color", "[color=white]White text[/color]"),
+            (r"\[color=#rrggbb\]...\[/color\]", "24-bit TrueColor hex color (Rich style)", "e.g. [color=cyan]#50fa7b[/color]"),
+        ],
+    ),
+    (
+        "Structural Layout Tags",
+        [
+            (r"\[table width=100%\]...\[/table\]", "Auto-aligned Unicode box-drawing table", "Encloses [tr], [th], and [td] cells"),
+            (r"\[tr\]...\[/tr\]", "Table row container element", "Groups header and data cells"),
+            (r"\[th\]...\[/th\]", "Table header cell (automatically bolded)", "Column header label cell"),
+            (r"\[td\]...\[/td\]", "Table data cell with text wrapping", "Standard table data cell"),
+            (r"\[list\]...\[/list\]", "Unordered bulleted list (`•`)", "Encloses [*] item bullet entries"),
+            (r"\[list=1\]...\[/list\]", "Ordered numbered list (`1.`, `2.`)", "Encloses [*] numbered step entries"),
+            (r"\[list=a\]...\[/list\]", "Ordered alphabetic list (`a.`, `b.`)", "Encloses [*] alphabetic entries"),
+            (r"\[*\]item", "List item entry delimiter", "Prefix for items inside [list]"),
+        ],
+    ),
+    (
+        "Parser Directives & Escaping",
+        [
+            (r"\[tag]", "Backslash escaping to render literal tags", r"Renders literal \[b] without styling"),
+            ("`[tag]` / ```[tag]```", "Inline and fenced code block suppression", "Suppresses tag styling inside code"),
+            ("no_formatting=True", "Screen/conversion parameter to bypass parser", "Displays raw unformatted source text"),
+        ],
+    ),
+]
+
+
+def format_rich_reference_help_text(col1_width: int = 34) -> str:
+    """Format Rich Text and BBCode tags reference into aligned help documentation."""
+    lines = []
+    for title, items in RICH_REFERENCE_SECTIONS:
+        if lines:
+            lines.append("")
+        lines.append(f"[bold magenta]── {title} ──[/bold magenta]")
+        for tag_syntax, desc, example in items:
+            padded_tag = f"{tag_syntax:<{col1_width}}"
+            lines.append(f"[bold white]{padded_tag}[/bold white] │ {desc}")
+            if example:
+                lines.append(f"  [dim]Example:[/dim] {example}")
+    return "\n".join(lines)
+
+
+RICH_REFERENCE_HELP_TEXT = format_rich_reference_help_text(34)
+
+
 def is_pua_glyph(c: str) -> bool:
     """
     Check if a character falls within Unicode Private Use Area ranges
@@ -2709,6 +2789,26 @@ class StreamOutputModalScreen(ModalScreen[None]):
             except Exception:  # noqa: BLE001, S110
                 pass
         self.dismiss(None)
+
+
+class RichHelpModalScreen(MessageModalScreen):
+    """Modal screen displaying Rich Text and BBCode tags reference with examples."""
+
+    def __init__(
+        self,
+        title: str = "Rich Text & BBCode Tags Reference",
+        theme: dict | None = None,
+        custom_help_text: str | None = None,
+    ):
+        help_content = custom_help_text if custom_help_text is not None else RICH_REFERENCE_HELP_TEXT
+        super().__init__(
+            title=title,
+            message=help_content,
+            theme=theme,
+            is_help=True,
+            no_formatting=False,
+            is_markdown=False,
+        )
 
 
 # Fallback synchronous wrapper functions (for headless / standalone use)

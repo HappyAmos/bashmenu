@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Hostname & System Identity Information
-# Cross-platform helper for BashMenu (Linux, macOS, BSD, Alpine, Arch, Termux)
+# SCRIPT: hostname.sh
+# DESCRIPTION: Hostname and system identity discovery tool. Reports hostname,
+#              FQDN/domain, kernel, architecture, OS distribution, and container.
 # ==============================================================================
 
 echo "=========================================="

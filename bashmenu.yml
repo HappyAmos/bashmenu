@@ -16,15 +16,28 @@ settings:
   cache_dir: '{home}/.cache/bashmenu'
   check_for_updates: false
   plugins:
+    type: table
+    width: 100%
+    entries: 4
+    headers: ''
+    divider: true
+    weather:
+      script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
+      sleep: 350
+    alienware:
+      sleep: 500
+      script: '{scripts_dir}/serverup.sh 192.168.4.46 Alienware'
+    pi3b:
+      sleep: 525
+      script: '{scripts_dir}/serverup.sh 192.168.4.47 Pi3b'
+    halftop:
+      sleep: 550
+      script: '{scripts_dir}/serverup.sh 192.168.4.96 Halftop'
     otd:
       script: otd.sh
       sleep: 300
+      standalone: true
       pretext: '{divider}'
-      posttext: '{divider}'
-    weather:
-      script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
-      sleep: 300
-      pretext: ''
       posttext: '{divider}'
   templates_dir: '{bashmenu_dir}/templates'
   scripts_dir: '{bashmenu_dir}/scripts'

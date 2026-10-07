@@ -42,6 +42,8 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 
 | Component / File | Description |
 | :--- | :--- |
+| `install.sh` | Universal POSIX /bin/sh installer with package auto-detection and self-cleanup. |
+| `uninstall.sh` | Pure POSIX /bin/sh uninstaller removing files, symlinks, and cache. |
 | `bashmenu.sh` | Launcher shell script with auto-setup and self-healing. |
 | `bashmenu.py` | Core Textual TUI application engine and main rendering window. |
 | `bashmenu_ui.py` | Shared UI library — modal screens, theme engine, formatting helpers. |
@@ -67,11 +69,18 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 
 | Script | Description |
 | :--- | :--- |
+| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility. |
+| `scripts/asteroids.sh` | Asteroids game runner that downloads, compiles, and launches the terminal game. |
+| `scripts/bsdgames.sh` | Interactive runner menu for classic BSD games (adventure, atc, battlestar, robots, snake, tetris, etc.). |
+| `scripts/cheat.py` | Python CLI cheatsheet search engine supporting exact matches, tags, and full-text search. |
+| `scripts/cheat.sh` | Cheatsheet lookup utility wrapper for rich.sh and pager.sh. |
 | `scripts/dnsconfig.sh` | Interactive shell script that configures IPv4 and IPv6 DNS server addresses for active network connections using nmcli and systemd-resolved. |
+| `scripts/games.sh` | Interactive runner menu for terminal games (ninvaders, pacman4console, nsnake, greed, moon-buggy, nethack, asteroids). |
 | `scripts/get_api_key.sh` | Script to securely retrieve and format API keys or credentials. |
 | `scripts/getdns.py` | CLI python utility to query and discover currently active upstream system DNS server settings. |
 | `scripts/glyphs.sh` | Curses search and preview dialog box utility for selecting Unicode emojis and Nerd Font icons. |
 | `scripts/gorillas.py` | QBasic Gorillas clone TUI game implemented as a Textual Screen, launched from the Games submenu. |
+| `scripts/hostname.sh` | Hostname and system identity discovery utility reporting hostname, FQDN, kernel, architecture, and OS distribution. |
 | `scripts/install_basics.sh` | Cross-platform basic tools installer wrapper. |
 | `scripts/install_cheat.sh` | Setup script that installs interactive cheat sheet terminal tools into the local environment. |
 | `scripts/install_games.sh` | Cross-platform installer for terminal games (ninvaders, nsnake, greed, moon-buggy, nethack, etc.). |
@@ -82,9 +91,12 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/ip_info.sh` | Displays current network interface IP addresses and connection status. |
 | `scripts/ncurses_colors.py` | Visual tester for ncurses color support. |
 | `scripts/otd.sh` | Shell script fetching a random "On This Day" historical quote/event and link from today.zenquotes.io API using curl and jq. |
+| `scripts/pager.sh` | Interactive full-screen terminal text pager supporting ANSI colors, vim/less keys, and link navigation. |
+| `scripts/ping.sh` | Cross-platform ping wrapper with unprivileged TCP handshake latency fallback for restricted environments. |
+| `scripts/rich.sh` | Markdown file rendering wrapper utilizing Python Rich piped into pager.sh. |
+| `scripts/serverup.sh` | Cross-platform server ping and uptime availability check script. |
 | `scripts/system_update.sh` | Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew. |
 | `scripts/unicode.sh` | Interactive Unicode Block Explorer script. |
-| `scripts/ascii.sh` | Standard and Extended ASCII viewing utility. |
 | `scripts/webopen.sh` | Cross-platform web browser launcher wrapper script that opens a specified URL, file, or default browser (supporting Linux, macOS, WSL, and Termux). Supports `--gui` / `-g` for graphical browsers and `--tty` / `tty` for terminal browsers (lynx, links, brow6el). |
 
 ### 2.2 Provided Templates (`templates/`)
@@ -106,7 +118,8 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `0` - `9`, `a` - `z`, `A` - `Z` | Direct option shortcut hotkey jump. |
 | `F1` | Display this markdown help manual using the `glow` terminal pager. |
 | `F4` | Launch visual menu editor (`menuedit.py`). |
-| `F5` | Toggle option shortcut key badges display. |
+| `F5` | Refresh menu, reload configuration and plugin outputs. |
+| `F6` | Toggle option shortcut key badges display. |
 | `ENTER` | Execute selected item action. |
 | `ESC` | Return to parent submenu or exit application. |
 
@@ -134,26 +147,28 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 | Keybinding | Action |
 | :--- | :--- |
-| `Ctrl+X` | Exit editor (prompts save if modified). |
-| `Ctrl+O` / `F3` | WriteOut (save active file). |
-| `Ctrl+R` / `F5` | Read File / Open file via file picker modal. |
-| `Ctrl+S` / `F6` | Save As (prompt destination path). |
-| `Ctrl+N` / `F4` | Create new empty document. |
-| `Ctrl+G` / `F1` | Toggle bottom Nano-style shortcut keys bar. |
-| `Ctrl+K` / `F8` | Cut line or active selection block. |
-| `Ctrl+U` / `F9` | Paste (uncut) cutbuffer text. |
-| `Ctrl+C` | Show cursor position or copy selection block. |
-| `Alt+6` | Copy line or selection block. |
-| `Alt+U` | Undo edit operation. |
-| `Alt+E` | Redo edit operation. |
-| `Ctrl+^` / `Alt+A` | Set or unset text selection mark. |
-| `Ctrl+P` / `Alt+M` | View available placeholders and macros modal. |
+| `Ctrl+Q` / `ESC` | Exit editor (prompts save if modified). |
+| `Ctrl+O` / `Ctrl+R` / `F5` / `F7` | Open file via file picker modal. |
+| `Ctrl+S` / `F2` / `F3` | Save active file. |
+| `Alt+S` / `Ctrl+Shift+S` / `F6` | Save As (prompt destination path). |
+| `Ctrl+E` / `F4` / `[ + ]` | Create new empty tab document. |
+| `Alt+]` / `Ctrl+Tab` | Switch to next tab. |
+| `Alt+[` / `Shift+Tab` | Switch to previous tab. |
+| `Ctrl+W` | Where Is (search document text). |
+| `Shift+Arrows` / `Shift+Home/End` | Select text range (desktop selection). |
+| `Ctrl+Left` / `Ctrl+Right` | Move word left / right. |
+| `Ctrl+Up` / `Ctrl+Down` | Move paragraph up / down. |
+| `Ctrl+X` | Cut line or active selection block. |
+| `Ctrl+C` | Copy line or active selection block. |
+| `Ctrl+V` | Paste cutbuffer / clipboard text. |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / redo edit operations. |
+| `Ctrl+P` / `Alt+M` | View available placeholders & macros modal. |
 | `Ctrl+A` / `F11` | Stream ASCII character table (`ascii.sh`). |
-| `Alt+V` / `F10` | Stream terminal colors table (`ncurses_colors.py`). |
-| `Alt+N` | Toggle line numbers gutter display. |
-| `Alt+P` / `Alt+W` | Toggle whitespace characters visibility. |
-| `F12` | Toggle Markdown rendering for active document. |
-| `F2` | Launch external `$EDITOR` (e.g. `vim`). |
+| `Alt+V` / `F10` | Stream terminal colors (`ncurses_colors.py`). |
+| `Alt+1` | Toggle whitespace characters visibility. |
+| `Ctrl+N` / `Alt+N` | Toggle line numbers gutter display. |
+| `F12` | Toggle Markdown rendering for document. |
+| `F1` / `Ctrl+G` | View BashEdit keybindings manual modal. |
 
 ---
 

@@ -1,5 +1,10 @@
 #!/bin/sh
 # shellcheck shell=bash
+# ==============================================================================
+# SCRIPT: bashmenu.sh
+# DESCRIPTION: Primary BashMenu launcher script with POSIX /bin/sh trampoline,
+#              virtual environment setup, dependency verification, and self-healing.
+# ==============================================================================
 # Version: 0.0.7
 # Author:  HA Bash Menu
 

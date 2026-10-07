@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: asteroids.sh
+# DESCRIPTION: Cross-platform runner and build installer for the terminal
+#              Asteroids C game clone.
+# ==============================================================================
 
 # Helper to determine writable binary installation directory
 get_bin_dir() {

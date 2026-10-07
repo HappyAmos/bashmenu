@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# SCRIPT: ip_info.sh
+# DESCRIPTION: Discovers and prints local and public IPv4 and IPv6 network
+#              interface addresses and routing details.
+# ==============================================================================
 
 echo "=========================================="
 echo "          Network IP Information          "

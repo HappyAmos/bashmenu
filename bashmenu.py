@@ -244,21 +244,54 @@ def truncate_to_visible_len(text, max_w, config=None):
     return text[:best]
 
 
-def wrap_gutter_items(items, max_w, max_lines=2, config=None):
+def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False):
     """Wrap a list of gutter badge/action items separated by ' | ' into at most max_lines,
     treating each item as an atomic token and ensuring each line does not exceed max_w.
+
+    If bottom_up is True, items are packed starting from the end of the list to fill
+    the bottom line first with as many items as fit within max_w. Overflow items
+    then fill the line(s) above, preserving left-to-right reading order within each line.
     """
     if not items:
         return []
 
+    cleaned_items = [str(item).strip() for item in items if str(item).strip()]
+    if not cleaned_items:
+        return []
+
+    if bottom_up:
+        reversed_lines = []
+        remaining = list(cleaned_items)
+        for _ in range(max_lines):
+            if not remaining:
+                break
+
+            if get_visible_len(remaining[-1], config) > max_w:
+                truncated = truncate_to_visible_len(remaining.pop(), max_w, config)
+                reversed_lines.append(truncated)
+                continue
+
+            line_items = []
+            while remaining:
+                cand_items = [remaining[-1]] + line_items
+                cand_str = " | ".join(cand_items)
+                if get_visible_len(cand_str, config) <= max_w:
+                    line_items.insert(0, remaining.pop())
+                else:
+                    break
+
+            if line_items:
+                reversed_lines.append(" | ".join(line_items))
+            else:
+                truncated = truncate_to_visible_len(remaining.pop(), max_w, config)
+                reversed_lines.append(truncated)
+
+        return list(reversed(reversed_lines))
+
     lines = []
     current_line = []
 
-    for item in items:
-        item_str = str(item).strip()
-        if not item_str:
-            continue
-
+    for item_str in cleaned_items:
         if not current_line:
             candidate = item_str
         else:
@@ -803,6 +836,65 @@ def resolve_divider_string(config, target_w=None, extra_vars=None, **kwargs):
     return f"[color=divider]{raw_div}[/color]"
 
 
+def get_plugin_divider_config(config: dict) -> tuple[bool, bool]:
+    """Return (has_divider, is_screen_divider) for the plugin section divider.
+
+    Checks `settings.plugins.divider`, `settings.plugins.top_divider`,
+    `settings.plugins.layout.divider`, or `settings.plugins.pretext` (if set to '{divider}').
+    If configured, respects explicit 'screen' or 'window' specification,
+    or defaults to the theme's effective divider configuration.
+    """
+    if not isinstance(config, dict):
+        return False, False
+    plugins = config.get("settings", {}).get("plugins", {})
+    if not isinstance(plugins, dict):
+        return False, False
+
+    val = plugins.get("divider")
+    if val is None:
+        val = plugins.get("top_divider")
+    if val is None:
+        layout = plugins.get("layout")
+        if isinstance(layout, dict):
+            val = layout.get("divider")
+            if val is None:
+                val = layout.get("top_divider")
+    if val is None:
+        p_pre = plugins.get("pretext")
+        if isinstance(p_pre, str) and "{divider}" in p_pre:
+            val = True
+        elif isinstance(p_pre, bool):
+            val = p_pre
+
+    if val is None or val is False:
+        return False, False
+
+    div_cfg = get_effective_divider_config(config)
+    length_val = div_cfg.get("length", "{window_width}")
+    if isinstance(length_val, dict):
+        theme_is_screen = any("screen_width" in str(k) for k in length_val)
+    else:
+        theme_is_screen = "screen_width" in str(length_val)
+
+    if isinstance(val, str):
+        val_str = val.strip().lower()
+        if val_str in ("false", "0", "no", "none", "off", ""):
+            return False, False
+        if val_str == "screen":
+            return True, True
+        if val_str == "window":
+            return True, False
+        return True, theme_is_screen
+
+    if isinstance(val, dict):
+        l_spec = val.get("length")
+        if l_spec:
+            return True, "screen" in str(l_spec)
+        return True, theme_is_screen
+
+    return bool(val), theme_is_screen
+
+
 def load_yaml_file(filename):
     """Load YAML file with error formatting."""
     if not os.path.exists(filename):
@@ -1110,9 +1202,18 @@ _plugin_lock = threading.RLock()
 
 def _fetch_plugin_worker(name, script_cmd, now):
     try:
+        env = dict(os.environ)
+        if "COLUMNS" not in env or not env["COLUMNS"]:
+            try:
+                term_w = shutil.get_terminal_size((80, 24)).columns
+                env["COLUMNS"] = str(max(20, term_w - 6))
+            except Exception:
+                env["COLUMNS"] = "74"
+
         if os.path.exists(script_cmd) and os.path.isfile(script_cmd):
             res = subprocess.run(
                 [script_cmd],
+                env=env,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -1121,6 +1222,7 @@ def _fetch_plugin_worker(name, script_cmd, now):
         else:
             res = subprocess.run(
                 script_cmd,
+                env=env,
                 shell=True,
                 executable=BASH_BIN,
                 capture_output=True,
@@ -1265,6 +1367,12 @@ class PluginBuffer(Static):
 
         plugins_dict = cfg.get("settings", {}).get("plugins", {})
         layout = plugins_dict.get("layout") if isinstance(plugins_dict, dict) else None
+        if (
+            not (isinstance(layout, dict) and layout.get("type") == "table")
+            and isinstance(plugins_dict, dict)
+            and plugins_dict.get("type") == "table"
+        ):
+            layout = plugins_dict
         is_table_layout = isinstance(layout, dict) and layout.get("type") == "table"
 
         raw_plugin_lines = get_plugin_outputs(cfg)
@@ -1305,11 +1413,10 @@ class PluginBuffer(Static):
         lines_to_display = raw_plugin_lines[:max_rows]
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": max_rows}
 
-        plugins_dict = cfg.get("settings", {}).get("plugins", {})
-        layout = plugins_dict.get("layout") if isinstance(plugins_dict, dict) else None
         if isinstance(layout, dict) and layout.get("type") == "table":
             width_spec = layout.get("width", "100%")
-            headers = layout.get("headers", [])
+            raw_headers = layout.get("headers", [])
+            headers = list(raw_headers) if isinstance(raw_headers, (list, tuple)) else []
             max_entries = layout.get("entries") or layout.get("columns") or 2
             try:
                 max_entries = max(1, int(max_entries))
@@ -1324,7 +1431,10 @@ class PluginBuffer(Static):
                 rows = []
                 cur_row = []
                 for p_name, p_val in plugins_dict.items():
-                    if p_name in ("layout", "_layout") or not isinstance(p_val, dict):
+                    if (
+                        p_name in ("layout", "_layout", "type", "width", "entries", "columns", "headers", "rows", "divider", "top_divider", "pretext", "posttext")
+                        or not isinstance(p_val, dict)
+                    ):
                         continue
                     is_standalone = p_val.get("standalone") or (p_val.get("span") in ("full", 1))
                     if is_standalone:
@@ -1355,7 +1465,11 @@ class PluginBuffer(Static):
                     if is_standalone:
                         with _plugin_lock:
                             cache_entry = _plugin_output_cache.get(p_name)
-                        lines = cache_entry["lines"] if cache_entry else []
+                        raw_lines = cache_entry["lines"] if cache_entry else []
+                        lines = [
+                            l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
+                            for l in raw_lines
+                        ]
                         pre = p_cfg.get("pretext")
                         post = p_cfg.get("posttext")
                         if lines:
@@ -1381,7 +1495,11 @@ class PluginBuffer(Static):
                 for p_name in r:
                     with _plugin_lock:
                         cache_entry = _plugin_output_cache.get(p_name)
-                    lines = cache_entry["lines"] if cache_entry else []
+                    raw_lines = cache_entry["lines"] if cache_entry else []
+                    lines = [
+                        l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
+                        for l in raw_lines
+                    ]
                     p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
                     pre = p_cfg.get("pretext")
                     post = p_cfg.get("posttext")
@@ -1507,11 +1625,13 @@ class MainMenuView(Widget):
         output lines, separator row count, and available menu option rows.
         """
         raw_plugin_lines = get_plugin_outputs(self.config)
-        max_plugin_rows = min(10, max(0, total_content_rows - 2))
+        has_top_div, _ = get_plugin_divider_config(self.config)
+        top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
+        max_plugin_rows = min(10, max(0, total_content_rows - 2 - top_div_rows))
         if len(raw_plugin_lines) > max_plugin_rows:
             raw_plugin_lines = raw_plugin_lines[:max_plugin_rows] if max_plugin_rows > 0 else []
         separator_rows = 1 if len(raw_plugin_lines) > 0 else 0
-        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines) - separator_rows)
+        visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines) - separator_rows - top_div_rows)
         return raw_plugin_lines, separator_rows, visible_option_rows
 
     def render(self) -> Text:
@@ -1576,9 +1696,9 @@ class MainMenuView(Widget):
 
         # Status and help gutters wrapping (max 50% screen width, max 2 lines)
         if self.show_shortcuts:
-            full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back"
+            full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
         else:
-            full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Keys | [F4]: Edit | [ESC]: Back"
+            full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
         raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
         help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config)
 
@@ -1587,7 +1707,7 @@ class MainMenuView(Widget):
         init_extra_vars = {"window_width": avail_w, "screen_width": screen_div_w}
         all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars).strip() for b in raw_badges if b.strip()]
         all_badges = [b for b in all_badges if b]
-        status_lines = wrap_gutter_items(all_badges, max_gutter_w, max_lines=2, config=self.config)
+        status_lines = wrap_gutter_items(all_badges, max_gutter_w, max_lines=2, config=self.config, bottom_up=True)
 
         gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))
 
@@ -1759,9 +1879,40 @@ class MainMenuView(Widget):
             rendered_content_rows += 1
 
         # 6. Pad blank rows between menu options and plugins
-        target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows
+        has_top_div, top_div_is_screen = get_plugin_divider_config(self.config)
+        top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
+        target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows - top_div_rows
         while rendered_content_rows < target_blank_rows:
             out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
+            rendered_content_rows += 1
+
+        # 6.5 Divider row above plugins when configured
+        if top_div_rows > 0:
+            if top_div_is_screen:
+                div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars)
+                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                line_rich = Text(f"{b_tee_l}", style=border_style)
+                line_rich.append_text(div_rich)
+                used_w = get_visible_len(div_str, self.config)
+                fill_w = max(0, screen_div_w - used_w)
+                if fill_w > 0:
+                    line_rich.append(" " * fill_w)
+                line_rich.append(f"{b_tee_r}\n", style=border_style)
+                out.append_text(line_rich)
+            else:
+                target_div_w = avail_w
+                if str(length_val).isdigit():
+                    target_div_w = min(avail_w, int(length_val))
+                div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars)
+                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                line_rich = Text(f"{b_v_left}  ", style=border_style)
+                line_rich.append_text(div_rich)
+                used_w = get_visible_len(div_str, self.config)
+                fill_w = max(0, avail_w - used_w)
+                if fill_w > 0:
+                    line_rich.append(" " * fill_w)
+                line_rich.append(f"  {b_v_right}\n", style=border_style)
+                out.append_text(line_rich)
             rendered_content_rows += 1
 
         # 7. Rows reserved for the PluginBuffer widget overlay
@@ -1785,9 +1936,11 @@ class MainMenuView(Widget):
             rendered_content_rows += 1
 
         # 9. Help Keys & Status Gutter Rows (up to 2 rows)
+        status_offset = gutter_rows - len(status_lines)
         for r in range(gutter_rows):
             h_text = help_lines[r] if r < len(help_lines) else ""
-            s_text = status_lines[r] if r < len(status_lines) else ""
+            s_idx = r - status_offset
+            s_text = status_lines[s_idx] if 0 <= s_idx < len(status_lines) else ""
             h_len = get_visible_len(h_text, self.config)
             s_len = get_visible_len(s_text, self.config)
             footer_spaces = max(0, avail_w - h_len - s_len)
@@ -2286,7 +2439,8 @@ class BashMenuScreen(Screen):
         Binding("f1", "help", "Help"),
         Binding("f2", "themes", "Themes"),
         Binding("f4", "edit_menu", "Edit Menu"),
-        Binding("f5", "toggle_shortcuts", "Keys"),
+        Binding("f5", "refresh_menu", "Refresh"),
+        Binding("f6", "toggle_shortcuts", "Keys"),
         Binding("escape", "go_back", "Back/Exit"),
     ]
 
@@ -2509,6 +2663,10 @@ class BashMenuScreen(Screen):
             theme_cb,
         )
 
+    def action_refresh_menu(self) -> None:
+        """Reload configuration, menu files, and plugin outputs (F5 shortcut)."""
+        self.refresh_environment(clear_plugins=True)
+
     def action_toggle_shortcuts(self) -> None:
         mv = self.menu_view
         mv.show_shortcuts = not mv.show_shortcuts
@@ -2516,14 +2674,22 @@ class BashMenuScreen(Screen):
         save_config(mv.config)
         mv.refresh()
 
-    def refresh_environment(self) -> None:
+    def refresh_environment(self, clear_plugins: bool = True) -> None:
+        if clear_plugins:
+            with _plugin_lock:
+                _plugin_output_cache.clear()
+                _plugin_fetching.clear()
         mv = self.menu_view
         mv.config, _ = load_config()
         mv.menu_data, _ = load_menu()
         mv.menu_stack = [mv.menu_data]
         mv.selected_rows = [0]
-        mv.refresh()
+        mv.show_shortcuts = get_config_value(mv.config, "settings.show_menu_shortcuts", True)
+        self.plugin_buffer.config = mv.config
+        get_plugin_outputs(mv.config)
         self._update_plugin_buffer_geometry()
+        mv.refresh()
+        self.plugin_buffer.refresh()
 
 
 class BashMenuApp(App):

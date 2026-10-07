@@ -479,7 +479,9 @@ Textual interface.
       (`max_gutter_w = max(5, avail_w // 2)`).
     - **Pipe Delimiter Wrapping (`wrap_gutter_items`)**: Both gutters treat text
       between pipe symbols (`|`) as atomic single words/badges. When adding an item
-      exceeds 50% width, overlapping text drops to the next line.
+      exceeds 50% width, overlapping text drops to the next line. Status gutter items
+      wrap bottom-up, filling the bottom row first with as many badges as fit, and placing
+      overflow on the line above (anchoring single-line status gutters to the bottom row).
     - **Two-Line Maximum Height**: Neither gutter should ever exceed two lines.
       Two lines is the maximum height allowed for the gutters (`max_lines=2`). Overflow
       beyond two lines is discarded.
@@ -501,6 +503,52 @@ Textual interface.
       * Each plugin retains its own independent `sleep` interval and background thread polling without blocking the TUI.
     - **Backtick Suppression & Escaping**: Tags inside inline backticks (`` `[b]code[/b]` ``) or fenced code blocks are automatically suppressed and rendered literally. Backslash prefixing (`\[table]`) escapes parsing.
     - **`no_formatting` Flag**: Passing `no_formatting=True` to formatting conversion functions bypasses BBCode processing entirely.
+39. **Cheat CLI Cheatsheet Manager (`scripts/cheat.sh`, `scripts/cheat.py`, `.cheat.yml`):**
+    - **Architecture & Role:** `cheat` is a lightweight command-line cheatsheet manager that searches, lists, and displays Markdown cheatsheet files. It acts as an intelligent wrapper around `scripts/rich.sh` (which renders Markdown via Python Rich) and `scripts/pager.sh` (for interactive ANSI scrolling, link jumping, and reloading).
+    - **Configuration (`.cheat.yml`):**
+      * Stored in `scripts/.cheat.yml` (auto-generated with `dir: ~/cheat` if missing).
+      * The `dir` key defines the root directory where Markdown cheatsheets are located (expands `~` portably).
+    - **Search & Resolution Hierarchy (`cheat <query>`):**
+      * *Priority 1a:* Exact relative path lookup (`<root>/<query>.md`).
+      * *Priority 1b:* Filename stem or relative path match across all `.md` files (case-insensitive, `.md` suffix stripped).
+      * *Priority 2:* YAML frontmatter tag match. Parses frontmatter headers (`--- ... ---`), supporting both YAML lists (`tags: [git, vcs, undo]`) and comma-separated strings (`tags: git, vcs, undo`). Matches if `<query>` is in the extracted tags (e.g. `cheat bash` matches `bash.md` or any cheatsheet tagged with `bash`).
+      * *Priority 3:* Full-text content match across markdown file bodies.
+    - **Display Pipeline (`display_markdown`):**
+      * Once matched, dispatches to `scripts/rich.sh <file_path>`, passing through `scripts/pager.sh` with interactive ANSI paging, terminal width auto-detection, and `--reload-cmd`.
+      * Gracefully falls back to stdout printing if `rich.sh` is unavailable.
+    - **List & Search Modes (`-l` / `--list`, `-s` / `--search`):**
+      * `cheat -l`: Lists all available cheatsheet files and their frontmatter tags in two neatly aligned columns: relative path on the left and `[tag1, tag2]` on the right.
+      * `cheat -l <query>` / `cheat -s <query>`: Filters and lists only matching files and their tags.
+    - **Environment & Launcher (`scripts/cheat.sh`):**
+      * Resolves symlinks canonically using `BASH_SOURCE[0]`, sets `LC_ALL=en_US.UTF-8`, enters the script directory with `pushd`/`popd`, activates `.venv` if present, and dispatches to `cheat.py`.
+40. **Script Header Standardization & Complete Documentation Parity (`scripts/`):**
+    - **Standardized Header Banners:** Every shell script inside `scripts/` (and root
+      launchers like `bashmenu.sh`) must feature a standardized comment banner at the top:
+      ```bash
+      #!/usr/bin/env bash
+      # ==============================================================================
+      # SCRIPT: <script_name>.sh
+      # DESCRIPTION: <Brief, dry, and concise summary of utility functionality>
+      # ==============================================================================
+      ```
+      The `SCRIPT:` name must strictly match the actual filename on disk. Python scripts
+      in `scripts/` must feature a comprehensive top-level module docstring (`"""..."""`)
+      explaining script purpose, dependencies, and command-line usage.
+    - **Universal 3-Tier Documentation Registration:** Whenever any script utility is
+      introduced or modified, it must be documented simultaneously across all three
+      documentation tiers:
+      1. `bashmenu.md`: Section 1 (Component Table for root scripts) or Section 2.1
+         (`Provided Utility Scripts (scripts/)` table).
+      2. `bashmenu.1`: Under `COMPONENT FILES` or `.SS Provided Utility Scripts (scripts/)`
+         with `.TP` and `.I scripts/<name>`.
+      3. `README.md`: Under `Component Directory` or relevant quick-start references.
+    - **Tone & Formatting Constraints:** Descriptions must remain dry, professional, and
+      free of promotional hype. Man page and markdown table lines should remain wrapped
+      under 80 characters where applicable.
+    - **Automated Parity Verification:** When new scripts are added, ensure unit tests in
+      `.tests/test_improvements.py` assert that all non-hidden executable scripts in
+      `scripts/` have corresponding documentation entries in both `bashmenu.md` and
+      `bashmenu.1`.
 
 
 ## Documentation Guidelines
