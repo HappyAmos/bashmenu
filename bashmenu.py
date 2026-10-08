@@ -1335,6 +1335,237 @@ def get_hex_from_style(style: Style | None, fallback: str = "#000000") -> str:
         return fallback
 
 
+def get_plugin_display_items(
+    config: dict,
+    avail_w: int = 74,
+    screen_div_w: int = 78,
+    has_screen_divider: bool = False,
+    extra_vars: dict | None = None,
+    theme_styles: dict | None = None,
+    plugin_style: Style | None = None,
+    bg_style: Style | None = None,
+) -> list[tuple[str, bool, Text]]:
+    """Return structured plugin rows (raw_text, is_divider, rendered_rich_text)
+    accounting for table layouts, standalone plugins, and screen/window margins.
+    """
+    raw_plugin_lines = get_plugin_outputs(config)
+    plugins_dict = config.get("settings", {}).get("plugins", {}) if isinstance(config, dict) else {}
+    if not isinstance(plugins_dict, dict):
+        plugins_dict = {}
+
+    layout = plugins_dict.get("layout") if isinstance(plugins_dict, dict) else None
+    if (
+        not (isinstance(layout, dict) and layout.get("type") == "table")
+        and isinstance(plugins_dict, dict)
+        and plugins_dict.get("type") == "table"
+    ):
+        layout = plugins_dict
+    is_table_layout = isinstance(layout, dict) and layout.get("type") == "table"
+
+    if theme_styles is None:
+        theme_styles = bashmenu_ui.init_theme_colors(
+            config.get("theme", "dracula") if isinstance(config, dict) else "dracula"
+        )
+    if plugin_style is None:
+        plugin_style = theme_styles.get("plugin", Style(color="cyan"))
+    if bg_style is None:
+        bg_style = theme_styles.get("background", Style())
+    if extra_vars is None:
+        extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": 10}
+
+    with _plugin_lock:
+        has_cached_data = any(
+            isinstance(p_name, str) and p_name in _plugin_output_cache
+            for p_name in plugins_dict
+        )
+
+    def _render_row(content: str | Text, is_div: bool, raw_str: str) -> tuple[str, bool, Text]:
+        if is_div:
+            target_w = screen_div_w if has_screen_divider else avail_w
+            div_vars = dict(extra_vars)
+            div_vars["window_width"] = target_w
+            div_vars["screen_width"] = target_w
+            if any(tok in str(content) for tok in ("{divider}", "{user.divider}", "{settings.divider}")):
+                div_str = interpolate_placeholders(str(content), config, extra_vars=div_vars)
+            else:
+                div_str = resolve_divider_string(config, target_w=target_w, extra_vars=div_vars)
+            div_rt = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles, avail_width=target_w)
+            if div_rt.cell_len > target_w:
+                div_rt.truncate(target_w)
+            pad_w = max(0, target_w - div_rt.cell_len)
+            if pad_w > 0:
+                div_rt.append(" " * pad_w, style=bg_style)
+            return (raw_str, True, div_rt)
+
+        if isinstance(content, Text):
+            c_rt = content.copy()
+        else:
+            c_interp = interpolate_placeholders(str(content), config, extra_vars=extra_vars)
+            if "\x1b[" in c_interp:
+                c_rt = Text.from_ansi(c_interp)
+            else:
+                c_rt = bashmenu_ui.formatting_to_rich_text(
+                    c_interp, default_style=plugin_style, theme=theme_styles, avail_width=avail_w
+                )
+
+        if has_screen_divider:
+            if c_rt.cell_len > avail_w:
+                c_rt.truncate(avail_w)
+            row_rt = Text("  ", style=bg_style)
+            row_rt.append_text(c_rt)
+            pad_w = max(0, screen_div_w - row_rt.cell_len)
+            if pad_w > 0:
+                row_rt.append(" " * pad_w, style=bg_style)
+            return (raw_str, False, row_rt)
+        else:
+            buffer_w = avail_w
+            if c_rt.cell_len > buffer_w:
+                c_rt.truncate(buffer_w)
+            pad_w = max(0, buffer_w - c_rt.cell_len)
+            if pad_w > 0:
+                c_rt.append(" " * pad_w, style=bg_style)
+            return (raw_str, False, c_rt)
+
+    items: list[tuple[str, bool, Text]] = []
+    if is_table_layout and has_cached_data:
+        width_spec = layout.get("width", "100%")
+        raw_headers = layout.get("headers", [])
+        headers = list(raw_headers) if isinstance(raw_headers, (list, tuple)) else []
+        max_entries = layout.get("entries") or layout.get("columns") or 2
+        try:
+            max_entries = max(1, int(max_entries))
+        except (ValueError, TypeError):
+            max_entries = 2
+
+        raw_rows = layout.get("rows")
+        if raw_rows and isinstance(raw_rows, list):
+            rows = [list(r) if isinstance(r, (list, tuple)) else [r] for r in raw_rows]
+        else:
+            rows = []
+            cur_row = []
+            for p_name, p_val in plugins_dict.items():
+                if (
+                    p_name in ("layout", "_layout", "type", "width", "entries", "columns", "headers", "rows", "divider", "top_divider", "pretext", "posttext")
+                    or not isinstance(p_val, dict)
+                ):
+                    continue
+                is_standalone = p_val.get("standalone") or (p_val.get("span") in ("full", 1))
+                if is_standalone:
+                    if cur_row:
+                        rows.append(cur_row)
+                        cur_row = []
+                    rows.append([p_name])
+                else:
+                    cur_row.append(p_name)
+                    if len(cur_row) >= max_entries:
+                        rows.append(cur_row)
+                        cur_row = []
+            if cur_row:
+                rows.append(cur_row)
+
+        has_any_content = False
+        for r in rows:
+            if not r or len(items) >= 10:
+                continue
+
+            if len(r) == 1:
+                p_name = r[0]
+                p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
+                is_standalone = p_cfg.get("standalone") or (p_cfg.get("span") in ("full", 1))
+                if is_standalone:
+                    with _plugin_lock:
+                        cache_entry = _plugin_output_cache.get(p_name)
+                    raw_lines = cache_entry["lines"] if cache_entry else []
+                    lines = [
+                        l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
+                        for l in raw_lines
+                    ]
+                    pre = p_cfg.get("pretext")
+                    post = p_cfg.get("posttext")
+                    if lines:
+                        has_any_content = True
+                        full_lines = ([pre] if pre else []) + list(lines) + ([post] if post else [])
+                    elif pre or post:
+                        full_lines = ([pre] if pre else []) + ([post] if post else [])
+                    else:
+                        full_lines = []
+
+                    for fl in full_lines:
+                        if len(items) >= 10:
+                            break
+                        for sub in str(fl).split("\n"):
+                            if len(items) >= 10:
+                                break
+                            is_div = any(tok in sub for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+                            items.append(_render_row(sub, is_div, sub))
+                    continue
+
+            # Multi-cell or non-standalone table row
+            row_has_data = False
+            row_cells = []
+            for p_name in r:
+                with _plugin_lock:
+                    cache_entry = _plugin_output_cache.get(p_name)
+                raw_lines = cache_entry["lines"] if cache_entry else []
+                lines = [
+                    l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
+                    for l in raw_lines
+                ]
+                p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
+                pre = p_cfg.get("pretext")
+                post = p_cfg.get("posttext")
+                if lines:
+                    row_has_data = True
+                    has_any_content = True
+                    full_lines = ([pre] if pre else []) + list(lines) + ([post] if post else [])
+                elif pre or post:
+                    full_lines = ([pre] if pre else []) + ([post] if post else [])
+                else:
+                    full_lines = []
+                cell_text = "\n".join(full_lines)
+                row_cells.append(f"[td]{cell_text}[/td]")
+
+            if row_has_data or headers:
+                table_parts = [f"[table width={width_spec}]"]
+                if headers and len(headers) == len(r):
+                    table_parts.append("[tr]" + "".join(f"[th]{h}[/th]" for h in headers) + "[/tr]")
+                table_parts.append("[tr]" + "".join(row_cells) + "[/tr]")
+                table_parts.append("[/table]")
+                table_bb = "".join(table_parts)
+                table_interp = interpolate_placeholders(table_bb, config, extra_vars=extra_vars)
+                table_rt = bashmenu_ui.formatting_to_rich_text(
+                    table_interp, default_style=plugin_style, theme=theme_styles, avail_width=avail_w
+                )
+                for t_line in table_rt.split("\n"):
+                    if len(items) >= 10:
+                        break
+                    raw_t = t_line.plain if hasattr(t_line, "plain") else str(t_line)
+                    items.append(_render_row(t_line, False, raw_t))
+
+        if not has_any_content and not headers:
+            return []
+        return items
+    else:
+        for p_line in raw_plugin_lines[:10]:
+            clean_line = (
+                p_line.replace("\x00", "")
+                .replace("\t", "    ")
+                .replace("\ufe0f", "")
+                .replace("\ufe0e", "")
+                .rstrip("\r\n")
+            )
+            is_div_line = any(tok in clean_line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+            items.append(_render_row(clean_line, is_div_line, clean_line))
+        return items
+
+
+def get_plugin_display_lines(config: dict, width: int | None = None) -> list[str]:
+    """Return the list of display lines for active plugins, accounting for table layouts."""
+    w = width or 74
+    items = get_plugin_display_items(config, avail_w=w, screen_div_w=w + 4, has_screen_divider=False)
+    return [it[0] for it in items]
+
+
 class PluginBuffer(Static):
     """The `PluginBuffer` widget displays active plugin lines in an isolated buffer."""
 
@@ -1365,20 +1596,6 @@ class PluginBuffer(Static):
             if self.screen and self.screen.menu_view and self.screen.menu_view.config:
                 cfg = self.screen.menu_view.config
 
-        plugins_dict = cfg.get("settings", {}).get("plugins", {})
-        layout = plugins_dict.get("layout") if isinstance(plugins_dict, dict) else None
-        if (
-            not (isinstance(layout, dict) and layout.get("type") == "table")
-            and isinstance(plugins_dict, dict)
-            and plugins_dict.get("type") == "table"
-        ):
-            layout = plugins_dict
-        is_table_layout = isinstance(layout, dict) and layout.get("type") == "table"
-
-        raw_plugin_lines = get_plugin_outputs(cfg)
-        if not is_table_layout and not raw_plugin_lines:
-            return Text()
-
         theme_styles = bashmenu_ui.init_theme_colors(cfg.get("theme", "dracula"))
         plugin_style = theme_styles.get("plugin", Style(color="cyan"))
         bg_style = theme_styles.get("background", Style())
@@ -1389,11 +1606,6 @@ class PluginBuffer(Static):
             is_screen = any("screen_width" in str(k) for k in length_val)
         else:
             is_screen = "screen_width" in str(length_val)
-
-        has_screen_divider = is_screen and any(
-            any(tok in line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
-            for line in raw_plugin_lines
-        )
 
         screen_w = 0
         with contextlib.suppress(Exception):
@@ -1408,178 +1620,40 @@ class PluginBuffer(Static):
             screen_div_w = max(20, screen_w - 2)
             avail_w = max(20, screen_w - 6)
 
-        buffer_w = screen_div_w if has_screen_divider else avail_w
-        max_rows = min(10, len(raw_plugin_lines))
-        lines_to_display = raw_plugin_lines[:max_rows]
+        raw_lines = get_plugin_display_lines(cfg, width=avail_w)
+        if not raw_lines:
+            return Text()
+
+        has_screen_divider = is_screen and any(
+            any(tok in line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
+            for line in raw_lines
+        )
+
+        if has_screen_divider:
+            avail_w = max(20, screen_div_w - 4)
+
+        max_rows = min(10, len(raw_lines))
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": max_rows}
 
-        if isinstance(layout, dict) and layout.get("type") == "table":
-            width_spec = layout.get("width", "100%")
-            raw_headers = layout.get("headers", [])
-            headers = list(raw_headers) if isinstance(raw_headers, (list, tuple)) else []
-            max_entries = layout.get("entries") or layout.get("columns") or 2
-            try:
-                max_entries = max(1, int(max_entries))
-            except (ValueError, TypeError):
-                max_entries = 2
+        items = get_plugin_display_items(
+            cfg,
+            avail_w=avail_w,
+            screen_div_w=screen_div_w,
+            has_screen_divider=has_screen_divider,
+            extra_vars=extra_vars,
+            theme_styles=theme_styles,
+            plugin_style=plugin_style,
+            bg_style=bg_style,
+        )
 
-            raw_rows = layout.get("rows")
-            if raw_rows and isinstance(raw_rows, list):
-                rows = [list(r) if isinstance(r, (list, tuple)) else [r] for r in raw_rows]
-            else:
-                # Group plugins automatically according to max_entries, honoring standalone/span
-                rows = []
-                cur_row = []
-                for p_name, p_val in plugins_dict.items():
-                    if (
-                        p_name in ("layout", "_layout", "type", "width", "entries", "columns", "headers", "rows", "divider", "top_divider", "pretext", "posttext")
-                        or not isinstance(p_val, dict)
-                    ):
-                        continue
-                    is_standalone = p_val.get("standalone") or (p_val.get("span") in ("full", 1))
-                    if is_standalone:
-                        if cur_row:
-                            rows.append(cur_row)
-                            cur_row = []
-                        rows.append([p_name])
-                    else:
-                        cur_row.append(p_name)
-                        if len(cur_row) >= max_entries:
-                            rows.append(cur_row)
-                            cur_row = []
-                if cur_row:
-                    rows.append(cur_row)
-
-            rendered_blocks = []
-            has_content = False
-
-            for r in rows:
-                if not r:
-                    continue
-
-                # Check if this row is a single standalone plugin
-                if len(r) == 1:
-                    p_name = r[0]
-                    p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
-                    is_standalone = p_cfg.get("standalone") or (p_cfg.get("span") in ("full", 1))
-                    if is_standalone:
-                        with _plugin_lock:
-                            cache_entry = _plugin_output_cache.get(p_name)
-                        raw_lines = cache_entry["lines"] if cache_entry else []
-                        lines = [
-                            l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
-                            for l in raw_lines
-                        ]
-                        pre = p_cfg.get("pretext")
-                        post = p_cfg.get("posttext")
-                        if lines:
-                            has_content = True
-                            full_lines = ([pre] if pre else []) + list(lines) + ([post] if post else [])
-                        elif pre or post:
-                            full_lines = ([pre] if pre else []) + ([post] if post else [])
-                        else:
-                            full_lines = []
-
-                        if full_lines:
-                            block_text = "\n".join(full_lines)
-                            interp = interpolate_placeholders(block_text, cfg, extra_vars=extra_vars)
-                            rt = bashmenu_ui.formatting_to_rich_text(
-                                interp, default_style=plugin_style, theme=theme_styles, avail_width=buffer_w
-                            )
-                            rendered_blocks.append(rt)
-                        continue
-
-                # Multi-cell or non-standalone single cell: construct a table for this row
-                row_has_data = False
-                row_cells = []
-                for p_name in r:
-                    with _plugin_lock:
-                        cache_entry = _plugin_output_cache.get(p_name)
-                    raw_lines = cache_entry["lines"] if cache_entry else []
-                    lines = [
-                        l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
-                        for l in raw_lines
-                    ]
-                    p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
-                    pre = p_cfg.get("pretext")
-                    post = p_cfg.get("posttext")
-                    if lines:
-                        row_has_data = True
-                        has_content = True
-                        full_lines = ([pre] if pre else []) + list(lines) + ([post] if post else [])
-                    elif pre or post:
-                        full_lines = ([pre] if pre else []) + ([post] if post else [])
-                    else:
-                        full_lines = []
-                    cell_text = "\n".join(full_lines)
-                    row_cells.append(f"[td]{cell_text}[/td]")
-
-                if row_has_data or headers:
-                    table_parts = [f"[table width={width_spec}]"]
-                    if headers and len(headers) == len(r):
-                        table_parts.append("[tr]" + "".join(f"[th]{h}[/th]" for h in headers) + "[/tr]")
-                    table_parts.append("[tr]" + "".join(row_cells) + "[/tr]")
-                    table_parts.append("[/table]")
-                    table_bb = "".join(table_parts)
-                    table_interp = interpolate_placeholders(table_bb, cfg, extra_vars=extra_vars)
-                    rt = bashmenu_ui.formatting_to_rich_text(
-                        table_interp, default_style=plugin_style, theme=theme_styles, avail_width=buffer_w
-                    )
-                    rendered_blocks.append(rt)
-
-            if not has_content or not rendered_blocks:
-                return Text()
-
-            # Combine all rendered blocks
-            all_lines = []
-            for b in rendered_blocks:
-                all_lines.extend(b.split("\n"))
-
-            rt_lines = all_lines[:10]
-            out = Text()
-            for idx, r_line in enumerate(rt_lines):
-                if r_line.cell_len > buffer_w:
-                    r_line.truncate(buffer_w)
-                pad_w = max(0, buffer_w - r_line.cell_len)
-                if pad_w > 0:
-                    r_line.append(" " * pad_w, style=bg_style)
-                out.append_text(r_line)
-                if idx < len(rt_lines) - 1:
-                    out.append("\n")
-            return out
+        if not items:
+            return Text()
 
         out = Text()
-        for idx, p_line in enumerate(lines_to_display):
-            clean_line = (
-                p_line.replace("\x00", "")
-                .replace("\t", "    ")
-                .replace("\ufe0f", "")
-                .replace("\ufe0e", "")
-                .rstrip("\r\n")
-            )
-            is_div_line = any(tok in clean_line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
-            p_line_interp = interpolate_placeholders(clean_line, cfg, extra_vars=extra_vars)
-
-            if has_screen_divider and not is_div_line:
-                p_line_interp = f"  {p_line_interp}"
-
-            if "\x1b[" in p_line_interp:
-                p_content_rich = Text.from_ansi(p_line_interp)
-            else:
-                p_content_rich = bashmenu_ui.formatting_to_rich_text(
-                    p_line_interp, default_style=plugin_style, theme=theme_styles, avail_width=buffer_w
-                )
-
-            if p_content_rich.cell_len > buffer_w:
-                p_content_rich.truncate(buffer_w)
-            pad_w = max(0, buffer_w - p_content_rich.cell_len)
-            if pad_w > 0:
-                p_content_rich.append(" " * pad_w, style=bg_style)
-
-            out.append_text(p_content_rich)
-            if idx < len(lines_to_display) - 1:
+        for idx, it in enumerate(items[:10]):
+            out.append_text(it[2])
+            if idx < min(10, len(items)) - 1:
                 out.append("\n")
-
         return out
 
 
@@ -1624,7 +1698,9 @@ class MainMenuView(Widget):
         """The `get_plugin_lines_and_limits` method returns the capped plugin
         output lines, separator row count, and available menu option rows.
         """
-        raw_plugin_lines = get_plugin_outputs(self.config)
+        w = max(40, self.size.width or 80)
+        avail_w = max(20, w - 6)
+        raw_plugin_lines = get_plugin_display_lines(self.config, width=avail_w)
         has_top_div, _ = get_plugin_divider_config(self.config)
         top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
         max_plugin_rows = min(10, max(0, total_content_rows - 2 - top_div_rows))
@@ -1713,6 +1789,7 @@ class MainMenuView(Widget):
 
         # Content rows available for menu options & plugins (excludes top border, 2-row top margin, gutter rows, and bottom border)
         total_content_rows = max(1, h - 4 - gutter_rows)
+        self.total_content_rows = total_content_rows
 
         # 2. Plugin lines and row allocation
         raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
@@ -2480,7 +2557,8 @@ class BashMenuScreen(Screen):
             h = max(10, self.size.height or 24)
             avail_w = max(20, w - 6)
             screen_div_w = max(20, w - 2)
-            total_content_rows = max(1, h - 5)
+            t_rows = getattr(self.menu_view, "total_content_rows", None)
+            total_content_rows = t_rows if isinstance(t_rows, int) else max(1, h - 5)
             raw_plugin_lines, separator_rows, _ = self.menu_view.get_plugin_lines_and_limits(total_content_rows)
             plugin_count = len(raw_plugin_lines)
 

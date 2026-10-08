@@ -5,7 +5,7 @@
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
 version: 0.0.1
-theme: tokyo_night
+theme: matrix
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'

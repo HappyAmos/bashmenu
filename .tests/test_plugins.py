@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import time
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -551,7 +552,95 @@ class TestPluginSystem(unittest.TestCase):
             div_lines = [l for l in rendered_lines if "──" in l and ("│" in l or "├" in l)]
             self.assertGreater(len(div_lines), 0)
 
+    def test_table_layout_screen_width_divider_and_tee_alignment(self):
+        """Test that with table layout and screen_width themes (cyberpunk, synthwave, qbasic, industry),
+        MainMenuView Tee rows and PluginBuffer divider rows align on the exact same row index,
+        and table rows preserve 2-space margins."""
+        for theme_name in ("cyberpunk", "synthwave", "qbasic", "industry"):
+            config = {
+                "theme": theme_name,
+                "settings": {
+                    "plugins": {
+                        "type": "table",
+                        "width": "100%",
+                        "entries": 4,
+                        "weather": {"script": "weather.sh"},
+                        "alienware": {"script": "alienware.sh"},
+                        "pi3b": {"script": "pi3b.sh"},
+                        "halftop": {"script": "halftop.sh"},
+                        "otd": {
+                            "script": "otd.sh",
+                            "standalone": True,
+                            "pretext": "{divider}",
+                            "posttext": "{divider}",
+                        },
+                    }
+                }
+            }
+            now = time.time()
+            with patch("bashmenu._plugin_lock"):
+                bashmenu._plugin_output_cache["weather"] = {"time": now, "lines": ["72F Clear"]}
+                bashmenu._plugin_output_cache["alienware"] = {"time": now, "lines": ["Alienware Up"]}
+                bashmenu._plugin_output_cache["pi3b"] = {"time": now, "lines": ["Pi3b Up"]}
+                bashmenu._plugin_output_cache["halftop"] = {"time": now, "lines": ["Halftop Up"]}
+                bashmenu._plugin_output_cache["otd"] = {"time": now, "lines": ["Quote of the day: Be kind."]}
+
+            mv = bashmenu.MainMenuView(config=config, menu_data={"title": "Test", "options": [{"label": "Opt 1"}]})
+            with patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)):
+                lines, sep, opt_rows = mv.get_plugin_lines_and_limits(19)
+                self.assertEqual(len(lines), 6, f"{theme_name} should produce 6 display rows (3 table + 3 otd)")
+                self.assertNotIn("{divider}", lines[0])
+                self.assertNotIn("{divider}", lines[1])
+                self.assertNotIn("{divider}", lines[2])
+                self.assertIn("{divider}", lines[3])
+                self.assertNotIn("{divider}", lines[4])
+                self.assertIn("{divider}", lines[5])
+
+                mock_screen = MagicMock()
+                mock_screen.size = Size(80, 24)
+                mock_screen.menu_view = mv
+
+                pb = bashmenu.PluginBuffer(config=config)
+                pb._screen = mock_screen
+                rendered_pb = pb.render().plain
+                pb_lines = rendered_pb.split("\n")
+                self.assertEqual(len(pb_lines), 6, f"{theme_name} pb should render 6 lines")
+
+                # Table lines (rows 0, 1, 2): have 2-space margin, width 78
+                for r in (0, 1, 2):
+                    self.assertEqual(cell_len(pb_lines[r]), 78)
+                    self.assertTrue(pb_lines[r].startswith("  "), f"Row {r} must have 2-space margin in {theme_name}")
+
+                # Divider line (row 3): no margin, width 78
+                self.assertEqual(cell_len(pb_lines[3]), 78)
+                self.assertFalse(pb_lines[3].startswith("  "), f"Row 3 divider must not have 2-space margin in {theme_name}")
+
+                # Quote line (row 4): has 2-space margin, width 78
+                self.assertEqual(cell_len(pb_lines[4]), 78)
+                self.assertTrue(pb_lines[4].startswith("  Quote of the day"), f"Row 4 must have 2-space margin in {theme_name}")
+
+                # Divider line (row 5): no margin, width 78
+                self.assertEqual(cell_len(pb_lines[5]), 78)
+                self.assertFalse(pb_lines[5].startswith("  "), f"Row 5 divider must not have 2-space margin in {theme_name}")
+
+                # Check MainMenuView border alignment
+                borders = bashmenu.bashmenu_ui.get_theme_window_borders(theme_name, config=config)
+                b_tee_l = borders.get("left_tee") or borders.get("border_tee_left") or "├"
+                b_v_l = borders.get("border_vertical_left") or borders.get("border_vertical") or "│"
+
+                rendered_mv = mv.render().plain
+                mv_lines = rendered_mv.split("\n")
+
+                plugin_start = 3 + (mv.total_content_rows or 18) - len(lines) - sep
+                self.assertTrue(mv_lines[plugin_start + 0].startswith(b_v_l), f"Row 0 must have vertical border in {theme_name}")
+                self.assertTrue(mv_lines[plugin_start + 1].startswith(b_v_l), f"Row 1 must have vertical border in {theme_name}")
+                self.assertTrue(mv_lines[plugin_start + 2].startswith(b_v_l), f"Row 2 must have vertical border in {theme_name}")
+                self.assertTrue(mv_lines[plugin_start + 3].startswith(b_tee_l), f"Row 3 must have Tee border in {theme_name}")
+                self.assertTrue(mv_lines[plugin_start + 4].startswith(b_v_l), f"Row 4 must have vertical border in {theme_name}")
+                self.assertTrue(mv_lines[plugin_start + 5].startswith(b_tee_l), f"Row 5 must have Tee border in {theme_name}")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
