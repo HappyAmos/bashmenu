@@ -13,8 +13,11 @@ from pathlib import Path
 from typing import ClassVar
 
 from rich._palettes import EIGHT_BIT_PALETTE
-from rich.markdown import Markdown
+from rich.markdown import Heading, Markdown
 from rich.style import Style
+
+if hasattr(Heading, "LEVEL_ALIGN"):
+    Heading.LEVEL_ALIGN["h1"] = "left"
 from rich.text import Text
 from textual import on
 from textual.app import ComposeResult

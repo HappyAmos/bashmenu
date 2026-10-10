@@ -587,7 +587,7 @@ class TestPluginSystem(unittest.TestCase):
 
             mv = bashmenu.MainMenuView(config=config, menu_data={"title": "Test", "options": [{"label": "Opt 1"}]})
             with patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)):
-                lines, sep, opt_rows = mv.get_plugin_lines_and_limits(19)
+                lines, sep, _opt_rows = mv.get_plugin_lines_and_limits(19)
                 self.assertEqual(len(lines), 6, f"{theme_name} should produce 6 display rows (3 table + 3 otd)")
                 self.assertNotIn("{divider}", lines[0])
                 self.assertNotIn("{divider}", lines[1])

@@ -656,6 +656,35 @@ settings:
       posttext: '{user.divider}'
 .fi
 .RE
+.SS Inactivity Timeout & Screensaver (settings.inactivity_timeout)
+HA Bash Menu supports automated screensaver and command execution when no
+keyboard or mouse interaction occurs for a specified duration. This subsystem
+is configured under \fIsettings.inactivity_timeout\fR in \fIbashmenu.yml\fR:
+.RS
+.nf
+settings:
+  inactivity_timeout:
+    milliseconds: 300000
+    # command: 'cmatrix'
+.fi
+.RE
+.IP \(bu 2
+.B Unconfigured Default:
+The timeout directive does not include a command argument by default. If this
+setting is not configured, the timeout function does nothing.
+.IP \(bu 2
+.B Keystroke & Mouse Event Reset:
+Any keyboard keystroke, mouse movement, click, or scroll resets the countdown
+timer back to the start.
+.IP \(bu 2
+.B Alternate Screen Buffer Isolation:
+When triggered, the command executes in an alternate screen buffer (\(rsx1b[?1049h)
+after suspending Textual. This prevents disturbance to underlying terminal
+lines and the active menu layout.
+.IP \(bu 2
+.B Automatic Restoration:
+When the screensaver command terminates, the menu interface is seamlessly
+restored and the inactivity timer is automatically re-armed.
 .SS Multi-Platform Support & Environment Detection
 HA Bash Menu incorporates an environment detection engine in bashmenu.sh enabling graceful degradation and multi-platform compatibility without manual configuration. All files leverage universal shebangs. Cross-Platform package wrappers automatically translate dependency installs to the correct local package manager (apt, dnf, pacman, pkg, or brew), and smartly add or omit sudo depending on whether it is running in standard Linux, macOS, WSL, or containerized user-spaces like Termux.
 .SH AUTHOR

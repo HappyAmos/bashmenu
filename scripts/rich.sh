@@ -76,25 +76,61 @@ if [ -t 1 ]; then
     fi
 fi
 
+render_markdown() {
+    "$PYTHON_BIN" -c '
+import sys
+from rich.console import Console
+from rich.markdown import Heading, Markdown
+
+if hasattr(Heading, "LEVEL_ALIGN"):
+    Heading.LEVEL_ALIGN["h1"] = "left"
+else:
+    def _custom_h1_console(self, console, options):
+        text = self.text
+        text.justify = "left"
+        if self.tag == "h1":
+            from rich import box
+            from rich.panel import Panel
+            yield Panel(text, box=box.HEAVY, style="markdown.h1.border")
+        else:
+            if self.tag == "h2":
+                from rich.text import Text
+                yield Text("")
+            yield text
+    Heading.__rich_console__ = _custom_h1_console
+
+width = None
+if "-w" in sys.argv:
+    w_idx = sys.argv.index("-w") + 1
+    if w_idx < len(sys.argv):
+        try:
+            width = int(sys.argv[w_idx])
+        except ValueError:
+            pass
+
+Console(force_terminal=True, width=width).print(Markdown(sys.stdin.read(), hyperlinks=True))
+' "${WIDTH_ARGS[@]}"
+}
+
 # Pipe through pager.sh for interactive terminals, or fallback to less -R, $PAGER, or raw stream
 if [ -t 1 ]; then
     if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
         RELOAD_CMD="\"${SCRIPT_DIR}/rich.sh\" \"$TARGET_FILE\""
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" - | \
+            render_markdown | \
             "${SCRIPT_DIR}/pager.sh" --file="$TARGET_FILE" --reload-cmd="$RELOAD_CMD"
     elif command -v less >/dev/null 2>&1; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" - | less -R
+            render_markdown | less -R
     elif [ -n "$PAGER" ]; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" - | $PAGER
+            render_markdown | $PAGER
     else
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-            "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" -
+            render_markdown
     fi
 else
     sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
-        "$PYTHON_BIN" -m rich.markdown -c -y "${WIDTH_ARGS[@]}" -
+        render_markdown
 fi
 

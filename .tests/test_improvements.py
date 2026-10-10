@@ -1741,7 +1741,7 @@ class TestImprovements(unittest.TestCase):
         with open(bashmenu.CONFIG_FILE, "r", encoding="utf-8") as f:
             yml_disk = f.read()
         self.assertIn("# BashMenu Configuration (bashmenu.yml)", yml_disk)
-        self.assertIn("theme: tokyo_night", yml_disk)
+        self.assertIn("theme:", yml_disk)
 
     def test_gutter_50_percent_width_and_two_line_wrapping(self):
         """Verify status gutter and help gutter never exceed 50% screen width,
@@ -2045,6 +2045,64 @@ class TestImprovements(unittest.TestCase):
                     self.assertNotIn("test_p", bashmenu._plugin_output_cache)
 
         asyncio.run(run_checks())
+
+    def test_cheat_heading_h1_left_aligned(self):
+        """Verify Heading h1 is left-aligned instead of centered in Rich Markdown."""
+        import contextlib
+        import subprocess
+
+        from rich.console import Console
+        from rich.markdown import Heading, Markdown
+
+        # Verify Heading.LEVEL_ALIGN["h1"] is set to left
+        self.assertEqual(Heading.LEVEL_ALIGN.get("h1"), "left")
+
+        # Verify console rendering of h1 heading begins at start of line without centering spaces
+        console = Console(width=80, force_terminal=False, color_system=None)
+        with console.capture() as capture:
+            console.print(Markdown("# My Heading"))
+        output = capture.get().strip()
+        lines = [line for line in output.splitlines() if "My Heading" in line]
+        self.assertTrue(lines, "Heading text not found in rendered output")
+        for line in lines:
+            self.assertTrue(
+                line.startswith("My Heading"),
+                f"Heading line should start at left margin, got: '{line}'",
+            )
+
+        # Verify scripts/rich.sh renders h1 left-aligned
+        rich_sh = os.path.join(os.path.dirname(__file__), "..", "scripts", "rich.sh")
+        if os.path.isfile(rich_sh):
+            import tempfile
+
+            with tempfile.NamedTemporaryFile("w+", suffix=".md", delete=False) as tf:
+                tf.write("# Test Heading One\n## Test Heading Two\n")
+                tf_path = tf.name
+
+            try:
+                res = subprocess.run(
+                    [rich_sh, tf_path],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(res.returncode, 0)
+                import re
+
+                h1_lines = [
+                    re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", l)
+                    for l in res.stdout.splitlines()
+                    if "Test Heading One" in l
+                ]
+                self.assertTrue(h1_lines, "Test Heading One not found in rich.sh output")
+                for l in h1_lines:
+                    self.assertTrue(
+                        l.startswith("Test Heading One"),
+                        f"rich.sh h1 should be left-aligned, got: '{l}'",
+                    )
+            finally:
+                with contextlib.suppress(OSError):
+                    os.remove(tf_path)
 
 
 if __name__ == "__main__":

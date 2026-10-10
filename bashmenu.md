@@ -243,6 +243,35 @@ settings:
 - **Standalone Plugins (`standalone: true` or `span: full`)**: Full-width plugins (such as quote-of-the-day or system banners) can stretch across the entire screen on their own without table borders, sitting above or below multi-column tables.
 - **Asynchronous Execution**: Each plugin continues running asynchronously in its own background worker thread honoring its own `sleep` interval without blocking the user interface. Content within each cell automatically wraps cleanly when lines exceed the column width.
 
+#### Inactivity Timeout & Screensaver (`settings.inactivity_timeout`):
+The `settings.inactivity_timeout` configuration enables automated screensaver
+execution or command execution when no keyboard or mouse activity is detected
+for a configured duration:
+
+```yaml
+settings:
+  inactivity_timeout:
+    milliseconds: 300000     # Duration in milliseconds (e.g. 5 minutes)
+    # command: 'cmatrix'     # Optional: command to execute (unconfigured by default)
+```
+
+| Setting | Type | Description |
+| :--- | :--- | :--- |
+| `milliseconds` | Integer / Float | Total inactivity duration before triggering. |
+| `command` | String (Optional) | Command to execute in alternate buffer. Unconfigured by default; if omitted, timeout does nothing. |
+
+- **Unconfigured Default**: The timeout directive does not include a command
+  argument by default. If `command` is not configured, the timeout function
+  does nothing.
+- **Countdown Reset**: Any keyboard keystroke, mouse movement, click, or scroll
+  action resets the countdown timer back to the beginning.
+- **Alternate Buffer Isolation**: The command executes inside an alternate
+  screen buffer (`\x1b[?1049h`), ensuring neither the underlying terminal
+  command line nor the menu layout is disturbed.
+- **Seamless Return**: When the screensaver command exits (e.g. via `q` or
+  `Ctrl+C`), the menu interface repaints cleanly and the inactivity countdown is
+  re-armed automatically.
+
 Dividers can be defined under `user.divider` (or `settings.divider`) with full specifications including `char` (e.g., `{ascii:196}` or `-`) and `length` (e.g., `{window_width}` or `40`). Using `{user.divider}` or `{divider}` in `pretext` or `posttext` expands to a styled divider line matching the active theme's configured divider color.
 
 The `settings.status_gutter` setting allows customization of the system badges displayed in the bottom right corner (the status gutter). This setting is a string containing text and placeholders separated by pipe symbols (`|`). Neither the status gutter nor the left-aligned help gutter ever exceeds 50% of the screen width. Badges and help action items are delimited by pipe symbols (`|`) and treated as atomic units. When text exceeds 50% of the screen width, overlapping items drop to the next line. Neither gutter ever exceeds two lines, with two lines being the maximum allowed height.

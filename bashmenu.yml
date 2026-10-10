@@ -49,3 +49,6 @@ settings:
   nerd_font_width: auto
   status_gutter: '| Theme: {theme} | {user} | Battery: {battery} | {user.localip}
     | {date_time_24_short}'
+  inactivity_timeout:
+    milliseconds: 30000
+    command: cmatrix -s

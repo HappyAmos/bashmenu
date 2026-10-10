@@ -29,6 +29,7 @@ from typing import ClassVar
 import yaml
 from rich.style import Style
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.events import Key
@@ -1207,7 +1208,7 @@ def _fetch_plugin_worker(name, script_cmd, now):
             try:
                 term_w = shutil.get_terminal_size((80, 24)).columns
                 env["COLUMNS"] = str(max(20, term_w - 6))
-            except Exception:
+            except (OSError, ValueError):
                 env["COLUMNS"] = "74"
 
         if os.path.exists(script_cmd) and os.path.isfile(script_cmd):
@@ -2541,6 +2542,11 @@ class BashMenuScreen(Screen):
     def on_mount(self) -> None:
         self._update_plugin_buffer_geometry()
         self.set_interval(1.0, self._periodic_refresh)
+        app_obj = None
+        with contextlib.suppress(Exception):
+            app_obj = getattr(self, "_app", None) or getattr(self, "app", None)
+        if app_obj and hasattr(app_obj, "setup_inactivity_timer"):
+            app_obj.setup_inactivity_timer()
 
     def _update_plugin_buffer_geometry(self) -> None:
         """The `_update_plugin_buffer_geometry` method positions and bounds
@@ -2768,6 +2774,11 @@ class BashMenuScreen(Screen):
         self._update_plugin_buffer_geometry()
         mv.refresh()
         self.plugin_buffer.refresh()
+        app_obj = None
+        with contextlib.suppress(Exception):
+            app_obj = getattr(self, "_app", None) or getattr(self, "app", None)
+        if app_obj and hasattr(app_obj, "setup_inactivity_timer"):
+            app_obj.setup_inactivity_timer()
 
 
 class BashMenuApp(App):
@@ -2775,8 +2786,130 @@ class BashMenuApp(App):
 
     ENABLE_COMMAND_PALETTE = False
 
+    def __init__(self, config=None, **kwargs):
+        super().__init__(**kwargs)
+        self.config = config
+        self._inactivity_timer = None
+        self._is_screensaver_active = False
+
     def on_mount(self) -> None:
-        self.push_screen(BashMenuScreen())
+        self.push_screen(BashMenuScreen(config=self.config))
+        self.setup_inactivity_timer()
+
+    def get_inactivity_config(self) -> tuple[float, str]:
+        """The `get_inactivity_config` method retrieves the inactivity timeout
+        duration in seconds and the command to execute from configuration.
+        """
+        cfg = getattr(self, "config", None)
+        if cfg is None:
+            with contextlib.suppress(Exception):
+                if getattr(self, "_screen_stack", None) and hasattr(self.screen, "menu_view"):
+                    cfg = getattr(self.screen.menu_view, "config", None)
+        if cfg is None:
+            cfg, _ = load_config()
+
+        timeout_cfg = get_config_value(cfg, "settings.inactivity_timeout", None)
+        if not isinstance(timeout_cfg, dict):
+            return 0.0, ""
+
+        ms = timeout_cfg.get("milliseconds", 0)
+        cmd = timeout_cfg.get("command", "")
+        if not isinstance(cmd, str) or not cmd.strip():
+            return 0.0, ""
+
+        try:
+            ms_val = float(ms)
+        except (ValueError, TypeError):
+            return 0.0, ""
+
+        if ms_val <= 0:
+            return 0.0, ""
+
+        seconds = ms_val / 1000.0
+        interpolated_cmd = interpolate_placeholders(cmd.strip(), cfg)
+        return seconds, interpolated_cmd
+
+    def setup_inactivity_timer(self) -> None:
+        """The `setup_inactivity_timer` method configures or arms the
+        inactivity timer countdown.
+        """
+        if self._inactivity_timer is not None:
+            with contextlib.suppress(Exception):
+                self._inactivity_timer.stop()
+            self._inactivity_timer = None
+
+        seconds, cmd = self.get_inactivity_config()
+        if seconds > 0 and cmd:
+            self._inactivity_timer = self.set_timer(
+                seconds,
+                self._trigger_inactivity_timeout,
+                name="inactivity_timeout",
+            )
+
+    def reset_inactivity_timer(self) -> None:
+        """The `reset_inactivity_timer` method resets the inactivity countdown."""
+        if self._is_screensaver_active:
+            return
+        if self._inactivity_timer is not None:
+            task = getattr(self._inactivity_timer, "_task", None)
+            if task is not None and not task.done():
+                self._inactivity_timer.reset()
+                return
+        self.setup_inactivity_timer()
+
+    def _trigger_inactivity_timeout(self) -> None:
+        """The `_trigger_inactivity_timeout` method executes the screensaver
+        command in an alternate screen buffer, suspending Textual.
+        """
+        if self._is_screensaver_active:
+            return
+        _, cmd = self.get_inactivity_config()
+        if not cmd:
+            return
+
+        self._is_screensaver_active = True
+        try:
+            driver = getattr(self, "_driver", None)
+            can_suspend = driver is not None and getattr(driver, "can_suspend", False)
+
+            if can_suspend:
+                with self.suspend():
+                    sys.stdout.write("\x1b[?1049h\x1b[H\x1b[2J")
+                    sys.stdout.flush()
+                    try:
+                        with contextlib.suppress(KeyboardInterrupt, Exception):
+                            subprocess.run(
+                                cmd,
+                                shell=True,
+                                executable=BASH_BIN,
+                                check=False,
+                            )
+                    finally:
+                        sys.stdout.write("\x1b[?1049l")
+                        sys.stdout.flush()
+                with contextlib.suppress(Exception):
+                    if getattr(self, "_screen_stack", None):
+                        self.screen.refresh()
+                self.refresh(layout=True)
+            else:
+                with contextlib.suppress(KeyboardInterrupt, Exception):
+                    subprocess.run(
+                        cmd,
+                        shell=True,
+                        executable=BASH_BIN,
+                        check=False,
+                    )
+        finally:
+            self._is_screensaver_active = False
+            self.setup_inactivity_timer()
+
+    async def on_event(self, event: events.Event) -> None:
+        """The `on_event` method intercepts keyboard and mouse events to reset
+        the inactivity timer countdown.
+        """
+        if isinstance(event, (events.Key, events.MouseEvent)):
+            self.reset_inactivity_timer()
+        await super().on_event(event)
 
 
 def main():

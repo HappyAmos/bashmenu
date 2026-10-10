@@ -334,6 +334,19 @@ def validate_config_file(filepath: str) -> bool:
         settings = data["settings"]
         if "plugins" in settings and not isinstance(settings["plugins"], dict):
             errors.append(f"'settings.plugins' must be a mapping, got {type(settings['plugins']).__name__}.")
+        if "inactivity_timeout" in settings:
+            it = settings["inactivity_timeout"]
+            if not isinstance(it, dict):
+                errors.append(f"'settings.inactivity_timeout' must be a mapping, got {type(it).__name__}.")
+            else:
+                if "milliseconds" in it and not isinstance(it["milliseconds"], (int, float)):
+                    errors.append(
+                        f"'settings.inactivity_timeout.milliseconds' must be a number, got {type(it['milliseconds']).__name__}."
+                    )
+                if "command" in it and not isinstance(it["command"], str):
+                    errors.append(
+                        f"'settings.inactivity_timeout.command' must be a string, got {type(it['command']).__name__}."
+                    )
 
     if "user" in data and not isinstance(data["user"], dict):
         errors.append(f"'user' must be a mapping, got {type(data['user']).__name__}.")

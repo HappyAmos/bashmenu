@@ -24,6 +24,30 @@ from pathlib import Path
 
 import yaml
 
+with contextlib.suppress(ImportError):
+    from rich.markdown import Heading
+
+    if hasattr(Heading, "LEVEL_ALIGN"):
+        Heading.LEVEL_ALIGN["h1"] = "left"
+    else:
+
+        def _custom_h1_console(self, console, options):
+            text = self.text
+            text.justify = "left"
+            if self.tag == "h1":
+                from rich import box
+                from rich.panel import Panel
+
+                yield Panel(text, box=box.HEAVY, style="markdown.h1.border")
+            else:
+                if self.tag == "h2":
+                    from rich.text import Text
+
+                    yield Text("")
+                yield text
+
+        Heading.__rich_console__ = _custom_h1_console
+
 
 def get_config_path() -> Path:
     """
@@ -106,13 +130,22 @@ def display_markdown(file_path: Path) -> None:
         except Exception:  # noqa: BLE001, S110
             pass
 
-    # Fall back to stdout print if rich.sh fails to run
+    # Fall back to rich or stdout print if rich.sh fails to run
     try:
-        print(file_path.read_text(encoding="utf-8"))
+        from rich.console import Console
+        from rich.markdown import Markdown
+
+        console = Console()
+        console.print(Markdown(file_path.read_text(encoding="utf-8"), hyperlinks=True))
     except KeyboardInterrupt:
         sys.exit(130)
-    except Exception as e:  # noqa: BLE001
-        sys.exit(f"Error reading {file_path}: {e}")
+    except Exception:  # noqa: BLE001
+        try:
+            print(file_path.read_text(encoding="utf-8"))
+        except KeyboardInterrupt:
+            sys.exit(130)
+        except Exception as e:  # noqa: BLE001
+            sys.exit(f"Error reading {file_path}: {e}")
 
 
 def extract_tags_from_frontmatter(file_path: Path) -> list[str]:

@@ -12,8 +12,11 @@ from typing import ClassVar
 
 from rich.color import Color, ColorParseError
 from rich.console import Console
-from rich.markdown import Markdown
+from rich.markdown import Heading, Markdown
 from rich.text import Text
+
+if hasattr(Heading, "LEVEL_ALIGN"):
+    Heading.LEVEL_ALIGN["h1"] = "left"
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical

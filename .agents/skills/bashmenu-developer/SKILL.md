@@ -549,6 +549,19 @@ Textual interface.
       `.tests/test_improvements.py` assert that all non-hidden executable scripts in
       `scripts/` have corresponding documentation entries in both `bashmenu.md` and
       `bashmenu.1`.
+41. **Inactivity Timeout & Screensaver Architecture (`settings.inactivity_timeout`):**
+    - **Configuration & Lean Default Invariant:**
+      * Configured under `settings.inactivity_timeout` with `milliseconds` (integer/float) and optional `command` (string).
+      * **No Default Command Invariant:** The default configuration in `bashmenu.yml` must **not** include a `command` argument (specifying only `milliseconds: 300000`). If `command` is omitted, `null`, or empty, the timeout subsystem must remain dormant (no timer task scheduled).
+    - **Textual Event Interception & Countdown Resets:**
+      * `BashMenuApp.on_event` must intercept all `events.Key` and `events.MouseEvent` (`MouseMove`, `MouseDown`, `MouseUp`, `Click`, `MouseScrollDown`, `MouseScrollUp`) before event dispatch, resetting countdown timers via `timer.reset()` with zero allocations.
+    - **Alternate Screen Buffer & Subprocess Isolation:**
+      * Executed screensavers or idle scripts must run inside an alternate terminal screen buffer (`\x1b[?1049h\x1b[H\x1b[2J`) with Textual suspended (`with self.suspend():`).
+      * Always restore the primary screen buffer (`\x1b[?1049l`) in a `finally` block, catch `KeyboardInterrupt` gracefully, repaint the UI via `self.refresh(layout=True)`, and re-arm the inactivity countdown upon exit so terminal lines and menu layout remain undisturbed.
+    - **Headless & ScreenStack Safety Patterns:**
+      * Before invoking `self.suspend()`, verify `hasattr(self, "_driver") and self._driver and getattr(self._driver, "can_suspend", False)` to support headless pilot testing.
+      * Avoid bare `self.screen` queries when screens may be unmounted; wrap lookups with `contextlib.suppress(Exception)` and check `getattr(self, "_screen_stack", None)` to prevent `ScreenStackError`.
+      * Always resolve application instances via `app_obj = getattr(self, "_app", None) or getattr(self, "app", None)` before calling `setup_inactivity_timer()`, preventing `NoActiveAppError` in headless test harnesses.
 
 
 ## Documentation Guidelines
