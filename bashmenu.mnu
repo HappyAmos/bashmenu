@@ -464,6 +464,13 @@ items:
                       title: Toggle Auto Update
                       message: Enable automatic updates?
                       icon: '{nf::#ea77}'
+                  - Toggle Background Enabled [{settings.background.enabled}]:
+                      type: toggle
+                      key: '{settings.background.enabled}'
+                      prompt: 'Enable backgrounds? :'
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                       type: toggle
                       key: settings.use_nerd_fonts

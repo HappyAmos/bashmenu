@@ -15,6 +15,28 @@
 # menu loop below, and add the retrieval line in the case 
 # statement below.
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Function to pipe output through pager.sh, less -R, $PAGER, or fallback
+show_in_pager() {
+    if [ -t 1 ]; then
+        if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
+            "${SCRIPT_DIR}/pager.sh"
+        elif command -v less >/dev/null 2>&1; then
+            less -R
+        elif [ -n "${PAGER:-}" ]; then
+            ${PAGER}
+        else
+            cat
+            echo "--------------------------------------------------"
+            read -r -s -p "Finished printing. Press [Enter] to return to the menu..."
+            echo ""
+        fi
+    else
+        cat
+    fi
+}
+
 # Function to cleanly print a specific range with a header
 print_unicode_range() {
     local label="$1"
@@ -27,14 +49,23 @@ print_unicode_range() {
     printf "  Printing: %s (U+%04X - U+%04X)\n" "$label" "$start" "$end"
     printf "======================================================================\n\n"
     
+    # Check Unicode rendering method once outside the loop for high performance
+    local mode="builtin"
+    if ! printf "\U00000041" 2>/dev/null | grep -q "A"; then
+        if command -v python3 &>/dev/null; then
+            mode="python"
+        fi
+    fi
+
     for ((i=start; i<=end; i++)); do
         local hex
         hex=$(printf "%08X" "$i")
         
         # Display short code point notation and the rendered symbol safely across shell versions
-        if printf "\U00000041" 2>/dev/null | grep -q "A"; then
+        if [[ "$mode" == "builtin" ]]; then
             printf "U+%04X:\U$hex\t" "$i"
-        elif command -v python3 &>/dev/null; then
+        elif [[ "$mode" == "python" ]]; then
+            local symbol
             symbol=$(python3 -c "import sys; sys.stdout.write(chr($i))" 2>/dev/null || true)
             printf "U+%04X:%s\t" "$i" "$symbol"
         else
@@ -48,6 +79,11 @@ print_unicode_range() {
         fi
     done
     printf "\n"
+}
+
+# Function to render range through pager
+view_unicode_range() {
+    print_unicode_range "$@" | show_in_pager
 }
 
 # Trap Ctrl+C to cleanly exit without showing an ugly error break
@@ -75,8 +111,16 @@ while true; do
     echo "=================================================="
     echo ""
     
+    # Discard any buffered stray input (such as mouse scrolls) before prompt when interactive
+    if [ -t 0 ]; then
+        read -r -t 0.05 -n 10000 _ 2>/dev/null || true
+    fi
+
     # Prompt the user for choice
-    read -r -p "Select an option [1-10, c, q]: " choice
+    if ! read -r -p "Select an option [1-10, c, q]: " choice; then
+        echo "Goodbye!"
+        break
+    fi
     
     # Check if user wants to quit
     if [[ "$choice" == "q" || "$choice" == "Q" ]]; then
@@ -86,16 +130,16 @@ while true; do
     
     # Match the choice to its corresponding Unicode range parameters
     case $choice in
-        1)  print_unicode_range "Mahjong Tiles" 0x1F000 0x1F02F 4 ;;
-        2)  print_unicode_range "Domino Tiles" 0x1F030 0x1F09F 4 ;;
-        3)  print_unicode_range "Playing Cards" 0x1F0A0 0x1F0FF 4 ;;
-        4)  print_unicode_range "Counting Rod Numerals" 0x1D360 0x1D37F 4 ;;
-        5)  print_unicode_range "Mathematical Alphanumeric Symbols" 0x1D400 0x1D7FF 4 ;;
-        6)  print_unicode_range "Ornamental Dingbats" 0x1F650 0x1F67F 4 ;;
-        7)  print_unicode_range "Transport and Map Symbols" 0x1F680 0x1F6FF 4 ;;
-        8)  print_unicode_range "Supplemental Symbols and Pictographs" 0x1F900 0x1F9FF 4 ;;
-        9)  print_unicode_range "Symbols for Legacy Computing" 0x1FB00 0x1FBFF 4 ;;
-        10) print_unicode_range "Chess Symbols" 0x1FA00 0x1FA6F 4 ;;
+        1)  view_unicode_range "Mahjong Tiles" 0x1F000 0x1F02F 4 ;;
+        2)  view_unicode_range "Domino Tiles" 0x1F030 0x1F09F 4 ;;
+        3)  view_unicode_range "Playing Cards" 0x1F0A0 0x1F0FF 4 ;;
+        4)  view_unicode_range "Counting Rod Numerals" 0x1D360 0x1D37F 4 ;;
+        5)  view_unicode_range "Mathematical Alphanumeric Symbols" 0x1D400 0x1D7FF 4 ;;
+        6)  view_unicode_range "Ornamental Dingbats" 0x1F650 0x1F67F 4 ;;
+        7)  view_unicode_range "Transport and Map Symbols" 0x1F680 0x1F6FF 4 ;;
+        8)  view_unicode_range "Supplemental Symbols and Pictographs" 0x1F900 0x1F9FF 4 ;;
+        9)  view_unicode_range "Symbols for Legacy Computing" 0x1FB00 0x1FBFF 4 ;;
+        10) view_unicode_range "Chess Symbols" 0x1FA00 0x1FA6F 4 ;;
         
         [cC])
             echo ""
@@ -110,7 +154,8 @@ while true; do
             # Validate that the strings are actual hex numbers
             if [[ ! "$start_hex" =~ ^[0-9a-fA-F]+$ || ! "$end_hex" =~ ^[0-9a-fA-F]+$ ]]; then
                 echo -e "\n❌ Error: Invalid hexadecimal input. Use characters 0-9 and A-F."
-                read -r -p "Press Enter to return to the menu..."
+                read -r -s -p "Press [Enter] to return to the menu..."
+                echo ""
                 continue
             fi
             
@@ -121,7 +166,8 @@ while true; do
             # Make sure start code point is less than or equal to end code point
             if [ $start_dec -gt $end_dec ]; then
                 echo -e "\n❌ Error: Start value cannot be greater than the End value."
-                read -r -p "Press Enter to return to the menu..."
+                read -r -s -p "Press [Enter] to return to the menu..."
+                echo ""
                 continue
             fi
             
@@ -135,19 +181,16 @@ while true; do
                 fi
             fi
             
-            # Run the print function on the verified custom range
-            print_unicode_range "Custom User Range" "$start_dec" "$end_dec" 4
+            # Run the viewer function on the verified custom range
+            view_unicode_range "Custom User Range" "$start_dec" "$end_dec" 4
             ;;
             
         *)  
             echo -e "\nInvalid choice! Please choose a number from 1 to 10, 'c', or 'q'."
-            read -r -p "Press Enter to return to the menu..."
+            read -r -s -p "Press [Enter] to return to the menu..."
+            echo ""
             continue 
             ;;
     esac
-    
-    # Pause mechanism to let them review before clearing and returning to prompt
-    echo "--------------------------------------------------"
-    read -r -p "Finished printing. Press [Enter] to return to the menu..."
 done
 

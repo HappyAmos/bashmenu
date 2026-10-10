@@ -14,6 +14,7 @@ import contextlib
 import copy
 import curses
 import datetime
+import functools
 import getpass
 import os
 import re
@@ -95,6 +96,7 @@ def resolve_existing_path(primary: Path, fallback: Path | None = None) -> str:
     return str(primary)
 
 
+@functools.lru_cache(maxsize=1)
 def get_powershell_profile_path() -> str:
     """Return platform-appropriate PowerShell profile path."""
     home = Path.home()
@@ -110,6 +112,7 @@ def get_powershell_profile_path() -> str:
     return str(ps_unix)
 
 
+@functools.lru_cache(maxsize=1)
 def get_shell_profile_path() -> str:
     """Resolve active login shell profile path, preferring existing files."""
     home = Path.home()
@@ -677,8 +680,16 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         os.environ["CACHE_DIR"] = resolved_cache
         cache_dir_setting = resolved_cache
 
-    cur_profile = resolve_existing_path(Path.home() / ".profile", Path.home() / ".bash_profile")
-    cur_bash_profile = resolve_existing_path(Path.home() / ".bash_profile", Path.home() / ".profile")
+    cur_profile = (
+        resolve_existing_path(Path.home() / ".profile", Path.home() / ".bash_profile")
+        if "{profile}" in res_text
+        else ""
+    )
+    cur_bash_profile = (
+        resolve_existing_path(Path.home() / ".bash_profile", Path.home() / ".profile")
+        if "{bash_profile}" in res_text
+        else ""
+    )
 
     placeholders = {
         "{user}": USERNAME,
@@ -701,8 +712,8 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{profile}": cur_profile,
         "{bash_profile}": cur_bash_profile,
         "{zprofile}": ZPROFILE_PATH,
-        "{shell_profile}": get_shell_profile_path(),
-        "{powershell_profile}": get_powershell_profile_path(),
+        "{shell_profile}": get_shell_profile_path() if "{shell_profile}" in res_text else "",
+        "{powershell_profile}": get_powershell_profile_path() if "{powershell_profile}" in res_text else "",
         "{prefix}": PREFIX_PATH,
         "{termux_properties}": TERMUX_PROPERTIES_PATH,
         "{termux_storage}": TERMUX_STORAGE_PATH,
@@ -1197,6 +1208,7 @@ def process_line_to_segments(line, default_theme_attr=0):
 
 
 _plugin_output_cache = {}
+_plugin_display_cache = {}
 _plugin_fetching = set()
 _plugin_lock = threading.RLock()
 
@@ -1350,6 +1362,13 @@ def get_plugin_display_items(
     accounting for table layouts, standalone plugins, and screen/window margins.
     """
     raw_plugin_lines = get_plugin_outputs(config)
+    cache_ver = tuple(raw_plugin_lines)
+    theme_name = config.get("theme", "dracula") if isinstance(config, dict) else "dracula"
+    cache_key = (avail_w, screen_div_w, has_screen_divider, theme_name, cache_ver)
+    cached_items = _plugin_display_cache.get(cache_key)
+    if cached_items is not None:
+        return [(r_str, is_d, rt.copy()) for r_str, is_d, rt in cached_items]
+
     plugins_dict = config.get("settings", {}).get("plugins", {}) if isinstance(config, dict) else {}
     if not isinstance(plugins_dict, dict):
         plugins_dict = {}
@@ -1544,8 +1563,7 @@ def get_plugin_display_items(
                     items.append(_render_row(t_line, False, raw_t))
 
         if not has_any_content and not headers:
-            return []
-        return items
+            items = []
     else:
         for p_line in raw_plugin_lines[:10]:
             clean_line = (
@@ -1557,7 +1575,10 @@ def get_plugin_display_items(
             )
             is_div_line = any(tok in clean_line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
             items.append(_render_row(clean_line, is_div_line, clean_line))
-        return items
+
+    if len(_plugin_display_cache) < 64:
+        _plugin_display_cache[cache_key] = items
+    return [(r_str, is_d, rt.copy()) for r_str, is_d, rt in items]
 
 
 def get_plugin_display_lines(config: dict, width: int | None = None) -> list[str]:
@@ -1712,9 +1733,21 @@ class MainMenuView(Widget):
         return raw_plugin_lines, separator_rows, visible_option_rows
 
     def render(self) -> Text:
-        """Render the complete primary menu interface as an isolated textual screen buffer.
+        """Render the complete primary menu interface as an isolated textual screen buffer."""
+        watchdog = None
+        with contextlib.suppress(Exception):
+            if hasattr(self, "app") and self.app:
+                watchdog = getattr(self.app, "watchdog", None)
+        if watchdog is None:
+            watchdog = getattr(self, "watchdog", None)
 
-        Constructs top/bottom window borders, menu titles, options with fixed 4-column
+        if watchdog is not None:
+            with watchdog.measure("MainMenuView.render"):
+                return self._render_menu_buffer()
+        return self._render_menu_buffer()
+
+    def _render_menu_buffer(self) -> Text:
+        """Constructs top/bottom window borders, menu titles, options with fixed 4-column
         icon slots and column 11 label alignment, shortcut badges, divider rules,
         and bottom status/help gutter. Enforces strict boundary padding and truncation
         to prevent terminal border overflow.
@@ -2046,7 +2079,77 @@ class MainMenuView(Widget):
         bot_bar = Text(b_bl + b_h_bot * max(0, w - 2) + b_br, style=border_style)
         out.append_text(bot_bar)
 
+        # 11. Composite half-block background wallpaper if enabled in settings or specified in theme
+        bg_cfg = get_config_value(self.config, "settings.background", None)
+        out = self._apply_wallpaper_background(out, w, h, theme_styles, bg_cfg)
+
         return out
+
+    def _apply_wallpaper_background(
+        self, text: Text, width: int, height: int, theme_styles: dict, bg_cfg: dict | None
+    ) -> Text:
+        """Apply half-block background wallpaper compositing to rendered menu interface."""
+        user_bg = bg_cfg if isinstance(bg_cfg, dict) else {}
+
+        # If user explicitly disabled background in settings, respect that
+        if user_bg.get("enabled") is False:
+            return text
+
+        # Check theme-level background specification
+        theme_bg_raw = theme_styles.get("theme_background") or theme_styles.get("wallpaper")
+        theme_bg_dict = {}
+        if isinstance(theme_bg_raw, dict):
+            theme_bg_dict = theme_bg_raw
+        elif isinstance(theme_bg_raw, str):
+            theme_bg_dict = {"image": theme_bg_raw}
+
+        # If background is not enabled in settings and no background is specified in theme, nothing to render
+        user_has_bg = user_bg.get("enabled", False) or bool(user_bg.get("image"))
+        theme_has_bg = bool(theme_bg_dict.get("image"))
+        if not user_has_bg and not theme_has_bg:
+            return text
+
+        # Hierarchy: user settings override theme defaults
+        img_spec = user_bg.get("image") or theme_bg_dict.get("image")
+        if not img_spec:
+            return text
+
+        opacity = user_bg.get("opacity") if "opacity" in user_bg else theme_bg_dict.get("opacity", 0.35)
+        scaling = user_bg.get("scaling") or theme_bg_dict.get("scaling", "cover")
+
+        img_path = interpolate_placeholders(str(img_spec).strip(), self.config)
+
+        compositor = getattr(self, "_wallpaper_compositor", None)
+        if compositor is None or getattr(compositor, "image_path", None) != img_path:
+            compositor = bashmenu_ui.WallpaperCompositor(
+                img_path,
+                opacity=opacity,
+                scaling=scaling,
+                base_dir=BASHMENU_DIR,
+            )
+            self._wallpaper_compositor = compositor
+        else:
+            compositor.opacity = opacity
+            compositor.scaling = scaling
+
+        theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(theme_styles)
+        grid = compositor.get_grid(width, height, theme_bg_rgb)
+        if not grid:
+            return text
+
+        console = getattr(self, "_compositor_console", None)
+        if console is None:
+            from rich.console import Console
+
+            console = Console(width=width, height=height)
+            self._compositor_console = console
+
+        theme_bg_style = theme_styles.get("background")
+        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
+
+        return bashmenu_ui.composite_menu_text(
+            text, grid, width, height, console=console, theme_default_bg=theme_default_bg
+        )
 
     def on_click(self, event) -> None:
         rendered_row = event.y - 3
@@ -2084,13 +2187,19 @@ class MainMenuView(Widget):
 
     def on_mouse_move(self, event) -> None:
         rendered_row = event.y - 3
+        if rendered_row == getattr(self, "_last_mouse_row", None):
+            return
+        self._last_mouse_row = rendered_row
+
         curr_menu = self.current_menu()
         options = curr_menu.get("items", curr_menu.get("options", []))
         if not options:
             return
 
-        total_content_rows = max(1, (self.size.height or 24) - 5)
-        _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
+        visible_option_rows = getattr(self, "visible_option_rows", None)
+        if visible_option_rows is None:
+            total_content_rows = max(1, (self.size.height or 24) - 5)
+            _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
 
         scroll_start = 0
         curr_row = self.current_row()
@@ -2762,6 +2871,7 @@ class BashMenuScreen(Screen):
         if clear_plugins:
             with _plugin_lock:
                 _plugin_output_cache.clear()
+                _plugin_display_cache.clear()
                 _plugin_fetching.clear()
         mv = self.menu_view
         mv.config, _ = load_config()
@@ -2781,6 +2891,41 @@ class BashMenuScreen(Screen):
             app_obj.setup_inactivity_timer()
 
 
+class ResponsivenessWatchdog:
+    """Monitors UI thread execution times and reports excessive blocking behavior."""
+
+    def __init__(self, threshold_ms: float = 35.0, warning_callback=None):
+        self.threshold_ms = threshold_ms
+        self.warning_callback = warning_callback or self._default_warn
+        self.max_frame_ms = 0.0
+        self.total_frames = 0
+        self.slow_frames = 0
+        self.history: list[tuple[str, float]] = []
+
+    def _default_warn(self, source: str, duration_ms: float):
+        import logging
+
+        logger = logging.getLogger("bashmenu")
+        logger.warning(
+            f"[Watchdog] Excessive blocking in {source}: {duration_ms:.2f}ms (threshold: {self.threshold_ms:.1f}ms)"
+        )
+
+    @contextlib.contextmanager
+    def measure(self, source: str):
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            dt = (time.perf_counter() - t0) * 1000.0
+            self.total_frames += 1
+            self.max_frame_ms = max(self.max_frame_ms, dt)
+            if len(self.history) < 200:
+                self.history.append((source, dt))
+            if dt > self.threshold_ms:
+                self.slow_frames += 1
+                self.warning_callback(source, dt)
+
+
 class BashMenuApp(App):
     """Main Textual Application for HA Bash Menu."""
 
@@ -2791,10 +2936,15 @@ class BashMenuApp(App):
         self.config = config
         self._inactivity_timer = None
         self._is_screensaver_active = False
+        self.watchdog = ResponsivenessWatchdog(threshold_ms=35.0)
 
     def on_mount(self) -> None:
         self.push_screen(BashMenuScreen(config=self.config))
         self.setup_inactivity_timer()
+
+    def on_ready(self) -> None:
+        """Arm or reset inactivity timer when application is fully mounted and ready for input."""
+        self.reset_inactivity_timer()
 
     def get_inactivity_config(self) -> tuple[float, str]:
         """The `get_inactivity_config` method retrieves the inactivity timeout

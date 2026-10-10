@@ -5,7 +5,7 @@
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
 version: 0.0.1
-theme: matrix
+theme: train_ride
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
@@ -23,19 +23,19 @@ settings:
     divider: true
     weather:
       script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
-      sleep: 350
+      sleep: 5000
     alienware:
-      sleep: 500
-      script: '{scripts_dir}/serverup.sh 192.168.4.46 Alienware'
+      sleep: 10000
+      script: '{scripts_dir}/serverup.sh 192.168.4.46 [b]Alienware[/b]'
     pi3b:
-      sleep: 525
-      script: '{scripts_dir}/serverup.sh 192.168.4.47 Pi3b'
+      sleep: 15000
+      script: '{scripts_dir}/serverup.sh 192.168.4.47 [b]Pi3b[/b]'
     halftop:
-      sleep: 550
-      script: '{scripts_dir}/serverup.sh 192.168.4.96 Halftop'
+      sleep: 20000
+      script: '{scripts_dir}/serverup.sh 192.168.4.96 [b]Halftop[/b]'
     otd:
       script: otd.sh
-      sleep: 300
+      sleep: 40000
       standalone: true
       pretext: '{divider}'
       posttext: '{divider}'
@@ -48,7 +48,9 @@ settings:
   use_nerd_fonts: true
   nerd_font_width: auto
   status_gutter: '| Theme: {theme} | {user} | Battery: {battery} | {user.localip}
-    | {date_time_24_short}'
+    | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
-    milliseconds: 30000
+    milliseconds: 300000
     command: cmatrix -s
+  background:
+    enabled: true

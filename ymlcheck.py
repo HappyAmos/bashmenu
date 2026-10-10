@@ -30,7 +30,7 @@ VALID_16_COLORS = {
 VALID_DEPTHS = {"256", "16", "8", "truecolor"}
 
 # Non-color structural attributes permitted in theme definitions
-VALID_NON_COLOR_KEYS = {"indicator", "prefix"}
+VALID_NON_COLOR_KEYS = {"indicator", "prefix", "wallpaper"}
 
 # Permitted window border keys in theme window: sections
 VALID_WINDOW_BORDER_KEYS = {
@@ -195,6 +195,30 @@ def validate_divider_section(divider_data: Any, path: str) -> list[str]:
     return errors
 
 
+def validate_theme_background_section(bg_data: Any, path: str) -> list[str]:
+    """Validate background image specification in a theme."""
+    if bg_data is None:
+        return []
+    if isinstance(bg_data, str):
+        return []
+    if isinstance(bg_data, dict):
+        errors = []
+        if "image" in bg_data and not isinstance(bg_data["image"], str):
+            errors.append(f"'{path}.image' must be a string, got {type(bg_data['image']).__name__}.")
+        if "opacity" in bg_data and not isinstance(bg_data["opacity"], (int, float)):
+            errors.append(f"'{path}.opacity' must be a number, got {type(bg_data['opacity']).__name__}.")
+        if "scaling" in bg_data and not isinstance(bg_data["scaling"], str):
+            errors.append(f"'{path}.scaling' must be a string, got {type(bg_data['scaling']).__name__}.")
+        if "mode" in bg_data and not isinstance(bg_data["mode"], str):
+            errors.append(f"'{path}.mode' must be a string, got {type(bg_data['mode']).__name__}.")
+        if "enabled" in bg_data and not isinstance(bg_data["enabled"], bool):
+            errors.append(f"'{path}.enabled' must be a boolean, got {type(bg_data['enabled']).__name__}.")
+        return errors
+    return [
+        f"'{path}': Background specification must be a string or mapping, got {type(bg_data).__name__}."
+    ]
+
+
 def validate_color_value(val: Any, depth_mode: str, path: str) -> list[str]:
     """Validate an individual color value (foreground, background, or standalone)."""
     errors = []
@@ -286,6 +310,10 @@ def validate_theme_file(filepath: str) -> bool:
                     errors.extend(validate_window_section(keys, f"{theme_name}.window"))
                 elif depth_str == "divider":
                     errors.extend(validate_divider_section(keys, f"{theme_name}.divider"))
+                elif depth_str == "background":
+                    errors.extend(
+                        validate_theme_background_section(keys, f"{theme_name}.background")
+                    )
                 elif depth_str in VALID_NON_COLOR_KEYS:
                     errors.extend(validate_indicator_value(keys, f"{theme_name}.{depth_str}"))
                 else:
@@ -297,6 +325,8 @@ def validate_theme_file(filepath: str) -> bool:
                 errors.extend(validate_window_section(keys, "root.window"))
             elif depth_str == "divider":
                 errors.extend(validate_divider_section(keys, "root.divider"))
+            elif depth_str == "background":
+                errors.extend(validate_theme_background_section(keys, "root.background"))
             elif depth_str in VALID_NON_COLOR_KEYS:
                 errors.extend(validate_indicator_value(keys, f"root.{depth_str}"))
             else:
@@ -346,6 +376,31 @@ def validate_config_file(filepath: str) -> bool:
                 if "command" in it and not isinstance(it["command"], str):
                     errors.append(
                         f"'settings.inactivity_timeout.command' must be a string, got {type(it['command']).__name__}."
+                    )
+        if "background" in settings:
+            bg = settings["background"]
+            if not isinstance(bg, dict):
+                errors.append(f"'settings.background' must be a mapping, got {type(bg).__name__}.")
+            else:
+                if "enabled" in bg and not isinstance(bg["enabled"], bool):
+                    errors.append(
+                        f"'settings.background.enabled' must be a boolean, got {type(bg['enabled']).__name__}."
+                    )
+                if "image" in bg and not isinstance(bg["image"], str):
+                    errors.append(
+                        f"'settings.background.image' must be a string, got {type(bg['image']).__name__}."
+                    )
+                if "opacity" in bg and not isinstance(bg["opacity"], (int, float)):
+                    errors.append(
+                        f"'settings.background.opacity' must be a number, got {type(bg['opacity']).__name__}."
+                    )
+                if "mode" in bg and not isinstance(bg["mode"], str):
+                    errors.append(
+                        f"'settings.background.mode' must be a string, got {type(bg['mode']).__name__}."
+                    )
+                if "scaling" in bg and not isinstance(bg["scaling"], str):
+                    errors.append(
+                        f"'settings.background.scaling' must be a string, got {type(bg['scaling']).__name__}."
                     )
 
     if "user" in data and not isinstance(data["user"], dict):

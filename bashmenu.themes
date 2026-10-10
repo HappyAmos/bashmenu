@@ -1349,3 +1349,193 @@ rose_pine:
     window_close_button: [COLOR_RED, -1]
     scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
     whitespace: [COLOR_CYAN, -1]
+twilight:
+  indicator: "{nf:*:◆}"
+  background:
+    image: "assets/wallpapers/twilight.png"
+    opacity: 0.85
+    scaling: "cover"
+    mode: "halfblock"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "╭"
+    border_top_right: "╮"
+    border_bottom_left: "╰"
+    border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "⟦"
+    title_right_cap: "⟧"
+  256:
+    background: 235
+    title: [153, -1]
+    border: [61, -1]
+    text: [253, -1]
+    highlight: [255, 61]
+    accent: [110, -1]
+    footer: [103, -1]
+    shadow: [234, COLOR_BLACK]
+    gutter: [103, -1]
+    selection: [255, 61]
+    status_bar: [255, 60]
+    shortcut_key: [183, -1]
+    shortcut_label: [253, -1]
+    divider: [61, -1]
+    button_primary: [255, 61]
+    button_error: [255, 131]
+    button_cancel: [253, 238]
+    button_success: [255, 65]
+    help_text: [110, -1]
+    plugin: [147, -1]
+    window_close_button: [203, -1]
+    scrollbar: [61, 235]
+    whitespace: [238, -1]
+  16:
+    background: COLOR_BLACK
+    title: [COLOR_CYAN, -1]
+    border: [COLOR_BLUE, -1]
+    text: [COLOR_WHITE, -1]
+    highlight: [COLOR_WHITE, COLOR_BLUE]
+    accent: [COLOR_CYAN, -1]
+    footer: [COLOR_BLUE, -1]
+    shadow: [8, COLOR_BLACK]
+    gutter: [8, -1]
+    selection: [COLOR_WHITE, COLOR_BLUE]
+    status_bar: [COLOR_WHITE, COLOR_BLUE]
+    shortcut_key: [COLOR_MAGENTA, -1]
+    shortcut_label: [COLOR_WHITE, -1]
+    divider: [COLOR_BLUE, -1]
+    button_primary: [COLOR_WHITE, COLOR_BLUE]
+    button_error: [COLOR_WHITE, COLOR_RED]
+    button_cancel: [COLOR_WHITE, COLOR_BLACK]
+    button_success: [COLOR_WHITE, COLOR_GREEN]
+    help_text: [COLOR_CYAN, -1]
+    plugin: [COLOR_MAGENTA, -1]
+    window_close_button: [COLOR_BRIGHT_RED, -1]
+    scrollbar: [COLOR_BLUE, COLOR_BLACK]
+    whitespace: [8, -1]
+  8:
+    background: COLOR_BLACK
+    title: [COLOR_CYAN, -1]
+    border: [COLOR_BLUE, -1]
+    text: [COLOR_WHITE, -1]
+    highlight: [COLOR_WHITE, COLOR_BLUE]
+    accent: [COLOR_CYAN, -1]
+    footer: [COLOR_BLUE, -1]
+    shadow: [COLOR_BLACK, COLOR_BLACK]
+    gutter: [COLOR_BLUE, -1]
+    selection: [COLOR_WHITE, COLOR_BLUE]
+    status_bar: [COLOR_WHITE, COLOR_BLUE]
+    shortcut_key: [COLOR_MAGENTA, -1]
+    shortcut_label: [COLOR_WHITE, -1]
+    divider: [COLOR_BLUE, -1]
+    button_primary: [COLOR_WHITE, COLOR_BLUE]
+    button_error: [COLOR_WHITE, COLOR_RED]
+    button_cancel: [COLOR_WHITE, COLOR_BLACK]
+    button_success: [COLOR_WHITE, COLOR_GREEN]
+    help_text: [COLOR_CYAN, -1]
+    plugin: [COLOR_MAGENTA, -1]
+    window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_BLUE, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
+train_ride:
+  indicator: "{nf:*:#f0f0f:}"
+  background:
+    image: "assets/wallpapers/big-sable-view.png"
+    opacity: 0.85
+    scaling: "cover"
+    mode: "quarterblock"
+  divider:
+    char: "─"
+    length: "{window_width}"
+  window:
+    border_horizontal: "─"
+    border_vertical: "│"
+    border_top_left: "╭"
+    border_top_right: "╮"
+    border_bottom_left: "╰"
+    border_bottom_right: "╯"
+    left_tee: "├"
+    right_tee: "┤"
+    top_tee: "┬"
+    bottom_tee: "┴"
+    title_left_cap: "["
+    title_right_cap: "]"
+  256:
+    background: -1
+    title: [64, -1]
+    border: [58, -1]
+    text: [7, -1]
+    highlight: [7, 28]
+    accent: [58, -1]
+    footer: [58, -1]
+    shadow: [233, 233]
+    gutter: [58, -1]
+    selection: [7, 28]
+    status_bar: [7, 28]
+    shortcut_key: [58, -1]
+    shortcut_label: [7, -1]
+    divider: [58, -1]
+    button_primary: [7, 28]
+    button_error: [7, 160]
+    button_cancel: [7, 233]
+    button_success: [7, 46]
+    help_text: [58, -1]
+    plugin: [58, -1]
+    window_close_button: [58, -1]
+    scrollbar: [58, 233]
+    whitespace: [233, -1]
+  16:
+    background: COLOR_BLACK
+    title: [COLOR_CYAN, -1]
+    border: [COLOR_BLUE, -1]
+    text: [COLOR_WHITE, -1]
+    highlight: [COLOR_WHITE, COLOR_BLUE]
+    accent: [COLOR_CYAN, -1]
+    footer: [COLOR_BLUE, -1]
+    shadow: [8, COLOR_BLACK]
+    gutter: [8, -1]
+    selection: [COLOR_WHITE, COLOR_BLUE]
+    status_bar: [COLOR_WHITE, COLOR_BLUE]
+    shortcut_key: [COLOR_MAGENTA, -1]
+    shortcut_label: [COLOR_WHITE, -1]
+    divider: [COLOR_BLUE, -1]
+    button_primary: [COLOR_WHITE, COLOR_BLUE]
+    button_error: [COLOR_WHITE, COLOR_RED]
+    button_cancel: [COLOR_WHITE, COLOR_BLACK]
+    button_success: [COLOR_WHITE, COLOR_GREEN]
+    help_text: [COLOR_CYAN, -1]
+    plugin: [COLOR_MAGENTA, -1]
+    window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_BLUE, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]
+  8:
+    background: COLOR_BLACK
+    title: [COLOR_CYAN, -1]
+    border: [COLOR_BLUE, -1]
+    text: [COLOR_WHITE, -1]
+    highlight: [COLOR_WHITE, COLOR_BLUE]
+    accent: [COLOR_CYAN, -1]
+    footer: [COLOR_BLUE, -1]
+    shadow: [COLOR_BLACK, COLOR_BLACK]
+    gutter: [COLOR_BLUE, -1]
+    selection: [COLOR_WHITE, COLOR_BLUE]
+    status_bar: [COLOR_WHITE, COLOR_BLUE]
+    shortcut_key: [COLOR_MAGENTA, -1]
+    shortcut_label: [COLOR_WHITE, -1]
+    divider: [COLOR_BLUE, -1]
+    button_primary: [COLOR_WHITE, COLOR_BLUE]
+    button_error: [COLOR_WHITE, COLOR_RED]
+    button_cancel: [COLOR_WHITE, COLOR_BLACK]
+    button_success: [COLOR_WHITE, COLOR_GREEN]
+    help_text: [COLOR_CYAN, -1]
+    plugin: [COLOR_MAGENTA, -1]
+    window_close_button: [COLOR_RED, -1]
+    scrollbar: [COLOR_BLUE, COLOR_BLACK]
+    whitespace: [COLOR_BLUE, -1]

@@ -8,13 +8,23 @@ import os
 import re
 import subprocess
 import threading
+import time
 import unicodedata
 from pathlib import Path
 from typing import ClassVar
 
 from rich._palettes import EIGHT_BIT_PALETTE
+from rich.cells import cell_len
 from rich.markdown import Heading, Markdown
 from rich.style import Style
+
+try:
+    from PIL import Image
+
+    PIL_AVAILABLE = True
+except ImportError:
+    Image = None
+    PIL_AVAILABLE = False
 
 if hasattr(Heading, "LEVEL_ALIGN"):
     Heading.LEVEL_ALIGN["h1"] = "left"
@@ -946,6 +956,8 @@ def parse_color_val(val):
 
 
 _themes_file_cache = {}
+_themes_last_stat_check: dict[str, float] = {}
+_default_themes_filepath: str | None = None
 _theme_styles_cache = {}
 
 DEFAULT_WINDOW_BORDER = {
@@ -1218,6 +1230,20 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("whitespace", default_ws)
     styles.setdefault("whitespace_color", default_ws)
     styles["indicator"] = indicator
+    raw_bg = theme_def.get("background")
+    raw_wp = theme_def.get("wallpaper")
+    if isinstance(raw_bg, dict):
+        styles["theme_background"] = raw_bg
+        styles["wallpaper"] = raw_bg.get("image")
+    elif isinstance(raw_bg, str):
+        styles["theme_background"] = {"image": raw_bg}
+        styles["wallpaper"] = raw_bg
+    elif isinstance(raw_wp, str):
+        styles["theme_background"] = {"image": raw_wp}
+        styles["wallpaper"] = raw_wp
+    else:
+        styles["theme_background"] = None
+        styles["wallpaper"] = None
     styles["theme_name"] = theme_name
     styles["window_borders"] = borders
 
@@ -1316,6 +1342,266 @@ def resolve_theme_dict(theme_val=None, app=None) -> dict:
         pass
 
     return init_theme_colors("dracula")
+
+
+def get_theme_bg_rgb(theme_styles: dict | None) -> tuple[int, int, int]:
+    """Extract RGB triplet (r, g, b) for theme background color."""
+    if not isinstance(theme_styles, dict):
+        return (15, 20, 32)
+    bg_style = theme_styles.get("background")
+    if bg_style and bg_style.bgcolor:
+        bg_col = bg_style.bgcolor
+        if hasattr(bg_col, "triplet") and bg_col.triplet:
+            return (bg_col.triplet.red, bg_col.triplet.green, bg_col.triplet.blue)
+        if hasattr(bg_col, "number") and bg_col.number is not None and 0 <= bg_col.number < 256:
+            trip = EIGHT_BIT_PALETTE[bg_col.number]
+            return (trip.red, trip.green, trip.blue)
+    return (15, 20, 32)
+
+
+class WallpaperCompositor:
+    """Manages loading, downsampling, caching, and half-block compositing of background wallpaper."""
+
+    def __init__(
+        self,
+        image_path: str,
+        opacity: float = 0.35,
+        scaling: str = "cover",
+        base_dir: str | None = None,
+    ) -> None:
+        self.image_path = str(image_path).strip() if image_path else ""
+        self.opacity = max(0.0, min(1.0, float(opacity)))
+        self.scaling = scaling or "cover"
+        self.base_dir = base_dir or os.getcwd()
+        self._raw_image = None
+        self._cached_key = None
+        self._cached_grid = None
+        self._load_image()
+
+    def _load_image(self) -> None:
+        if not PIL_AVAILABLE or not self.image_path:
+            self._raw_image = None
+            return
+        try:
+            expanded = os.path.expanduser(self.image_path)
+            if not os.path.isabs(expanded):
+                cand1 = os.path.join(self.base_dir, expanded)
+                cand2 = os.path.join(os.getcwd(), expanded)
+                if os.path.exists(cand1):
+                    expanded = cand1
+                elif os.path.exists(cand2):
+                    expanded = cand2
+            if os.path.exists(expanded) and os.path.isfile(expanded):
+                self._raw_image = Image.open(expanded).convert("RGB")
+            else:
+                self._raw_image = None
+        except Exception:  # noqa: BLE001
+            self._raw_image = None
+
+    def get_grid(
+        self, width: int, height: int, theme_bg_rgb: tuple[int, int, int] = (15, 20, 32)
+    ) -> list[list[tuple[Style, str]]] | None:
+        """Return 2D grid of (half_block_style, cell_bg_color_str) for given dimensions."""
+        if not self._raw_image or width <= 0 or height <= 0:
+            return None
+
+        cache_key = (width, height, theme_bg_rgb, round(self.opacity, 3), self.scaling)
+        if self._cached_key == cache_key and self._cached_grid is not None:
+            return self._cached_grid
+
+        pixel_w = width
+        pixel_h = height * 2
+
+        img = self._raw_image
+        if self.scaling == "cover":
+            img_ratio = img.width / max(1, img.height)
+            target_ratio = pixel_w / max(1, pixel_h)
+            if img_ratio > target_ratio:
+                new_w = max(1, int(img.height * target_ratio))
+                left = (img.width - new_w) // 2
+                cropped = img.crop((left, 0, left + new_w, img.height))
+            else:
+                new_h = max(1, int(img.width / target_ratio))
+                top = (img.height - new_h) // 2
+                cropped = img.crop((0, top, img.width, top + new_h))
+            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
+        else:
+            resized = img.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
+
+        pixels = resized.load()
+        grid = []
+        op = self.opacity
+        inv_op = 1.0 - op
+        t_r, t_g, t_b = theme_bg_rgb
+        style_cache: dict[tuple[int, int, int, int, int, int], tuple[Style, str]] = {}
+        quant = 4
+
+        for r in range(height):
+            row_cache = []
+            for c in range(width):
+                orig_r1, orig_g1, orig_b1 = pixels[c, r * 2][:3]
+                orig_r2, orig_g2, orig_b2 = pixels[c, r * 2 + 1][:3]
+
+                r1 = (int(orig_r1 * op + t_r * inv_op) // quant) * quant
+                g1 = (int(orig_g1 * op + t_g * inv_op) // quant) * quant
+                b1 = (int(orig_b1 * op + t_b * inv_op) // quant) * quant
+
+                r2 = (int(orig_r2 * op + t_r * inv_op) // quant) * quant
+                g2 = (int(orig_g2 * op + t_g * inv_op) // quant) * quant
+                b2 = (int(orig_b2 * op + t_b * inv_op) // quant) * quant
+
+                k = (r1, g1, b1, r2, g2, b2)
+                cached = style_cache.get(k)
+                if cached is None:
+                    avg_r = (r1 + r2) // 2
+                    avg_g = (g1 + g2) // 2
+                    avg_b = (b1 + b2) // 2
+                    half_style = Style(color=f"rgb({r1},{g1},{b1})", bgcolor=f"rgb({r2},{g2},{b2})")
+                    bg_color_str = f"rgb({avg_r},{avg_g},{avg_b})"
+                    cached = (half_style, bg_color_str)
+                    style_cache[k] = cached
+                row_cache.append(cached)
+            grid.append(row_cache)
+
+        self._cached_key = cache_key
+        self._cached_grid = grid
+        return grid
+
+
+_style_combine_cache: dict[tuple[int, str], Style] = {}
+
+
+def get_combined_style(style: Style | None, bg_color_str: str) -> Style:
+    """Get or create cached Style combining foreground style with wallpaper cell background color."""
+    key = (id(style), bg_color_str)
+    cached = _style_combine_cache.get(key)
+    if cached is not None:
+        return cached
+    new_style = Style(
+        color=style.color if style and style.color else "white",
+        bgcolor=bg_color_str,
+        bold=style.bold if style else False,
+        italic=style.italic if style else False,
+        underline=style.underline if style else False,
+        reverse=style.reverse if style else False,
+    )
+    _style_combine_cache[key] = new_style
+    return new_style
+
+
+_row_composite_cache: dict[tuple, Text] = {}
+_cached_grid_id: int | None = None
+
+
+def composite_menu_text(
+    rendered_text: Text,
+    grid: list[list[tuple[Style, str]]] | None,
+    width: int,
+    height: int,
+    console=None,
+    theme_default_bg=None,
+) -> Text:
+    """Composite half-block background and text cell background colors onto rendered menu lines."""
+    global _cached_grid_id
+    if not grid:
+        return rendered_text
+
+    grid_id = id(grid)
+    if _cached_grid_id != grid_id:
+        _row_composite_cache.clear()
+        _cached_grid_id = grid_id
+
+    if console is None:
+        from rich.console import Console
+
+        console = Console(width=width, height=height)
+
+    lines = rendered_text.split("\n")
+    out = Text()
+    num_lines = len(lines)
+
+    for row_idx, line in enumerate(lines):
+        row_cache = grid[row_idx] if row_idx < len(grid) else None
+        if not row_cache:
+            out.append_text(line)
+            if row_idx < num_lines - 1:
+                out.append("\n")
+            continue
+
+        spans_key = tuple((s.start, s.end, id(s.style)) for s in line._spans)
+        row_key = (row_idx, line.plain, spans_key, id(theme_default_bg))
+        cached_row = _row_composite_cache.get(row_key)
+        if cached_row is not None:
+            out.append_text(cached_row)
+            if row_idx < num_lines - 1:
+                out.append("\n")
+            continue
+
+        row_out = Text()
+        col_idx = 0
+        char_idx = 0
+
+        # Identify multi-space runs (margins, blank rows, filler padding)
+        plain = line.plain
+        is_padding = set()
+        for m in re.finditer(r" {2,}", plain):
+            is_padding.update(range(m.start(), m.end()))
+        if plain.startswith(" "):
+            is_padding.add(0)
+        if plain.endswith(" "):
+            is_padding.add(len(plain) - 1)
+
+        curr_chars: list[str] = []
+        curr_style: Style | None = None
+
+        for seg in line.render(console):
+            text = seg.text
+            style = seg.style
+            is_highlight_bg = (
+                style is not None
+                and style.bgcolor is not None
+                and (theme_default_bg is None or style.bgcolor != theme_default_bg)
+            )
+
+            for ch in text:
+                w_ch = 1 if ord(ch) < 128 else cell_len(ch)
+                if col_idx < len(row_cache):
+                    half_style, bg_color_str = row_cache[col_idx]
+                    if ch == " " and char_idx in is_padding and not is_highlight_bg:
+                        target_ch = "▀"
+                        target_style = half_style
+                    elif is_highlight_bg:
+                        target_ch = ch
+                        target_style = style
+                    else:
+                        target_ch = ch
+                        target_style = get_combined_style(style, bg_color_str)
+                else:
+                    target_ch = ch
+                    target_style = style
+
+                col_idx += max(1, w_ch) if w_ch > 0 else 0
+                char_idx += 1
+
+                if target_style is curr_style:
+                    curr_chars.append(target_ch)
+                else:
+                    if curr_chars:
+                        row_out.append("".join(curr_chars), style=curr_style)
+                    curr_chars = [target_ch]
+                    curr_style = target_style
+
+        if curr_chars:
+            row_out.append("".join(curr_chars), style=curr_style)
+
+        if len(_row_composite_cache) < 512:
+            _row_composite_cache[row_key] = row_out
+
+        out.append_text(row_out)
+        if row_idx < num_lines - 1:
+            out.append("\n")
+
+    return out
 
 
 def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
@@ -1473,34 +1759,46 @@ def load_themes_file(filepath: str | None = None) -> dict:
     """
     Load bashmenu.themes file and parse YAML.
     """
+    global _default_themes_filepath
     import yaml
 
-    if not filepath or not os.path.exists(filepath):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        c1 = os.path.join(base_dir, "bashmenu.themes")
-        c2 = os.path.join(os.getcwd(), "bashmenu.themes")
-        if os.path.exists(c1):
-            filepath = c1
-        elif os.path.exists(c2):
-            filepath = c2
+    target_path = filepath
+    if not target_path:
+        if _default_themes_filepath and os.path.exists(_default_themes_filepath):
+            target_path = _default_themes_filepath
         else:
-            filepath = c1
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            c1 = os.path.join(base_dir, "bashmenu.themes")
+            c2 = os.path.join(os.getcwd(), "bashmenu.themes")
+            if os.path.exists(c1):
+                target_path = c1
+            elif os.path.exists(c2):
+                target_path = c2
+            else:
+                target_path = c1
+            _default_themes_filepath = target_path
 
-    if not os.path.exists(filepath):
+    if not target_path or not os.path.exists(target_path):
         return {}
 
+    now = time.time()
+    last_stat = _themes_last_stat_check.get(target_path, 0.0)
+    cached = _themes_file_cache.get(target_path)
+    if cached is not None and (now - last_stat < 1.0):
+        return cached[1]
+
     try:
-        mtime = os.path.getmtime(filepath)
-        cached = _themes_file_cache.get(filepath)
+        _themes_last_stat_check[target_path] = now
+        mtime = os.path.getmtime(target_path)
         if cached and cached[0] == mtime:
             return cached[1]
 
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(target_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
-            _themes_file_cache[filepath] = (mtime, data)
+            _themes_file_cache[target_path] = (mtime, data)
             return data
     except (yaml.YAMLError, OSError):
-        return {}
+        return cached[1] if cached else {}
 
 
 # ==============================================================================
