@@ -585,6 +585,25 @@ borders never override dividers. Dividers only appear in a menu if declared as
 an option in bashmenu.mnu. Dividers of length \fB{window_width}\fR render
 within standard margins with vertical borders and no tees; dividers of length
 \fB{screen_width}\fR run border to border using left and right tees without margins.
+.SS Wallpaper Backgrounds & TrueColor Compositing (settings.background)
+HA Bash Menu features a TrueColor half-block (\(bu) wallpaper compositing engine that renders graphical background images directly behind menus, options, and status lines using universal ANSI text capabilities.
+Wallpapers can be specified in user settings (\fIsettings.background\fR in bashmenu.yml) or bundled with themes (\fItheme_background\fR in bashmenu.themes).
+Supported settings:
+.TP
+.B enabled
+Boolean master switch enabling or disabling wallpaper compositing.
+.TP
+.B image
+Path to wallpaper image (PNG or JPG format). Supports system placeholders like {bashmenu_dir}.
+.TP
+.B opacity
+Float factor between 0.0 (transparent) and 1.0 (opaque), default 0.35. Lower values blend more theme background tint.
+.TP
+.B scaling
+Image scaling mode: "cover" (maintains aspect ratio, auto-cropping) or "stretch".
+.TP
+.B clustering
+Integer delta threshold between 0 and 128 (default: 64). Controls horizontal pixel run clustering to collapse subtle photo gradient variations into unified terminal spans, eliminating cursor and scrolling latency on heavy photographic wallpapers.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

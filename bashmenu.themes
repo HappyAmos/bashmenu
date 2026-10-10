@@ -1373,7 +1373,7 @@ twilight:
     title_left_cap: "⟦"
     title_right_cap: "⟧"
   256:
-    background: 235
+    background: 233
     title: [153, -1]
     border: [61, -1]
     text: [253, -1]
@@ -1447,10 +1447,11 @@ twilight:
 train_ride:
   indicator: "{nf:*:#f0f0f:}"
   background:
-    image: "assets/wallpapers/big-sable-view.png"
+    image: "assets/wallpapers/mountain-train.png"
     opacity: 0.85
     scaling: "cover"
-    mode: "quarterblock"
+    clustering: 96
+    mode: "halfblock"
   divider:
     char: "─"
     length: "{window_width}"
@@ -1468,18 +1469,18 @@ train_ride:
     title_left_cap: "["
     title_right_cap: "]"
   256:
-    background: -1
+    background: 233
     title: [64, -1]
     border: [58, -1]
     text: [7, -1]
     highlight: [7, 28]
     accent: [58, -1]
-    footer: [58, -1]
+    footer: [136, -1]
     shadow: [233, 233]
-    gutter: [58, -1]
+    gutter: [226, -1]
     selection: [7, 28]
     status_bar: [7, 28]
-    shortcut_key: [58, -1]
+    shortcut_key: [7, -1]
     shortcut_label: [7, -1]
     divider: [58, -1]
     button_primary: [7, 28]

@@ -293,7 +293,10 @@ class TestInactivityTimeout(unittest.TestCase):
                     self.assertEqual(mock_trigger.call_count, 0)
 
                     # 3. Allow timeout to expire
-                    await asyncio.sleep(0.3)
+                    for _ in range(8):
+                        if mock_trigger.call_count >= 1:
+                            break
+                        await asyncio.sleep(0.1)
                     self.assertGreaterEqual(mock_trigger.call_count, 1)
                     mock_subproc.assert_called()
 

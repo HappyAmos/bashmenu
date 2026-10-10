@@ -562,6 +562,22 @@ Textual interface.
       * Before invoking `self.suspend()`, verify `hasattr(self, "_driver") and self._driver and getattr(self._driver, "can_suspend", False)` to support headless pilot testing.
       * Avoid bare `self.screen` queries when screens may be unmounted; wrap lookups with `contextlib.suppress(Exception)` and check `getattr(self, "_screen_stack", None)` to prevent `ScreenStackError`.
       * Always resolve application instances via `app_obj = getattr(self, "_app", None) or getattr(self, "app", None)` before calling `setup_inactivity_timer()`, preventing `NoActiveAppError` in headless test harnesses.
+42. **TrueColor Half-Block Wallpaper Compositing & Pre-Baked Canvas (`settings.background`, `PrebakedWallpaperCanvas`):**
+    - **Architecture & Terminal Standard Invariant:**
+      * Half-block (`▀`) TrueColor compositing blends wallpaper graphics with text using ANSI escape codes. Strictly maintain pure standard terminal text compatibility; **never** introduce Sixel, Kitty Graphics Protocol, or iTerm2 escape dependencies.
+    - **In-Memory Pre-Baked Canvas (`PrebakedWallpaperCanvas`):**
+      * **Sub-Millisecond Assembly Invariant:** Navigation (arrow keys, scrolling, number shortcuts) must assemble frames in under 1 ms without executing dynamic string formatting, regex matching, icon width measurement, or pixel math.
+      * **Pre-Baking Lifecycle:** Pre-bake static borders, margins, divider rules, and plugin placeholder rows on menu load or resize. Pre-bake both unselected (`is_selected=False`) and selected (`is_selected=True`) variants of visible menu options in memory.
+      * **Content Blank Row Integrity:** When warming the canvas, pre-bake static blank rows (`│ ... │`) across all content rows (`3` to `3 + target_blank_rows`). In `assemble_frame()`, fall back to `_static_lines.get(y)` whenever `opt_idx >= num_options` to ensure exact window width and border integrity on menus with few options.
+      * **Gutter Formatting Caching:** Cache rendered gutter lines (`raw_hg_lines`) against `gutter_key` so status and help text formatting only runs when the timestamp second ticks, avoiding redundant Rich text creation during rapid arrow key navigation.
+    - **Differential Line & Status Decoupling:**
+      * `set_current_row()` calculates visible screen row coordinates and issues `self.refresh(Region(0, y_old, w, 1), Region(0, y_new, w, 1))` when scrolling offset is unchanged, cutting terminal stdout bytes from ~36 KB down to ~600 bytes.
+      * Periodic clock and plugin ticks must refresh only the bottom two status lines (`Region(0, max(0, h - 3), w, 2)`), decoupled from main wallpaper redraws.
+    - **Horizontal Span Clustering & Quantization (`clustering`):**
+      * Natural photographic wallpapers contain smooth micro-gradients that cause Rich to emit 24-bit escape codes for every individual cell, saturating the PTY buffer.
+      * Built-in `clustering` (default `64`, range `0`–`128`) clusters adjacent cells with imperceptible color differences into unified Rich style runs.
+      * Wallpapers must be pre-processed without Floyd-Steinberg dithering (`+dither` in ImageMagick, `--nofs` in `pngquant`) to prevent checkerboard stippling from defeating span aggregation.
+
 
 
 ## Documentation Guidelines

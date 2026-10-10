@@ -20,6 +20,7 @@ editor for Linux systems.
   - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
   - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
   - [4.3 Color Themes Specification (`bashmenu.themes`)](#43-color-themes-specification-bashmenuthemes)
+  - [4.4 Wallpaper Backgrounds & Image Preparation](#44-wallpaper-backgrounds--image-preparation)
 - [5. Complete Menu Option Types Reference](#5-complete-menu-option-types-reference)
 - [6. Dynamic Directives & Variables](#6-dynamic-directives--variables)
   - [6.1 Dynamic Input Directives](#61-dynamic-input-directives)
@@ -412,6 +413,112 @@ Divider styling (`char` glyph, `length`, and color) is defined **strictly in the
 - `{window_width}`: Standard shorter divider bounded within window borders and 2-character margins (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/`border_vertical_right`) with 2-character padding on each side, and **without** border tees.
 - `{screen_width}`: Full-width divider running from left border to right border (`w - 2`), overriding all margins. Connects directly to `left_tee` (`border_tee_left`) on the left and `right_tee` (`border_tee_right`) on the right without margin spaces.
 
+### 4.4 Wallpaper Backgrounds & Image Preparation
+
+HA Bash Menu features a TrueColor half-block (`▀`) wallpaper compositing engine that renders graphical background images directly behind menus, options, and status lines.
+
+#### Configuration
+
+Wallpapers can be specified either globally in user settings (`bashmenu.yml`) or bundled with a theme in `bashmenu.themes`:
+
+```yaml
+# In bashmenu.yml (User override):
+settings:
+  background:
+    enabled: true
+    image: "{bashmenu_dir}/assets/wallpapers/twilight.png"
+    opacity: 0.35    # Float between 0.0 (transparent) and 1.0 (opaque)
+    scaling: "cover" # "cover" (crops to fill aspect ratio) or "stretch"
+    clustering: 64   # Integer 0 to 128 (default: 64). Higher values merge subtle color differences
+                     # into solid horizontal spans for maximum terminal scroll responsiveness.
+```
+
+```yaml
+# In bashmenu.themes (Theme-level default):
+twilight:
+  theme_background:
+    image: "{bashmenu_dir}/assets/wallpapers/twilight.png"
+    opacity: 0.35
+    scaling: "cover"
+    clustering: 64
+```
+
+> [!NOTE]
+> If a theme defines a `theme_background`, it displays automatically. Users can disable it or choose their own custom wallpaper at any time by configuring `settings.background` in `bashmenu.yml`.
+
+| Background Setting | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `enabled` | Boolean | `true` | Master switch to enable or disable wallpaper background compositing. |
+| `image` | String | (theme) | Path to wallpaper image (PNG/JPG). Supports `{bashmenu_dir}` and placeholders. |
+| `opacity` | Float | `0.35` | Blending factor ($0.0$ to $1.0$). Lower values blend more theme background tint. |
+| `scaling` | String | `"cover"` | Scaling mode: `"cover"` (aspect ratio fill with auto-crop) or `"stretch"`. |
+| `clustering` | Integer | `64` | Horizontal delta threshold ($0$ to $128$). Controls how aggressively subtle neighboring pixel variations collapse into unified terminal spans. Set to $64$–$96$ for smooth, lag-free scrolling on photos. |
+
+---
+
+#### Image Preparation for Optimal Performance
+
+Terminal emulators render text lines from left to right. When adjacent cells share identical foreground and background colors, Rich combines them into a single string span, emitting only one ANSI escape code for the entire block. When neighboring cells have different colors (common in raw dithered photographs), Rich emits a full 24-bit TrueColor escape sequence for **every single character**, which can flood the terminal PTY buffer and cause scrolling or cursor lag.
+
+BashMenu's engine includes built-in horizontal delta clustering to mitigate this, but preparing your images with proper quantization ensures the fastest, snappiest navigation possible.
+
+##### Recommended Image Types
+
+1. **Flat Vector & Minimalist Art (Fastest — < 3 ms redraws)**
+   - Artworks featuring broad horizontal color bands, vector silhouettes, flat-color anime/landscape art, or clean skies (such as `twilight.png`) yield the fewest Rich segments and provide instantaneous keyboard response.
+
+2. **Photographs & Complex Artwork**
+   - Natural photos containing fine grain or dithering stippling should be pre-processed to remove high-frequency noise and prevent Floyd-Steinberg dither stippling.
+
+##### ImageMagick Recipes
+
+Before using photographs as wallpapers, optimize them using ImageMagick (`convert`):
+
+* **Clean Posterized Photo (Smooth color bands, sharp edges):**
+  ```bash
+  convert input.jpg \
+    -resize 480x360 \
+    -blur 0x1.0 \
+    +dither \
+    -colors 24 \
+    assets/wallpapers/wallpaper.png
+  ```
+  - `-blur 0x1.0`: Merges camera sensor noise and fine gradient steps into uniform color blocks.
+  - `+dither`: **Crucial.** Strictly disables Floyd-Steinberg error-diffusion dithering, preventing checkerboard dot stippling that forces 1-character terminal draw calls.
+  - `-colors 24`: Clamps the palette to broad unified regions that collapse into long horizontal spans.
+
+* **Oil-Painting / Illustrated Aesthetic (Preserves bold silhouettes):**
+  ```bash
+  convert input.jpg \
+    -resize 480x360 \
+    -paint 4 \
+    +dither \
+    -colors 16 \
+    assets/wallpapers/wallpaper.png
+  ```
+  - `-paint 4`: Applies a Kuwahara filter to group gradients into artistic flat regions while preserving primary subject edges.
+
+* **Retro Terminal Pixel-Art Style:**
+  ```bash
+  convert input.jpg \
+    -resize 80x48\! \
+    -blur 0x0.5 \
+    +dither \
+    -colors 16 \
+    -scale 480x360\! \
+    assets/wallpapers/wallpaper.png
+  ```
+  - Directly matches the terminal's native half-block character resolution (80×48), yielding ultra-low Rich span counts and a distinctive retro aesthetic.
+
+##### `pngquant` Recommendations
+
+If using `pngquant` for PNG palette reduction:
+```bash
+# Always pass --nofs to disable Floyd-Steinberg dithering:
+pngquant --nofs 24 --speed 1 --ext -clean.png input.png
+```
+> [!IMPORTANT]
+> Never use default `pngquant` with dithering enabled on terminal wallpapers. Floyd-Steinberg dithering scatters single-pixel dots across gradients, breaking adjacent cell matching and degrading terminal rendering throughput.
 
 ---
 

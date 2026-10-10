@@ -2,11 +2,10 @@
 
 ![](assets/bashmenu.gif)
 
-A lightweight, data-driven Textual TUI (Text User Interface) menu engine
-and settings editor for Linux, configured entirely through modular YAML files.
-
-Extend your shell script experience with widgets, visual file choosers,
-in-process python sub-apps, and self-installing settings templates.
+A data-driven Textual TUI (Text User Interface) menu engine and settings 
+editor for Linux, configured entirely through modular YAML files. 
+Easy to implement your own themes, background images, plug-ins, and 
+customize the status gutter to your tastes.
 
 Contains a few personal scripts as examples.
 
@@ -30,7 +29,7 @@ Contains a few personal scripts as examples.
   modular configuration snippets from templates into shell profiles (e.g.
   `~/.bashrc`), with automatic install, update, and uninstall prompts.
 - **Self-Healing Virtualenv**: The `bashmenu.sh` launcher manages Python virtual
-  environments and dependencies automatically without user friction.
+  environments and dependencies automatically.
 - **Multi-Platform Support**: Features smart environment detection and package
   manager abstraction (pkg, apt, dnf, pacman, brew) ensuring seamless execution
   across standard Linux, Termux, WSL, and macOS.
@@ -59,13 +58,13 @@ Contains a few personal scripts as examples.
 
 | File | Description |
 | :--- | :--- |
-| `bashmenu.1` | Exhaustively comprehensive man page for HA Bash Menu. |
+| `bashmenu.1` | Man page for HA Bash Menu. |
 
 ---
 
 ## ⚡ Quick Start
 
-### Universal One-Line Install (Recommended)
+### One-Line Install (Recommended)
 
 Run the universal installer (supports Debian, Ubuntu, Alpine Linux, Fedora, Arch, FreeBSD, macOS, and Termux):
 
@@ -105,7 +104,7 @@ full YAML schemas:
 | Resource | Description |
 | :--- | :--- |
 | **Complete User Manual** | Refer to the localized **[bashmenu.md](bashmenu.md)** file. |
-| **Unix Man Page** | Execute **`man ./bashmenu.1`** from your terminal to pull up the exhaustively detailed manual page in standard formatting. |
+| **Unix Man Page** | Execute **`man ./bashmenu.1`** from your terminal to pull up the man(ual) page in standard formatting. |
 
 ---
 

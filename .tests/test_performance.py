@@ -131,6 +131,21 @@ class TestPerformanceAndResponsiveness(unittest.TestCase):
         self.assertGreaterEqual(warnings[0][1], 10.0)
         self.assertGreaterEqual(watchdog.max_frame_ms, 10.0)
 
+    def test_dynamic_refresh_interval_detection(self):
+        """Verify _determine_refresh_interval preserves 1.0s for second-precision clocks and 5.0s otherwise."""
+        screen = bashmenu.BashMenuScreen()
+        screen.initial_config = {"settings": {"status_gutter": "User: {user} | {date_time_24}"}}
+        self.assertEqual(screen._determine_refresh_interval(), 1.0)
+
+        screen.initial_config = {"settings": {"status_gutter": "User: {user} | {time_12}"}}
+        self.assertEqual(screen._determine_refresh_interval(), 1.0)
+
+        screen.initial_config = {"settings": {"status_gutter": "User: {user} | {date_time_24_short}"}}
+        self.assertEqual(screen._determine_refresh_interval(), 5.0)
+
+        screen.initial_config = {"settings": {"status_gutter": "User: {user} | Static Info"}}
+        self.assertEqual(screen._determine_refresh_interval(), 5.0)
+
 
 if __name__ == "__main__":
     unittest.main()

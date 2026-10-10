@@ -1368,11 +1368,13 @@ class WallpaperCompositor:
         opacity: float = 0.35,
         scaling: str = "cover",
         base_dir: str | None = None,
+        clustering: int = 64,
     ) -> None:
         self.image_path = str(image_path).strip() if image_path else ""
         self.opacity = max(0.0, min(1.0, float(opacity)))
         self.scaling = scaling or "cover"
         self.base_dir = base_dir or os.getcwd()
+        self.clustering = max(0, int(clustering))
         self._raw_image = None
         self._cached_key = None
         self._cached_grid = None
@@ -1392,7 +1394,13 @@ class WallpaperCompositor:
                 elif os.path.exists(cand2):
                     expanded = cand2
             if os.path.exists(expanded) and os.path.isfile(expanded):
-                self._raw_image = Image.open(expanded).convert("RGB")
+                img = Image.open(expanded).convert("RGB")
+                # Pre-downscale high-res images to a lightweight thumbnail bounding box
+                # to prevent memory pressure and slow Lanczos downsampling on larger wallpapers.
+                max_thumb_w, max_thumb_h = 320, 200
+                if img.width > max_thumb_w or img.height > max_thumb_h:
+                    img.thumbnail((max_thumb_w, max_thumb_h), Image.Resampling.BILINEAR)
+                self._raw_image = img
             else:
                 self._raw_image = None
         except Exception:  # noqa: BLE001
@@ -1405,7 +1413,7 @@ class WallpaperCompositor:
         if not self._raw_image or width <= 0 or height <= 0:
             return None
 
-        cache_key = (width, height, theme_bg_rgb, round(self.opacity, 3), self.scaling)
+        cache_key = (width, height, theme_bg_rgb, round(self.opacity, 3), self.scaling, self.clustering)
         if self._cached_key == cache_key and self._cached_grid is not None:
             return self._cached_grid
 
@@ -1424,9 +1432,9 @@ class WallpaperCompositor:
                 new_h = max(1, int(img.width / target_ratio))
                 top = (img.height - new_h) // 2
                 cropped = img.crop((0, top, img.width, top + new_h))
-            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
+            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.BILINEAR)
         else:
-            resized = img.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
+            resized = img.resize((pixel_w, pixel_h), Image.Resampling.BILINEAR)
 
         pixels = resized.load()
         grid = []
@@ -1434,10 +1442,14 @@ class WallpaperCompositor:
         inv_op = 1.0 - op
         t_r, t_g, t_b = theme_bg_rgb
         style_cache: dict[tuple[int, int, int, int, int, int], tuple[Style, str]] = {}
-        quant = 4
+        quant = 16
+
+        delta_threshold = self.clustering
 
         for r in range(height):
             row_cache = []
+            anchor_cell = None
+            anchor_k = None
             for c in range(width):
                 orig_r1, orig_g1, orig_b1 = pixels[c, r * 2][:3]
                 orig_r2, orig_g2, orig_b2 = pixels[c, r * 2 + 1][:3]
@@ -1451,6 +1463,22 @@ class WallpaperCompositor:
                 b2 = (int(orig_b2 * op + t_b * inv_op) // quant) * quant
 
                 k = (r1, g1, b1, r2, g2, b2)
+
+                # Cluster adjacent cells with imperceptible color differences into the same
+                # style run, preventing excessive Rich Segment fragmentation in terminal output.
+                if anchor_k is not None:
+                    delta = (
+                        abs(k[0] - anchor_k[0])
+                        + abs(k[1] - anchor_k[1])
+                        + abs(k[2] - anchor_k[2])
+                        + abs(k[3] - anchor_k[3])
+                        + abs(k[4] - anchor_k[4])
+                        + abs(k[5] - anchor_k[5])
+                    )
+                    if delta <= delta_threshold:
+                        row_cache.append(anchor_cell)
+                        continue
+
                 cached = style_cache.get(k)
                 if cached is None:
                     avg_r = (r1 + r2) // 2
@@ -1460,6 +1488,9 @@ class WallpaperCompositor:
                     bg_color_str = f"rgb({avg_r},{avg_g},{avg_b})"
                     cached = (half_style, bg_color_str)
                     style_cache[k] = cached
+
+                anchor_cell = cached
+                anchor_k = k
                 row_cache.append(cached)
             grid.append(row_cache)
 
@@ -1491,6 +1522,94 @@ def get_combined_style(style: Style | None, bg_color_str: str) -> Style:
 
 _row_composite_cache: dict[tuple, Text] = {}
 _cached_grid_id: int | None = None
+_compositor_console = None
+
+
+def get_compositor_console(width: int = 250, height: int = 100):
+    """Return a shared Rich Console for compositing text lines to avoid re-creation overhead."""
+    global _compositor_console
+    if _compositor_console is None or _compositor_console.width < width or _compositor_console.height < height:
+        from rich.console import Console
+
+        _compositor_console = Console(
+            width=max(250, width),
+            height=max(100, height),
+            color_system="truecolor",
+            legacy_windows=False,
+        )
+    return _compositor_console
+
+
+def composite_single_row(
+    line: Text,
+    row_cache: list[tuple[Style, str]] | None,
+    console=None,
+    theme_default_bg=None,
+) -> Text:
+    """Composite half-block background and text cell background colors onto a single rendered line."""
+    if not row_cache:
+        return line
+
+    if console is None:
+        console = get_compositor_console(len(row_cache), 1)
+
+    row_out = Text()
+    col_idx = 0
+    char_idx = 0
+
+    plain = line.plain
+    is_padding = set()
+    for m in re.finditer(r" {2,}", plain):
+        is_padding.update(range(m.start(), m.end()))
+    if plain.startswith(" "):
+        is_padding.add(0)
+    if plain.endswith(" "):
+        is_padding.add(len(plain) - 1)
+
+    curr_chars: list[str] = []
+    curr_style: Style | None = None
+
+    for seg in line.render(console):
+        text = seg.text
+        style = seg.style
+        is_highlight_bg = (
+            style is not None
+            and style.bgcolor is not None
+            and (theme_default_bg is None or style.bgcolor != theme_default_bg)
+        )
+
+        for ch in text:
+            w_ch = 1 if ord(ch) < 128 else cell_len(ch)
+            if col_idx < len(row_cache):
+                half_style, bg_color_str = row_cache[col_idx]
+                if ch == " " and char_idx in is_padding and not is_highlight_bg:
+                    target_ch = "▀"
+                    target_style = half_style
+                elif is_highlight_bg:
+                    target_ch = ch
+                    target_style = style
+                else:
+                    target_ch = ch
+                    target_style = get_combined_style(style, bg_color_str)
+            else:
+                target_ch = ch
+                target_style = style
+
+            col_idx += max(1, w_ch) if w_ch > 0 else 0
+            char_idx += 1
+
+            if target_style is curr_style:
+                curr_chars.append(target_ch)
+            else:
+                if curr_chars:
+                    row_out.append("".join(curr_chars), style=curr_style)
+                curr_chars = [target_ch]
+                curr_style = target_style
+
+    if curr_chars:
+        row_out.append("".join(curr_chars), style=curr_style)
+
+    return row_out
 
 
 def composite_menu_text(
@@ -1512,9 +1631,7 @@ def composite_menu_text(
         _cached_grid_id = grid_id
 
     if console is None:
-        from rich.console import Console
-
-        console = Console(width=width, height=height)
+        console = get_compositor_console(width, height)
 
     lines = rendered_text.split("\n")
     out = Text()
@@ -1528,8 +1645,8 @@ def composite_menu_text(
                 out.append("\n")
             continue
 
-        spans_key = tuple((s.start, s.end, id(s.style)) for s in line._spans)
-        row_key = (row_idx, line.plain, spans_key, id(theme_default_bg))
+        spans_key = tuple((s.start, s.end, s.style) for s in line._spans)
+        row_key = (row_idx, line.plain, spans_key, theme_default_bg)
         cached_row = _row_composite_cache.get(row_key)
         if cached_row is not None:
             out.append_text(cached_row)
@@ -1537,62 +1654,9 @@ def composite_menu_text(
                 out.append("\n")
             continue
 
-        row_out = Text()
-        col_idx = 0
-        char_idx = 0
-
-        # Identify multi-space runs (margins, blank rows, filler padding)
-        plain = line.plain
-        is_padding = set()
-        for m in re.finditer(r" {2,}", plain):
-            is_padding.update(range(m.start(), m.end()))
-        if plain.startswith(" "):
-            is_padding.add(0)
-        if plain.endswith(" "):
-            is_padding.add(len(plain) - 1)
-
-        curr_chars: list[str] = []
-        curr_style: Style | None = None
-
-        for seg in line.render(console):
-            text = seg.text
-            style = seg.style
-            is_highlight_bg = (
-                style is not None
-                and style.bgcolor is not None
-                and (theme_default_bg is None or style.bgcolor != theme_default_bg)
-            )
-
-            for ch in text:
-                w_ch = 1 if ord(ch) < 128 else cell_len(ch)
-                if col_idx < len(row_cache):
-                    half_style, bg_color_str = row_cache[col_idx]
-                    if ch == " " and char_idx in is_padding and not is_highlight_bg:
-                        target_ch = "▀"
-                        target_style = half_style
-                    elif is_highlight_bg:
-                        target_ch = ch
-                        target_style = style
-                    else:
-                        target_ch = ch
-                        target_style = get_combined_style(style, bg_color_str)
-                else:
-                    target_ch = ch
-                    target_style = style
-
-                col_idx += max(1, w_ch) if w_ch > 0 else 0
-                char_idx += 1
-
-                if target_style is curr_style:
-                    curr_chars.append(target_ch)
-                else:
-                    if curr_chars:
-                        row_out.append("".join(curr_chars), style=curr_style)
-                    curr_chars = [target_ch]
-                    curr_style = target_style
-
-        if curr_chars:
-            row_out.append("".join(curr_chars), style=curr_style)
+        row_out = composite_single_row(
+            line, row_cache, console=console, theme_default_bg=theme_default_bg
+        )
 
         if len(_row_composite_cache) < 512:
             _row_composite_cache[row_key] = row_out
@@ -1602,6 +1666,180 @@ def composite_menu_text(
             out.append("\n")
 
     return out
+
+
+class PrebakedWallpaperCanvas:
+    """In-memory pre-baked canvas that pre-renders and caches wallpaper rows,
+    static window borders/margins, and menu option rows.
+
+    Eliminates runtime compositing, regex parsing, and string formatting during keyboard
+    navigation, achieving sub-millisecond frame assembly.
+    """
+
+    def __init__(
+        self,
+        compositor: WallpaperCompositor | None = None,
+    ) -> None:
+        self.compositor = compositor
+        self.grid: list[list[tuple[Style, str]]] | None = None
+        self.theme_default_bg = None
+        self.console = None
+
+        self._canvas_key: tuple | None = None
+        self._static_lines: dict[int, Text] = {}
+        self._raw_option_lines: dict[tuple[int, bool], Text] = {}
+        self._option_line_cache: dict[tuple[int, int, bool], Text] = {}
+        self._cached_gutter_key: tuple | None = None
+        self._cached_gutter_lines: list[Text] = []
+
+    def is_valid(self, canvas_key: tuple) -> bool:
+        """Check if the cached canvas matches the current state key."""
+        return self._canvas_key == canvas_key and self._canvas_key is not None
+
+    def invalidate(self) -> None:
+        """Clear all pre-baked lines and cached states."""
+        self._canvas_key = None
+        self._static_lines.clear()
+        self._raw_option_lines.clear()
+        self._option_line_cache.clear()
+        self._cached_gutter_key = None
+        self._cached_gutter_lines.clear()
+
+    def set_grid(
+        self,
+        grid: list[list[tuple[Style, str]]] | None,
+        theme_default_bg=None,
+        console=None,
+    ) -> None:
+        """Set the active wallpaper grid and console for compositing."""
+        self.grid = grid
+        self.theme_default_bg = theme_default_bg
+        self.console = console or get_compositor_console()
+
+    def set_static_line(self, y: int, raw_line: Text) -> None:
+        """Pre-bake and store a static frame line at screen row y."""
+        clean_line = raw_line.copy()
+        if clean_line.plain.endswith("\n"):
+            clean_line.rstrip()
+        row_cache = self.grid[y] if (self.grid and y < len(self.grid)) else None
+        if row_cache:
+            composited = composite_single_row(
+                clean_line,
+                row_cache,
+                console=self.console,
+                theme_default_bg=self.theme_default_bg,
+            )
+        else:
+            composited = clean_line
+        self._static_lines[y] = composited
+
+    def set_raw_option_line(self, opt_idx: int, is_selected: bool, raw_line: Text) -> None:
+        """Store the uncomposited formatted line for an option."""
+        clean_line = raw_line.copy()
+        if clean_line.plain.endswith("\n"):
+            clean_line.rstrip()
+        self._raw_option_lines[(opt_idx, is_selected)] = clean_line
+
+    def prebake_option(self, y: int, opt_idx: int, is_selected: bool) -> Text:
+        """Composite and cache an option row at screen row y."""
+        cached = self._option_line_cache.get((y, opt_idx, is_selected))
+        if cached is not None:
+            return cached
+
+        raw_line = self._raw_option_lines.get((opt_idx, is_selected))
+        if raw_line is None:
+            return Text()
+
+        row_cache = self.grid[y] if (self.grid and y < len(self.grid)) else None
+        if row_cache:
+            composited = composite_single_row(
+                raw_line,
+                row_cache,
+                console=self.console,
+                theme_default_bg=self.theme_default_bg,
+            )
+        else:
+            composited = raw_line
+
+        self._option_line_cache[(y, opt_idx, is_selected)] = composited
+        return composited
+
+    def get_option_line(self, y: int, opt_idx: int, is_selected: bool) -> Text:
+        """Retrieve pre-baked option line from cache, or pre-bake if not cached."""
+        cached = self._option_line_cache.get((y, opt_idx, is_selected))
+        if cached is not None:
+            return cached
+        return self.prebake_option(y, opt_idx, is_selected)
+
+    def get_gutter_lines(
+        self,
+        gutter_key: tuple,
+        gutter_y_start: int,
+        raw_gutter_lines: list[Text],
+    ) -> list[Text]:
+        """Retrieve or composite gutter lines (help text and status badges)."""
+        if self._cached_gutter_key == gutter_key and self._cached_gutter_lines:
+            return self._cached_gutter_lines
+
+        composited_gutters: list[Text] = []
+        for r, line in enumerate(raw_gutter_lines):
+            y = gutter_y_start + r
+            clean_line = line.copy()
+            if clean_line.plain.endswith("\n"):
+                clean_line.rstrip()
+            row_cache = self.grid[y] if (self.grid and y < len(self.grid)) else None
+            if row_cache:
+                c_line = composite_single_row(
+                    clean_line,
+                    row_cache,
+                    console=self.console,
+                    theme_default_bg=self.theme_default_bg,
+                )
+            else:
+                c_line = clean_line
+            composited_gutters.append(c_line)
+
+        self._cached_gutter_key = gutter_key
+        self._cached_gutter_lines = composited_gutters
+        return composited_gutters
+
+    def assemble_frame(
+        self,
+        height: int,
+        scroll_start: int,
+        curr_row: int,
+        visible_option_rows: int,
+        num_options: int,
+        gutter_y_start: int,
+        gutter_lines: list[Text],
+    ) -> Text:
+        """Assemble full screen Text buffer from pre-baked lines."""
+        out = Text()
+        last_y = height - 1
+
+        for y in range(height):
+            if y < 3:
+                line = self._static_lines.get(y)
+            elif 3 <= y < 3 + visible_option_rows:
+                opt_offset = y - 3
+                opt_idx = scroll_start + opt_offset
+                if opt_idx < num_options:
+                    line = self.get_option_line(y, opt_idx, opt_idx == curr_row)
+                else:
+                    line = self._static_lines.get(y)
+            elif gutter_y_start <= y < gutter_y_start + len(gutter_lines):
+                g_idx = y - gutter_y_start
+                line = gutter_lines[g_idx]
+            else:
+                line = self._static_lines.get(y)
+
+            if line is not None:
+                out.append_text(line)
+            if y < last_y:
+                out.append("\n")
+
+        return out
+
 
 
 def apply_modal_theme(screen: ModalScreen, theme=None) -> None:

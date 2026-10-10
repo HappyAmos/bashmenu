@@ -209,6 +209,8 @@ def validate_theme_background_section(bg_data: Any, path: str) -> list[str]:
             errors.append(f"'{path}.opacity' must be a number, got {type(bg_data['opacity']).__name__}.")
         if "scaling" in bg_data and not isinstance(bg_data["scaling"], str):
             errors.append(f"'{path}.scaling' must be a string, got {type(bg_data['scaling']).__name__}.")
+        if "clustering" in bg_data and not isinstance(bg_data["clustering"], int):
+            errors.append(f"'{path}.clustering' must be an integer, got {type(bg_data['clustering']).__name__}.")
         if "mode" in bg_data and not isinstance(bg_data["mode"], str):
             errors.append(f"'{path}.mode' must be a string, got {type(bg_data['mode']).__name__}.")
         if "enabled" in bg_data and not isinstance(bg_data["enabled"], bool):
@@ -401,6 +403,10 @@ def validate_config_file(filepath: str) -> bool:
                 if "scaling" in bg and not isinstance(bg["scaling"], str):
                     errors.append(
                         f"'settings.background.scaling' must be a string, got {type(bg['scaling']).__name__}."
+                    )
+                if "clustering" in bg and not isinstance(bg["clustering"], int):
+                    errors.append(
+                        f"'settings.background.clustering' must be an integer, got {type(bg['clustering']).__name__}."
                     )
 
     if "user" in data and not isinstance(data["user"], dict):

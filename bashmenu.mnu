@@ -291,7 +291,7 @@ items:
       alt_buffer: true
   - Internet:
       type: submenu
-      icon: '{nf::#f059f}'
+      icon: '{nf::#f059f:}'
       submenu:
         title: Internet Options
         items:
@@ -329,6 +329,9 @@ items:
               type: back
               icon: '{nf::#f048}'
           - '{divider}':
+      interactive: true
+      quiet: false
+      alt_buffer: true
   - Network Utilities:
       icon: '{nf::#ef09:}'
       submenu:
@@ -464,13 +467,14 @@ items:
                       title: Toggle Auto Update
                       message: Enable automatic updates?
                       icon: '{nf::#ea77}'
-                  - Toggle Background Enabled [{settings.background.enabled}]:
+                  - Enable Backgrounds [{settings.background.enabled}]:
                       type: toggle
                       key: '{settings.background.enabled}'
-                      prompt: 'Enable backgrounds? :'
+                      prompt: Enable backgrounds?
                       interactive: true
                       quiet: false
                       alt_buffer: true
+                      icon: '{nf::#f0e09}'
                   - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                       type: toggle
                       key: settings.use_nerd_fonts

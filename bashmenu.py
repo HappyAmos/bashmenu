@@ -34,6 +34,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.events import Key
+from textual.geometry import Region
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Static
@@ -723,16 +724,16 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{window_width}": str(win_w),
         "{screen_width}": str(scr_w),
         "{window_height}": str(win_h),
-        "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p"),
-        "{date_time_12_short}": now.strftime("%Y-%m-%d %I:%M %p"),
-        "{date_time_24}": now.strftime("%Y-%m-%d %H:%M:%S"),
-        "{date_time_24_short}": now.strftime("%Y-%m-%d %H:%M"),
-        "{date}": now.strftime("%Y-%m-%d"),
-        "{time_12}": now.strftime("%I:%M:%S %p"),
-        "{time_12_short}": now.strftime("%I:%M %p"),
-        "{time_24}": now.strftime("%H:%M:%S"),
-        "{time_24_short}": now.strftime("%H:%M"),
-        "{utc_seconds}": str(int(now.timestamp())),
+        "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p") if "{date_time_12}" in res_text else "",
+        "{date_time_12_short}": now.strftime("%Y-%m-%d %I:%M %p") if "{date_time_12_short}" in res_text else "",
+        "{date_time_24}": now.strftime("%Y-%m-%d %H:%M:%S") if "{date_time_24}" in res_text else "",
+        "{date_time_24_short}": now.strftime("%Y-%m-%d %H:%M") if "{date_time_24_short}" in res_text else "",
+        "{date}": now.strftime("%Y-%m-%d") if "{date}" in res_text else "",
+        "{time_12}": now.strftime("%I:%M:%S %p") if "{time_12}" in res_text else "",
+        "{time_12_short}": now.strftime("%I:%M %p") if "{time_12_short}" in res_text else "",
+        "{time_24}": now.strftime("%H:%M:%S") if "{time_24}" in res_text else "",
+        "{time_24_short}": now.strftime("%H:%M") if "{time_24_short}" in res_text else "",
+        "{utc_seconds}": str(int(now.timestamp())) if "{utc_seconds}" in res_text else "",
         "{user-mode}": "Root" if os.geteuid() == 0 else "User",
         "{version}": __version__,
         "{localip}": get_primary_ip() if "{localip}" in res_text else PRIMARY_IP,
@@ -1703,6 +1704,7 @@ class MainMenuView(Widget):
         self.selected_rows = [0]
         self.show_shortcuts = True
         self.can_focus = True
+        self._canvas = bashmenu_ui.PrebakedWallpaperCanvas()
 
     def current_menu(self) -> dict:
         return self.menu_stack[-1]
@@ -1712,9 +1714,35 @@ class MainMenuView(Widget):
 
     def set_current_row(self, row: int) -> None:
         opts = self.current_menu().get("items", self.current_menu().get("options", []))
-        if opts:
-            self.selected_rows[-1] = max(0, min(row, len(opts) - 1))
-            self.refresh()
+        if not opts:
+            return
+        old_row = self.selected_rows[-1]
+        new_row = max(0, min(row, len(opts) - 1))
+        if old_row == new_row:
+            return
+
+        self.selected_rows[-1] = new_row
+
+        # Check if the scroll offset changes between old_row and new_row
+        visible_rows = getattr(self, "visible_option_rows", None)
+        w = max(40, self.size.width or 80)
+        h = max(10, self.size.height or 24)
+
+        if visible_rows and visible_rows > 0:
+            old_scroll = 0 if old_row < visible_rows else old_row - visible_rows + 1
+            new_scroll = 0 if new_row < visible_rows else new_row - visible_rows + 1
+            if old_scroll == new_scroll:
+                # Menu option indices map directly to terminal line rows:
+                # Row 0: Top frame border, Rows 1-2: Top margins, Row 3+: Options
+                y_old = 3 + (old_row - old_scroll)
+                y_new = 3 + (new_row - new_scroll)
+                if 0 <= y_old < h and 0 <= y_new < h:
+                    r_old = Region(0, y_old, w, 1)
+                    r_new = Region(0, y_new, w, 1)
+                    self.refresh(r_old, r_new)
+                    return
+
+        self.refresh()
 
     def get_plugin_lines_and_limits(self, total_content_rows: int) -> tuple[list[str], int, int]:
         """The `get_plugin_lines_and_limits` method returns the capped plugin
@@ -1722,6 +1750,11 @@ class MainMenuView(Widget):
         """
         w = max(40, self.size.width or 80)
         avail_w = max(20, w - 6)
+        cache_key = (total_content_rows, avail_w, len(_plugin_display_cache))
+        cached = getattr(self, "_cached_plugin_limits", None)
+        if cached and cached[0] == cache_key:
+            return cached[1], cached[2], cached[3]
+
         raw_plugin_lines = get_plugin_display_lines(self.config, width=avail_w)
         has_top_div, _ = get_plugin_divider_config(self.config)
         top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
@@ -1730,6 +1763,7 @@ class MainMenuView(Widget):
             raw_plugin_lines = raw_plugin_lines[:max_plugin_rows] if max_plugin_rows > 0 else []
         separator_rows = 1 if len(raw_plugin_lines) > 0 else 0
         visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines) - separator_rows - top_div_rows)
+        self._cached_plugin_limits = (cache_key, raw_plugin_lines, separator_rows, visible_option_rows)
         return raw_plugin_lines, separator_rows, visible_option_rows
 
     def render(self) -> Text:
@@ -1749,12 +1783,10 @@ class MainMenuView(Widget):
     def _render_menu_buffer(self) -> Text:
         """Constructs top/bottom window borders, menu titles, options with fixed 4-column
         icon slots and column 11 label alignment, shortcut badges, divider rules,
-        and bottom status/help gutter. Enforces strict boundary padding and truncation
-        to prevent terminal border overflow.
+        and bottom status/help gutter using an in-memory pre-baked canvas for sub-millisecond assembly.
         """
         w = max(40, self.size.width or 80)
         h = max(10, self.size.height or 24)
-        out = Text()
 
         curr_menu = self.current_menu()
         curr_row = self.current_row()
@@ -1768,236 +1800,246 @@ class MainMenuView(Widget):
                 self.app.theme_styles = theme_styles
             if hasattr(self, "screen") and self.screen:
                 self.screen.theme_styles = theme_styles
-        indicator_symbol = resolve_glyph(theme_styles.get("indicator", ">"), self.config)
+
+        # 1. Resolve wallpaper background configuration
+        bg_cfg = get_config_value(self.config, "settings.background", None)
+        user_bg = bg_cfg if isinstance(bg_cfg, dict) else {}
+        theme_bg_raw = theme_styles.get("theme_background") or theme_styles.get("wallpaper")
+        theme_bg_dict = {}
+        if isinstance(theme_bg_raw, dict):
+            theme_bg_dict = theme_bg_raw
+        elif isinstance(theme_bg_raw, str):
+            theme_bg_dict = {"image": theme_bg_raw}
+
+        user_has_bg = user_bg.get("enabled", False) or bool(user_bg.get("image"))
+        theme_has_bg = bool(theme_bg_dict.get("image"))
+        user_disabled = user_bg.get("enabled") is False
+
+        img_spec = None
+        opacity = 0.35
+        scaling = "cover"
+        clustering = 64
+        has_bg = False
+
+        if not user_disabled and (user_has_bg or theme_has_bg):
+            img_spec = user_bg.get("image") or theme_bg_dict.get("image")
+            if img_spec:
+                opacity = user_bg.get("opacity") if "opacity" in user_bg else theme_bg_dict.get("opacity", 0.35)
+                scaling = user_bg.get("scaling") or theme_bg_dict.get("scaling", "cover")
+                clustering = user_bg.get("clustering") if "clustering" in user_bg else theme_bg_dict.get("clustering", 64)
+                has_bg = True
+
+        img_path = interpolate_placeholders(str(img_spec).strip(), self.config) if (img_spec and has_bg) else ""
+        if has_bg and not img_path:
+            has_bg = False
+
+        # Status and help gutters wrapping (cached per second/width to avoid re-evaluating during rapid navigation)
+        avail_w = max(20, w - 6)
+        screen_div_w = max(20, w - 2)
+        max_gutter_w = max(5, avail_w // 2)
+
+        now_sec = int(time.time())
+        gutter_key = (now_sec, max_gutter_w, avail_w, self.show_shortcuts)
+        cached_gutters = getattr(self, "_cached_gutters", None)
+        if cached_gutters and cached_gutters[0] == gutter_key:
+            help_lines, status_lines = cached_gutters[1], cached_gutters[2]
+        else:
+            if self.show_shortcuts:
+                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
+            else:
+                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
+            raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
+            help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config)
+
+            status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
+            raw_badges = split_gutter_badges(status_gutter_raw)
+            init_extra_vars = {"window_width": avail_w, "screen_width": screen_div_w}
+            all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars).strip() for b in raw_badges if b.strip()]
+            all_badges = [b for b in all_badges if b]
+            status_lines = wrap_gutter_items(all_badges, max_gutter_w, max_lines=2, config=self.config, bottom_up=True)
+            self._cached_gutters = (gutter_key, help_lines, status_lines)
+
+        gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))
+        gutter_y_start = h - 1 - gutter_rows
+
+        total_content_rows = max(1, h - 4 - gutter_rows)
+        self.total_content_rows = total_content_rows
+        raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
+        self.visible_option_rows = visible_option_rows
+
+        canvas = getattr(self, "_canvas", None)
+        if canvas is None:
+            canvas = bashmenu_ui.PrebakedWallpaperCanvas()
+            self._canvas = canvas
+
+        canvas_key = (
+            w,
+            h,
+            id(curr_menu),
+            len(options),
+            theme_name,
+            self.show_shortcuts,
+            has_bg,
+            img_path,
+            round(opacity, 3),
+            scaling,
+            clustering,
+            tuple(raw_plugin_lines),
+            separator_rows,
+            gutter_rows,
+        )
+
+        if not canvas.is_valid(canvas_key):
+            self._build_canvas(
+                canvas,
+                canvas_key,
+                w,
+                h,
+                curr_menu,
+                options,
+                theme_name,
+                theme_styles,
+                has_bg,
+                img_path,
+                opacity,
+                scaling,
+                clustering,
+                avail_w,
+                screen_div_w,
+                visible_option_rows,
+                total_content_rows,
+                raw_plugin_lines,
+                separator_rows,
+            )
+
+        scroll_start = 0
+        if curr_row >= visible_option_rows:
+            scroll_start = curr_row - visible_option_rows + 1
+
+        cached_hg = getattr(self, "_cached_raw_hg_lines", None)
+        if cached_hg and cached_hg[0] == gutter_key:
+            raw_hg_lines = cached_hg[1]
+        else:
+            raw_hg_lines = self._render_raw_gutter_lines(
+                help_lines, status_lines, gutter_rows, avail_w, theme_styles
+            )
+            self._cached_raw_hg_lines = (gutter_key, raw_hg_lines)
+
+        gutter_lines = canvas.get_gutter_lines(
+            (gutter_key, id(theme_styles)),
+            gutter_y_start,
+            raw_hg_lines,
+        )
+
+        return canvas.assemble_frame(
+            h,
+            scroll_start,
+            curr_row,
+            visible_option_rows,
+            len(options),
+            gutter_y_start,
+            gutter_lines,
+        )
+
+    def _build_canvas(
+        self,
+        canvas: bashmenu_ui.PrebakedWallpaperCanvas,
+        canvas_key: tuple,
+        w: int,
+        h: int,
+        curr_menu: dict,
+        options: list,
+        theme_name: str,
+        theme_styles: dict,
+        has_bg: bool,
+        img_path: str,
+        opacity: float,
+        scaling: str,
+        clustering: int,
+        avail_w: int,
+        screen_div_w: int,
+        visible_option_rows: int,
+        total_content_rows: int,
+        raw_plugin_lines: list,
+        separator_rows: int,
+    ) -> None:
+        """Pre-bake static frame borders, margins, options, and plugin rows onto the canvas."""
+        grid = None
+        if has_bg and img_path:
+            compositor = getattr(self, "_wallpaper_compositor", None)
+            if compositor is None or getattr(compositor, "image_path", None) != img_path:
+                compositor = bashmenu_ui.WallpaperCompositor(
+                    img_path,
+                    opacity=opacity,
+                    scaling=scaling,
+                    base_dir=BASHMENU_DIR,
+                    clustering=clustering,
+                )
+                self._wallpaper_compositor = compositor
+            else:
+                compositor.opacity = opacity
+                compositor.scaling = scaling
+                compositor.clustering = clustering
+
+            theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(theme_styles)
+            grid = compositor.get_grid(w, h, theme_bg_rgb)
+
+        theme_bg_style = theme_styles.get("background")
+        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
+        canvas.invalidate()
+        canvas.set_grid(grid, theme_default_bg=theme_default_bg)
+
+        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
         border_style = theme_styles.get("border", Style(color="blue"))
         title_style = theme_styles.get("title", Style(color="magenta", bold=True))
-        highlight_style = theme_styles.get("highlight", Style(color="white", bgcolor="magenta", bold=True))
-        text_style = theme_styles.get("text", Style(color="white"))
-        shortcut_key_style = theme_styles.get("shortcut_key", Style(color="magenta", bold=True))
-        gutter_style = theme_styles.get("gutter", Style(color="cyan", bold=True))
-        help_text_style = theme_styles.get("help_text", Style(color="cyan"))
-
-        # Window borders resolved from theme
-        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
-        b_h_top = borders.get("border_horizontal_top", borders.get("border_horizontal", "─"))
-        b_h_bot = borders.get("border_horizontal_bottom", borders.get("border_horizontal", "─"))
-        b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
-        b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
+        cap_style = theme_styles.get("title_cap") or theme_styles.get("title") or title_style
         b_tl = borders.get("border_top_left", "┌")
         b_tr = borders.get("border_top_right", "┐")
         b_bl = borders.get("border_bottom_left", "└")
         b_br = borders.get("border_bottom_right", "┘")
+        b_h_top = borders.get("border_horizontal_top", borders.get("border_horizontal", "─"))
+        b_h_bot = borders.get("border_horizontal_bottom", borders.get("border_horizontal", "─"))
+        b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
+        b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
         b_tee_l = borders.get("left_tee") or borders.get("border_tee_left") or b_v_left
         b_tee_r = borders.get("right_tee") or borders.get("border_tee_right") or b_v_right
         title_l_cap = borders.get("title_left_cap", " ") or " "
         title_r_cap = borders.get("title_right_cap", " ") or " "
 
-        div_cfg = get_effective_divider_config(self.config)
-        length_val = div_cfg.get("length", "{window_width}")
-        if isinstance(length_val, dict):
-            is_screen = any("screen_width" in str(k) for k in length_val)
-        else:
-            is_screen = "screen_width" in str(length_val)
-
-        # 1. Printable dimensions (2-character margins on left and right inside border)
-        avail_w = max(20, w - 6)
-        screen_div_w = max(20, w - 2)
-        max_gutter_w = max(5, avail_w // 2)
-
-        # Status and help gutters wrapping (max 50% screen width, max 2 lines)
-        if self.show_shortcuts:
-            full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
-        else:
-            full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
-        raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
-        help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config)
-
-        status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
-        raw_badges = split_gutter_badges(status_gutter_raw)
-        init_extra_vars = {"window_width": avail_w, "screen_width": screen_div_w}
-        all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars).strip() for b in raw_badges if b.strip()]
-        all_badges = [b for b in all_badges if b]
-        status_lines = wrap_gutter_items(all_badges, max_gutter_w, max_lines=2, config=self.config, bottom_up=True)
-
-        gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))
-
-        # Content rows available for menu options & plugins (excludes top border, 2-row top margin, gutter rows, and bottom border)
-        total_content_rows = max(1, h - 4 - gutter_rows)
-        self.total_content_rows = total_content_rows
-
-        # 2. Plugin lines and row allocation
-        raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
-        self.visible_option_rows = visible_option_rows
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
 
-        # 3. Header border line: ┌──[ Title ]──┐
+        # 1. Header border line: ┌──[ Title ]──┐
         title_raw = interpolate_placeholders(curr_menu.get("title", "HA Bash Menu"), self.config, extra_vars=extra_vars)
         title_body = f" {title_raw} "
         title_full = f"{title_l_cap}{title_body}{title_r_cap}"
         title_len = get_visible_len(title_full, self.config)
-
         left_b = max(2, (w - title_len) // 2)
         right_b = max(2, w - left_b - title_len)
-
-        cap_style = theme_styles.get("title_cap") or theme_styles.get("title") or title_style
 
         top_bar = Text(b_tl + b_h_top * max(0, left_b - 1), style=border_style)
         top_bar.append(title_l_cap, style=cap_style)
         top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_body, default_style=title_style, theme=theme_styles))
         top_bar.append(title_r_cap, style=cap_style)
-        top_bar.append(b_h_top * max(0, right_b - 1) + b_tr + "\n", style=border_style)
-        out.append_text(top_bar)
+        top_bar.append(b_h_top * max(0, right_b - 1) + b_tr, style=border_style)
+        canvas.set_static_line(0, top_bar)
 
-        # Top Margin Rows (2 blank lines below top border per .gemini specification)
-        out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
-        out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
+        # 2. Margins (Lines 1, 2)
+        canvas.set_static_line(1, Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}", style=border_style))
+        canvas.set_static_line(2, Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}", style=border_style))
 
-        # 4. Scroll position calculation
-        scroll_start = 0
-        if curr_row >= visible_option_rows:
-            scroll_start = curr_row - visible_option_rows + 1
-
-        shortcut_chars = "123456789abcdefghijklmnopqrstuvwxyz"
-        shortcut_map = {}
-        sc_idx = 0
-        for idx, opt in enumerate(options):
-            if not is_divider(opt) and sc_idx < len(shortcut_chars):
-                shortcut_map[idx] = shortcut_chars[sc_idx]
-                sc_idx += 1
-
-        rendered_content_rows = 0
-
-        # 5. Render visible menu options
-        for i in range(visible_option_rows):
-            idx = scroll_start + i
-            if idx >= len(options):
-                break
-
-            opt = options[idx]
-            is_selected = (idx == curr_row)
-            item_style = highlight_style if is_selected else text_style
-
-            if is_divider(opt):
-                item_div_conf = get_effective_divider_config(self.config)
-
-                length_val = item_div_conf.get("length", "{window_width}")
-                if isinstance(length_val, dict):
-                    is_screen = any("screen_width" in str(k) for k in length_val)
-                else:
-                    is_screen = "screen_width" in str(length_val)
-
-                if is_screen:
-                    div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars)
-                    div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
-                    line_rich = Text(f"{b_tee_l}", style=border_style)
-                    line_rich.append_text(div_rich)
-                    used_w = get_visible_len(div_str, self.config)
-                    fill_w = max(0, screen_div_w - used_w)
-                    if fill_w > 0:
-                        line_rich.append(" " * fill_w)
-                    line_rich.append(f"{b_tee_r}\n", style=border_style)
-                    out.append_text(line_rich)
-                else:
-                    target_div_w = avail_w
-                    if str(length_val).isdigit():
-                        target_div_w = min(avail_w, int(length_val))
-                    div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars)
-                    div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
-                    line_rich = Text(f"{b_v_left}  ", style=border_style)
-                    line_rich.append_text(div_rich)
-                    used_w = get_visible_len(div_str, self.config)
-                    fill_w = max(0, avail_w - used_w)
-                    if fill_w > 0:
-                        line_rich.append(" " * fill_w)
-                    line_rich.append(f"  {b_v_right}\n", style=border_style)
-                    out.append_text(line_rich)
-
-                rendered_content_rows += 1
-                continue
-
-            line_rich = Text(f"{b_v_left}  ", style=border_style)
-
-            ind_str = f"{indicator_symbol} " if is_selected else "  "
-            ind_w = get_display_width(ind_str, self.config)
-
-            sc_char = shortcut_map.get(idx, "")
-            sc_str = f"[{sc_char}] " if (self.show_shortcuts and sc_char) else "    "
-            sc_w = get_display_width(sc_str, self.config)
-
-            icon_raw = opt.get("icon") or opt.get("glyph") or ""
-            icon_resolved = resolve_glyph(interpolate_placeholders(icon_raw, self.config, extra_vars=extra_vars), self.config) if icon_raw else ""
-            if icon_resolved:
-                clean_icon = icon_resolved.replace("\ufe0f", "").replace("\ufe0e", "")
-                vis_w = get_display_width(clean_icon, self.config)
-                pad_w = max(1, 4 - vis_w)
-                icon_str = f"{clean_icon}{' ' * pad_w}"
-                icon_w = vis_w + pad_w
-            else:
-                icon_str = "    "
-                icon_w = 4
-
-            raw_label = interpolate_placeholders(opt.get("label") or opt.get("title") or "", self.config, extra_vars=extra_vars)
-            if opt.get("set_theme") == self.config.get("theme"):
-                raw_label += " (Active)"
-
-            left_label, right_bracket = split_label_brackets(raw_label)
-
-            prefix_w = ind_w + sc_w + icon_w
-            right_w = get_visible_len(right_bracket, self.config) if right_bracket else 0
-            label_avail_w = max(5, avail_w - prefix_w - (right_w + 1 if right_w else 0))
-
-            row_content = Text(ind_str, style=item_style)
-            if self.show_shortcuts and sc_char:
-                row_content.append(f"[{sc_char}] ", style=shortcut_key_style if not is_selected else item_style)
-            else:
-                row_content.append("    ", style=item_style)
-
-            row_content.append(icon_str, style=item_style)
-
-            lbl_truncated = left_label
-            if get_visible_len(left_label, self.config) > label_avail_w:
-                low, high = 1, len(left_label)
-                best = 1
-                while low <= high:
-                    mid = (low + high) // 2
-                    if get_visible_len(left_label[:mid], self.config) <= label_avail_w:
-                        best = mid
-                        low = mid + 1
-                    else:
-                        high = mid - 1
-                lbl_truncated = left_label[:best]
-
-            lbl_rich = bashmenu_ui.formatting_to_rich_text(lbl_truncated, default_style=item_style, theme=theme_styles)
-            row_content.append_text(lbl_rich)
-
-            rendered_lbl_w = get_visible_len(lbl_truncated, self.config)
-            spaces_w = max(0, avail_w - prefix_w - rendered_lbl_w - right_w)
-            row_content.append(" " * spaces_w, style=item_style)
-
-            if right_bracket:
-                rb_rich = bashmenu_ui.formatting_to_rich_text(right_bracket, default_style=item_style, theme=theme_styles)
-                row_content.append_text(rb_rich)
-
-            if row_content.cell_len > avail_w:
-                row_content.truncate(avail_w)
-            pad_w = max(0, avail_w - row_content.cell_len)
-            if pad_w > 0:
-                row_content.append(" " * pad_w, style=item_style)
-
-            line_rich.append_text(row_content)
-            line_rich.append(f"  {b_v_right}\n", style=border_style)
-            out.append_text(line_rich)
-            rendered_content_rows += 1
-
-        # 6. Pad blank rows between menu options and plugins
+        # 3. Static lines between options and plugins
         has_top_div, top_div_is_screen = get_plugin_divider_config(self.config)
         top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
         target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows - top_div_rows
-        while rendered_content_rows < target_blank_rows:
-            out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
-            rendered_content_rows += 1
 
-        # 6.5 Divider row above plugins when configured
+        div_cfg = get_effective_divider_config(self.config)
+        length_val = div_cfg.get("length", "{window_width}")
+        is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
+
+        for y in range(3, 3 + target_blank_rows):
+            canvas.set_static_line(y, Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}", style=border_style))
+
+        curr_y = 3 + target_blank_rows
         if top_div_rows > 0:
             if top_div_is_screen:
                 div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars)
@@ -2008,8 +2050,8 @@ class MainMenuView(Widget):
                 fill_w = max(0, screen_div_w - used_w)
                 if fill_w > 0:
                     line_rich.append(" " * fill_w)
-                line_rich.append(f"{b_tee_r}\n", style=border_style)
-                out.append_text(line_rich)
+                line_rich.append(f"{b_tee_r}", style=border_style)
+                canvas.set_static_line(curr_y, line_rich)
             else:
                 target_div_w = avail_w
                 if str(length_val).isdigit():
@@ -2022,11 +2064,10 @@ class MainMenuView(Widget):
                 fill_w = max(0, avail_w - used_w)
                 if fill_w > 0:
                     line_rich.append(" " * fill_w)
-                line_rich.append(f"  {b_v_right}\n", style=border_style)
-                out.append_text(line_rich)
-            rendered_content_rows += 1
+                line_rich.append(f"  {b_v_right}", style=border_style)
+                canvas.set_static_line(curr_y, line_rich)
+            curr_y += 1
 
-        # 7. Rows reserved for the PluginBuffer widget overlay
         for p_line in raw_plugin_lines:
             clean_line = (
                 p_line.replace("\x00", "")
@@ -2036,18 +2077,66 @@ class MainMenuView(Widget):
             )
             is_div_line = any(tok in clean_line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
             if is_screen and is_div_line:
-                out.append_text(Text(f"{b_tee_l}" + " " * screen_div_w + f"{b_tee_r}\n", style=border_style))
+                canvas.set_static_line(curr_y, Text(f"{b_tee_l}" + " " * screen_div_w + f"{b_tee_r}", style=border_style))
             else:
-                out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
-            rendered_content_rows += 1
+                canvas.set_static_line(curr_y, Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}", style=border_style))
+            curr_y += 1
 
-        # 8. Blank separation row above Help Keys & Status Gutter (when plugins are active)
         if separator_rows > 0:
-            out.append_text(Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}\n", style=border_style))
-            rendered_content_rows += 1
+            canvas.set_static_line(curr_y, Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}", style=border_style))
+            curr_y += 1
 
-        # 9. Help Keys & Status Gutter Rows (up to 2 rows)
+        # Bottom border at h - 1
+        bot_bar = Text(b_bl + b_h_bot * max(0, w - 2) + b_br, style=border_style)
+        canvas.set_static_line(h - 1, bot_bar)
+
+        # 4. Pre-bake options
+        shortcut_chars = "123456789abcdefghijklmnopqrstuvwxyz"
+        shortcut_map = {}
+        sc_idx = 0
+        for idx, opt in enumerate(options):
+            if not is_divider(opt) and sc_idx < len(shortcut_chars):
+                shortcut_map[idx] = shortcut_chars[sc_idx]
+                sc_idx += 1
+
+        indicator_symbol = resolve_glyph(theme_styles.get("indicator", ">"), self.config)
+        for idx, opt in enumerate(options):
+            sc_char = shortcut_map.get(idx, "")
+            line_unsel = self._render_raw_option_line(
+                idx, opt, False, sc_char, avail_w, screen_div_w, extra_vars, theme_styles, borders, div_cfg, is_screen, indicator_symbol
+            )
+            canvas.set_raw_option_line(idx, False, line_unsel)
+            line_sel = self._render_raw_option_line(
+                idx, opt, True, sc_char, avail_w, screen_div_w, extra_vars, theme_styles, borders, div_cfg, is_screen, indicator_symbol
+            )
+            canvas.set_raw_option_line(idx, True, line_sel)
+
+        # 5. Pre-warm visible slots
+        for i in range(min(visible_option_rows, len(options))):
+            y = 3 + i
+            canvas.prebake_option(y, i, False)
+            canvas.prebake_option(y, i, True)
+
+        canvas._canvas_key = canvas_key
+
+    def _render_raw_gutter_lines(
+        self,
+        help_lines: list[str],
+        status_lines: list[str],
+        gutter_rows: int,
+        avail_w: int,
+        theme_styles: dict,
+    ) -> list[Text]:
+        theme_name = self.config.get("theme", "dracula")
+        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
+        b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
+        b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
+        border_style = theme_styles.get("border", Style(color="blue"))
+        gutter_style = theme_styles.get("gutter", Style(color="cyan", bold=True))
+        help_text_style = theme_styles.get("help_text", Style(color="cyan"))
+
         status_offset = gutter_rows - len(status_lines)
+        raw_lines = []
         for r in range(gutter_rows):
             h_text = help_lines[r] if r < len(help_lines) else ""
             s_idx = r - status_offset
@@ -2072,18 +2161,145 @@ class MainMenuView(Widget):
 
             hg_line = Text(f"{b_v_left}  ", style=border_style)
             hg_line.append_text(hg_content)
-            hg_line.append(f"  {b_v_right}\n", style=border_style)
-            out.append_text(hg_line)
+            hg_line.append(f"  {b_v_right}", style=border_style)
+            raw_lines.append(hg_line)
+        return raw_lines
 
-        # 10. Bottom Border Row (h - 1): └────────...────────┘
-        bot_bar = Text(b_bl + b_h_bot * max(0, w - 2) + b_br, style=border_style)
-        out.append_text(bot_bar)
+    def _render_raw_option_line(
+        self,
+        idx: int,
+        opt: dict,
+        is_selected: bool,
+        shortcut_char: str,
+        avail_w: int,
+        screen_div_w: int,
+        extra_vars: dict,
+        theme_styles: dict,
+        borders: dict,
+        div_cfg: dict,
+        is_screen: bool,
+        indicator_symbol: str,
+    ) -> Text:
+        border_style = theme_styles.get("border", Style(color="blue"))
+        highlight_style = theme_styles.get("highlight", Style(color="white", bgcolor="magenta", bold=True))
+        text_style = theme_styles.get("text", Style(color="white"))
+        shortcut_key_style = theme_styles.get("shortcut_key", Style(color="magenta", bold=True))
 
-        # 11. Composite half-block background wallpaper if enabled in settings or specified in theme
-        bg_cfg = get_config_value(self.config, "settings.background", None)
-        out = self._apply_wallpaper_background(out, w, h, theme_styles, bg_cfg)
+        b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
+        b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
+        b_tee_l = borders.get("left_tee") or borders.get("border_tee_left") or b_v_left
+        b_tee_r = borders.get("right_tee") or borders.get("border_tee_right") or b_v_right
 
-        return out
+        item_style = highlight_style if is_selected else text_style
+
+        if is_divider(opt):
+            item_div_conf = get_effective_divider_config(self.config)
+            length_val = item_div_conf.get("length", "{window_width}")
+            item_is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
+
+            if item_is_screen:
+                div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars)
+                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                line_rich = Text(f"{b_tee_l}", style=border_style)
+                line_rich.append_text(div_rich)
+                used_w = get_visible_len(div_str, self.config)
+                fill_w = max(0, screen_div_w - used_w)
+                if fill_w > 0:
+                    line_rich.append(" " * fill_w)
+                line_rich.append(f"{b_tee_r}", style=border_style)
+            else:
+                target_div_w = avail_w
+                if str(length_val).isdigit():
+                    target_div_w = min(avail_w, int(length_val))
+                div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars)
+                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                line_rich = Text(f"{b_v_left}  ", style=border_style)
+                line_rich.append_text(div_rich)
+                used_w = get_visible_len(div_str, self.config)
+                fill_w = max(0, avail_w - used_w)
+                if fill_w > 0:
+                    line_rich.append(" " * fill_w)
+                line_rich.append(f"  {b_v_right}", style=border_style)
+            return line_rich
+
+        line_rich = Text(f"{b_v_left}  ", style=border_style)
+        ind_str = f"{indicator_symbol} " if is_selected else "  "
+        ind_w = get_display_width(ind_str, self.config)
+
+        sc_char = shortcut_char
+        sc_str = f"[{sc_char}] " if (self.show_shortcuts and sc_char) else "    "
+        sc_w = get_display_width(sc_str, self.config)
+
+        theme_key = (self.config.get("theme"), self.config.get("settings.use_nerd_fonts", True))
+        cached_opt = opt.get("_parsed_cache")
+        if cached_opt and cached_opt[0] == theme_key:
+            icon_str, icon_w, left_label, right_bracket = cached_opt[1:]
+        else:
+            icon_raw = opt.get("icon") or opt.get("glyph") or ""
+            icon_resolved = resolve_glyph(interpolate_placeholders(icon_raw, self.config, extra_vars=extra_vars), self.config) if icon_raw else ""
+            if icon_resolved:
+                clean_icon = icon_resolved.replace("\ufe0f", "").replace("\ufe0e", "")
+                vis_w = get_display_width(clean_icon, self.config)
+                pad_w = max(1, 4 - vis_w)
+                icon_str = f"{clean_icon}{' ' * pad_w}"
+                icon_w = vis_w + pad_w
+            else:
+                icon_str = "    "
+                icon_w = 4
+
+            raw_label = interpolate_placeholders(opt.get("label") or opt.get("title") or "", self.config, extra_vars=extra_vars)
+            if opt.get("set_theme") == self.config.get("theme"):
+                raw_label += " (Active)"
+
+            left_label, right_bracket = split_label_brackets(raw_label)
+            if "{" not in str(icon_raw) and "{" not in str(opt.get("label") or opt.get("title") or ""):
+                opt["_parsed_cache"] = (theme_key, icon_str, icon_w, left_label, right_bracket)
+
+        prefix_w = ind_w + sc_w + icon_w
+        right_w = get_visible_len(right_bracket, self.config) if right_bracket else 0
+        label_avail_w = max(5, avail_w - prefix_w - (right_w + 1 if right_w else 0))
+
+        row_content = Text(ind_str, style=item_style)
+        if self.show_shortcuts and sc_char:
+            row_content.append(f"[{sc_char}] ", style=shortcut_key_style if not is_selected else item_style)
+        else:
+            row_content.append("    ", style=item_style)
+
+        row_content.append(icon_str, style=item_style)
+
+        lbl_truncated = left_label
+        if get_visible_len(left_label, self.config) > label_avail_w:
+            low, high = 1, len(left_label)
+            best = 1
+            while low <= high:
+                mid = (low + high) // 2
+                if get_visible_len(left_label[:mid], self.config) <= label_avail_w:
+                    best = mid
+                    low = mid + 1
+                else:
+                    high = mid - 1
+            lbl_truncated = left_label[:best]
+
+        lbl_rich = bashmenu_ui.formatting_to_rich_text(lbl_truncated, default_style=item_style, theme=theme_styles)
+        row_content.append_text(lbl_rich)
+
+        rendered_lbl_w = get_visible_len(lbl_truncated, self.config)
+        spaces_w = max(0, avail_w - prefix_w - rendered_lbl_w - right_w)
+        row_content.append(" " * spaces_w, style=item_style)
+
+        if right_bracket:
+            rb_rich = bashmenu_ui.formatting_to_rich_text(right_bracket, default_style=item_style, theme=theme_styles)
+            row_content.append_text(rb_rich)
+
+        if row_content.cell_len > avail_w:
+            row_content.truncate(avail_w)
+        pad_w = max(0, avail_w - row_content.cell_len)
+        if pad_w > 0:
+            row_content.append(" " * pad_w, style=item_style)
+
+        line_rich.append_text(row_content)
+        line_rich.append(f"  {b_v_right}", style=border_style)
+        return line_rich
 
     def _apply_wallpaper_background(
         self, text: Text, width: int, height: int, theme_styles: dict, bg_cfg: dict | None
@@ -2116,6 +2332,7 @@ class MainMenuView(Widget):
 
         opacity = user_bg.get("opacity") if "opacity" in user_bg else theme_bg_dict.get("opacity", 0.35)
         scaling = user_bg.get("scaling") or theme_bg_dict.get("scaling", "cover")
+        clustering = user_bg.get("clustering") if "clustering" in user_bg else theme_bg_dict.get("clustering", 64)
 
         img_path = interpolate_placeholders(str(img_spec).strip(), self.config)
 
@@ -2126,11 +2343,13 @@ class MainMenuView(Widget):
                 opacity=opacity,
                 scaling=scaling,
                 base_dir=BASHMENU_DIR,
+                clustering=clustering,
             )
             self._wallpaper_compositor = compositor
         else:
             compositor.opacity = opacity
             compositor.scaling = scaling
+            compositor.clustering = clustering
 
         theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(theme_styles)
         grid = compositor.get_grid(width, height, theme_bg_rgb)
@@ -2648,9 +2867,30 @@ class BashMenuScreen(Screen):
     def plugin_buffer(self) -> PluginBuffer:
         return self.query_one("#plugin_buffer", PluginBuffer)
 
+    def _determine_refresh_interval(self) -> float:
+        """Return optimal periodic refresh interval based on status gutter clock granularity."""
+        cfg = None
+        with contextlib.suppress(Exception):
+            cfg = getattr(self.menu_view, "config", None)
+        if not cfg:
+            cfg = self.initial_config or {}
+        gutter = str(get_config_value(cfg, "settings.status_gutter", ""))
+        second_tokens = (
+            "{date_time_24}",
+            "{date_time_12}",
+            "{time_24}",
+            "{time_12}",
+            "{seconds}",
+            "%S",
+        )
+        if any(tok in gutter for tok in second_tokens):
+            return 1.0
+        return 5.0
+
     def on_mount(self) -> None:
         self._update_plugin_buffer_geometry()
-        self.set_interval(1.0, self._periodic_refresh)
+        interval = self._determine_refresh_interval()
+        self._refresh_timer = self.set_interval(interval, self._periodic_refresh)
         app_obj = None
         with contextlib.suppress(Exception):
             app_obj = getattr(self, "_app", None) or getattr(self, "app", None)
@@ -2711,9 +2951,17 @@ class BashMenuScreen(Screen):
                 pb.refresh()
 
     def _periodic_refresh(self) -> None:
-        """The `_periodic_refresh` method refreshes the menu view periodically."""
+        """The `_periodic_refresh` method refreshes the menu view periodically.
+        When only the clock/gutter or plugins update, it limits refreshes to the
+        affected regions to decouple background wallpaper from timer ticks.
+        """
         with contextlib.suppress(Exception):
-            self.menu_view.refresh()
+            mv = self.menu_view
+            h = max(10, mv.size.height or 24)
+            w = max(40, mv.size.width or 80)
+            # The help keys & status gutter occupy up to 2 rows directly above the bottom border (h - 3, h - 2)
+            gutter_region = Region(0, max(0, h - 3), w, 2)
+            mv.refresh(gutter_region)
             self._update_plugin_buffer_geometry()
 
     def on_resize(self, event) -> None:
@@ -2884,6 +3132,12 @@ class BashMenuScreen(Screen):
         self._update_plugin_buffer_geometry()
         mv.refresh()
         self.plugin_buffer.refresh()
+        if hasattr(self, "_refresh_timer") and self._refresh_timer:
+            with contextlib.suppress(Exception):
+                new_interval = self._determine_refresh_interval()
+                if getattr(self._refresh_timer, "interval", None) != new_interval:
+                    self._refresh_timer.pause()
+                    self._refresh_timer = self.set_interval(new_interval, self._periodic_refresh)
         app_obj = None
         with contextlib.suppress(Exception):
             app_obj = getattr(self, "_app", None) or getattr(self, "app", None)

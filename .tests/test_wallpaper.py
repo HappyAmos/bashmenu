@@ -197,6 +197,86 @@ class TestWallpaperCompositor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_prebaked_wallpaper_canvas_lifecycle(self):
+        """Verify PrebakedWallpaperCanvas lifecycle: setting grid, static rows, options, and assemble_frame."""
+        compositor = bashmenu_ui.WallpaperCompositor(
+            self.wallpaper_path, opacity=0.35, scaling="cover", base_dir=self.test_dir
+        )
+        grid = compositor.get_grid(80, 24, (15, 20, 32))
+        canvas = bashmenu_ui.PrebakedWallpaperCanvas(compositor)
+        canvas.set_grid(grid)
+
+        # Set static frame borders
+        canvas.set_static_line(0, Text("┌" + "─" * 78 + "┐"))
+        canvas.set_static_line(1, Text("│" + " " * 78 + "│"))
+        canvas.set_static_line(2, Text("│" + " " * 78 + "│"))
+        canvas.set_static_line(23, Text("└" + "─" * 78 + "┘"))
+
+        # Set raw option lines
+        canvas.set_raw_option_line(0, False, Text("│  [1] Option 1" + " " * 62 + "│"))
+        canvas.set_raw_option_line(0, True, Text("│ >[1] Option 1" + " " * 62 + "│", style=Style(bgcolor="magenta")))
+
+        # Pre-bake option
+        opt_unsel = canvas.prebake_option(3, 0, False)
+        opt_sel = canvas.prebake_option(3, 0, True)
+
+        self.assertIn("▀", opt_unsel.plain)
+        self.assertIn("Option 1", opt_unsel.plain)
+        self.assertIn("Option 1", opt_sel.plain)
+
+        # Gutter lines
+        g_lines = canvas.get_gutter_lines(
+            ("key1",), 22, [Text("│  [F1] Help" + " " * 66 + "│")]
+        )
+        self.assertEqual(len(g_lines), 1)
+
+        # Assemble full frame
+        frame = canvas.assemble_frame(24, 0, 0, 15, 1, 22, g_lines)
+        lines = frame.plain.splitlines()
+        self.assertEqual(len(lines), 24)
+        self.assertIn("┌", lines[0])
+        self.assertIn("Option 1", lines[3])
+        self.assertIn("└", lines[23])
+
+    def test_prebaked_canvas_invalidation(self):
+        """Verify PrebakedWallpaperCanvas key validation and invalidation behavior."""
+        canvas = bashmenu_ui.PrebakedWallpaperCanvas()
+        canvas._canvas_key = (80, 24, "test_menu")
+        self.assertTrue(canvas.is_valid((80, 24, "test_menu")))
+        self.assertFalse(canvas.is_valid((100, 30, "test_menu")))
+
+        canvas.invalidate()
+        self.assertFalse(canvas.is_valid((80, 24, "test_menu")))
+        self.assertEqual(len(canvas._static_lines), 0)
+        self.assertEqual(len(canvas._option_line_cache), 0)
+
+    def test_main_menu_view_prebaked_canvas_navigation(self):
+        """Verify MainMenuView uses PrebakedWallpaperCanvas and updates selection across row changes."""
+        cfg, _ = bashmenu.load_config()
+        cfg["theme"] = "twilight"
+        menu, _ = bashmenu.load_menu()
+
+        mv = bashmenu.MainMenuView(config=cfg, menu_data=menu)
+        with patch.object(
+            bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)
+        ):
+            # First render warms the canvas (row 1 is initially selected)
+            mv.set_current_row(1)
+            frame1 = mv.render()
+            self.assertIsNotNone(mv._canvas)
+            self.assertTrue(mv._canvas.is_valid(mv._canvas._canvas_key))
+
+            # Navigate to row 2
+            mv.set_current_row(2)
+            frame2 = mv.render()
+
+            # Ensure row 1 and row 2 changed selection states (lines 4 and 5 in output)
+            lines1 = frame1.plain.splitlines()
+            lines2 = frame2.plain.splitlines()
+            self.assertNotEqual(lines1[4], lines2[4])
+            self.assertNotEqual(lines1[5], lines2[5])
+
 
 if __name__ == "__main__":
     unittest.main()
+
