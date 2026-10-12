@@ -5,13 +5,14 @@
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
 version: 0.0.1
-theme: train_ride
+theme: dracula
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
   example_string: A string of text
   localip: '[b]{localip}[/b]'
   postal_code: 49079
+  antigravity: cd {dir_picker} && agy -c
 settings:
   cache_dir: '{home}/.cache/bashmenu'
   check_for_updates: false
@@ -51,16 +52,6 @@ settings:
     | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
-  # Background wallpaper compositing:
-  # Renders TrueColor graphic wallpapers behind menus using half-block ('▀') text compositing.
-  # Settings:
-  #   enabled: true/false (Default: true). Master switch for wallpaper backgrounds.
-  #   image: Path to image file (PNG/JPG). If omitted, uses the active theme's default wallpaper.
-  #   opacity: 0.0 to 1.0 (Default: 0.35). Blending factor against theme background tint.
-  #   scaling: 'cover' or 'stretch' (Default: 'cover'). 'cover' crops to aspect ratio.
-  #   clustering: 0 to 128 (Default: 64). Merges adjacent cell color variations into unified
-  #               horizontal terminal runs, eliminating cursor and scrolling lag on photos.
   background:
     enabled: true
     clustering: 64
-

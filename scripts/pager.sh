@@ -31,6 +31,7 @@ READ_TIMEOUT="0.05"
 MAX_LINES=1000000
 STRIP_COLORS=0
 SHOW_HELP=1
+ALLOW_FILE=1
 HAVE_FILES=0
 START_LINE=""
 START_PATTERN=""
@@ -92,6 +93,7 @@ Options:
   +/PATTERN         Start at the first line containing PATTERN.
   -c, --no-color    Discard ANSI escape sequences instead of rendering them.
   --no-help         Omit the shortcut hints from the command bar.
+  --no-file         Do not show filename badge or allow editing current file.
   --max-lines=N     Store at most N input lines (default ${MAX_LINES}).
   --file=PATH       Associated file path to open when editing piped streams.
   --reload-cmd=CMD  Command to refresh spool after editing piped streams.
@@ -245,31 +247,38 @@ build_bar() {
     fi
 
     # Determine badge label: [ filename.ext ] or [ <stdin> ]
-    if [ "${HAVE_FILES}" -ge 1 ]; then
-        fname="${FILES[0]##*/}"
-        if [ "${HAVE_FILES}" -gt 1 ]; then
-            extra=" (+$((HAVE_FILES - 1)))"
+    if [ "${ALLOW_FILE}" = "1" ]; then
+        if [ "${HAVE_FILES}" -ge 1 ]; then
+            fname="${FILES[0]##*/}"
+            if [ "${HAVE_FILES}" -gt 1 ]; then
+                extra=" (+$((HAVE_FILES - 1)))"
+            fi
+        elif [ -n "${ORIGINAL_FILE}" ]; then
+            fname="${ORIGINAL_FILE##*/}"
         fi
-    elif [ -n "${ORIGINAL_FILE}" ]; then
-        fname="${ORIGINAL_FILE##*/}"
-    fi
 
-    if [ -n "${fname}" ]; then
-        local max_fname=28
-        [ "${COLS}" -lt 80 ] && max_fname=20
-        [ "${COLS}" -lt 60 ] && max_fname=14
-        [ "${COLS}" -lt 40 ] && max_fname=8
-        if [ "${#fname}" -gt "${max_fname}" ]; then
-            fname="${fname:0:$((max_fname - 3))}..."
+        if [ -n "${fname}" ]; then
+            local max_fname=28
+            [ "${COLS}" -lt 80 ] && max_fname=20
+            [ "${COLS}" -lt 60 ] && max_fname=14
+            [ "${COLS}" -lt 40 ] && max_fname=8
+            if [ "${#fname}" -gt "${max_fname}" ]; then
+                fname="${fname:0:$((max_fname - 3))}..."
+            fi
+            badge="[ ${fname}${extra} ]"
+        else
+            badge="[ <stdin> ]"
         fi
-        badge="[ ${fname}${extra} ]"
+        center_start=$(( (COLS - ${#badge}) / 2 ))
+        center_end=$(( center_start + ${#badge} ))
+        avail_right=$(( COLS - center_end - 1 ))
     else
-        badge="[ <stdin> ]"
+        badge=""
+        center_start=0
+        center_end=0
+        avail_right=$(( COLS - ${#left} - 2 ))
+        [ "${avail_right}" -lt 0 ] && avail_right=0
     fi
-
-    center_start=$(( (COLS - ${#badge}) / 2 ))
-    center_end=$(( center_start + ${#badge} ))
-    avail_right=$(( COLS - center_end - 1 ))
 
     if [ -n "${MESSAGE}" ]; then
         right="${MESSAGE}"
@@ -290,27 +299,37 @@ build_bar() {
         fi
     fi
 
-    if [ "${center_start}" -gt "${#left}" ]; then
-        pad_left=$(( center_start - ${#left} ))
-        printf -v pad_left_str '%*s' "${pad_left}" ''
-        pad_right=$(( COLS - center_end - ${#right} ))
-        [ "${pad_right}" -lt 0 ] && pad_right=0
-        printf -v pad_right_str '%*s' "${pad_right}" ''
-        BAR_LINE="${left}${pad_left_str}${badge}${pad_right_str}${right}"
-    else
-        prefix="${left} ${badge}"
-        if [ "${#prefix}" -lt "${COLS}" ]; then
-            if [ -n "${right}" ] && [ $(( ${#prefix} + 1 + ${#right} )) -le "${COLS}" ]; then
-                pad=$(( COLS - ${#prefix} - ${#right} ))
-                printf -v pad_str '%*s' "${pad}" ''
-                BAR_LINE="${prefix}${pad_str}${right}"
-            else
-                pad=$(( COLS - ${#prefix} ))
-                printf -v pad_str '%*s' "${pad}" ''
-                BAR_LINE="${prefix}${pad_str}"
-            fi
+    if [ -n "${badge}" ]; then
+        if [ "${center_start}" -gt "${#left}" ]; then
+            pad_left=$(( center_start - ${#left} ))
+            printf -v pad_left_str '%*s' "${pad_left}" ''
+            pad_right=$(( COLS - center_end - ${#right} ))
+            [ "${pad_right}" -lt 0 ] && pad_right=0
+            printf -v pad_right_str '%*s' "${pad_right}" ''
+            BAR_LINE="${left}${pad_left_str}${badge}${pad_right_str}${right}"
         else
-            BAR_LINE="${prefix:0:${COLS}}"
+            prefix="${left} ${badge}"
+            if [ "${#prefix}" -lt "${COLS}" ]; then
+                if [ -n "${right}" ] && [ $(( ${#prefix} + 1 + ${#right} )) -le "${COLS}" ]; then
+                    pad=$(( COLS - ${#prefix} - ${#right} ))
+                    printf -v pad_str '%*s' "${pad}" ''
+                    BAR_LINE="${prefix}${pad_str}${right}"
+                else
+                    pad=$(( COLS - ${#prefix} ))
+                    printf -v pad_str '%*s' "${pad}" ''
+                    BAR_LINE="${prefix}${pad_str}"
+                fi
+            else
+                BAR_LINE="${prefix:0:${COLS}}"
+            fi
+        fi
+    else
+        if [ -n "${right}" ] && [ $(( ${#left} + 1 + ${#right} )) -le "${COLS}" ]; then
+            pad=$(( COLS - ${#left} - ${#right} ))
+            printf -v pad_str '%*s' "${pad}" ''
+            BAR_LINE="${left}${pad_str}${right}"
+        else
+            BAR_LINE="${left:0:${COLS}}"
         fi
     fi
 
@@ -349,40 +368,60 @@ render() {
         if (strip == 1) {
             gsub(/\033\[[0-9;?]*[a-zA-Z]/, "", line)
             gsub(/\033\][^\a\033]*(\a|\033\\)/, "", line)
-            if (length(line) > cols) line = substr(line, 1, cols)
-        } else if (length(line) > cols) {
-            if (index(line, esc) == 0) {
-                line = substr(line, 1, cols)
-            } else {
-                out = ""
-                used = 0
-                rest = line
-                while (length(rest) > 0 && used < cols) {
-                    p = index(rest, esc)
-                    if (p == 0) {
-                        out = out substr(rest, 1, cols - used)
-                        break
-                    } else if (p > 1) {
-                        chunk = substr(rest, 1, p - 1)
-                        if (used + length(chunk) > cols) {
-                            out = out substr(chunk, 1, cols - used)
-                            break
-                        }
-                        out = out chunk
-                        used += length(chunk)
-                        rest = substr(rest, p)
+        }
+        # In byte-oriented awks (like mawk), length() is byte count.
+        # If length(line) <= cols and there is no escape sequence to strip, the line always fits.
+        if (index(line, esc) == 0 && length(line) <= cols) {
+            # Line fits within cols without truncation
+        } else {
+            out = ""
+            used = 0
+            rest = line
+            while (length(rest) > 0 && used < cols) {
+                p = index(rest, esc)
+                if (p == 0) {
+                    chunk = rest
+                    rest = ""
+                } else if (p > 1) {
+                    chunk = substr(rest, 1, p - 1)
+                    rest = substr(rest, p)
+                } else {
+                    if (match(rest, /^\033\[[0-9;?]*[a-zA-Z]/) || match(rest, /^\033\][^\a\033]*(\a|\033\\)/)) {
+                        out = out substr(rest, RSTART, RLENGTH)
+                        rest = substr(rest, RLENGTH + 1)
+                        continue
                     } else {
-                        if (match(rest, /^\033\[[0-9;?]*[a-zA-Z]/) || match(rest, /^\033\][^\a\033]*(\a|\033\\)/)) {
-                            out = out substr(rest, RSTART, RLENGTH)
-                            rest = substr(rest, RLENGTH + 1)
-                        } else {
-                            out = out substr(rest, 1, 1)
-                            rest = substr(rest, 2)
+                        out = out substr(rest, 1, 1)
+                        rest = substr(rest, 2)
+                        used++
+                        continue
+                    }
+                }
+
+                while (length(chunk) > 0 && used < cols) {
+                    if (match(chunk, /^[\300-\377][\200-\277]+/)) {
+                        out = out substr(chunk, 1, RLENGTH)
+                        chunk = substr(chunk, RLENGTH + 1)
+                        used++
+                    } else {
+                        m = match(chunk, /[\300-\377]/)
+                        if (m == 0) {
+                            take = cols - used
+                            if (take > length(chunk)) take = length(chunk)
+                            out = out substr(chunk, 1, take)
+                            used += take
+                            chunk = substr(chunk, take + 1)
+                        } else if (m > 1) {
+                            take = cols - used
+                            if (take > m - 1) take = m - 1
+                            out = out substr(chunk, 1, take)
+                            used += take
+                            chunk = substr(chunk, take + 1)
                         }
                     }
                 }
-                line = out "\033[0m"
             }
+            line = out "\033[0m"
         }
         printf "%s[%d;1H%s%s[0m%s[K", esc, row, line, esc, esc
         row++
@@ -517,6 +556,11 @@ get_editor() {
 
 open_in_editor() {
     # Launch the user's default text editor on the current file, positioned at TOP_LINE.
+    if [ "${ALLOW_FILE}" != "1" ]; then
+        MESSAGE="editing disabled"
+        return 0
+    fi
+
     local target_file=""
     if [ "${HAVE_FILES}" -ge 1 ]; then
         target_file="${FILES[0]}"
@@ -960,6 +1004,7 @@ parse_args() {
             -V|--version) printf '%s %s\n' "${0##*/}" "${PAGER_VERSION}"
                           exit 0 ;;
             -c|--no-color|--no-colour) STRIP_COLORS=1 ;;
+            --no-file|--no-edit|--view-only) ALLOW_FILE=0 ;;
             --no-help) SHOW_HELP=0 ;;
             --max-lines=*) MAX_LINES="${arg#*=}" ;;
             --max-lines) [ "$#" -ge 2 ] || die "--max-lines needs a value"
@@ -1024,7 +1069,11 @@ main() {
         exit 0
     fi
 
-    HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  e edit  q quit"
+    if [ "${ALLOW_FILE}" = "1" ]; then
+        HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  e edit  q quit"
+    else
+        HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  q quit"
+    fi
 
     NEED_RESIZE=0
     query_size

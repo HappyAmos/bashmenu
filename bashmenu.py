@@ -249,13 +249,44 @@ def truncate_to_visible_len(text, max_w, config=None):
     return text[:best]
 
 
-def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False):
+def format_spread_gutter_line(line_items: list[str], max_w: int, config: dict | None = None) -> str:
+    """Format items onto a single line, spreading them apart evenly across max_w with pipe delimiters."""
+    if not line_items:
+        return ""
+    if len(line_items) == 1:
+        return line_items[0]
+    num_gaps = len(line_items) - 1
+    item_lens = [get_visible_len(it, config) for it in line_items]
+    tot_item_len = sum(item_lens)
+    min_line_len = tot_item_len + num_gaps * 3
+    if min_line_len >= max_w:
+        return " | ".join(line_items)
+
+    rem = max_w - min_line_len
+    base_extra = rem // num_gaps
+    extra = rem % num_gaps
+
+    parts = []
+    for i, it in enumerate(line_items):
+        parts.append(it)
+        if i < num_gaps:
+            total_extra = base_extra + (1 if i < extra else 0)
+            left_spaces = 1 + (total_extra // 2)
+            right_spaces = 1 + (total_extra - (total_extra // 2))
+            parts.append(f"{' ' * left_spaces}|{' ' * right_spaces}")
+    return "".join(parts)
+
+
+def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False, spread=False):
     """Wrap a list of gutter badge/action items separated by ' | ' into at most max_lines,
     treating each item as an atomic token and ensuring each line does not exceed max_w.
 
     If bottom_up is True, items are packed starting from the end of the list to fill
     the bottom line first with as many items as fit within max_w. Overflow items
     then fill the line(s) above, preserving left-to-right reading order within each line.
+
+    If spread is True, items on each formatted line are spread apart across max_w
+    evenly, with pipe delimiters separating the items.
     """
     if not items:
         return []
@@ -263,6 +294,19 @@ def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False):
     cleaned_items = [str(item).strip() for item in items if str(item).strip()]
     if not cleaned_items:
         return []
+
+    if spread and max_lines == 2 and not bottom_up:
+        # Check if all items can fit into 2 balanced lines
+        mid = (len(cleaned_items) + 1) // 2
+        line1_items = cleaned_items[:mid]
+        line2_items = cleaned_items[mid:]
+        l1_min = sum(get_visible_len(it, config) for it in line1_items) + max(0, len(line1_items) - 1) * 3
+        l2_min = sum(get_visible_len(it, config) for it in line2_items) + max(0, len(line2_items) - 1) * 3
+        if l1_min <= max_w and l2_min <= max_w:
+            return [
+                format_spread_gutter_line(line1_items, max_w, config),
+                format_spread_gutter_line(line2_items, max_w, config),
+            ]
 
     if bottom_up:
         reversed_lines = []
@@ -286,7 +330,8 @@ def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False):
                     break
 
             if line_items:
-                reversed_lines.append(" | ".join(line_items))
+                line_str = format_spread_gutter_line(line_items, max_w, config) if spread else " | ".join(line_items)
+                reversed_lines.append(line_str)
             else:
                 truncated = truncate_to_visible_len(remaining.pop(), max_w, config)
                 reversed_lines.append(truncated)
@@ -309,7 +354,8 @@ def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False):
             # Overlapping item drops to the next line
             if len(lines) < max_lines - 1:
                 if current_line:
-                    lines.append(" | ".join(current_line))
+                    line_str = format_spread_gutter_line(current_line, max_w, config) if spread else " | ".join(current_line)
+                    lines.append(line_str)
                     current_line = []
                 if get_visible_len(item_str, config) <= max_w:
                     current_line.append(item_str)
@@ -320,7 +366,8 @@ def wrap_gutter_items(items, max_w, max_lines=2, config=None, bottom_up=False):
                 break
 
     if current_line and len(lines) < max_lines:
-        lines.append(" | ".join(current_line))
+        line_str = format_spread_gutter_line(current_line, max_w, config) if spread else " | ".join(current_line)
+        lines.append(line_str)
 
     return lines[:max_lines]
 
@@ -1845,11 +1892,11 @@ class MainMenuView(Widget):
             help_lines, status_lines = cached_gutters[1], cached_gutters[2]
         else:
             if self.show_shortcuts:
-                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
+                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [ESC]: Back"
             else:
-                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F5]: Refresh | [F6]: Keys | [F4]: Edit | [ESC]: Back"
+                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [ESC]: Back"
             raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
-            help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config)
+            help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config, spread=True)
 
             status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
             raw_badges = split_gutter_badges(status_gutter_raw)
@@ -2448,6 +2495,51 @@ def _get_active_title_chain(screen) -> list[str]:
     return chain
 
 
+def _apply_file_picker_macros(template_str: str, fpath: str) -> str:
+    """Substitute {file_picker} and its path modifiers (:stem, :name, :base, :dir, :ext)."""
+    p = Path(fpath)
+    p_stem = str(p.parent / p.stem) if str(p.parent) != "." else p.stem
+    p_name = p.name
+    p_base = p.stem
+    p_dir = str(p.parent)
+    p_ext = p.suffix
+
+    res = template_str
+    for prefix in ("{file_picker_new:", "{file_picker:new:", "{file_picker:"):
+        res = (
+            res.replace(f"{prefix}stem}}", p_stem)
+            .replace(f"{prefix}name}}", p_name)
+            .replace(f"{prefix}base}}", p_base)
+            .replace(f"{prefix}dir}}", p_dir)
+            .replace(f"{prefix}ext}}", p_ext)
+        )
+    return (
+        res.replace("{file_picker}", fpath)
+        .replace("{file_picker_new}", fpath)
+        .replace("{file_picker:new}", fpath)
+    )
+
+
+def _apply_dir_picker_macros(template_str: str, dpath: str) -> str:
+    """Substitute {dir_picker} and its path modifiers (:name, :dir, :parent)."""
+    p = Path(dpath)
+    p_name = p.name
+    p_dir = str(p.parent)
+
+    res = template_str
+    for prefix in ("{dir_picker_new:", "{dir_picker:new:", "{dir_picker:"):
+        res = (
+            res.replace(f"{prefix}name}}", p_name)
+            .replace(f"{prefix}dir}}", p_dir)
+            .replace(f"{prefix}parent}}", p_dir)
+        )
+    return (
+        res.replace("{dir_picker}", dpath)
+        .replace("{dir_picker_new}", dpath)
+        .replace("{dir_picker:new}", dpath)
+    )
+
+
 def process_item_action(screen, item, config):
     """Execute menu entry action based on option dictionary definition type."""
     item_type = item.get("type", "command")
@@ -2533,6 +2625,7 @@ def process_item_action(screen, item, config):
 
             if picker_mode in ["file", "dir"]:
                 start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+                allow_new = item.get("allow_new", False)
 
                 def picker_cb(chosen_path):
                     if chosen_path is not None:
@@ -2542,7 +2635,13 @@ def process_item_action(screen, item, config):
                         screen.menu_view.refresh()
 
                 screen.app.push_screen(
-                    bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode=picker_mode),
+                    bashmenu_ui.FilePickerModalScreen(
+                        title,
+                        start_dir=start_dir,
+                        mode=picker_mode,
+                        allow_new=allow_new,
+                        theme=getattr(screen.app, "theme_styles", None),
+                    ),
                     picker_cb,
                 )
             else:
@@ -2591,14 +2690,24 @@ def process_item_action(screen, item, config):
                 lambda res: screen.menu_view.refresh(),
             )
 
-        if resolved_file and ("{file_picker}" in resolved_file or "{file_picker_new}" in resolved_file or "{file_picker:new}" in resolved_file):
+        if resolved_file and "{file_picker" in resolved_file:
+            is_new = "{file_picker_new}" in resolved_file or "{file_picker:new}" in resolved_file or "{file_picker_new:" in resolved_file or "{file_picker:new:" in resolved_file
             start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
 
             def fp_cb(chosen_file):
                 if chosen_file:
-                    launch_editor(chosen_file)
+                    launch_editor(_apply_file_picker_macros(resolved_file, chosen_file))
 
-            screen.app.push_screen(bashmenu_ui.FilePickerModalScreen("Select File to Edit", start_dir=start_dir, mode="file"), fp_cb)
+            screen.app.push_screen(
+                bashmenu_ui.FilePickerModalScreen(
+                    "Select File to Edit",
+                    start_dir=start_dir,
+                    mode="file",
+                    allow_new=is_new,
+                    theme=getattr(screen.app, "theme_styles", None),
+                ),
+                fp_cb,
+            )
         else:
             launch_editor(resolved_file)
 
@@ -2707,37 +2816,49 @@ def process_item_action(screen, item, config):
                 return
 
             # 2. Resolve interactive file picker macro ({file_picker})
-            if "{file_picker}" in curr_action or "{file_picker_new}" in curr_action or "{file_picker:new}" in curr_action:
-                title = item.get("title", "Select File")
+            if "{file_picker" in curr_action:
+                is_new = "{file_picker_new}" in curr_action or "{file_picker:new}" in curr_action or "{file_picker_new:" in curr_action or "{file_picker:new:" in curr_action
+                title = item.get("title", "Select File" if not is_new else "Select or Create File")
                 start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
 
                 def f_cb(fpath):
                     if fpath is not None:
-                        res = (
-                            curr_action.replace("{file_picker}", fpath)
-                            .replace("{file_picker_new}", fpath)
-                            .replace("{file_picker:new}", fpath)
-                        )
+                        res = _apply_file_picker_macros(curr_action, fpath)
                         resolve_and_run(res)
 
-                screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="file"), f_cb)
+                screen.app.push_screen(
+                    bashmenu_ui.FilePickerModalScreen(
+                        title,
+                        start_dir=start_dir,
+                        mode="file",
+                        allow_new=is_new,
+                        theme=getattr(screen.app, "theme_styles", None),
+                    ),
+                    f_cb,
+                )
                 return
 
             # 3. Resolve interactive directory picker macro ({dir_picker})
-            if "{dir_picker}" in curr_action or "{dir_picker_new}" in curr_action or "{dir_picker:new}" in curr_action:
-                title = item.get("title", "Select Directory")
+            if "{dir_picker" in curr_action:
+                is_new = "{dir_picker_new}" in curr_action or "{dir_picker:new}" in curr_action or "{dir_picker_new:" in curr_action or "{dir_picker:new:" in curr_action
+                title = item.get("title", "Select Directory" if not is_new else "Select or Create Directory")
                 start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
 
                 def d_cb(dpath):
                     if dpath is not None:
-                        res = (
-                            curr_action.replace("{dir_picker}", dpath)
-                            .replace("{dir_picker_new}", dpath)
-                            .replace("{dir_picker:new}", dpath)
-                        )
+                        res = _apply_dir_picker_macros(curr_action, dpath)
                         resolve_and_run(res)
 
-                screen.app.push_screen(bashmenu_ui.FilePickerModalScreen(title, start_dir=start_dir, mode="dir"), d_cb)
+                screen.app.push_screen(
+                    bashmenu_ui.FilePickerModalScreen(
+                        title,
+                        start_dir=start_dir,
+                        mode="dir",
+                        allow_new=is_new,
+                        theme=getattr(screen.app, "theme_styles", None),
+                    ),
+                    d_cb,
+                )
                 return
 
             if "menuedit.py" in curr_action:
@@ -2844,6 +2965,7 @@ class BashMenuScreen(Screen):
         Binding("enter", "select_option", "Select", show=False),
         Binding("f1", "help", "Help"),
         Binding("f2", "themes", "Themes"),
+        Binding("f3", "launch_editor", "Text Editor"),
         Binding("f4", "edit_menu", "Edit Menu"),
         Binding("f5", "refresh_menu", "Refresh"),
         Binding("f6", "toggle_shortcuts", "Keys"),
@@ -3046,6 +3168,16 @@ class BashMenuScreen(Screen):
             mv.refresh()
         else:
             self.app.exit()
+
+    def action_launch_editor(self) -> None:
+        import bashedit
+
+        self.app.push_screen(
+            bashedit.BashEditScreen(
+                theme=getattr(self.app, "theme_styles", None),
+            ),
+            lambda res: self.refresh_environment(),
+        )
 
     def action_edit_menu(self) -> None:
         curr_row = self.menu_view.current_row()

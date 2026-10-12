@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from typing import ClassVar
 
 from rich.color import Color, ColorParseError
@@ -1051,6 +1052,10 @@ class BashEditScreen(Screen):
     .footer_item_last {
         margin-right: 0;
     }
+    .footer_sep {
+        padding: 0 0;
+        color: $text-muted;
+    }
     #editor_divider {
         height: 1;
         width: 100%;
@@ -1061,17 +1066,11 @@ class BashEditScreen(Screen):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("ctrl+o", "open_file", "Open"),
         Binding("ctrl+r", "open_file", "Open", show=False),
-        Binding("f5", "open_file", "Open", show=False),
-        Binding("f7", "open_file", "Open", show=False),
         Binding("ctrl+s", "save_file", "Save"),
-        Binding("f2", "save_file", "Save", show=False),
-        Binding("f3", "save_file", "Save", show=False),
+        Binding("ctrl+n", "new_tab", "New Tab", show=False),
         Binding("ctrl+e", "new_file", "New", show=False),
-        Binding("f4", "new_file", "New", show=False),
+        Binding("ctrl+a", "save_file_as", "Save As"),
         Binding("ctrl+shift+s", "save_file_as", "Save As", show=False),
-        Binding("alt+s", "save_file_as", "Save As", show=False),
-        Binding("meta+s", "save_file_as", "Save As", show=False),
-        Binding("f6", "save_file_as", "Save As", show=False),
         Binding("ctrl+x", "cut_line", "Cut"),
         Binding("ctrl+shift+x", "cut_line", "Cut", show=False),
         Binding("ctrl+c", "copy_selection", "Copy"),
@@ -1081,20 +1080,17 @@ class BashEditScreen(Screen):
         Binding("ctrl+w", "search_text", "WhereIs"),
         Binding("ctrl+q", "exit_editor", "Exit"),
         Binding("escape", "exit_editor", "Exit", show=False),
-        Binding("alt+1", "toggle_whitespace", "Whitespace"),
-        Binding("meta+1", "toggle_whitespace", "Whitespace", show=False),
-        Binding("m-1", "toggle_whitespace", "Whitespace", show=False),
-        Binding("m+1", "toggle_whitespace", "Whitespace", show=False),
-        Binding("ctrl+p", "show_placeholders", "Placeholders"),
-        Binding("alt+m", "show_placeholders", "Placeholders", show=False),
+        Binding("f1", "help_manual", "Help"),
+        Binding("f2", "toggle_whitespace", "Whitespace"),
+        Binding("f3", "show_ascii_table", "ASCII Table"),
+        Binding("f4", "view_colors", "View Colors"),
+        Binding("f5", "show_placeholders", "Macros"),
+        Binding("f6", "toggle_markdown", "Markdown"),
+        Binding("f7", "toggle_lineno", "Line Numbers"),
+        Binding("f8", "show_markdown_reference", "MD Ref"),
         Binding("ctrl+z", "undo", "Undo"),
         Binding("ctrl+y", "redo", "Redo"),
-        Binding("ctrl+n", "toggle_lineno", "Line Numbers"),
         Binding("alt+n", "toggle_lineno", "Line Numbers", show=False),
-        Binding("f12", "toggle_markdown", "Markdown", show=False),
-        Binding("f1", "help_manual", "Help"),
-        Binding("ctrl+g", "help_manual", "Help", show=False),
-        Binding("alt+h", "help_manual", "Help", show=False),
         Binding("up", "move_up", "Up", show=False),
         Binding("down", "move_down", "Down", show=False),
         Binding("left", "move_left", "Left", show=False),
@@ -1102,10 +1098,6 @@ class BashEditScreen(Screen):
         Binding("home", "move_home", "Home", show=False),
         Binding("end", "move_end", "End", show=False),
         Binding("alt+t", "toggle_theme_colors", "Toggle Theme Colors", show=False),
-        Binding("alt+v", "view_colors", "View Colors", show=False),
-        Binding("f10", "view_colors", "View Colors", show=False),
-        Binding("ctrl+a", "show_ascii_table", "ASCII Table", show=False),
-        Binding("f11", "show_ascii_table", "ASCII Table", show=False),
         Binding("alt+]", "next_tab", "Next Tab", show=False),
         Binding("alt+[", "prev_tab", "Prev Tab", show=False),
         Binding("ctrl+tab", "next_tab", "Next Tab", show=False),
@@ -1179,7 +1171,7 @@ class BashEditScreen(Screen):
                     yield Label(f" {idx + 1}: {name}{mod} ", classes=f"editor_tab_select tab_select_{idx} {cls}")
                     if len(self.tabs) > 1:
                         yield Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}")
-                yield Label(" [ + ] ", id="tab_add_new", classes="editor_tab_add")
+                yield Label(" [ + ] ", classes="editor_tab_add tab_add_new")
         yield EditorWidget(
             lines=self.initial_lines,
             show_whitespace=self.show_whitespace,
@@ -1201,22 +1193,36 @@ class BashEditScreen(Screen):
             yield Label(div_char * 500, id="editor_divider")
             with Vertical(id="editor_legend"):
                 with Horizontal(id="footer_row_1", classes="footer_row"):
-                    yield Label("^O Open", id="lbl_open", classes="footer_item lbl_open", markup=False)
-                    yield Label("^S Save", id="lbl_save", classes="footer_item lbl_save", markup=False)
-                    yield Label("Alt+S SaveAs", id="lbl_save_as", classes="footer_item lbl_save_as", markup=False)
-                    yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
-                    yield Label("^X Cut", id="lbl_cut", classes="footer_item", markup=False)
-                    yield Label("^C Copy", id="lbl_copy", classes="footer_item", markup=False)
-                    yield Label("^V Paste", id="lbl_paste", classes="footer_item", markup=False)
-                    yield Label("^Z Undo", id="lbl_undo", classes="footer_item footer_item_last", markup=False)
-                with Horizontal(id="footer_row_2", classes="footer_row"):
-                    yield Label("^P Macros", id="lbl_placeholders", classes="footer_item", markup=False)
-                    yield Label("^A ASCII", id="lbl_ascii", classes="footer_item", markup=False)
-                    yield Label("Alt+V Colors", id="lbl_colors", classes="footer_item", markup=False)
-                    yield Label("Alt+1 Space", id="lbl_space", classes="footer_item", markup=False)
-                    yield Label("^N Lineno", id="lbl_lineno", classes="footer_item", markup=False)
-                    yield Label("F12 MD", id="lbl_markdown", classes="footer_item", markup=False)
                     yield Label("F1 Help", id="lbl_help", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F2 Whitespace", id="lbl_space", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F3 ASCII", id="lbl_ascii", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F4 Colors", id="lbl_colors", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F5 Macros", id="lbl_placeholders", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F6 MD", id="lbl_markdown", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F7 Lineno", id="lbl_lineno", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("F8 MD Ref", id="lbl_md_ref", classes="footer_item footer_item_last", markup=False)
+                with Horizontal(id="footer_row_2", classes="footer_row"):
+                    yield Label("^N Tab", id="lbl_new_tab", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("^O Open", id="lbl_open", classes="footer_item lbl_open", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("^S Save", id="lbl_save", classes="footer_item lbl_save", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("^A SaveAs", id="lbl_save_as", classes="footer_item lbl_save_as", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("^W Search", id="lbl_search", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("^Z Undo", id="lbl_undo", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
+                    yield Label("Alt+←/→ Tab", id="lbl_tabs", classes="footer_item", markup=False)
+                    yield Label("|", classes="footer_sep", markup=False)
                     yield Label("^Q/ESC Exit", id="lbl_exit", classes="footer_item footer_item_last", markup=False)
             yield Label("  Line 1/1, Col 1  ", id="editor_status")
 
@@ -1315,8 +1321,14 @@ class BashEditScreen(Screen):
             self.action_toggle_whitespace()
         elif target_action == "lbl_lineno":
             self.action_toggle_lineno()
+        elif target_action in ("lbl_tabs", "lbl_tab"):
+            self.action_next_tab()
         elif target_action == "lbl_markdown":
             self.action_toggle_markdown()
+        elif target_action in ("lbl_md_ref", "lbl_markdown_reference"):
+            self.action_show_markdown_reference()
+        elif target_action in ("lbl_new_tab", "lbl_newtab"):
+            self.action_new_tab()
         elif target_action == "lbl_help":
             self.action_help_manual()
 
@@ -1379,7 +1391,21 @@ class BashEditScreen(Screen):
     def refresh_tab_bar(self) -> None:
         try:
             tab_bar = self.query_one("#editor_tab_bar", Horizontal)
-            tab_bar.remove_children()
+            select_labels = list(tab_bar.query(".editor_tab_select"))
+            if len(select_labels) == len(self.tabs):
+                for idx, tab in enumerate(self.tabs):
+                    name = os.path.basename(tab.file_path) if tab.file_path else "Untitled"
+                    mod = " *" if tab.modified else ""
+                    tab_label = f" {idx + 1}: {name}{mod} "
+                    lbl = select_labels[idx]
+                    lbl.update(tab_label)
+                    is_active = (idx == self.active_tab_idx)
+                    lbl.set_class(is_active, "editor_tab_active")
+                    lbl.set_class(not is_active, "editor_tab")
+                return
+
+            for c in list(tab_bar.children):
+                c.remove()
 
             widgets = []
             for idx, tab in enumerate(self.tabs):
@@ -1391,7 +1417,7 @@ class BashEditScreen(Screen):
                 if len(self.tabs) > 1:
                     widgets.append(Label(" ✕ ", classes=f"editor_tab_close tab_close_{idx}"))
 
-            widgets.append(Label(" [ + ] ", id="tab_add_new", classes="editor_tab_add"))
+            widgets.append(Label(" [ + ] ", classes="editor_tab_add tab_add_new"))
             tab_bar.mount(*widgets)
         except Exception:  # noqa: BLE001, S110
             pass
@@ -1560,6 +1586,15 @@ class BashEditScreen(Screen):
                         for item in self.query(".footer_item"):
                             item.styles.color = css_accent
 
+            sep_style = self.theme_styles.get("border") or self.theme_styles.get("divider") or self.theme_styles.get("footer")
+            if sep_style and sep_style.color and sep_style.color.name:
+                css_sep = bashmenu_ui.parse_css_color(sep_style.color.name)
+                if css_sep:
+                    with contextlib.suppress(Exception):
+                        for sep in self.query(".footer_sep"):
+                            sep.styles.color = css_sep
+                            sep.styles.auto_color = False
+
             with contextlib.suppress(Exception):
                 ed = self.query_one("#editor_widget", EditorWidget)
                 ed.theme = self.theme_styles
@@ -1570,7 +1605,7 @@ class BashEditScreen(Screen):
         """Distribute footer keyboard shortcut labels equally across both footer rows.
         
         Calculates available screen width and dynamically sets right margins on items
-        so that keyboard shortcuts and descriptions span the full width without breaking.
+        and separators so that keyboard shortcuts span the full width without breaking.
         """
         w = width
         if w is None or w <= 0:
@@ -1586,6 +1621,7 @@ class BashEditScreen(Screen):
             rows = list(legend.query(".footer_row"))
             for row in rows:
                 items = list(row.query(".footer_item"))
+                seps = list(row.query(".footer_sep"))
                 if not items:
                     continue
                 num_items = len(items)
@@ -1598,7 +1634,7 @@ class BashEditScreen(Screen):
                     t = str(it.renderable) if hasattr(it, "renderable") else ""
                     item_lens.append(len(t) if t else len(getattr(it, "content", "")))
 
-                tot_text = sum(item_lens)
+                tot_text = sum(item_lens) + len(seps)
                 num_gaps = num_items - 1
                 rem = max(0, w - tot_text)
                 base_gap = rem // num_gaps
@@ -1606,8 +1642,12 @@ class BashEditScreen(Screen):
 
                 for i, it in enumerate(items):
                     if i < num_gaps:
-                        gap = base_gap + (1 if i < extra else 0)
-                        it.styles.margin = (0, gap, 0, 0)
+                        total_gap = base_gap + (1 if i < extra else 0)
+                        left_gap = total_gap // 2
+                        right_gap = total_gap - left_gap
+                        it.styles.margin = (0, left_gap, 0, 0)
+                        if i < len(seps):
+                            seps[i].styles.margin = (0, right_gap, 0, 0)
                     else:
                         it.styles.margin = (0, 0, 0, 0)
 
@@ -1670,9 +1710,7 @@ class BashEditScreen(Screen):
             self.action_prev_tab()
             return
 
-        if key_lower in ["alt+1", "meta+1", "m-1", "m+1", "alt_1", "meta_1", "esc 1", "escape 1", "¡"] or (
-            key_lower.startswith(("alt+", "meta+", "m-", "alt_", "meta_")) and key_lower.endswith("1")
-        ) or char_lower in ["¡", "\u00a1"]:
+        if key_lower == "f2":
             event.prevent_default()
             event.stop()
             self.action_toggle_whitespace()
@@ -1695,37 +1733,65 @@ class BashEditScreen(Screen):
             self.action_exit_editor()
             return
 
-        if key_lower in ["f1", "ctrl+g", "alt+h", "meta+h"]:
+        if key_lower == "f1":
             event.prevent_default()
             event.stop()
             self.action_help_manual()
             return
 
         if key_lower in ["alt+t", "meta+t"]:
+            if self.display_theme_colors:
+                event.prevent_default()
+                event.stop()
+                self.action_toggle_theme_colors()
+                return
+
+        if key_lower in ["ctrl+n", "ctrl_n"] or char_lower in ["\x0e"]:
             event.prevent_default()
             event.stop()
-            if self.display_theme_colors:
-                self.action_toggle_theme_colors()
-            else:
-                self.action_new_tab()
+            self.action_new_tab()
             return
 
-        if key_lower in ["alt+v", "meta+v", "f10"]:
+        if key_lower == "f7":
+            event.prevent_default()
+            event.stop()
+            self.action_toggle_lineno()
+            return
+
+        if key_lower == "f8":
+            event.prevent_default()
+            event.stop()
+            self.action_show_markdown_reference()
+            return
+
+        if key_lower in ["ctrl+t", "ctrl_t"] or char_lower in ["\x14"]:
+            event.prevent_default()
+            event.stop()
+            self.action_new_tab()
+            return
+
+        if key_lower == "f4":
             event.prevent_default()
             event.stop()
             self.action_view_colors()
             return
 
-        if key_lower in ["ctrl+a", "ctrl_a", "f11"] or char_lower in ["\x01"]:
+        if key_lower == "f3":
             event.prevent_default()
             event.stop()
             self.action_show_ascii_table()
             return
 
-        if key_lower in ["ctrl+p", "alt+m", "meta+m"]:
+        if key_lower == "f5":
             event.prevent_default()
             event.stop()
             self.action_show_placeholders()
+            return
+
+        if key_lower in ["ctrl+a", "ctrl_a"] or char_lower in ["\x01"]:
+            event.prevent_default()
+            event.stop()
+            self.action_save_file_as()
             return
 
         if key_lower in ["ctrl+x", "ctrl+shift+x", "ctrl_x", "ctrl_shift_x"] or char_lower in ["\x18"]:
@@ -1758,43 +1824,10 @@ class BashEditScreen(Screen):
             self.action_redo()
             return
 
-        if key_lower == "f12":
+        if key_lower == "f6":
             event.prevent_default()
             event.stop()
             self.action_toggle_markdown()
-            return
-
-        if ed.show_markdown:
-            if event.key == "up":
-                ed.scroll_lines_up(1)
-                self.update_status()
-            elif event.key == "down":
-                ed.scroll_lines_down(1)
-                self.update_status()
-            elif event.key in ("pageup", "page_up"):
-                page_size = max(1, (ed.size.height or 20) - 2)
-                ed.scroll_lines_up(page_size)
-                self.update_status()
-            elif event.key in ("pagedown", "page_down"):
-                page_size = max(1, (ed.size.height or 20) - 2)
-                ed.scroll_lines_down(page_size)
-                self.update_status()
-            elif event.key == "home":
-                ed.top_line = 0
-                ed.refresh()
-                self.update_status()
-            elif event.key == "end":
-                total_lines = len(ed._get_rendered_md_lines())
-                ed.top_line = max(0, total_lines - 1)
-                ed.refresh()
-                self.update_status()
-            elif (
-                key_lower in ["enter", "return", "backspace", "ctrl+h", "delete", "tab", "space", "full_stop"]
-                or char_lower in ["\r", "\n", "\t", " "]
-                or (len(event.character or "") == 1 and event.character.isprintable())
-                or (len(event.key or "") == 1 and event.key.isprintable())
-            ):
-                self.update_status("Markdown preview active (Press F12 to edit)")
             return
 
         # Shift + Directional keys (Desktop selection extension)
@@ -2244,18 +2277,19 @@ class BashEditScreen(Screen):
             "",
             "| Keybinding / Shortcut | Description / Action |",
             "| :--- | :--- |",
-            "| `^O` / `^R` / `F5` / `F7` | Open File Picker |",
-            "| `^S` / `F2` / `F3` | Save File |",
-            "| `Alt+S` / `^Shift+S` / `F6` | Save File As (Save Under New Name) |",
-            "| `^E` / `F4` / `[ + ]` | New Tab / New File |",
-            "| `Alt+]` / `Ctrl+Tab` | Next Tab |",
-            "| `Alt+[` / `Shift+Tab` | Previous Tab |",
-            "| `^P` / `Alt+M` | Show Available Placeholders & Macros |",
-            "| `^A` / `F11` | View ASCII Character Table (`ascii.sh`) |",
-            "| `Alt+V` / `F10` | View Terminal Colors (`ncurses_colors.py`) |",
-            "| `Alt+1` | Toggle Whitespace Display (spaces & tabs) |",
-            "| `^N` / `Alt+N` | Toggle Line Numbers |",
-            "| `F12` | Toggle Markdown Rendering |",
+            "| `F1` | Help Manual |",
+            "| `F2` | Toggle Whitespace Display (spaces & tabs) |",
+            "| `F3` | View ASCII Character Table (`ascii.sh`) |",
+            "| `F4` | View Terminal Colors (`ncurses_colors.py`) |",
+            "| `F5` | Show Available Placeholders & Macros |",
+            "| `F6` | View Markdown via Rich Pager (`rich.sh`) |",
+            "| `F7` | Toggle Line Numbers |",
+            "| `F8` | Show Markdown Syntax Quick Reference |",
+            "| `^O` / `^R` | Open File Picker |",
+            "| `^S` | Save File |",
+            "| `^A` / `^Shift+S` | Save File As (Save Under New Name) |",
+            "| `^N` / `^E` / `[ + ]` | New Tab / New File |",
+            "| `Alt+Left/Right` / `Alt+[/]` | Switch Tabs (Prev / Next) |",
             "| `Shift+Arrows` / `Shift+Home/End` | Select Text Range (Desktop Selection) |",
             "| `Ctrl+Left` / `Ctrl+Right` | Move Word Left / Right |",
             "| `Ctrl+Up` / `Ctrl+Down` | Move Paragraph Up / Down |",
@@ -2323,16 +2357,65 @@ class BashEditScreen(Screen):
         self.update_status("Toggled Line Numbers")
 
     def action_toggle_markdown(self) -> None:
-        """Toggles Markdown rendering for the active document buffer."""
+        """Launches the active buffer in rich.sh using the in-house pager (F6)."""
         ed = self.query_one("#editor_widget", EditorWidget)
-        ed.show_markdown = not ed.show_markdown
-        if 0 <= self.active_tab_idx < len(self.tabs):
-            self.tabs[self.active_tab_idx].show_markdown = ed.show_markdown
-        if not ed.show_markdown:
-            ed.clamp_cursor()
-        status = "enabled" if ed.show_markdown else "disabled"
-        self.update_status(f"Markdown rendering {status}")
-        ed.refresh()
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        rich_script = os.path.join(base_dir, "scripts", "rich.sh")
+
+        if not os.path.isfile(rich_script) or not os.access(rich_script, os.X_OK):
+            try:
+                import bashmenu
+                app_obj = getattr(self, "app", None)
+                cfg = getattr(app_obj, "config", {}) if app_obj else {}
+                interpolated = bashmenu.interpolate_placeholders("{scripts_dir}/rich.sh", cfg)
+                if os.path.isfile(interpolated):
+                    rich_script = interpolated
+            except Exception:  # noqa: BLE001, S110
+                pass
+
+        if not os.path.isfile(rich_script):
+            self.update_status("Error: scripts/rich.sh not found")
+            return
+
+        temp_target = None
+        target_path = self.file_path
+
+        # If untitled or buffer has unsaved changes, write to temporary markdown file
+        if not target_path or getattr(ed, "modified", False) or not os.path.exists(target_path):
+            with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as tf:
+                tf.write("\n".join(ed.lines))
+                temp_target = tf.name
+            target_path = temp_target
+
+        try:
+            bash_bin = "/usr/bin/env bash"
+            cmd = f'bash "{rich_script}" --no-file "{target_path}"'
+            app_obj = getattr(self, "app", None)
+            driver = getattr(app_obj, "_driver", None) if app_obj else None
+            can_suspend = driver is not None and getattr(driver, "can_suspend", False)
+
+            if can_suspend and hasattr(app_obj, "suspend"):
+                with app_obj.suspend():
+                    sys.stdout.write("\x1b[?1049h\x1b[H\x1b[2J")
+                    sys.stdout.flush()
+                    try:
+                        with contextlib.suppress(KeyboardInterrupt, Exception):
+                            subprocess.run(cmd, shell=True, check=False)
+                    finally:
+                        sys.stdout.write("\x1b[?1049l")
+                        sys.stdout.flush()
+                with contextlib.suppress(Exception):
+                    self.screen.refresh()
+            else:
+                with contextlib.suppress(KeyboardInterrupt, Exception):
+                    subprocess.run(cmd, shell=True, check=False)
+            self.update_status("Returned from Markdown viewer")
+        finally:
+            if temp_target and os.path.exists(temp_target):
+                with contextlib.suppress(OSError):
+                    os.unlink(temp_target)
+
+    action_view_markdown = action_toggle_markdown
 
     def action_show_pos(self) -> None:
         self.update_status()
@@ -2402,6 +2485,18 @@ class BashEditScreen(Screen):
                 bashmenu_ui.PLACEHOLDER_HELP_TEXT,
                 theme=self.theme_styles,
                 is_help=True,
+            )
+        )
+
+    def action_show_markdown_reference(self) -> None:
+        """Display the Markdown reference help modal (F8)."""
+        self.app.push_screen(
+            bashmenu_ui.MessageModalScreen(
+                "Markdown Reference",
+                bashmenu_ui.MARKDOWN_REFERENCE_TEXT,
+                theme=self.theme_styles,
+                is_help=True,
+                is_markdown=True,
             )
         )
 

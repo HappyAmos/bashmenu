@@ -1,0 +1,2 @@
+- [ ] Mouse navigation, selection sluggish, clicking links large delay.
+- [ ] Try altering image manipulation to minimize too much ansi character clustering, as it's distorting too much.

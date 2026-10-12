@@ -150,14 +150,23 @@ Dynamic aliases shell template sourced inside user profiles.
 .SH KEYBOARD SHORTCUTS
 .SS Main Menu Interface (bashmenu.py)
 .TP
-.B UP, DOWN, j, k
+.B UP, DOWN
 Navigate highlighted selection row.
 .TP
-.B 0-9, a-z, A-Z
+.B 0-9, a-z
 Select menu option directly by shortcut hotkey.
 .TP
+.B ENTER
+Execute active selected menu option action.
+.TP
 .B F1
-Display the markdown help manual using the glow terminal pager.
+Display Markdown help manual modal.
+.TP
+.B F2
+Open Theme selector dialog.
+.TP
+.B F3
+Launch built-in text editor (bashedit.py).
 .TP
 .B F4
 Launch menuedit.py visual menu tree editor.
@@ -168,9 +177,6 @@ Refresh menu, reload configuration, menu files, and plugin outputs.
 .B F6
 Toggle visibility of option shortcut key badges.
 .TP
-.B ENTER
-Execute active selected menu option action.
-.TP
 .B ESC
 Return to parent menu, or quit if at the root menu level.
 
@@ -179,35 +185,57 @@ Return to parent menu, or quit if at the root menu level.
 When returning from editors, or scripts with refresh: true, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
 .SS Visual Menu Editor (menuedit.py)
 .TP
-.B a, Ins
-Insert new menu option node.
+.B a
+Add new menu option node.
 .TP
 .B e, ENTER
 Edit node properties or submenu header title (opens ItemEditModal).
 .TP
-.B E
-Open raw YAML snippet editor for the selected node.
+.B t
+Change selected item type.
 .TP
-.B d, Delete
+.B SPACE
+Expand or collapse submenu tree node.
+.TP
+.B d
 Delete selected menu option node (with confirm box).
 .TP
-.B m, M
-Move selected item down (m) or up (M).
+.B m
+Move selected item down.
 .TP
-.B <, >
-Outdent (<) item to parent menu or indent (>) item into preceding Submenu.
+.B M
+Move selected item up.
 .TP
-.B t
-Test-run selected menu item action directly.
+.B >
+Indent (>) item into preceding Submenu folder.
 .TP
-.B s
+.B <
+Outdent (<) item to parent menu.
+.TP
+.B F1, ?
+Display HA Bash Menu manual (bashmenu.md) modal.
+.TP
+.B F2
+Toggle (collapse/expand) all children of top root menu.
+.TP
+.B F3, CTRL+A
+View ASCII character table (ascii.sh) modal.
+.TP
+.B F4, CTRL+N
+Search Nerd Font & Emoji glyphs (glyphs.sh) modal.
+.TP
+.B F5, CTRL+P
+View available placeholders and macros modal.
+.TP
+.B s, CTRL+S
 Save changes to bashmenu.mnu.
 .TP
-.B ?, h, F1
-Display comprehensive Property Inspector General Help screen.
-.TP
-.B ESC, C
-Exit editor or cancel dialogs (prompts to save if modifications exist).
+.B ESC, q
+Exit editor (prompts to save if modifications exist).
+
+.PP
+.B ItemEditModal Dialog Keybindings:
+CTRL+S / F2 / s (Save changes), CTRL+T / t (Change item type), CTRL+A / F3 (ASCII table), CTRL+N / F4 (Glyphs), CTRL+P / F5 (Placeholders), F1 / ? (Item property help), ESC / c (Cancel).
 
 .PP
 .B Menu Focus Synchronization & Property Inspector Previews:
@@ -216,22 +244,46 @@ When launching menuedit.py from bashmenu.py (via F4 or menu item action), the ed
 The application features a built-in text editor supporting tabs and desktop
 shortcuts.
 .TP
+.B F1
+View BashEdit keybindings manual modal dialog.
+.TP
+.B F2
+Toggle whitespace visibility (spaces as dots, tabs as arrows).
+.TP
+.B F3
+Stream ASCII character table (ascii.sh) in modal viewer.
+.TP
+.B F4
+Stream terminal colors table (ncurses_colors.py) in modal viewer.
+.TP
+.B F5
+Show modal with available placeholders and macros.
+.TP
+.B F6
+View Markdown via Rich pager (scripts/rich.sh).
+.TP
+.B F7
+Toggle line numbers gutter display.
+.TP
+.B F8
+View Markdown syntax quick reference modal.
+.TP
 .B Ctrl+Q, ESC
 Exit editor (prompts to save if modifications exist).
 .TP
-.B Ctrl+O, Ctrl+R, F5, F7
+.B Ctrl+O, Ctrl+R
 Open file via file picker modal into current or new tab.
 .TP
-.B Ctrl+S, F2, F3
+.B Ctrl+S
 Save active file buffer.
 .TP
-.B Alt+S, Ctrl+Shift+S, F6
+.B Ctrl+A, Ctrl+Shift+S
 Save As (prompts for destination file path).
 .TP
-.B Ctrl+E, F4, [ + ]
+.B Ctrl+N, [ + ]
 Create a new empty document tab.
 .TP
-.B Alt+], Ctrl+Tab / Alt+[, Shift+Tab
+.B Alt+Left, Alt+Right / Alt+], Alt+[
 Switch to next or previous document tab.
 .TP
 .B Ctrl+W
@@ -257,27 +309,6 @@ Paste cutbuffer or system clipboard text at cursor.
 .TP
 .B Ctrl+Z, Ctrl+Y
 Undo or redo edit operations.
-.TP
-.B Ctrl+P, Alt+M
-Show modal with available placeholders and macros.
-.TP
-.B Ctrl+A, F11
-Stream ASCII character table (ascii.sh) in modal viewer.
-.TP
-.B Alt+V, F10
-Stream terminal colors table (ncurses_colors.py) in modal viewer.
-.TP
-.B Alt+1
-Toggle whitespace visibility (spaces as dots, tabs as arrows).
-.TP
-.B Ctrl+N, Alt+N
-Toggle line numbers gutter display.
-.TP
-.B F12
-Toggle Markdown rendering for active document buffer.
-.TP
-.B F1, Ctrl+G
-View BashEdit keybindings manual modal dialog.
 .SH CONFIGURATION & SCHEMA SPECIFICATIONS
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
@@ -404,6 +435,29 @@ Launches a visual directory chooser dialog box.
 .TP
 .B {dir_picker_new}, {dir_picker:new}
 Launches a visual directory chooser dialog box allowing creation of new folders.
+.SS Path Modifiers for Pickers
+Pickers support suffix modifiers to extract subcomponents of the chosen path prior to shell execution:
+.TP
+.B {file_picker:stem}
+Full path without the file extension (e.g. "/path/to/img" from "/path/to/img.png").
+.TP
+.B {file_picker:name}
+Filename with extension (e.g. "img.png").
+.TP
+.B {file_picker:base}
+Filename without extension (e.g. "img").
+.TP
+.B {file_picker:dir}
+Parent directory path (e.g. "/path/to").
+.TP
+.B {file_picker:ext}
+File extension including leading dot (e.g. ".png").
+.TP
+.B {dir_picker:name}
+Folder name without parent path.
+.TP
+.B {dir_picker:dir}
+Parent directory path of the chosen directory.
 .SS Picker Auto-Starting Folders
 Preceding file/directory pickers with a folder path (e.g.
 "{templates_dir}/{file_picker}" or "~/projects/{dir_picker}") causes the engine
@@ -558,7 +612,7 @@ Color themes configure the visual color scheme for the main menu, visual menu ed
 Supported Theme Elements: background, title, border, text, highlight, accent,
 footer, help_text (configures help text in bottom gutter and modal footers),
 plugin (configures text color of background plugin feeds), gutter, selection,
-status_bar, shortcut_key, shortcut_label, divider, button_primary, button_error,
+shortcut_key, divider, button_primary, button_error,
 button_cancel, button_success, scrollbar, and whitespace (configures
 non-visible whitespace character color in the text editor).
 .PP
@@ -638,17 +692,19 @@ and
 lines (such as {user.divider}) rendered before and after script output lines.
 .IP \(bu 2
 .B Declarative Multi-Column Table Layout & Entries Chunking:
-Plugins can be arranged horizontally in equal-width columns (e.g. 50/50, 33/33/33) across the terminal window by specifying a
-.I layout
-dictionary under
-.I settings.plugins
-with
+Plugins can be arranged horizontally in equal-width columns (e.g. 50/50, 33/33/33) across the terminal window by specifying
 .I type: table
-and
-.I width: "100%".
-The
+directly under
+.I settings.plugins
+or within a nested
+.I layout
+mapping. Setting
+.I divider: true
+(or
+.I top_divider: true\c
+) renders a native horizontal divider above the plugin dashboard, automatically allocating vertical line budget. The
 .I entries
-setting (default: 2) sets the maximum plugins per table row. When a third or additional plugin is encountered, a new table is constructed automatically. Long text within cells wraps cleanly at word boundaries.
+setting (default: 2) sets the maximum plugins per table row. When additional plugins are encountered, subsequent tables are constructed automatically. Long text within cells wraps cleanly at word boundaries.
 .IP \(bu 2
 .B Standalone Plugins (standalone: true or span: full):
 Full-width plugins such as Quote of the Day or system status banners can stretch across the entire screen on their own line without table borders by setting

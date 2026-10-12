@@ -106,8 +106,15 @@ PLACEHOLDER_SECTIONS = [
         [
             ("{param}", "Prompts for text input modal (masked=true supported)"),
             ("{file_picker}", "Launches visual file chooser dialog"),
+            ("{file_picker:stem}", "Path without file extension (/path/to/img)"),
+            ("{file_picker:name}", "Filename with extension (img.png)"),
+            ("{file_picker:base}", "Filename without extension (img)"),
+            ("{file_picker:dir}", "Parent directory path (/path/to)"),
+            ("{file_picker:ext}", "File extension with leading dot (.png)"),
             ("{file_picker_new}", "File chooser allowing creation of new files ('n')"),
             ("{dir_picker}", "Launches visual directory chooser dialog"),
+            ("{dir_picker:name}", "Folder name without parent path"),
+            ("{dir_picker:dir}", "Parent directory path of chosen folder"),
             ("{dir_picker_new}", "Directory chooser allowing creation of new folders ('n')"),
         ],
     ),
@@ -288,6 +295,29 @@ def format_rich_reference_help_text(col1_width: int = 34) -> str:
 
 
 RICH_REFERENCE_HELP_TEXT = format_rich_reference_help_text(34)
+
+
+MARKDOWN_REFERENCE_TEXT = """# Markdown Syntax Reference
+
+| Syntax | Output / Action |
+| :--- | :--- |
+| `# Heading 1` | Top-level section heading |
+| `## Heading 2` | Secondary section heading |
+| `### Heading 3` | Subsection heading |
+| `**Bold**` or `__Bold__` | Bold weighted text |
+| `*Italic*` or `_Italic_` | Italic emphasized text |
+| `~~Strikethrough~~` | Strikethrough text |
+| `` `code` `` | Inline monospace code snippet |
+| `> Blockquote` | Quoted callout block |
+| `- Item` or `* Item` | Unordered bulleted list item |
+| `1. Item` | Ordered numbered list item |
+| `- [ ] Todo` / `- [x] Done` | Task list checkboxes |
+| `[Title](url)` | Hyperlink anchor reference |
+| `![Alt](path/to/img)` | Image embed reference |
+| `---` or `***` | Horizontal divider rule |
+| ```` ```bash ```` | Fenced code block with syntax highlight |
+"""
+
 
 
 def is_pua_glyph(c: str) -> bool:
@@ -1210,9 +1240,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("shadow", Style(color="black", dim=True, bgcolor=bg_color))
     styles.setdefault("gutter", Style(color="blue", bgcolor=bg_color))
     styles.setdefault("selection", Style(color="white", bgcolor="blue"))
-    styles.setdefault("status_bar", Style(color="black", bgcolor="cyan"))
     styles.setdefault("shortcut_key", Style(color="magenta", bold=True, bgcolor=bg_color))
-    styles.setdefault("shortcut_label", Style(color="white", bgcolor=bg_color))
     styles.setdefault("divider", Style(color="blue", bgcolor=bg_color))
     styles.setdefault("button_primary", Style(color="white", bgcolor="blue"))
     styles.setdefault("button_error", Style(color="white", bgcolor="red"))
@@ -1334,7 +1362,8 @@ def resolve_theme_dict(theme_val=None, app=None) -> dict:
 
     try:
         import bashmenu
-        config = bashmenu.load_config() if hasattr(bashmenu, "load_config") else {}
+        cfg_res = bashmenu.load_config() if hasattr(bashmenu, "load_config") else {}
+        config = cfg_res[0] if isinstance(cfg_res, tuple) else cfg_res
         if isinstance(config, dict) and "theme" in config:
             active_name = config.get("theme", "dracula")
             return init_theme_colors(active_name)
@@ -1568,10 +1597,11 @@ def composite_single_row(
 
     curr_chars: list[str] = []
     curr_style: Style | None = None
+    base_line_style = console.get_style(line.style) if line.style else None
 
     for seg in line.render(console):
         text = seg.text
-        style = seg.style
+        style = seg.style or base_line_style
         is_highlight_bg = (
             style is not None
             and style.bgcolor is not None
@@ -1902,6 +1932,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_title = parse_css_color(title_style.color.name)
             if css_title:
                 title.styles.color = css_title
+                title.styles.auto_color = False
         borders = theme_dict.get("window_borders") or get_theme_window_borders(theme_dict.get("theme_name", "dracula"))
         l_cap = borders.get("title_left_cap", "[").strip() or "["
         r_cap = borders.get("title_right_cap", "]").strip() or "]"
@@ -1916,6 +1947,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_msg = parse_css_color(msg_style.color.name)
             if css_msg:
                 msg.styles.color = css_msg
+                msg.styles.auto_color = False
 
     with contextlib.suppress(Exception):
         prompt = screen.query_one("#prompt", Static)
@@ -1924,14 +1956,27 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_prompt = parse_css_color(prompt_style.color.name)
             if css_prompt:
                 prompt.styles.color = css_prompt
+                prompt.styles.auto_color = False
 
     with contextlib.suppress(Exception):
-        footer = screen.query_one("#footer", Label)
-        footer_style = theme_dict.get("help_text") or theme_dict.get("footer") or theme_dict.get("text")
+        footer_style = theme_dict.get("footer") or theme_dict.get("help_text") or theme_dict.get("text")
         if footer_style and footer_style.color and footer_style.color.name:
             css_footer = parse_css_color(footer_style.color.name)
             if css_footer:
-                footer.styles.color = css_footer
+                for ft in screen.query("#footer"):
+                    ft.styles.color = css_footer
+                    ft.styles.auto_color = False
+                for fi in screen.query(".footer_item"):
+                    fi.styles.color = css_footer
+                    fi.styles.auto_color = False
+
+        sep_style = theme_dict.get("border") or theme_dict.get("divider")
+        if sep_style and sep_style.color and sep_style.color.name:
+            css_sep = parse_css_color(sep_style.color.name)
+            if css_sep:
+                for fs in screen.query(".footer_sep"):
+                    fs.styles.color = css_sep
+                    fs.styles.auto_color = False
 
     with contextlib.suppress(Exception):
         path_lbl = screen.query_one("#path_label", Label)
@@ -1940,6 +1985,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_path = parse_css_color(path_style.color.name)
             if css_path:
                 path_lbl.styles.color = css_path
+                path_lbl.styles.auto_color = False
 
     for opt_id in ["#options_list", "#option_list"]:
         with contextlib.suppress(Exception):
@@ -1957,6 +2003,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
                 css_fl = parse_css_color(fl_style.color.name)
                 if css_fl:
                     fl.styles.color = css_fl
+                    fl.styles.auto_color = False
 
     with contextlib.suppress(Exception):
         btn_close = screen.query_one(".btn_close_x", Label)
@@ -2122,10 +2169,12 @@ class MessageModalScreen(ModalScreen[None]):
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
+    #modal_frame {
+        max-height: 90%;
+    }
     #dialog {
         width: 70;
         height: auto;
-        max-height: 80%;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -2202,7 +2251,6 @@ class MessageModalScreen(ModalScreen[None]):
     #footer {
         text-align: center;
         margin-top: 1;
-        color: $text-muted;
     }
     """
 
@@ -2440,7 +2488,6 @@ class ConfirmModalScreen(ModalScreen[str]):
     }
     #footer {
         text-align: center;
-        color: $text-muted;
     }
     """
 
@@ -2571,7 +2618,6 @@ class ToggleModalScreen(ModalScreen[str]):
     }
     #footer {
         text-align: center;
-        color: $text-muted;
     }
     """
 
@@ -2703,7 +2749,6 @@ class InputModalScreen(ModalScreen[str]):
     }
     #footer {
         text-align: center;
-        color: $text-muted;
     }
     """
 
@@ -2788,7 +2833,7 @@ class FilePickerModalScreen(ModalScreen[str]):
     }
     #dialog {
         width: 76;
-        height: 22;
+        height: 25;
         max-width: 95%;
         max-height: 95%;
         border: thick $accent;
@@ -2796,7 +2841,7 @@ class FilePickerModalScreen(ModalScreen[str]):
         padding: 1 2;
     }
     FilePickerModalScreen.save_modal #dialog {
-        height: 26;
+        height: 27;
     }
     FilePickerModalScreen.save_modal #options_list {
         height: 10;
@@ -2834,11 +2879,10 @@ class FilePickerModalScreen(ModalScreen[str]):
         background: transparent;
     }
     #path_label {
-        color: $text-muted;
         margin-bottom: 1;
     }
     #options_list {
-        height: 12;
+        height: 11;
         border: solid $accent;
     }
     #save_filename_container {
@@ -2859,7 +2903,6 @@ class FilePickerModalScreen(ModalScreen[str]):
     #footer {
         text-align: center;
         margin-top: 1;
-        color: $text-muted;
     }
     """
 
@@ -2868,6 +2911,7 @@ class FilePickerModalScreen(ModalScreen[str]):
         Binding("ctrl+h", "toggle_hidden", "Toggle Hidden"),
         Binding("space", "select_dir", "Select Folder"),
         Binding("n", "new_item", "New", show=False),
+        Binding("N", "new_item", "New", show=False),
     ]
 
     def __init__(
@@ -2911,11 +2955,26 @@ class FilePickerModalScreen(ModalScreen[str]):
                         with Horizontal(id="save_buttons"):
                             yield Button("Save", variant="primary", id="btn_save")
                             yield Button("Cancel", variant="default", id="btn_cancel")
-                    footer_text = (
-                        "[ENTER] Save/Navigate | [ESC] Cancel"
-                        if self.mode == "save"
-                        else ("[ENTER] Open/Select | [N] New | [ESC] Cancel" if self.allow_new else "[ENTER] Open/Select | [ESC] Cancel")
-                    )
+                    else:
+                        with Horizontal(id="save_buttons"):
+                            ok_label = "Continue" if self.mode == "dir" else "OK"
+                            yield Button(ok_label, variant="primary", id="btn_ok")
+                            if self.allow_new:
+                                new_lbl = "New Folder" if self.mode == "dir" else "New File"
+                                yield Button(new_lbl, variant="default", id="btn_new")
+                            yield Button("Cancel", variant="default", id="btn_cancel")
+                    if self.mode == "save":
+                        footer_text = "[ENTER] Save/Navigate | [ESC] Cancel"
+                    elif self.mode == "dir":
+                        if self.allow_new:
+                            footer_text = "[ENTER] Open/Select | [SPACE] Use Dir | [N] New Folder | [ESC] Cancel"
+                        else:
+                            footer_text = "[ENTER] Open/Select | [SPACE] Use Dir | [ESC] Cancel"
+                    else:
+                        if self.allow_new:
+                            footer_text = "[ENTER] Open/Select | [N] New File | [ESC] Cancel"
+                        else:
+                            footer_text = "[ENTER] Open/Select | [ESC] Cancel"
                     yield Label(footer_text, id="footer")
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
@@ -2929,6 +2988,12 @@ class FilePickerModalScreen(ModalScreen[str]):
             with contextlib.suppress(Exception):
                 apply_button_theme(self.query_one("#btn_save", Button), self.theme, "button_primary")
                 apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+        else:
+            with contextlib.suppress(Exception):
+                apply_button_theme(self.query_one("#btn_ok", Button), self.theme, "button_primary")
+                if self.allow_new:
+                    apply_button_theme(self.query_one("#btn_new", Button), self.theme, "button_cancel")
+                apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
 
     def _submit_save(self) -> None:
         filename = ""
@@ -2941,6 +3006,29 @@ class FilePickerModalScreen(ModalScreen[str]):
         else:
             self.dismiss(None)
 
+    def _submit_selection(self) -> None:
+        try:
+            options_list = self.query_one("#options_list", OptionList)
+            idx = options_list.highlighted
+            if idx is not None and 0 <= idx < len(self.entries):
+                selected = self.entries[idx]
+                if selected.get("is_new"):
+                    self.action_new_item()
+                    return
+                if selected.get("is_self"):
+                    self.dismiss(selected["path"])
+                    return
+                if selected.get("is_dir"):
+                    self.current_path = selected["path"]
+                    self.load_directory()
+                    return
+                self.dismiss(selected["path"])
+                return
+        except Exception:
+            pass
+        if self.mode == "dir":
+            self.dismiss(self.current_path)
+
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
         if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
@@ -2949,8 +3037,17 @@ class FilePickerModalScreen(ModalScreen[str]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id in ("btn_close_x", "btn_cancel"):
             self.dismiss(None)
+        elif event.button.id in ("btn_ok", "btn_continue"):
+            if self.mode == "dir":
+                self.dismiss(self.current_path)
+            elif self.mode == "save":
+                self._submit_save()
+            else:
+                self._submit_selection()
         elif event.button.id == "btn_save":
             self._submit_save()
+        elif event.button.id in ("btn_new", "btn_new_dir"):
+            self.action_new_item()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if self.mode == "save" and getattr(event.input, "id", None) == "filename_input":
@@ -3005,16 +3102,17 @@ class FilePickerModalScreen(ModalScreen[str]):
                 options_list.add_option(Option("📁 .. (Parent Directory)"))
 
             if self.mode == "dir":
+                dir_name = os.path.basename(self.current_path) or "/"
                 self.entries.append(
                     {
-                        "name": f"[ Select Current Directory: {os.path.basename(self.current_path) or '/'} ]",
+                        "name": f"✔  Use this directory ({dir_name})",
                         "is_dir": True,
                         "path": self.current_path,
                         "is_self": True,
                     }
                 )
                 options_list.add_option(
-                    Option("✔ [ Select Current Directory ]")
+                    Option(f"✔  Use this directory ({dir_name})")
                 )
 
             for d in dirs:
@@ -3068,10 +3166,21 @@ class FilePickerModalScreen(ModalScreen[str]):
 
         def name_cb(name: str | None) -> None:
             if name and name.strip():
-                self.dismiss(os.path.join(self.current_path, name.strip()))
+                new_target = os.path.join(self.current_path, name.strip())
+                if self.mode == "dir":
+                    try:
+                        os.makedirs(new_target, exist_ok=True)
+                    except OSError as err:
+                        self.app.push_screen(
+                            MessageModalScreen("Error", f"Failed to create directory:\n{err}", theme=self.theme)
+                        )
+                        return
+                    self.dismiss(new_target)
+                else:
+                    self.dismiss(new_target)
 
         self.app.push_screen(
-            InputModalScreen(f"New {prompt_type}", f"Enter new {prompt_type.lower()} name:"),
+            InputModalScreen(f"New {prompt_type}", f"Enter new {prompt_type.lower()} name:", theme=self.theme),
             name_cb,
         )
 
@@ -3130,7 +3239,6 @@ class ThemePickerModalScreen(ModalScreen[str]):
     #footer {
         text-align: center;
         margin-top: 1;
-        color: $text-muted;
     }
     """
 
@@ -3250,7 +3358,6 @@ class StreamOutputModalScreen(ModalScreen[None]):
     #footer {
         text-align: center;
         margin-top: 1;
-        color: $text-muted;
     }
     """
 

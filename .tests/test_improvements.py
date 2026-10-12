@@ -4,6 +4,9 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+import shutil
+import tempfile
+
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -26,6 +29,193 @@ class TestImprovements(unittest.TestCase):
         # Bindings should include 'n'
         binding_keys = [b.key for b in fp.BINDINGS]
         self.assertIn("n", binding_keys)
+
+    def test_dir_picker_modal_ui_and_actions(self):
+        """Verify FilePickerModalScreen in dir mode with allow_new=True."""
+        dismissed = []
+        new_folder_name = "test_created_subfolder"
+
+        class MockApp:
+            def push_screen(self, scr, cb):
+                cb(new_folder_name)
+
+        mock_app = MockApp()
+
+        class DummyDirModal(bashmenu_ui.FilePickerModalScreen):
+            def dismiss(self, result=None):
+                dismissed.append(result)
+
+            @property
+            def app(self):
+                return mock_app
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            dp = DummyDirModal("Select Directory", start_dir=temp_dir, mode="dir", allow_new=True)
+            self.assertTrue(dp.allow_new)
+            self.assertEqual(dp.mode, "dir")
+
+            # Check keybindings
+            binding_keys = [b.key for b in dp.BINDINGS]
+            self.assertIn("n", binding_keys)
+            self.assertIn("N", binding_keys)
+            self.assertIn("space", binding_keys)
+
+            # Check on_button_pressed for btn_ok (Continue)
+            class DummyBtn:
+                def __init__(self, bid):
+                    self.id = bid
+
+            class DummyEv:
+                def __init__(self, bid):
+                    self.button = DummyBtn(bid)
+
+            dp.on_button_pressed(DummyEv("btn_ok"))
+            self.assertEqual(len(dismissed), 1)
+            self.assertEqual(dismissed[0], dp.current_path)
+
+            # Check new folder creation via action_new_item
+            target_created = os.path.join(temp_dir, new_folder_name)
+            self.assertFalse(os.path.exists(target_created))
+
+            dp.action_new_item()
+            self.assertTrue(os.path.exists(target_created))
+            self.assertEqual(dismissed[-1], target_created)
+
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_dir_picker_new_action_invocation(self):
+        """Verify process_item_action with {dir_picker_new} macro launches FilePickerModalScreen with allow_new=True."""
+        screens_pushed = []
+
+        class MockApp:
+            def push_screen(self, scr, cb=None):
+                screens_pushed.append(scr)
+
+        class MockScreen:
+            app = MockApp()
+
+        item = {
+            "type": "command",
+            "action": "cd {dir_picker_new} && agy",
+        }
+        config = bashmenu.load_config()[0]
+        bashmenu.process_item_action(MockScreen(), item, config)
+
+        self.assertEqual(len(screens_pushed), 1)
+        picker = screens_pushed[0]
+        self.assertIsInstance(picker, bashmenu_ui.FilePickerModalScreen)
+        self.assertEqual(picker.mode, "dir")
+        self.assertTrue(picker.allow_new)
+
+    def test_file_picker_new_action_invocation(self):
+        """Verify process_item_action with {file_picker_new} macro launches FilePickerModalScreen with allow_new=True."""
+        screens_pushed = []
+
+        class MockApp:
+            def push_screen(self, scr, cb=None):
+                screens_pushed.append(scr)
+
+        class MockScreen:
+            app = MockApp()
+
+        item = {
+            "type": "command",
+            "action": "cat {file_picker_new}",
+        }
+        config = bashmenu.load_config()[0]
+        bashmenu.process_item_action(MockScreen(), item, config)
+
+        self.assertEqual(len(screens_pushed), 1)
+        picker = screens_pushed[0]
+        self.assertIsInstance(picker, bashmenu_ui.FilePickerModalScreen)
+        self.assertEqual(picker.mode, "file")
+        self.assertTrue(picker.allow_new)
+
+    def test_file_picker_path_modifiers_unit(self):
+        """Verify _apply_file_picker_macros and _apply_dir_picker_macros decomposition."""
+        sample_path = "/home/andrew/Pictures/twilight.png"
+        template = r'convert "{file_picker}" -resize 80x48\! "{file_picker:stem}.pixel.png" -name "{file_picker:name}" -base "{file_picker:base}" -dir "{file_picker:dir}" -ext "{file_picker:ext}"'
+        res = bashmenu._apply_file_picker_macros(template, sample_path)
+
+        expected = r'convert "/home/andrew/Pictures/twilight.png" -resize 80x48\! "/home/andrew/Pictures/twilight.pixel.png" -name "twilight.png" -base "twilight" -dir "/home/andrew/Pictures" -ext ".png"'
+        self.assertEqual(res, expected)
+
+        # Test paths with spaces
+        spaced_path = "/home/andrew/My Wallpapers/cool sunset.jpg"
+        spaced_template = 'cp "{file_picker}" "{file_picker:stem}.bak.jpg"'
+        res_spaced = bashmenu._apply_file_picker_macros(spaced_template, spaced_path)
+        self.assertEqual(res_spaced, 'cp "/home/andrew/My Wallpapers/cool sunset.jpg" "/home/andrew/My Wallpapers/cool sunset.bak.jpg"')
+
+        # Test file with no extension
+        no_ext_path = "/usr/local/bin/myrunner"
+        no_ext_template = '{file_picker:stem}|{file_picker:base}|{file_picker:ext}'
+        res_no_ext = bashmenu._apply_file_picker_macros(no_ext_template, no_ext_path)
+        self.assertEqual(res_no_ext, "/usr/local/bin/myrunner|myrunner|")
+
+        # Test new variant modifiers
+        new_template = '{file_picker_new:stem}.out'
+        res_new = bashmenu._apply_file_picker_macros(new_template, sample_path)
+        self.assertEqual(res_new, "/home/andrew/Pictures/twilight.out")
+
+        # Test directory picker modifiers
+        dir_sample = "/home/andrew/Pictures/Screenshots"
+        dir_template = 'cd "{dir_picker}" && echo "{dir_picker:name}" in "{dir_picker:dir}"'
+        res_dir = bashmenu._apply_dir_picker_macros(dir_template, dir_sample)
+        self.assertEqual(res_dir, 'cd "/home/andrew/Pictures/Screenshots" && echo "Screenshots" in "/home/andrew/Pictures"')
+
+    def test_file_picker_path_modifiers_invocation(self):
+        """Verify process_item_action with {file_picker:stem} launches picker and resolves callback."""
+        screens_pushed = []
+        callbacks = []
+
+        class MockApp:
+            def push_screen(self, scr, cb=None):
+                screens_pushed.append(scr)
+                callbacks.append(cb)
+
+        class MockScreen:
+            app = MockApp()
+
+        item = {
+            "type": "command",
+            "action": 'convert "{file_picker}" "{file_picker:stem}.pixel.png"',
+        }
+        config = bashmenu.load_config()[0]
+        bashmenu.process_item_action(MockScreen(), item, config)
+
+        self.assertEqual(len(screens_pushed), 1)
+        picker = screens_pushed[0]
+        self.assertIsInstance(picker, bashmenu_ui.FilePickerModalScreen)
+        self.assertFalse(picker.allow_new)
+
+    def test_message_modal_dialog_sizing_and_shadow(self):
+        """Verify MessageModalScreen dialog and drop shadow alignment without OK button clipping."""
+        import asyncio
+        from textual.app import App
+
+        class ModalApp(App):
+            async def on_mount(self):
+                screen = bashmenu_ui.MessageModalScreen("Save Menu", "Menu saved successfully to disk.")
+                await self.push_screen(screen)
+                await asyncio.sleep(0.05)
+                d = screen.query_one("#dialog")
+                dh = screen.query_one("#dialog_hrow")
+                sb = screen.query_one("#shadow_bottom")
+                btn = screen.query_one("#btn_ok")
+                self.dialog_h = d.outer_size.height
+                self.dh_h = dh.size.height
+                self.sb_y = sb.region.y
+                self.dialog_bottom_y = d.region.y + d.region.height
+                self.btn_bottom_y = btn.region.y + btn.region.height
+                self.exit()
+
+        app = ModalApp()
+        app.run(headless=True)
+        self.assertEqual(app.dialog_h, app.dh_h)
+        self.assertEqual(app.sb_y, app.dialog_bottom_y)
+        self.assertLess(app.btn_bottom_y, app.dialog_bottom_y)
 
     def test_theme_picker_modal(self):
         tp = bashmenu_ui.ThemePickerModalScreen(current_theme="dracula")
@@ -203,7 +393,7 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_modal_links())
 
-    def test_bashedit_f12_markdown_toggle(self):
+    def test_bashedit_f6_markdown_toggle(self):
         import asyncio
 
         from textual.app import App
@@ -225,66 +415,32 @@ class TestImprovements(unittest.TestCase):
 
                 # 1. Legend label verification
                 self.assertIsNotNone(lbl_md)
-                self.assertEqual(str(lbl_md.render()), "F12 MD")
+                self.assertEqual(str(lbl_md.render()), "F6 MD")
 
                 # Set up sample markdown lines
-                ed.lines = ["# Title", "", "A paragraph of markdown text.", ""] + [
-                    f"- Item {i}" for i in range(50)
-                ]
-                self.assertFalse(ed.show_markdown)
-                self.assertFalse(screen.tabs[screen.active_tab_idx].show_markdown)
+                ed.lines = ["# Title", "", "A paragraph of markdown text.", ""]
 
-                # 2. Press F12 to enable Markdown rendering
-                await pilot.press("f12")
-                await pilot.pause()
-                self.assertTrue(ed.show_markdown)
-                self.assertTrue(screen.tabs[screen.active_tab_idx].show_markdown)
+                # 2. Test F6 invokes action_toggle_markdown / action_view_markdown
+                with patch.object(screen, "action_toggle_markdown") as mock_toggle:
+                    await pilot.press("f6")
+                    await pilot.pause()
+                    mock_toggle.assert_called_once()
+
+                # 3. Test clicking lbl_markdown triggers action_toggle_markdown
+                with patch.object(screen, "action_toggle_markdown") as mock_toggle:
+                    await pilot.click(lbl_md)
+                    await pilot.pause()
+                    mock_toggle.assert_called_once()
+
+                # 4. Verify action_toggle_markdown executes rich.sh and suspends app
+                with patch("subprocess.run") as mock_subproc:
+                    screen.action_toggle_markdown()
+                    mock_subproc.assert_called_once()
+                    cmd_run = mock_subproc.call_args[0][0]
+                    self.assertIn("rich.sh", cmd_run)
+
                 status_lbl = screen.query_one("#editor_status", Label)
-                self.assertIn("Markdown rendering enabled", str(status_lbl.render()))
-
-                # 3. Test scrolling in Markdown mode
-                ed.top_line = 0
-                ed.post_message(
-                    MouseScrollDown(
-                        ed, x=10, y=5, delta_x=0, delta_y=1, button=4, shift=False, meta=False, ctrl=False
-                    )
-                )
-                await pilot.pause()
-                self.assertEqual(ed.top_line, 3)
-
-                ed.post_message(
-                    MouseScrollUp(
-                        ed, x=10, y=5, delta_x=0, delta_y=-1, button=5, shift=False, meta=False, ctrl=False
-                    )
-                )
-                await pilot.pause()
-                self.assertEqual(ed.top_line, 0)
-
-                # 4. In Markdown preview mode, typing keys does not mutate lines
-                initial_lines = list(ed.lines)
-                await pilot.press("a")
-                await pilot.pause()
-                self.assertEqual(ed.lines, initial_lines)
-                self.assertIn("Markdown preview active", str(status_lbl.render()))
-
-                # 5. Press F12 again to disable Markdown rendering
-                await pilot.press("f12")
-                await pilot.pause()
-                self.assertFalse(ed.show_markdown)
-                self.assertFalse(screen.tabs[screen.active_tab_idx].show_markdown)
-                self.assertIn("Markdown rendering disabled", str(status_lbl.render()))
-
-                # 6. Regular editing resumes
-                ed.lines = [""]
-                ed.cursor_x = 0
-                ed.cursor_y = 0
-                await pilot.press("x")
-                await pilot.pause()
-                self.assertEqual(ed.lines[0], "x")
-
-                # 7. Clicking lbl_markdown toggles markdown
-                screen.action_toggle_markdown()
-                self.assertTrue(ed.show_markdown)
+                self.assertIn("Returned from Markdown viewer", str(status_lbl.render()))
 
         asyncio.run(run_markdown_toggle_checks())
 
@@ -434,12 +590,12 @@ class TestImprovements(unittest.TestCase):
                 self.assertEqual(len(row1_ids), 8)
                 self.assertEqual(len(row2_ids), 8)
                 self.assertEqual(row1_ids, [
-                    "lbl_open", "lbl_save", "lbl_save_as", "lbl_search",
-                    "lbl_cut", "lbl_copy", "lbl_paste", "lbl_undo",
+                    "lbl_help", "lbl_space", "lbl_ascii", "lbl_colors",
+                    "lbl_placeholders", "lbl_markdown", "lbl_lineno", "lbl_md_ref",
                 ])
                 self.assertEqual(row2_ids, [
-                    "lbl_placeholders", "lbl_ascii", "lbl_colors", "lbl_space",
-                    "lbl_lineno", "lbl_markdown", "lbl_help", "lbl_exit",
+                    "lbl_new_tab", "lbl_open", "lbl_save", "lbl_save_as",
+                    "lbl_search", "lbl_undo", "lbl_tabs", "lbl_exit",
                 ])
 
         asyncio.run(run_checks())
@@ -475,15 +631,15 @@ class TestImprovements(unittest.TestCase):
                 screen.update_legend_layout(width=80)
                 margins_80_r0 = [it.styles.margin.right for it in rows[0].query(".footer_item")]
                 margins_80_r1 = [it.styles.margin.right for it in rows[1].query(".footer_item")]
-                self.assertEqual(margins_80_r0, [3, 3, 3, 2, 2, 2, 2, 0])
-                self.assertEqual(margins_80_r1, [1, 1, 1, 1, 1, 1, 1, 0])
+                self.assertEqual(margins_80_r0, [0, 0, 0, 0, 0, 0, 0, 0])
+                self.assertEqual(margins_80_r1, [0, 0, 0, 0, 0, 0, 0, 0])
 
                 # Test dynamic update at 160 width
                 screen.update_legend_layout(width=160)
                 margins_160_r0 = [it.styles.margin.right for it in rows[0].query(".footer_item")]
                 margins_160_r1 = [it.styles.margin.right for it in rows[1].query(".footer_item")]
-                self.assertEqual(margins_160_r0, [14, 14, 14, 14, 14, 14, 13, 0])
-                self.assertEqual(margins_160_r1, [13, 13, 13, 12, 12, 12, 12, 0])
+                self.assertEqual(margins_160_r0, [6, 6, 6, 6, 6, 6, 6, 0])
+                self.assertEqual(margins_160_r1, [6, 6, 6, 6, 6, 6, 6, 0])
 
         asyncio.run(run_checks())
 
@@ -1228,7 +1384,7 @@ class TestImprovements(unittest.TestCase):
             self.assertTrue(help_modal.is_markdown)
             self.assertTrue(help_modal.is_help)
             self.assertIn("| Keybinding / Shortcut | Description / Action |", help_modal.message)
-            self.assertIn("| `^A` / `F11` | View ASCII Character Table (`ascii.sh`) |", help_modal.message)
+            self.assertIn("| `F3` | View ASCII Character Table (`ascii.sh`) |", help_modal.message)
 
             # 2. Test action_show_ascii_table pushes StreamOutputModalScreen
             screen.action_show_ascii_table()
@@ -1238,9 +1394,10 @@ class TestImprovements(unittest.TestCase):
             self.assertIn("ascii.sh", stream_modal.command)
 
         # 3. Test bindings in BashEditScreen
-        binding_keys = {b.key for b in bashedit.BashEditScreen.BINDINGS}
-        self.assertIn("ctrl+a", binding_keys)
-        self.assertIn("f11", binding_keys)
+        binding_dict = {b.key: b.action for b in bashedit.BashEditScreen.BINDINGS}
+        self.assertEqual(binding_dict.get("f3"), "show_ascii_table")
+        self.assertEqual(binding_dict.get("ctrl+a"), "save_file_as")
+        self.assertNotIn("f11", binding_dict)
 
     def test_bashedit_terminal_key_input_handling(self):
         """Verify Enter, Tab, Backspace, and characters are never swallowed by control character checks."""
@@ -2103,6 +2260,447 @@ class TestImprovements(unittest.TestCase):
             finally:
                 with contextlib.suppress(OSError):
                     os.remove(tf_path)
+
+    def test_bashmenu_f3_launches_bashedit(self):
+        """Verify pressing F3 launches bashedit from the main menu."""
+        import asyncio
+        from bashmenu import BashMenuApp, BashMenuScreen
+        from bashedit import BashEditScreen
+
+        async def run_check():
+            app = BashMenuApp()
+            async with app.run_test(size=(120, 30)) as pilot:
+                await pilot.pause()
+                self.assertIsInstance(app.screen, BashMenuScreen)
+                await pilot.press("f3")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, BashEditScreen)
+
+        asyncio.run(run_check())
+
+    def test_bashmenu_help_gutter_spreading(self):
+        """Verify wrap_gutter_items with spread=True balances and spreads items across max_w."""
+        import bashmenu
+        import bashmenu_ui
+
+        items = ["[UP/DN]: Nav", "[F1]: Help", "[F2]: Themes", "[F3]: Editor"]
+        max_w = 60
+        spread_line = bashmenu.format_spread_gutter_line(items, max_w)
+        self.assertEqual(bashmenu_ui.get_visible_len(spread_line), max_w)
+        self.assertIn(" | ", spread_line)
+        for it in items:
+            self.assertIn(it, spread_line)
+
+        # Multi-line spread test
+        all_items = [f"Item{i}" for i in range(8)]
+        lines = bashmenu.wrap_gutter_items(all_items, max_w=40, max_lines=2, spread=True)
+        self.assertEqual(len(lines), 2)
+        for l in lines:
+            self.assertEqual(bashmenu_ui.get_visible_len(l), 40)
+            self.assertIn("|", l)
+
+    def test_menuedit_footer_dynamic_spreading(self):
+        """Verify menuedit.MenuEditScreen spreads footer items and pipe separators across available width."""
+        import asyncio
+        from textual.app import App
+        import menuedit
+
+        class MenuApp(App):
+            def compose(self):
+                yield menuedit.MenuEditScreen()
+
+        async def run_check():
+            app = MenuApp()
+            async with app.run_test(size=(120, 30)):
+                screen = app.query_one(menuedit.MenuEditScreen)
+                rows = list(screen.query("#footer .footer_row"))
+                self.assertEqual(len(rows), 2)
+                # Verify row 0 begins with F1-F5 function key shortcuts in order
+                r0_ids = [it.id for it in rows[0].query(".footer_item")[:5]]
+                self.assertEqual(r0_ids, ["lbl_help", "lbl_toggle_all", "lbl_ascii", "lbl_glyphs", "lbl_placeholders"])
+
+                # Check margins were calculated on items and separators
+                r0_item_margins = [it.styles.margin.right for it in rows[0].query(".footer_item")]
+                r0_sep_margins = [it.styles.margin.right for it in rows[0].query(".footer_sep")]
+                self.assertEqual(r0_item_margins[-1], 0)
+                self.assertTrue(any(m > 0 for m in r0_item_margins[:-1]))
+                self.assertTrue(any(m > 0 for m in r0_sep_margins))
+
+        asyncio.run(run_check())
+
+    def test_menuedit_lookup_glyphs(self):
+        """Verify menuedit.MenuEditScreen and ItemEditModal support Ctrl+N and F5 glyph lookup."""
+        import menuedit
+        import bashmenu_ui
+
+        # 1. Check MenuEditScreen bindings and footer item
+        screen_bindings = {b.key: b.action for b in menuedit.MenuEditScreen.BINDINGS}
+        self.assertIn("ctrl+n", screen_bindings)
+        self.assertEqual(screen_bindings["ctrl+n"], "lookup_glyphs")
+        self.assertIn("f4", screen_bindings)
+        self.assertEqual(screen_bindings["f4"], "lookup_glyphs")
+
+        # 2. Check ItemEditModal bindings
+        modal_bindings = {b.key: b.action for b in menuedit.ItemEditModal.BINDINGS}
+        self.assertIn("ctrl+n", modal_bindings)
+        self.assertEqual(modal_bindings["ctrl+n"], "lookup_glyphs")
+        self.assertIn("f4", modal_bindings)
+        self.assertEqual(modal_bindings["f4"], "lookup_glyphs")
+
+        # 3. Test action_lookup_glyphs behavior on MenuEditScreen
+        class DummyApp:
+            def __init__(self):
+                self.pushed = []
+                self.callbacks = []
+                self.config = {"scripts_dir": "/mock/scripts"}
+
+            def push_screen(self, screen, callback=None):
+                self.pushed.append(screen)
+                if callback:
+                    self.callbacks.append(callback)
+
+        dummy_app = DummyApp()
+        editor = menuedit.MenuEditScreen()
+        editor._app = dummy_app
+        editor.action_lookup_glyphs()
+
+        self.assertEqual(len(dummy_app.pushed), 1)
+        self.assertIsInstance(dummy_app.pushed[0], bashmenu_ui.InputModalScreen)
+        self.assertEqual(len(dummy_app.callbacks), 1)
+
+        # Trigger callback with a search term
+        dummy_app.callbacks[0]("arrow")
+        self.assertEqual(len(dummy_app.pushed), 2)
+        self.assertIsInstance(dummy_app.pushed[1], bashmenu_ui.StreamOutputModalScreen)
+        self.assertIn("glyphs.sh", dummy_app.pushed[1].command)
+        self.assertIn("arrow", dummy_app.pushed[1].command)
+
+        # 4. Test action_lookup_glyphs on ItemEditModal
+        dummy_app_modal = DummyApp()
+        modal = menuedit.ItemEditModal({"type": "command", "title": "Test", "command": "echo 1"})
+        modal._app = dummy_app_modal
+        modal.action_lookup_glyphs()
+
+        self.assertEqual(len(dummy_app_modal.pushed), 1)
+        self.assertIsInstance(dummy_app_modal.pushed[0], bashmenu_ui.InputModalScreen)
+        dummy_app_modal.callbacks[0]("folder")
+        self.assertEqual(len(dummy_app_modal.pushed), 2)
+        self.assertIsInstance(dummy_app_modal.pushed[1], bashmenu_ui.StreamOutputModalScreen)
+        self.assertIn("glyphs.sh", dummy_app_modal.pushed[1].command)
+        self.assertIn("folder", dummy_app_modal.pushed[1].command)
+
+    def test_menuedit_help_modal(self):
+        """Verify menuedit.MenuEditScreen has F1 / ? help binding and pushes HA Bash Menu manual modal."""
+        import menuedit
+        import bashmenu_ui
+
+        # 1. Verify BINDINGS
+        screen_bindings = {b.key: b.action for b in menuedit.MenuEditScreen.BINDINGS}
+        self.assertIn("f1", screen_bindings)
+        self.assertEqual(screen_bindings["f1"], "help")
+        self.assertIn("question_mark", screen_bindings)
+        self.assertEqual(screen_bindings["question_mark"], "help")
+
+        # 2. Verify action_help pushes HA Bash Menu Manual modal
+        class DummyApp:
+            def __init__(self):
+                self.pushed = []
+
+            def push_screen(self, screen, callback=None):
+                self.pushed.append(screen)
+
+        dummy_app = DummyApp()
+        editor = menuedit.MenuEditScreen()
+        editor._app = dummy_app
+        editor.action_help()
+
+        self.assertEqual(len(dummy_app.pushed), 1)
+        help_modal = dummy_app.pushed[0]
+        self.assertIsInstance(help_modal, bashmenu_ui.MessageModalScreen)
+        self.assertEqual(help_modal.modal_title, "HA Bash Menu Manual")
+        self.assertTrue(help_modal.is_help)
+        self.assertTrue(help_modal.is_markdown)
+        self.assertIn("HA Bash Menu Specification & User Manual", help_modal.message)
+
+    def test_menuedit_prevent_root_collapse_and_f2_toggle_children(self):
+        """Verify top root node cannot be collapsed, F2 toggles children, and F3/F4/F5 mappings."""
+        import asyncio
+        from textual.app import App
+        from textual.widgets import Tree
+        import menuedit
+
+        # 1. Check MenuEditScreen keybindings
+        screen_bindings = {b.key: b.action for b in menuedit.MenuEditScreen.BINDINGS}
+        self.assertEqual(screen_bindings.get("f2"), "toggle_children")
+        self.assertEqual(screen_bindings.get("f3"), "lookup_ascii")
+        self.assertEqual(screen_bindings.get("f4"), "lookup_glyphs")
+        self.assertEqual(screen_bindings.get("f5"), "show_placeholders")
+
+        class EditorApp(App):
+            def compose(self):
+                yield menuedit.MenuEditScreen()
+
+        async def run_checks():
+            app = EditorApp()
+            async with app.run_test():
+                screen = app.query_one(menuedit.MenuEditScreen)
+                tree = screen.query_one("#tree", Tree)
+                root = tree.root
+
+                # Root starts expanded
+                self.assertTrue(root.is_expanded)
+
+                # Attempt to collapse root directly or via space/toggle
+                root.collapse()
+                self.assertTrue(root.is_expanded)
+                root.toggle()
+                self.assertTrue(root.is_expanded)
+
+                tree.cursor_line = 0  # Select root node
+                tree.action_toggle_node()
+                self.assertTrue(root.is_expanded)
+                screen.action_toggle_tree_node()
+                self.assertTrue(root.is_expanded)
+
+                # Check children exist
+                self.assertTrue(len(root.children) > 0)
+
+                # First F2 press toggles: should collapse all expandable children
+                screen.action_toggle_children()
+                self.assertTrue(root.is_expanded)
+                expandable_children = [c for c in root.children if c.children]
+                for c in expandable_children:
+                    self.assertFalse(c.is_expanded)
+
+                # Second F2 press toggles: should expand all expandable children
+                screen.action_toggle_children()
+                self.assertTrue(root.is_expanded)
+                for c in expandable_children:
+                    self.assertTrue(c.is_expanded)
+
+        asyncio.run(run_checks())
+
+    def test_bashedit_f1_to_f6_function_key_bindings_and_no_aliases(self):
+        """Verify F1-F6 bindings, footer labels, on_key routing, and absence of old aliases."""
+        import asyncio
+        from unittest.mock import MagicMock, patch
+        from textual.app import App
+        from textual.widgets import Label
+        import bashedit
+
+        # 1. BINDINGS mapping verification
+        binding_dict = {b.key: b.action for b in bashedit.BashEditScreen.BINDINGS}
+        self.assertEqual(binding_dict.get("f1"), "help_manual")
+        self.assertEqual(binding_dict.get("f2"), "toggle_whitespace")
+        self.assertEqual(binding_dict.get("f3"), "show_ascii_table")
+        self.assertEqual(binding_dict.get("f4"), "view_colors")
+        self.assertEqual(binding_dict.get("f5"), "show_placeholders")
+        self.assertEqual(binding_dict.get("f6"), "toggle_markdown")
+
+        # Discarded keys must not be present in BINDINGS
+        discarded_keys = ["alt+1", "alt+v", "ctrl+p", "f10", "f11", "f12", "ctrl+g", "alt+h", "alt+m", "alt+s", "meta+s"]
+        for k in discarded_keys:
+            self.assertNotIn(k, binding_dict)
+        self.assertEqual(binding_dict.get("ctrl+a"), "save_file_as")
+
+        # F2-F6 must not be bound to file operations
+        for b in bashedit.BashEditScreen.BINDINGS:
+            if b.key in ("f2", "f3"):
+                self.assertNotEqual(b.action, "save_file")
+            if b.key == "f4":
+                self.assertNotEqual(b.action, "new_file")
+            if b.key == "f5":
+                self.assertNotEqual(b.action, "open_file")
+            if b.key == "f6":
+                self.assertNotEqual(b.action, "save_file_as")
+
+        # 2. Check footer labels in TestApp
+        class TestApp(App):
+            def compose(self):
+                yield bashedit.BashEditScreen()
+
+        app = TestApp()
+
+        async def run_editor_checks():
+            async with app.run_test() as pilot:
+                screen = app.query_one(bashedit.BashEditScreen)
+                legend = screen.query_one("#editor_legend")
+                rows = list(legend.query(".footer_row"))
+                row1_items = list(rows[0].query(".footer_item"))
+                row2_items = list(rows[1].query(".footer_item"))
+
+                # All 8 items on row 1 must be F1-F8 in numerical order
+                expected_first_8 = [
+                    ("lbl_help", "F1 Help"),
+                    ("lbl_space", "F2 Whitespace"),
+                    ("lbl_ascii", "F3 ASCII"),
+                    ("lbl_colors", "F4 Colors"),
+                    ("lbl_placeholders", "F5 Macros"),
+                    ("lbl_markdown", "F6 MD"),
+                    ("lbl_lineno", "F7 Lineno"),
+                    ("lbl_md_ref", "F8 MD Ref"),
+                ]
+                for idx, (expected_id, expected_text) in enumerate(expected_first_8):
+                    item = row1_items[idx]
+                    self.assertEqual(item.id, expected_id)
+                    self.assertEqual(str(item.render()), expected_text)
+
+                # Check Tab, SaveAs, and Tabs labels in row 2
+                lbl_new_tab = screen.query_one("#lbl_new_tab", Label)
+                self.assertEqual(str(lbl_new_tab.render()), "^N Tab")
+                lbl_save_as = screen.query_one("#lbl_save_as", Label)
+                self.assertEqual(str(lbl_save_as.render()), "^A SaveAs")
+                lbl_tabs = screen.query_one("#lbl_tabs", Label)
+                self.assertEqual(str(lbl_tabs.render()), "Alt+←/→ Tab")
+
+                # 3. Test on_key routing for F2 whitespace toggle
+                ed = screen.query_one("#editor_widget", bashedit.EditorWidget)
+                self.assertFalse(ed.show_whitespace)
+                await pilot.press("f2")
+                self.assertTrue(ed.show_whitespace)
+                await pilot.press("f2")
+                self.assertFalse(ed.show_whitespace)
+
+                # Ensure old Alt+1 does not toggle whitespace
+                await pilot.press("alt+1")
+                self.assertFalse(ed.show_whitespace)
+
+                # 4. Test Ctrl+A triggers save_file_as
+                with patch.object(screen, "action_save_file_as") as mock_save_as:
+                    await pilot.press("ctrl+a")
+                    mock_save_as.assert_called_once()
+
+                # 5. Test Ctrl+N triggers new tab and Alt+T does not
+                with patch.object(screen, "action_new_tab") as mock_new_tab:
+                    await pilot.press("ctrl+n")
+                    mock_new_tab.assert_called_once()
+                with patch.object(screen, "action_new_tab") as mock_new_tab:
+                    await pilot.press("alt+t")
+                    mock_new_tab.assert_not_called()
+
+                # 6. Test F7 triggers toggle_lineno and F8 triggers show_markdown_reference
+                with patch.object(screen, "action_toggle_lineno") as mock_lineno:
+                    await pilot.press("f7")
+                    mock_lineno.assert_called_once()
+                with patch.object(screen, "action_show_markdown_reference") as mock_mdref:
+                    await pilot.press("f8")
+                    mock_mdref.assert_called_once()
+
+                # 7. Test clicking lbl_tabs advances tab and lbl_new_tab creates tab
+                with patch.object(screen, "action_next_tab") as mock_next_tab:
+                    await pilot.click(lbl_tabs)
+                    mock_next_tab.assert_called_once()
+                with patch.object(screen, "action_new_tab") as mock_new_tab:
+                    await pilot.click(lbl_new_tab)
+                    mock_new_tab.assert_called_once()
+
+        asyncio.run(run_editor_checks())
+
+    def test_bashedit_tab_bar_retention_on_save_and_tab_lifecycle(self):
+        """Verify tab bar does not blank/disappear when saving a file or managing tabs."""
+        import asyncio
+        import os
+        import tempfile
+        from textual.app import App
+        import bashedit
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+            f.write("initial line\n")
+            path = f.name
+
+        try:
+            class TestApp(App):
+                def compose(self):
+                    yield bashedit.BashEditScreen(file_path=path)
+
+            app = TestApp()
+
+            async def run_checks():
+                async with app.run_test() as pilot:
+                    screen = app.query_one(bashedit.BashEditScreen)
+                    tab_bar = screen.query_one("#editor_tab_bar")
+
+                    # 1. Verify initial tab bar has active tab label and add button
+                    self.assertGreaterEqual(len(tab_bar.children), 2)
+                    tab_labels = [str(c.render()) for c in tab_bar.children]
+                    base_name = os.path.basename(path)
+                    self.assertTrue(any(base_name in t for t in tab_labels))
+
+                    # 2. Modify editor and save file
+                    ed = screen.query_one("#editor_widget", bashedit.EditorWidget)
+                    ed.lines.append("second line")
+                    ed.modified = True
+                    screen.tabs[screen.active_tab_idx].modified = True
+                    screen.refresh_tab_bar()
+
+                    # Tab bar shows modified indicator
+                    mod_labels = [str(c.render()) for c in tab_bar.children]
+                    self.assertTrue(any("*" in t for t in mod_labels))
+
+                    # Execute save
+                    screen.action_save_file()
+                    await pilot.pause()
+
+                    # 3. CRITICAL: Tab bar must NOT be blank/empty after save
+                    post_save_children = list(tab_bar.children)
+                    self.assertGreaterEqual(len(post_save_children), 2)
+                    post_save_labels = [str(c.render()) for c in post_save_children]
+                    # Modified indicator must be cleared, filename remains visible
+                    self.assertTrue(any(base_name in t for t in post_save_labels))
+                    self.assertFalse(any("*" in t for t in post_save_labels))
+
+                    # 4. Open new tab and verify tab bar displays both tabs
+                    screen.action_new_tab()
+                    await pilot.pause()
+                    new_tab_labels = [str(c.render()) for c in tab_bar.children]
+                    self.assertTrue(any(base_name in t for t in new_tab_labels))
+                    self.assertTrue(any("Untitled" in t for t in new_tab_labels))
+
+                    # 5. Save again on new tab and verify tab bar remains intact
+                    screen.action_save_file()
+                    await pilot.pause()
+                    self.assertGreaterEqual(len(tab_bar.children), 3)
+
+                    # 6. Close second tab and verify tab bar updates cleanly
+                    screen.action_close_tab(1)
+                    await pilot.pause()
+                    self.assertGreaterEqual(len(tab_bar.children), 2)
+
+            asyncio.run(run_checks())
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_bashedit_markdown_viewer_uses_no_file(self):
+        """Verify action_toggle_markdown launches rich.sh with --no-file flag."""
+        import asyncio
+        from unittest.mock import patch
+        from textual.app import App
+        import bashedit
+
+        class MarkdownTestApp(App):
+            def compose(self):
+                yield bashedit.BashEditScreen()
+
+        async def run_checks():
+            app = MarkdownTestApp()
+            async with app.run_test():
+                screen = app.query_one(bashedit.BashEditScreen)
+                executed_cmds = []
+
+                def fake_run(cmd, shell=False, check=False):
+                    executed_cmds.append(cmd)
+                    return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+                with patch("subprocess.run", side_effect=fake_run):
+                    screen.action_toggle_markdown()
+
+                self.assertTrue(len(executed_cmds) > 0)
+                cmd = executed_cmds[0]
+                self.assertIn("rich.sh", cmd)
+                self.assertIn("--no-file", cmd)
+
+        asyncio.run(run_checks())
 
 
 if __name__ == "__main__":

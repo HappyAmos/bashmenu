@@ -2,18 +2,28 @@ version: 0.0.1
 title: Bash Menu
 items:
   - '{divider}':
+  - TODO List:
+      type: editor
+      file: '{bashmenu_dir}/todo.txt'
+      tabstop: 4
+      interactive: true
+      quiet: true
+      alt_buffer: true
+      icon: '{nf::#f448}'
+  - '{divider}':
   - Applications:
       icon: '{nf::#f003b:}'
       submenu:
         title: Applications
         items:
           - '{divider}':
-          - Antigravity:
+          - Antigravity [Resume Last Session]:
               icon: '{nf::#eb44:}'
-              type: script
-              action: '{home}/.local/bin/agy'
+              type: command
+              action: cd {dir_picker_new} && agy
               interactive: true
               quiet: true
+              alt_buffer: true
           - Brow6el:
               type: script
               action: '{home}/github/brow6el/build/brow6el'
@@ -28,27 +38,23 @@ items:
           - Copilot:
               icon: '{nf::#F0372}'
               type: command
-              action: copilot
+              action: cd {dir_picker_new} && copilot
               interactive: true
               quiet: true
+              alt_buffer: true
           - Carbonyl [https://duckduckgo.com]:
               type: command
               action: carbonyl https://duckduckgo.com
               icon: '{nf::#f059f:}'
               interactive: true
               quiet: true
-          - Gemini [New Session]:
-              icon: '{nf::#F1A0}'
-              type: command
-              action: gemini
-              interactive: true
-              quiet: true
           - Gemini [Resume Last Session]:
               icon: '{nf::#F1A0}'
               type: command
-              action: gemini --resume latest
+              action: cd {dir_picker_new} && gemini --resume latest
               interactive: true
               quiet: true
+              alt_buffer: true
           - Glow:
               type: command
               action: glow -t {home}/cheat
@@ -56,12 +62,28 @@ items:
               quiet: true
               icon: '{nf::#eeab:}'
               alt_buffer: true
+          - Internet:
+              type: submenu
+              submenu:
+                title: New submenu
+                items: []
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              icon: '{nf::#f059f}'
           - Midnight Commander:
               icon: '{nf::#f0ab6}'
               type: script
               action: /usr/bin/mc
               interactive: true
               quiet: true
+          - Open Code:
+              type: command
+              icon: '{nf::#f4b0}'
+              command: cd {dir_picker_new} && opencode
+              interactive: true
+              quiet: false
+              alt_buffer: true
           - Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]:
               type: script
               action: '{scripts_dir}/glyphs.sh {param}'
@@ -100,15 +122,6 @@ items:
               quiet: false
               alt_buffer: true
           - '{divider}':
-          - Internet:
-              type: submenu
-              submenu:
-                title: New submenu
-                items: []
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f059f}'
       type: submenu
       interactive: true
       quiet: false
@@ -532,6 +545,15 @@ items:
               quiet: false
               alt_buffer: true
               icon: '{nf::#f11e7}'
+          - Convert Image To BM Wallpaper:
+              type: command
+              icon: '{nf::#}'
+              command: 'convert "{file_picker}" -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"'
+              prompt: 'Convert image to BM friendly wallpaper:'
+              start_dir: '~/Pictures'
+              interactive: true
+              quiet: false
+              alt_buffer: true
           - Edit .bashrc [{bashrc}]:
               type: editor
               action: '{bashrc}'
@@ -643,17 +665,17 @@ items:
               picker: none
           - Weather -> 3 Day [curl wttr.in/{user.postal_code}]:
               type: command
-              action: curl wttr.in/{user.postal_code}
+              action: curl wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
               icon: '{nf::#eef0:}'
-              quiet: false
+              quiet: true
               interactive: true
               alt_buffer: true
           - Weather -> 3 Day v.2. [curl v2.wttr.in/{user.postal_code}]:
               type: command
-              action: curl v2.wttr.in/{user.postal_code}
+              action: curl v2.wttr.in/{user.postal_code} | {scripts_dir}/pager.sh
               icon: '{nf::#eef0:}'
               interactive: true
-              quiet: false
+              quiet: true
               alt_buffer: true
           - '{divider}':
           - Back to Main Menu:

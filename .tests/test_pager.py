@@ -3,6 +3,7 @@
 import fcntl
 import os
 import pty
+import struct
 import subprocess
 import sys
 import tempfile
@@ -780,6 +781,107 @@ class TestPagerScript(unittest.TestCase):
             self.assertTrue(os.path.isdir(spool_dir))
             # Verify temporary spool files are cleaned up on exit
             self.assertEqual(os.listdir(spool_dir), [])
+
+    def test_no_file_option_behavior(self):
+        """Verify --no-file hides file badge, omits 'e edit' hint, and disables editing."""
+        cmd = f"""
+        source "{PAGER_SCRIPT}"
+        ALLOW_FILE=0
+        COLS=80
+        TOTAL=100
+        TOP_LINE=1
+        LAST_SHOWN=23
+        SHOW_HELP=1
+        MESSAGE=""
+        HAVE_FILES=1
+        FILES=("secret_file.md")
+        build_bar
+        printf "BAR:%s\\n" "$BAR_LINE"
+        open_in_editor
+        printf "MSG:%s\\n" "$MESSAGE"
+        """
+        res = subprocess.run(
+            ["bash", "-c", cmd],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=PROJECT_ROOT,
+        )
+        self.assertEqual(res.returncode, 0)
+        self.assertNotIn("secret_file.md", res.stdout)
+        self.assertIn("MSG:editing disabled", res.stdout)
+
+        # Verify arg parsing sets ALLOW_FILE=0 and usage includes --no-file
+        res_help = subprocess.run(
+            ["bash", PAGER_SCRIPT, "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=PROJECT_ROOT,
+        )
+        self.assertEqual(res_help.returncode, 0)
+        self.assertIn("--no-file", res_help.stdout)
+
+    def test_utf8_multibyte_clipping(self):
+        """Verify wide lines with multibyte UTF-8 characters are clipped without byte corruption."""
+        master, slave = pty.openpty()
+        winsize = struct.pack("HHHH", 24, 80, 0, 0)
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        test_line = (
+            "┌──────────────────────────────┬───────────────────────┤"
+            "  Sun 11 Oct ├───────────────────────┬──────────────────────────────┐\n"
+        )
+        with tempfile.NamedTemporaryFile("w+", delete=False, encoding="utf-8") as tf:
+            tf.write(test_line)
+            temp_path = tf.name
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+            time.sleep(0.2)
+            os.write(master, b"q")
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 2048)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            # Find row 1 rendered output
+            row1_text = ""
+            for part in out.split(b"\x1b["):
+                if part.startswith(b"1;1H"):
+                    row1_bytes = part[4:].split(b"\x1b[0m")[0]
+                    # Verify no replacement character / invalid UTF-8
+                    row1_text = row1_bytes.decode("utf-8")
+                    break
+
+            self.assertEqual(len(row1_text), 80)
+            self.assertFalse("\ufffd" in row1_text)
+            self.assertTrue(row1_text.startswith("┌──────"))
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
 
 
 if __name__ == "__main__":

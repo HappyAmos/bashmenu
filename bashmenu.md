@@ -115,13 +115,15 @@ Used as dynamic templates for code generation, settings, or block injections:
 ### 3.1 Main Menu Engine (`bashmenu.py`)
 | Keybinding | Action |
 | :--- | :--- |
-| `UP` / `DOWN` / `j` / `k` | Navigate highlighted selection row. |
-| `0` - `9`, `a` - `z`, `A` - `Z` | Direct option shortcut hotkey jump. |
-| `F1` | Display this markdown help manual using the `glow` terminal pager. |
-| `F4` | Launch visual menu editor (`menuedit.py`). |
-| `F5` | Refresh menu, reload configuration and plugin outputs. |
-| `F6` | Toggle option shortcut key badges display. |
+| `UP` / `DOWN` | Navigate highlighted selection row. |
+| `0` - `9`, `a` - `z` | Direct option shortcut hotkey jump. |
 | `ENTER` | Execute selected item action. |
+| `F1` | Display Markdown help manual modal. |
+| `F2` | Open Theme selector dialog. |
+| `F3` | Launch built-in text editor (`bashedit.py`). |
+| `F4` | Launch visual menu editor (`menuedit.py`). |
+| `F5` | Refresh menu, reload configuration, menu files, and plugin outputs. |
+| `F6` | Toggle option shortcut key badges display. |
 | `ESC` | Return to parent submenu or exit application. |
 
 *Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
@@ -130,17 +132,33 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 | Keybinding | Action |
 | :--- | :--- |
-| `a` / `Ins` | Insert new menu option node. |
-| `e` / `ENTER` | Edit selected node properties or menu header (opens `ItemEditModal`). |
-| `E` | Open raw YAML snippet in editor for selected node. |
-| `d` / `Del` | Delete selected option node (with confirm box). |
-| `m` / `M` | Move selected node down (`m`) or up (`M`). |
-| `>` / `.` / `Tab` | Indent item into preceding Submenu folder. |
-| `<` / `,` / `Shift+Tab` | Outdent item out to Parent menu list. |
-| `t` | Test-run selected menu item action directly. |
-| `s` | Save changes to `bashmenu.mnu`. |
-| `?` / `h` / `F1` | Display comprehensive General Help modal. |
-| `ESC` / `C` | Exit editor or cancel dialogs (prompts if unsaved changes exist). |
+| `a` | Add new menu option node. |
+| `e` / `ENTER` | Edit selected node properties (opens `ItemEditModal`). |
+| `t` | Change selected item type. |
+| `SPACE` | Expand or collapse submenu tree node. |
+| `d` | Delete selected option node (with confirm box). |
+| `m` | Move selected node down. |
+| `M` | Move selected node up. |
+| `>` | Indent item into preceding Submenu folder. |
+| `<` | Outdent item out to Parent menu list. |
+| `F1` / `?` | Display HA Bash Menu manual (`bashmenu.md`). |
+| `F2` | Toggle (collapse/expand) all children of top root menu. |
+| `F3` / `CTRL+A` | View ASCII character table (`ascii.sh`). |
+| `F4` / `CTRL+N` | Search Nerd Font & Emoji glyphs (`glyphs.sh`). |
+| `F5` / `CTRL+P` | View available placeholders and macros modal. |
+| `s` / `CTRL+S` | Save changes to `bashmenu.mnu`. |
+| `ESC` / `q` | Exit editor (prompts if unsaved changes exist). |
+
+*ItemEditModal Dialog Keybindings:*
+| Keybinding | Action |
+| :--- | :--- |
+| `CTRL+S` / `F2` / `s` | Save changes to item. |
+| `CTRL+T` / `t` | Change item type. |
+| `CTRL+A` / `F3` | View ASCII character table (`ascii.sh`). |
+| `CTRL+N` / `F4` | Search Nerd Font & Emoji glyphs (`glyphs.sh`). |
+| `CTRL+P` / `F5` | View available placeholders and macros modal. |
+| `F1` / `?` | Display item property editor help modal. |
+| `ESC` / `c` | Cancel changes and close dialog. |
 
 *Note on Menu Focus Synchronization & Property Inspector Previews:* When launching `menuedit.py` from `bashmenu.py` (via `F4` or menu item action), the editor tree automatically synchronizes active keyboard focus and selection directly on the item that was selected in `bashmenu.py`, so pressing `e` or `ENTER` immediately opens the `ItemEditModal` dialog for that exact item. The Property Inspector side panel features a real-time visual `Preview:` section for all item types (commands, submenus, scripts, dividers, etc.) showing exactly how the item will appear in the main menu (including resolved Nerd Font/emoji icons, placeholders, and right-aligned shortcut brackets). Additionally, the `ItemEditModal` dialog dynamically updates its preview box in real-time as title or icon fields are edited. Property inspector binary switches match window background styling (`Switch:focus { background: transparent; }`), and the help text footer clearly displays `[ESC / C] Cancel`.
 
@@ -148,11 +166,20 @@ Used as dynamic templates for code generation, settings, or block injections:
 
 | Keybinding | Action |
 | :--- | :--- |
+| `F1` | View BashEdit keybindings manual modal. |
+| `F2` | Toggle whitespace characters visibility. |
+| `F3` | Stream ASCII character table (`ascii.sh`). |
+| `F4` | Stream terminal colors (`ncurses_colors.py`). |
+| `F5` | View available placeholders & macros modal. |
+| `F6` | View Markdown via Rich pager (`scripts/rich.sh`). |
+| `F7` | Toggle line numbers gutter display. |
+| `F8` | View Markdown syntax quick reference modal. |
 | `Ctrl+Q` / `ESC` | Exit editor (prompts save if modified). |
-| `Ctrl+O` / `Ctrl+R` / `F5` / `F7` | Open file via file picker modal. |
-| `Ctrl+S` / `F2` / `F3` | Save active file. |
-| `Alt+S` / `Ctrl+Shift+S` / `F6` | Save As (prompt destination path). |
-| `Ctrl+E` / `F4` / `[ + ]` | Create new empty tab document. |
+| `Ctrl+O` / `Ctrl+R` | Open file via file picker modal. |
+| `Ctrl+S` | Save active file. |
+| `Ctrl+A` / `Ctrl+Shift+S` | Save As (prompt destination path). |
+| `Ctrl+N` / `[ + ]` | Create new empty tab document. |
+| `Alt+Left` / `Alt+Right` | Switch to previous / next tab. |
 | `Alt+]` / `Ctrl+Tab` | Switch to next tab. |
 | `Alt+[` / `Shift+Tab` | Switch to previous tab. |
 | `Ctrl+W` | Where Is (search document text). |
@@ -163,13 +190,6 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `Ctrl+C` | Copy line or active selection block. |
 | `Ctrl+V` | Paste cutbuffer / clipboard text. |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo edit operations. |
-| `Ctrl+P` / `Alt+M` | View available placeholders & macros modal. |
-| `Ctrl+A` / `F11` | Stream ASCII character table (`ascii.sh`). |
-| `Alt+V` / `F10` | Stream terminal colors (`ncurses_colors.py`). |
-| `Alt+1` | Toggle whitespace characters visibility. |
-| `Ctrl+N` / `Alt+N` | Toggle line numbers gutter display. |
-| `F12` | Toggle Markdown rendering for document. |
-| `F1` / `Ctrl+G` | View BashEdit keybindings manual modal. |
 
 ---
 
@@ -214,34 +234,35 @@ The `settings.plugins` setting specifies plugin scripts located in the configure
 | `posttext` | Text or placeholder rendered immediately after the plugin script output. |
 
 #### Multi-Column Plugin Dashboard Layout:
-Plugins can be arranged horizontally into columns spanning the full width of the interface using a declarative `layout` configuration under `settings.plugins`:
+Plugins can be arranged horizontally into columns spanning the full width of the interface using a declarative configuration under `settings.plugins` (configured either inside a `layout` block or directly at the top level of `plugins`):
 ```yaml
 settings:
   plugins:
-    layout:
-      type: table
-      width: "100%"          # Automatically divides available width equally across columns (e.g. 50/50, 33/33/33)
-      entries: 2             # Maximum entries per table row (default: 2)
-      headers: ["System", "Weather"]  # Optional column headers
-      # rows: [ ["uptime", "weather"] ] # Optional explicit row grouping
-    otd:
-      script: "otd.sh"
-      sleep: 300
-      standalone: true       # Renders on its own line stretching across the screen without table borders
-      pretext: '{user.divider}'
-      posttext: '{user.divider}'
-    uptime:
-      script: "uptime.sh"
-      sleep: 30
+    divider: true            # Render native divider above plugin section (options: true, "screen", "window", false)
+    type: table
+    width: "100%"            # Automatically divides available width equally across columns (e.g. 50/50, 33/33/33)
+    entries: 3               # Maximum entries per table row (default: 2)
+    headers: ''              # Optional column headers (list or empty string)
     weather:
       script: "curl -s 'wttr.in?format=3'"
       sleep: 300
+    uptime:
+      script: "uptime.sh"
+      sleep: 30
     disk:
       script: "disk.sh"
       sleep: 60
+    otd:
+      script: "otd.sh"
+      sleep: 300
+      standalone: true         # Renders full-width across the screen outside table borders
+      pretext: '{divider}'
+      posttext: '{divider}'
 ```
-- **Automatic Multi-Table Chunking (`entries: N`)**: When `entries: 2` is set and `rows` is omitted, plugins are automatically grouped into 2-column tables. If a 3rd plugin is encountered, a new table is constructed, spanning the screen on its own or grouping with subsequent plugins.
-- **Standalone Plugins (`standalone: true` or `span: full`)**: Full-width plugins (such as quote-of-the-day or system banners) can stretch across the entire screen on their own without table borders, sitting above or below multi-column tables.
+- **Section Divider (`divider: true` / `top_divider: true`)**: Draws a native divider line directly above the plugin section. Accepts `true` (inherits active theme width), `"screen"` (full-width with border tees `├───┤`), or `"window"` (inset with side margins).
+- **Flexible Configuration Placement**: Layout options (`type: table`, `width`, `entries`, `headers`, `rows`, `divider`) can be placed directly under `settings.plugins` or nested in `settings.plugins.layout`.
+- **Automatic Multi-Table Chunking (`entries: N`)**: When `entries: N` is set and `rows` is omitted, plugins are automatically grouped into N-column tables. If additional plugins are encountered, subsequent tables are constructed automatically.
+- **Standalone Plugins (`standalone: true` or `span: full`)**: Full-width plugins (such as quote-of-the-day or system banners) stretch across the entire screen on their own without table borders, sitting above or below multi-column tables.
 - **Asynchronous Execution**: Each plugin continues running asynchronously in its own background worker thread honoring its own `sleep` interval without blocking the user interface. Content within each cell automatically wraps cleanly when lines exceed the column width.
 
 #### Inactivity Timeout & Screensaver (`settings.inactivity_timeout`):
@@ -337,9 +358,7 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 | `plugin` | Dedicated text color for background plugin output feeds. |
 | `gutter` | Status gutter text color. |
 | `selection` | Text selection highlight color. |
-| `status_bar` | Status bar header/footer color. |
 | `shortcut_key` | Direct selection shortcut hotkey character badge color. |
-| `shortcut_label` | Direct selection shortcut hotkey label color. |
 | `divider` | Horizontal divider line color. |
 | `button_primary` | Modal dialog primary action button color. |
 | `button_error` | Modal dialog error/destructive action button color. |
@@ -562,6 +581,32 @@ If you precede `{file_picker}` or `{dir_picker}` with a valid folder path in
 the action (e.g., `"{templates_dir}/{file_picker}"` or `"/var/log/{file_picker}"`),
 the engine parses the prefix, validates it, and **automatically launches the
 visual chooser inside that directory**, completely avoiding double-prefixing.
+
+#### 6.1.1 Path Decomposition Modifiers for Pickers
+
+When passing selected files or folders to commands, you often need to alter the extension (e.g., converting wallpapers), reference just the filename, or target the containing directory. The engine provides built-in path decomposition modifiers evaluated prior to shell execution:
+
+| Modifier | Target Macro | Description & Example (Selected: `/home/user/Pictures/wallpaper.png`) |
+| :--- | :--- | :--- |
+| **`{file_picker}`** | File | Full absolute path (`/home/user/Pictures/wallpaper.png`) |
+| **`{file_picker:stem}`** | File | Full path without file extension (`/home/user/Pictures/wallpaper`) |
+| **`{file_picker:name}`** | File | Filename only with extension (`wallpaper.png`) |
+| **`{file_picker:base}`** | File | Filename only without extension (`wallpaper`) |
+| **`{file_picker:dir}`** | File | Parent directory path (`/home/user/Pictures`) |
+| **`{file_picker:ext}`** | File | File extension with leading dot (`.png`, or empty if none) |
+| **`{dir_picker:name}`** | Dir | Folder name only without parent path (`Pictures`) |
+| **`{dir_picker:dir}`** | Dir | Parent directory of the chosen folder (`/home/user`) |
+
+*(Note: Modifiers also function seamlessly with creation mode, e.g. `{file_picker_new:stem}` or `{file_picker:new:stem}`).*
+
+##### Practical Example: Converting Wallpapers & Changing Extensions
+```yaml
+- Convert Image To BM Wallpaper:
+    type: command
+    start_dir: '~/Pictures'
+    command: 'convert "{file_picker}" -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"'
+```
+If the user selects `/home/user/Pictures/twilight.jpg`, `{file_picker:stem}.pixel.png` seamlessly resolves to `/home/user/Pictures/twilight.pixel.png`.
 
 ### 6.2 System & Path Placeholders
 These variables are dynamically resolved using active configuration and environment values:

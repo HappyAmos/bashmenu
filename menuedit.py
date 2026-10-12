@@ -9,6 +9,7 @@ __author__ = "HappyAmos"
 
 import contextlib
 import os
+import shlex
 import sys
 import textwrap
 from typing import ClassVar
@@ -80,7 +81,8 @@ ITEM_EDIT_HELP_TEXT = """\
   Purpose: Leading glyph drawn in a 4-column slot.
   Usage:   Adaptive form {nf:<char>:<nerd_hex>:<emoji>}.
            Tiers resolve emoji, then Nerd Font hex, then plain
-           char, then blank when unset.
+           char, then blank when unset. Press CTRL+N / F4 to
+           search Nerd Font & Emoji glyphs (glyphs.sh).
   Example: icon: "{nf:#:f015:🏠}"
 
 [bold cyan]Action / Command / Script / File / Key[/bold cyan]
@@ -203,13 +205,22 @@ ITEM_EDIT_HELP_TEXT = """\
   Usage:   Substituted into action string. Uses 'title' and
            'start_dir'. '{file_picker_new}' allows creating new
            files by pressing 'n' or 'N'.
-  Example: action: "{scripts_dir}/view_doc.sh {file_picker}"
+           Path modifiers:
+             {file_picker:stem} -> path without extension
+             {file_picker:name} -> filename with extension
+             {file_picker:base} -> filename without extension
+             {file_picker:dir}  -> parent directory path
+             {file_picker:ext}  -> extension with dot
+  Example: action: "convert {file_picker} {file_picker:stem}.pixel.png"
 
 [bold cyan]{dir_picker} / {dir_picker_new}[/bold cyan]
   Purpose: Launches an interactive visual directory chooser modal.
   Usage:   Substituted into action string. Uses 'title' and
            'start_dir'. '{dir_picker_new}' allows creating new
            folders by pressing 'n' or 'N'.
+           Path modifiers:
+             {dir_picker:name} -> folder name only
+             {dir_picker:dir}  -> parent directory path
   Example: action: "ls -la {dir_picker}"
 """
 
@@ -321,12 +332,6 @@ class ItemTypePickerModal(ModalScreen[str]):
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
-        accent_style = self.theme.get("accent") or self.theme.get("help_text")
-        if accent_style and accent_style.color and accent_style.color.name:
-            css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
-            if css_accent:
-                for item in self.query(".footer_item"):
-                    item.styles.color = css_accent
         opts = self.query_one("#option_list", OptionList)
         sel_style = self.theme.get("highlight") or self.theme.get("selection")
         if sel_style and hasattr(opts, "_component_styles"):
@@ -781,8 +786,10 @@ class ItemEditModal(ModalScreen[dict]):
         Binding("t", "change_type", "Change Type", show=False),
         Binding("ctrl+a", "lookup_ascii", "ASCII Table"),
         Binding("f3", "lookup_ascii", "ASCII Table"),
+        Binding("ctrl+n", "lookup_glyphs", "Glyphs"),
+        Binding("f4", "lookup_glyphs", "Glyphs"),
         Binding("ctrl+p", "show_placeholders", "Placeholders"),
-        Binding("f4", "show_placeholders", "Placeholders"),
+        Binding("f5", "show_placeholders", "Placeholders"),
         Binding("f1", "show_help", "Help"),
         Binding("question_mark", "show_help", "Help", show=False),
     ]
@@ -944,7 +951,9 @@ class ItemEditModal(ModalScreen[dict]):
                         with Horizontal(classes="footer_row"):
                             yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
                             yield Label("|", classes="footer_sep", markup=False)
-                            yield Label("[CTRL+P / F4] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
+                            yield Label("[CTRL+N / F4] Glyphs", id="lbl_modal_glyphs", classes="footer_item", markup=False)
+                            yield Label("|", classes="footer_sep", markup=False)
+                            yield Label("[CTRL+P / F5] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
                             yield Label("|", classes="footer_sep", markup=False)
                             yield Label("[ESC / C] Cancel", id="lbl_modal_cancel", classes="footer_item", markup=False)
                 yield bashmenu_ui.ShadowWidget(id="shadow_right")
@@ -952,12 +961,6 @@ class ItemEditModal(ModalScreen[dict]):
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
-        accent_style = self.theme.get("accent") or self.theme.get("help_text")
-        if accent_style and accent_style.color and accent_style.color.name:
-            css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
-            if css_accent:
-                for item in self.query(".footer_item"):
-                    item.styles.color = css_accent
         with contextlib.suppress(Exception):
             bashmenu_ui.apply_button_theme(self.query_one("#btn_save", Button), theme=self.theme, button_type="button_primary")
             bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_cancel")
@@ -1004,6 +1007,8 @@ class ItemEditModal(ModalScreen[dict]):
             self.action_change_type()
         elif lbl_id == "lbl_modal_ascii":
             self.action_lookup_ascii()
+        elif lbl_id == "lbl_modal_glyphs":
+            self.action_lookup_glyphs()
         elif lbl_id == "lbl_modal_placeholders":
             self.action_show_placeholders()
         elif lbl_id in ("lbl_modal_cancel", "btn_cancel", "btn_close_x") or "btn_close_x" in getattr(widget, "classes", []):
@@ -1266,7 +1271,7 @@ class ItemEditModal(ModalScreen[dict]):
             def dir_cb(path):
                 if path:
                     self.query_one("#inp_start_dir", Input).value = path
-            self.app.push_screen(bashmenu_ui.FilePickerModalScreen("Select Start Directory", mode="dir"), dir_cb)
+            self.app.push_screen(bashmenu_ui.FilePickerModalScreen("Select Start Directory", mode="dir", allow_new=True), dir_cb)
         elif btn_id == "btn_save":
             self.perform_save()
         else:
@@ -1282,6 +1287,38 @@ class ItemEditModal(ModalScreen[dict]):
         cmd = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
         if app_obj:
             app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme))
+
+    def action_lookup_glyphs(self) -> None:
+        try:
+            app_obj = self.app
+            cfg = getattr(app_obj, "config", {})
+        except Exception:  # noqa: BLE001
+            app_obj = getattr(self, "_app", None)
+            cfg = getattr(app_obj, "config", {}) if app_obj else {}
+        script_cmd = bashmenu.interpolate_placeholders("{scripts_dir}/glyphs.sh", cfg)
+
+        def query_cb(search_term: str | None) -> None:
+            if search_term and search_term.strip():
+                term = search_term.strip()
+                full_cmd = f"{script_cmd} {shlex.quote(term)}"
+                if app_obj:
+                    app_obj.push_screen(
+                        bashmenu_ui.StreamOutputModalScreen(
+                            f"Nerd Font & Emoji: {term}",
+                            full_cmd,
+                            theme=self.theme,
+                        )
+                    )
+
+        if app_obj:
+            app_obj.push_screen(
+                bashmenu_ui.InputModalScreen(
+                    "Search Nerd Font & Emoji",
+                    "Enter glyph search term (e.g. arrow, folder, python):",
+                    theme=self.theme,
+                ),
+                query_cb,
+            )
 
     def action_show_placeholders(self) -> None:
         try:
@@ -1318,11 +1355,12 @@ class ItemEditModal(ModalScreen[dict]):
 
 
 class MenuEditTree(Tree):
-    """Custom Tree widget using Enter to edit items and Space to expand/collapse nodes."""
+    """Custom Tree widget using Enter to edit items, Space to expand/collapse, and F2 to toggle children."""
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("space", "toggle_node", "Expand/Collapse", show=False),
         Binding("enter", "edit_node", "Edit Item", show=False),
+        Binding("f2", "toggle_children", "Toggle All", show=False),
     ]
 
     custom_cursor_style: Style | None = None
@@ -1340,9 +1378,19 @@ class MenuEditTree(Tree):
             return self.custom_guide_style
         return super().get_component_rich_style(*names, partial=partial, default=default)
 
+    def _toggle_node(self, node) -> None:
+        if node == self.root:
+            return
+        super()._toggle_node(node)
+
     def action_toggle_node(self) -> None:
-        if self.cursor_node:
-            self.cursor_node.toggle()
+        if self.cursor_node and self.cursor_node != self.root:
+            self._toggle_node(self.cursor_node)
+
+    def action_toggle_children(self) -> None:
+        screen = getattr(self, "screen", None)
+        if screen and hasattr(screen, "action_toggle_children"):
+            screen.action_toggle_children()
 
     def action_edit_node(self) -> None:
         if self.cursor_node and self.cursor_node != self.root:
@@ -1402,10 +1450,10 @@ class MenuEditScreen(Screen):
     .footer_row {
         height: 1;
         width: 100%;
-        align: center middle;
+        align: left middle;
     }
     .footer_item {
-        padding: 0 1;
+        padding: 0 0;
         color: $accent;
     }
     .footer_item:hover {
@@ -1413,6 +1461,7 @@ class MenuEditScreen(Screen):
         color: $text;
     }
     .footer_sep {
+        padding: 0 0;
         color: $text-muted;
     }
     #workspace {
@@ -1477,6 +1526,9 @@ class MenuEditScreen(Screen):
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
+        Binding("f1", "help", "Help"),
+        Binding("question_mark", "help", "Help", show=False),
+        Binding("f2", "toggle_children", "Toggle All"),
         Binding("a", "add_item", "Add Item"),
         Binding("e", "edit_item", "Edit Item"),
         Binding("enter", "edit_item", "Edit Item"),
@@ -1490,10 +1542,12 @@ class MenuEditScreen(Screen):
         Binding("pipe", "indent_item", "Indent", show=False),
         Binding("less", "outdent_item", "Outdent"),
         Binding("<", "outdent_item", "Outdent", show=False),
-        Binding("ctrl+a", "lookup_ascii", "ASCII Table"),
-        Binding("f3", "lookup_ascii", "ASCII Table", show=False),
-        Binding("ctrl+p", "show_placeholders", "Placeholders"),
-        Binding("f4", "show_placeholders", "Placeholders", show=False),
+        Binding("f3", "lookup_ascii", "ASCII Table"),
+        Binding("ctrl+a", "lookup_ascii", "ASCII Table", show=False),
+        Binding("f4", "lookup_glyphs", "Glyphs"),
+        Binding("ctrl+n", "lookup_glyphs", "Glyphs", show=False),
+        Binding("f5", "show_placeholders", "Placeholders"),
+        Binding("ctrl+p", "show_placeholders", "Placeholders", show=False),
         Binding("s", "save_menu", "Save Menu"),
         Binding("ctrl+s", "save_menu", "Save Menu"),
         Binding("escape", "exit_editor", "Exit"),
@@ -1541,12 +1595,22 @@ class MenuEditScreen(Screen):
                 yield Static("Select a menu item in the hierarchy tree to inspect properties.", id="inspector_content")
         with Vertical(id="footer"):
             with Horizontal(classes="footer_row"):
+                yield Label("[F1] Help", id="lbl_help", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[F2] Toggle All", id="lbl_toggle_all", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[F3] ASCII", id="lbl_ascii", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[F4] Glyphs", id="lbl_glyphs", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[F5] Placeholders", id="lbl_placeholders", classes="footer_item", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[a] Add", id="lbl_add", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[e/ENTER] Edit", id="lbl_edit", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[t] Type", id="lbl_type", classes="footer_item", markup=False)
-                yield Label("|", classes="footer_sep", markup=False)
+            with Horizontal(classes="footer_row"):
                 yield Label("[SPACE] Toggle", id="lbl_toggle", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[d] Delete", id="lbl_delete", classes="footer_item", markup=False)
@@ -1554,14 +1618,10 @@ class MenuEditScreen(Screen):
                 yield Label("[m] Move Dn", id="lbl_move_down", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[M] Move Up", id="lbl_move_up", classes="footer_item", markup=False)
-            with Horizontal(classes="footer_row"):
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[>] Indent", id="lbl_indent", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[<] Outdent", id="lbl_outdent", classes="footer_item", markup=False)
-                yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[CTRL+A] ASCII", id="lbl_ascii", classes="footer_item", markup=False)
-                yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[CTRL+P] Placeholders", id="lbl_placeholders", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[s] Save", id="lbl_save", classes="footer_item", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
@@ -1570,8 +1630,30 @@ class MenuEditScreen(Screen):
     def action_toggle_tree_node(self) -> None:
         with contextlib.suppress(Exception):
             tree = self.query_one("#tree", Tree)
-            if tree.cursor_node:
+            if tree.cursor_node and tree.cursor_node != tree.root:
                 tree.cursor_node.toggle()
+
+    def action_toggle_children(self) -> None:
+        """Toggle all direct children and submenus of the top root node between collapsed and expanded states (F2)."""
+        with contextlib.suppress(Exception):
+            tree = self.query_one("#tree", Tree)
+            root = tree.root
+
+            def has_expanded_child(node) -> bool:
+                return any(
+                    bool(c.children and (c.is_expanded or has_expanded_child(c)))
+                    for c in node.children
+                )
+
+            if has_expanded_child(root):
+                for child in root.children:
+                    child.collapse_all()
+            else:
+                for child in root.children:
+                    child.expand_all()
+
+            if not root.is_expanded:
+                root.expand()
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -1596,7 +1678,9 @@ class MenuEditScreen(Screen):
 
         # 2. Interactive footer items / close button
         lbl_id = getattr(widget, "id", None)
-        if lbl_id == "lbl_add":
+        if lbl_id == "lbl_help":
+            self.action_help()
+        elif lbl_id == "lbl_add":
             self.action_add_item()
         elif lbl_id == "lbl_edit":
             self.action_edit_item()
@@ -1604,6 +1688,8 @@ class MenuEditScreen(Screen):
             self.action_change_item_type()
         elif lbl_id == "lbl_toggle":
             self.action_toggle_tree_node()
+        elif lbl_id == "lbl_toggle_all":
+            self.action_toggle_children()
         elif lbl_id == "lbl_delete":
             self.action_delete_item()
         elif lbl_id == "lbl_move_down":
@@ -1616,12 +1702,38 @@ class MenuEditScreen(Screen):
             self.action_outdent_item()
         elif lbl_id == "lbl_ascii":
             self.action_lookup_ascii()
+        elif lbl_id == "lbl_glyphs":
+            self.action_lookup_glyphs()
         elif lbl_id == "lbl_placeholders":
             self.action_show_placeholders()
         elif lbl_id == "lbl_save":
             self.action_save_menu()
         elif lbl_id in ("lbl_exit", "btn_close_x"):
             self.action_exit_editor()
+
+    def action_help(self) -> None:
+        """Display the HA Bash Menu manual modal (F1 / ? shortcut)."""
+        help_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.md")
+        help_text = "Help manual file not found."
+        if os.path.exists(help_path):
+            with open(help_path, "r", encoding="utf-8") as f:
+                help_text = f.read()
+        try:
+            app_obj = self.app
+        except Exception:  # noqa: BLE001
+            app_obj = getattr(self, "_app", None)
+        if app_obj:
+            app_obj.push_screen(
+                bashmenu_ui.MessageModalScreen(
+                    "HA Bash Menu Manual",
+                    help_text,
+                    theme=self.theme_styles,
+                    is_help=True,
+                    is_markdown=True,
+                )
+            )
+
+    action_show_help = action_help
 
     def action_lookup_ascii(self) -> None:
         try:
@@ -1633,6 +1745,38 @@ class MenuEditScreen(Screen):
         cmd = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
         if app_obj:
             app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme_styles))
+
+    def action_lookup_glyphs(self) -> None:
+        try:
+            app_obj = self.app
+            cfg = getattr(app_obj, "config", {})
+        except Exception:  # noqa: BLE001
+            app_obj = getattr(self, "_app", None)
+            cfg = getattr(app_obj, "config", {}) if app_obj else {}
+        script_cmd = bashmenu.interpolate_placeholders("{scripts_dir}/glyphs.sh", cfg)
+
+        def query_cb(search_term: str | None) -> None:
+            if search_term and search_term.strip():
+                term = search_term.strip()
+                full_cmd = f"{script_cmd} {shlex.quote(term)}"
+                if app_obj:
+                    app_obj.push_screen(
+                        bashmenu_ui.StreamOutputModalScreen(
+                            f"Nerd Font & Emoji: {term}",
+                            full_cmd,
+                            theme=self.theme_styles,
+                        )
+                    )
+
+        if app_obj:
+            app_obj.push_screen(
+                bashmenu_ui.InputModalScreen(
+                    "Search Nerd Font & Emoji",
+                    "Enter glyph search term (e.g. arrow, folder, python):",
+                    theme=self.theme_styles,
+                ),
+                query_cb,
+            )
 
     def action_show_placeholders(self) -> None:
         try:
@@ -1728,6 +1872,15 @@ class MenuEditScreen(Screen):
                         for item in self.query(".footer_item"):
                             item.styles.color = css_accent
 
+            sep_style = self.theme_styles.get("border") or self.theme_styles.get("divider") or self.theme_styles.get("footer")
+            if sep_style and sep_style.color and sep_style.color.name:
+                css_sep = bashmenu_ui.parse_css_color(sep_style.color.name)
+                if css_sep:
+                    with contextlib.suppress(Exception):
+                        for sep in self.query(".footer_sep"):
+                            sep.styles.color = css_sep
+                            sep.styles.auto_color = False
+
             # Apply theme highlight & guide colors to the hierarchy tree
             highlight_style = (
                 self.theme_styles.get("highlight")
@@ -1772,9 +1925,63 @@ class MenuEditScreen(Screen):
                             w.styles.scrollbar_background = css_sb_bg
                             w.styles.scrollbar_background_hover = css_sb_bg
 
+    def update_footer_layout(self, width: int | None = None) -> None:
+        """Distribute footer keyboard shortcut labels and pipe separators equally across both footer rows."""
+        w = width
+        if w is None or w <= 0:
+            if hasattr(self, "size") and self.size and self.size.width:
+                w = self.size.width
+            elif hasattr(self, "app") and self.app and hasattr(self.app, "size") and self.app.size:
+                w = self.app.size.width
+            else:
+                w = 80
+
+        with contextlib.suppress(Exception):
+            footer = self.query_one("#footer")
+            rows = list(footer.query(".footer_row"))
+            for row in rows:
+                items = list(row.query(".footer_item"))
+                seps = list(row.query(".footer_sep"))
+                if not items:
+                    continue
+                num_items = len(items)
+                if num_items == 1:
+                    items[0].styles.margin = (0, 0, 0, 0)
+                    continue
+
+                item_lens = []
+                for it in items:
+                    t = str(it.renderable) if hasattr(it, "renderable") else ""
+                    item_lens.append(len(t) if t else len(getattr(it, "content", "")))
+
+                tot_text = sum(item_lens) + len(seps)
+                num_gaps = num_items - 1
+                rem = max(0, w - tot_text)
+                base_gap = rem // num_gaps
+                extra = rem % num_gaps
+
+                for i, it in enumerate(items):
+                    if i < num_gaps:
+                        total_gap = base_gap + (1 if i < extra else 0)
+                        left_gap = total_gap // 2
+                        right_gap = total_gap - left_gap
+                        it.styles.margin = (0, left_gap, 0, 0)
+                        if i < len(seps):
+                            seps[i].styles.margin = (0, right_gap, 0, 0)
+                    else:
+                        it.styles.margin = (0, 0, 0, 0)
+
+    def on_resize(self, event=None) -> None:
+        """Adjust footer keyboard shortcut spacing responsively on terminal resize."""
+        w = None
+        if event is not None and hasattr(event, "size") and event.size:
+            w = event.size.width
+        self.update_footer_layout(width=w)
+
     def on_mount(self) -> None:
         self.populate_tree()
         self.apply_theme()
+        self.update_footer_layout()
         if self._target_node_to_focus:
             tn = self._target_node_to_focus
             self.call_after_refresh(self._focus_target_node, tn)
@@ -1862,6 +2069,8 @@ class MenuEditScreen(Screen):
         opts = self.menu_data.get("items", self.menu_data.get("options", []))
         self._build_tree_branch(tree.root, opts)
         tree.root.expand()
+        tree.root.collapse = lambda: None
+        tree.root.toggle = lambda: None
 
         target_node = None
         if target_item:
@@ -1910,6 +2119,13 @@ class MenuEditScreen(Screen):
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         self.update_inspector(event.node.data if event.node else None)
+
+    def on_tree_node_collapsed(self, event: Tree.NodeCollapsed) -> None:
+        with contextlib.suppress(Exception):
+            tree = self.query_one("#tree", Tree)
+            if event.node == tree.root:
+                event.node.expand()
+                event.stop()
 
     def update_inspector(self, item: dict | None) -> None:
         """Update the property inspector panel with formatted details and live preview of the selected menu item."""

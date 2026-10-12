@@ -86,6 +86,11 @@ Textual interface.
     background.
   - Strip Unicode Variation Selectors (`\ufe0f`, `\ufe0e`) from external
     plugin text to eliminate terminal cursor drift and border overflow.
+  - **Plugin Section Divider (`divider: true` / `top_divider: true`)**:
+    When a top divider is enabled under `settings.plugins`, `MainMenuView`
+    renders a horizontal divider immediately above the plugin area.
+    `get_plugin_lines_and_limits()` deducts 1 row from `visible_option_rows`
+    so the menu option scrolling boundary never overlaps the divider.
 - **Textual CSS Rules:**
   - Always prefix Textual CSS variables with `$` (e.g. `$surface`,
     `$surface-darken-1`). Never write bare variable names without `$`.
@@ -402,7 +407,9 @@ Textual interface.
          (or unquoted `type: {divider}`). Plain `"divider"` is **not** recognized.
     - **Divider Presence**: Dividers only appear in a menu if explicitly declared as an option (`type: "{divider}"`)
       in `bashmenu.mnu`. If no dividers are declared in `bashmenu.mnu`, no dividers are rendered in that menu.
-      Plugins in `bashmenu.yml` place dividers using `pretext: "{divider}"` or `posttext: "{divider}"`.
+      Plugins in `bashmenu.yml` place dividers using `pretext: "{divider}"` or `posttext: "{divider}"` on individual
+      plugins, or across the top of the entire plugin section using `divider: true` (or `top_divider: true`, or
+      `layout.divider`) under `settings.plugins`.
     - **Divider Width Modes**:
       * `{window_width}`: Standard shorter divider bounded within window borders and 2-space margins
         (`avail_w = max(20, w - 6)`). Framed by standard vertical borders (`border_vertical_left`/
@@ -496,8 +503,25 @@ Textual interface.
       * Table width & column distribution: `[table width=100%]` (or `width=full`) automatically divides available width equally across columns (e.g. 50/50 for 2 cols, 33/33/33 for 3 cols, 25/25/25/25 for 4 cols). Explicit integer widths (`width=60`) are also supported.
       * In-cell text wrapping: When column widths are constrained, cell text automatically wraps at word boundaries, increasing row height dynamically without breaking border alignment. When no width is defined, columns auto-fit to the longest string. Headers (`[th]`) are automatically bolded.
       * Structural lists: Unordered `[list][*]...[/list]` (bullet glyphs `• `), ordered `[list=1][*]...[/list]` (numbers `1. `, `2. `), and alphabetical `[list=a][*]...[/list]`. Closing `[/*]` tags are optionally accepted.
-    - **Declarative Plugin Dashboard Layout (`settings.plugins.layout`)**:
-      * Supports `type: table`, `width: "100%"`, `entries: N` (default 2), `headers: [...]`, and optional explicit `rows: [["plugin_a", "plugin_b"]]` under `settings.plugins` in `bashmenu.yml` to render plugins in a multi-column dashboard.
+    - **Declarative Plugin Dashboard Layout (`settings.plugins.layout` / `settings.plugins`)**:
+      * **Top-Level or Nested Configuration**: Layout properties can be configured directly under `settings.plugins` (e.g. `settings.plugins.type: table`) or inside a dedicated `layout:` sub-dictionary (`settings.plugins.layout`).
+      * **Plugin Section Divider (`divider: true` / `top_divider: true`)**:
+        - `divider: true` (or `top_divider: true`): Renders a native divider above the plugin section matching the theme's effective divider width (`screen_width` or `window_width`).
+        - `divider: "screen"`: Forces a full-width border-to-border divider using border tees (`b_tee_l` / `b_tee_r`).
+        - `divider: "window"`: Forces an inset divider bounded within inner margins (`avail_w`).
+      * **Dashboard Schema & Attributes**:
+        - `type`: Set to `table` for tabular multi-column rendering.
+        - `width`: Total table width, e.g. `"100%"` (or `"full"`) or integer characters.
+        - `entries`: Maximum plugin columns per table row (default: 2). Also accepts `columns`.
+        - `headers`: Optional list or string of column header labels.
+        - `rows`: Optional explicit list of plugin keys per row (e.g. `[["weather", "alienware", "pi3b"], ["otd"]]`).
+        - **Reserved Keys**: Keys ignored during plugin auto-grouping: `layout`, `_layout`, `type`, `width`, `entries`, `columns`, `headers`, `rows`, `divider`, `top_divider`, `pretext`, `posttext`.
+      * **Plugin Item Schema**:
+        - `script`: Command or script path (expands `{scripts_dir}`).
+        - `sleep`: Polling interval in seconds (`0` for live per-tick refresh).
+        - `standalone: true` (or `span: full`): Stretch across the full screen width outside tabular column borders.
+        - `pretext`: Text or placeholder (e.g. `'{divider}'`) rendered before output lines.
+        - `posttext`: Text or placeholder (e.g. `'{divider}'`) rendered after output lines.
       * Multi-table chunking: If `entries: 2` is set and a 3rd plugin is encountered, a new table is constructed, spanning the screen on its own or grouping with subsequent plugins.
       * Standalone plugins: Plugins configured with `standalone: true` or `span: full` (e.g. Quote of the Day or system banners) render on their own line stretching across the screen without table borders.
       * Each plugin retains its own independent `sleep` interval and background thread polling without blocking the TUI.

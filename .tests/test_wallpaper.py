@@ -117,6 +117,7 @@ class TestWallpaperCompositor(unittest.TestCase):
         self.assertGreater(out_enabled.plain.count("▀"), 500)
 
         # 2. Disabled
+        cfg["theme"] = "dracula"
         cfg["settings"]["background"]["enabled"] = False
         mv_disabled = bashmenu.MainMenuView(config=cfg, menu_data=menu)
         with patch.object(
@@ -266,15 +267,15 @@ class TestWallpaperCompositor(unittest.TestCase):
             self.assertIsNotNone(mv._canvas)
             self.assertTrue(mv._canvas.is_valid(mv._canvas._canvas_key))
 
-            # Navigate to row 2
-            mv.set_current_row(2)
+            # Navigate to row 3 (next selectable option after row 1 and divider row 2)
+            mv.set_current_row(3)
             frame2 = mv.render()
 
-            # Ensure row 1 and row 2 changed selection states (lines 4 and 5 in output)
+            # Ensure row 1 and row 3 changed selection states (lines 4 and 6 in output)
             lines1 = frame1.plain.splitlines()
             lines2 = frame2.plain.splitlines()
             self.assertNotEqual(lines1[4], lines2[4])
-            self.assertNotEqual(lines1[5], lines2[5])
+            self.assertNotEqual(lines1[6], lines2[6])
 
 
 if __name__ == "__main__":

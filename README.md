@@ -19,8 +19,9 @@ Contains a few personal scripts as examples.
   live. Includes a Property Inspector panel and edit dialog with real-time visual
   menu item previews.
 - **Dynamic Prompts & Pickers**: Prompt the user on action select using `{param}`
-  text modals, or `{file_picker}`/`{dir_picker}` filesystem navigators. Includes
-  intelligent path-aware folder pre-loading.
+  text modals, or `{file_picker}`/`{dir_picker}` filesystem navigators. Supports
+  path decomposition modifiers (`:stem`, `:name`, `:base`, `:dir`, `:ext`) for
+  seamless file conversion and manipulation, along with intelligent folder pre-loading.
 - **Adaptive Icons**: Icons mapped via `{nf:[char]:[hex]:[emoji]}`.
   Toggles gracefully between Unicode Emojis, Nerd Font Glyphs, or defined
   characters. Icon slots standardize to 4 columns, ensuring all menu text

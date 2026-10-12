@@ -7,25 +7,50 @@
 
 set -eo pipefail
 
+ALLOW_FILE=1
+TARGET_FILE=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --no-file|--no-edit|--view-only)
+            ALLOW_FILE=0
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            echo "Usage: $0 [--no-file] <filename>" >&2
+            exit 1
+            ;;
+        *)
+            if [ -z "$TARGET_FILE" ]; then
+                TARGET_FILE="$1"
+            else
+                echo "Error: Unexpected argument '$1'" >&2
+                exit 1
+            fi
+            ;;
+    esac
+    shift
+done
+
 # Check if filename argument is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 <filename>" >&2
+if [ -z "$TARGET_FILE" ]; then
+    echo "Usage: $0 [--no-file] <filename>" >&2
     exit 1
 fi
 
 # Verify the file exists
-if [ ! -f "$1" ]; then
-    echo "Error: File '$1' does not exist." >&2
+if [ ! -f "$TARGET_FILE" ]; then
+    echo "Error: File '$TARGET_FILE' does not exist." >&2
     exit 1
 fi
 
 # Resolve file path portably without hardcoded paths
 if command -v realpath >/dev/null 2>&1; then
-    TARGET_FILE="$(realpath "$1")"
+    TARGET_FILE="$(realpath "$TARGET_FILE")"
 elif command -v readlink >/dev/null 2>&1; then
-    TARGET_FILE="$(readlink -f "$1" 2>/dev/null || echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")")"
+    TARGET_FILE="$(readlink -f "$TARGET_FILE" 2>/dev/null || echo "$(cd "$(dirname "$TARGET_FILE")" && pwd)/$(basename "$TARGET_FILE")")"
 else
-    TARGET_FILE="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+    TARGET_FILE="$(cd "$(dirname "$TARGET_FILE")" && pwd)/$(basename "$TARGET_FILE")"
 fi
 
 # Resolve script directory and project root dynamically
@@ -115,10 +140,16 @@ Console(force_terminal=True, width=width).print(Markdown(sys.stdin.read(), hyper
 # Pipe through pager.sh for interactive terminals, or fallback to less -R, $PAGER, or raw stream
 if [ -t 1 ]; then
     if [ -x "${SCRIPT_DIR}/pager.sh" ]; then
-        RELOAD_CMD="\"${SCRIPT_DIR}/rich.sh\" \"$TARGET_FILE\""
+        PAGER_ARGS=()
+        if [ "$ALLOW_FILE" = "1" ]; then
+            RELOAD_CMD="\"${SCRIPT_DIR}/rich.sh\" \"$TARGET_FILE\""
+            PAGER_ARGS+=(--file="$TARGET_FILE" --reload-cmd="$RELOAD_CMD")
+        else
+            PAGER_ARGS+=(--no-file)
+        fi
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
             render_markdown | \
-            "${SCRIPT_DIR}/pager.sh" --file="$TARGET_FILE" --reload-cmd="$RELOAD_CMD"
+            "${SCRIPT_DIR}/pager.sh" "${PAGER_ARGS[@]}"
     elif command -v less >/dev/null 2>&1; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
             render_markdown | less -R
