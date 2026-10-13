@@ -542,7 +542,7 @@ class ThemePreviewWidget(Static):
 
     def render(self) -> Text:
         """Render complete simulated BashMenu frame with active borders and styles."""
-        w = 48
+        w = 56
         inner_w = w - 6  # Borders (2) + Margins (4)
         t_dict = dict(self.theme_dict)
         if 256 not in t_dict and "256" in t_dict:
@@ -669,28 +669,33 @@ class ThemePreviewWidget(Static):
         out.append("\n")
 
         # Row 5: Plugin Header
-        r_pl_h = Text("┌─ Weather Dashboard ────────┐", style=plug_style)
+        pl_box_w = max(24, inner_w - 6)
+        title_pl = " Weather Dashboard "
+        dash_len = max(0, pl_box_w - 3 - len(title_pl))
+        r_pl_h = Text(f"┌─{title_pl}" + "─" * dash_len + "┐", style=plug_style)
         out.append_text(wrap_line(r_pl_h))
         out.append("\n")
 
         # Row 6: Plugin Content
-        r_pl_c = Text("│ 72°F Sunny • Orion Up 3d   │", style=plug_style)
+        cont_pl = " 72°F Sunny • Orion Up 3d"
+        rem_cont = max(0, pl_box_w - 2 - len(cont_pl))
+        r_pl_c = Text(f"│{cont_pl}" + " " * rem_cont + "│", style=plug_style)
         out.append_text(wrap_line(r_pl_c))
         out.append("\n")
 
         # Row 7: Plugin Bottom
-        r_pl_b = Text("└────────────────────────────┘", style=plug_style)
+        r_pl_b = Text("└" + "─" * (pl_box_w - 2) + "┘", style=plug_style)
         out.append_text(wrap_line(r_pl_b))
         out.append("\n")
 
         # Row 8: Gutter Top Border
         avail_both = max(4, w - 11)
-        left_gw = avail_both // 2
+        left_gw = 23
         right_gw = avail_both - left_gw
         sep_x = 3 + left_gw + 2
+        rem_right = w - 2 - sep_x
 
         gt_line = Text()
-        rem_right = w - 2 - sep_x
         gt_line.append(b_gt_l_tee + b_gt_border * (sep_x - 1), style=b_style)
         gt_line.append(b_gt_top_tee, style=b_style)
         gt_line.append(b_gt_border * rem_right + b_gt_r_tee, style=b_style)
@@ -699,19 +704,27 @@ class ThemePreviewWidget(Static):
         out.append("\n")
 
         # Row 9: Gutter Content Row
+        h_part = Text("[F1] Help | [F2] Themes", style=help_style)
+        if h_part.cell_len > left_gw:
+            h_part.truncate(left_gw)
+        h_pad = max(0, left_gw - h_part.cell_len)
+        if h_pad > 0:
+            h_part.append(" " * h_pad)
+
+        s_part = Text(f"{self.theme_name} | 12:45", style=gutter_style)
+        if s_part.cell_len > right_gw:
+            s_part.truncate(right_gw)
+        s_pad = max(0, right_gw - s_part.cell_len)
+        status_cell = Text(" " * s_pad)
+        status_cell.append_text(s_part)
+
         g_content = Text()
         g_content.append(b_v_left + "  ", style=b_style)
-        h_part = Text("[F1] Help | [F2] Themes", style=help_style)
-        h_part.truncate(left_gw)
-        h_part.pad_right(left_gw)
         g_content.append_text(h_part)
         g_content.append("  ", style=text_style)
         g_content.append(b_gt_sep, style=b_style)
         g_content.append("  ", style=text_style)
-        s_part = Text(f"{self.theme_name} | 12:45", style=gutter_style)
-        s_part.truncate(right_gw)
-        s_part.pad_right(right_gw)
-        g_content.append_text(s_part)
+        g_content.append_text(status_cell)
         g_content.append("  " + b_v_right, style=b_style)
         g_content.append(shadow_ch * 2, style=shadow_style)
         out.append_text(g_content)
@@ -764,14 +777,14 @@ class ThemeEditScreen(Screen):
         width: 100%;
     }
     #preview_panel {
-        width: 48%;
+        width: 1fr;
         height: 100%;
         border: solid $accent;
-        padding: 1 2;
+        padding: 1 1;
         align: center middle;
     }
     #inspector_panel {
-        width: 52%;
+        width: 1fr;
         height: 100%;
         border: solid $accent;
         padding: 0 1;
