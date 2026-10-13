@@ -146,6 +146,80 @@ class TestPerformanceAndResponsiveness(unittest.TestCase):
         screen.initial_config = {"settings": {"status_gutter": "User: {user} | Static Info"}}
         self.assertEqual(screen._determine_refresh_interval(), 5.0)
 
+    def test_mouse_navigation_scroll_stability(self):
+        """Verify mouse hover in a scrolled menu preserves scroll offset without collapsing to top."""
+        many_options = [{"title": f"Option {i}", "type": "command"} for i in range(30)]
+        test_menu = {"items": many_options}
+        mv = bashmenu.MainMenuView(config=self.cfg, menu_data=test_menu)
+        mv.visible_option_rows = 10
+
+        # Scroll down to offset 10 (showing options 10-19)
+        mv.scroll_offsets = [10]
+        mv.selected_rows = [15]
+
+        # Hover over rendered row 3 (which corresponds to Option 13)
+        event = MagicMock()
+        event.y = 6  # 6 - 3 = rendered_row 3
+        mv.on_mouse_move(event)
+
+        # Selection should move to 13, and scroll_offset MUST remain 10 (no collapse)
+        self.assertEqual(mv.current_row(), 13)
+        self.assertEqual(mv.current_scroll_offset(), 10)
+
+        # Move mouse over rendered row 0 (Option 10)
+        event.y = 3  # 3 - 3 = rendered_row 0
+        mv.on_mouse_move(event)
+        self.assertEqual(mv.current_row(), 10)
+        self.assertEqual(mv.current_scroll_offset(), 10)
+
+        # Move mouse over rendered row 9 (Option 19)
+        event.y = 12  # 12 - 3 = rendered_row 9
+        mv.on_mouse_move(event)
+        self.assertEqual(mv.current_row(), 19)
+        self.assertEqual(mv.current_scroll_offset(), 10)
+
+    def test_scroll_wheel_navigation_bounds(self):
+        """Verify scroll_down and scroll_up clamp gracefully at boundaries without wrapping."""
+        many_options = [{"title": f"Option {i}", "type": "command"} for i in range(20)]
+        test_menu = {"items": many_options}
+        mv = bashmenu.MainMenuView(config=self.cfg, menu_data=test_menu)
+        mv.visible_option_rows = 8  # max_scroll = 20 - 8 = 12
+
+        self.assertEqual(mv.current_scroll_offset(), 0)
+
+        # Scroll down multiple times
+        for _ in range(25):
+            mv.scroll_down(step=1)
+
+        # Should be clamped at max_scroll = 12, not wrapped around
+        self.assertEqual(mv.current_scroll_offset(), 12)
+        self.assertGreaterEqual(mv.current_row(), 12)
+        self.assertLess(mv.current_row(), 20)
+
+        # Scroll up multiple times
+        for _ in range(25):
+            mv.scroll_up(step=1)
+
+        # Should be clamped at 0, not wrapped around
+        self.assertEqual(mv.current_scroll_offset(), 0)
+        self.assertLessEqual(mv.current_row(), 7)
+
+    def test_mouse_scroll_event_stopping(self):
+        """Verify on_mouse_scroll_down and on_mouse_scroll_up prevent default and stop bubbling."""
+        many_options = [{"title": f"Option {i}", "type": "command"} for i in range(10)]
+        mv = bashmenu.MainMenuView(config=self.cfg, menu_data={"items": many_options})
+        mv.visible_option_rows = 5
+
+        ev_down = MagicMock()
+        mv.on_mouse_scroll_down(ev_down)
+        ev_down.prevent_default.assert_called_once()
+        ev_down.stop.assert_called_once()
+
+        ev_up = MagicMock()
+        mv.on_mouse_scroll_up(ev_up)
+        ev_up.prevent_default.assert_called_once()
+        ev_up.stop.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

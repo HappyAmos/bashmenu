@@ -412,6 +412,12 @@ pacman:
 | `border_tee_left` / `left_tee` | Left vertical T-junction connector character. | `├` (`{ascii:195}`) |
 | `border_tee_right` / `right_tee` | Right vertical T-junction connector character. | `┤` (`{ascii:180}`) |
 | `border_cross` | Grid intersection cross character. | `┼` (`{ascii:197}`) |
+| `gutter_border` | Horizontal border character placed above status and help gutters. | `border_horizontal_bottom` / `─` (`{ascii:196}`) |
+| `gutter_separator` | Vertical separator line between help and status gutters. | `border_vertical` / `│` (`{ascii:179}`) |
+| `gutter_left_tee` | Left-side T-junction connector where gutter top border meets left window border. | `left_tee` / `├` (`{ascii:195}`) |
+| `gutter_right_tee` | Right-side T-junction connector where gutter top border meets right window border. | `right_tee` / `┤` (`{ascii:180}`) |
+| `gutter_top_tee` | Top-side T-junction connector where vertical separator meets gutter top border. | `top_tee` / `┬` (`{ascii:194}`) |
+| `gutter_bottom_tee` | Bottom-side T-junction connector where vertical separator meets window bottom border. | `bottom_tee` / `┴` (`{ascii:193}`) |
 | `title_left_cap` | Decorative left cap before the title text in header border. | `[` (bracket) |
 | `title_right_cap` | Decorative right cap after the title text in header border. | `]` (bracket) |
 | `shadow_char` | Drop shadow shade character for modal dialogs and popups. | `░` (`{ascii:176}`) |
@@ -648,6 +654,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{time_24}` | 24-hour formatted time (e.g., `15:00:00`). |
 | `{time_24_short}` | Short 24-hour formatted time (e.g., `15:00`). |
 | `{battery}` | Current battery percentage (e.g., `84%`, or `N/A` if no battery is detected). Performance-optimized with a 5-second cache to prevent rendering lag. |
+| `{battery_stat}` / `{battery_status}` | Current battery charging status (e.g., `Charging`, `Discharging`, `Full`, `Not charging`, or `N/A`). Performance-optimized with a 5-second cache. |
 | `{theme}` | Active color theme name from `bashmenu.yml` (e.g., `tokyo_night`, `dracula`). |
 | `{localip}` | Primary outbound IPv4 address (e.g., `192.168.1.50`). Evaluated on demand via UDP socket probe with TTL cache. |
 | `{utc_seconds}` | Current UTC time in seconds since epoch. |

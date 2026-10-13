@@ -451,6 +451,66 @@ def get_battery_info():
     return _cached_battery
 
 
+_last_battery_stat_time = 0.0
+_cached_battery_stat = "N/A"
+
+
+def get_battery_status():
+    """Retrieve current battery charging/discharging status with a 5-second cache."""
+    global _last_battery_stat_time, _cached_battery_stat
+    now = time.time()
+    if now - _last_battery_stat_time < 5.0:
+        return _cached_battery_stat
+
+    _last_battery_stat_time = now
+    try:
+        if os.path.exists("/sys/class/power_supply"):
+            for name in os.listdir("/sys/class/power_supply"):
+                type_path = os.path.join("/sys/class/power_supply", name, "type")
+                is_bat = name.startswith("BAT")
+                if not is_bat and os.path.exists(type_path):
+                    with open(type_path, "r") as f:
+                        if "battery" in f.read().lower():
+                            is_bat = True
+                if is_bat:
+                    status_path = os.path.join("/sys/class/power_supply", name, "status")
+                    if os.path.exists(status_path):
+                        with open(status_path, "r") as f:
+                            stat = f.read().strip()
+                            if stat:
+                                _cached_battery_stat = stat
+                                return _cached_battery_stat
+
+        # macOS fallback via pmset
+        if shutil.which("pmset"):
+            res = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=1, check=False)
+            if res.returncode == 0 and res.stdout:
+                stdout_lower = res.stdout.lower()
+                if "charging" in stdout_lower:
+                    _cached_battery_stat = "Charging"
+                elif "discharging" in stdout_lower:
+                    _cached_battery_stat = "Discharging"
+                elif "finishing charge" in stdout_lower or "charged" in stdout_lower:
+                    _cached_battery_stat = "Full"
+                return _cached_battery_stat
+
+        # Termux fallback via termux-battery-status
+        if shutil.which("termux-battery-status"):
+            res = subprocess.run(["termux-battery-status"], capture_output=True, text=True, timeout=1, check=False)
+            if res.returncode == 0 and res.stdout:
+                import json
+
+                data = json.loads(res.stdout)
+                if "status" in data:
+                    _cached_battery_stat = str(data["status"]).title()
+                    return _cached_battery_stat
+    except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+        pass
+
+    _cached_battery_stat = "N/A"
+    return _cached_battery_stat
+
+
 PRIMARY_IP = "127.0.0.1"
 
 DEFAULT_CONFIG = {
@@ -768,6 +828,8 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{appdata}": APPDATA_PATH,
         "{userprofile}": USERPROFILE_PATH,
         "{battery}": get_battery_info() if "{battery}" in res_text else "",
+        "{battery_stat}": get_battery_status() if "{battery_stat}" in res_text or "{battery_status}" in res_text else "",
+        "{battery_status}": get_battery_status() if "{battery_stat}" in res_text or "{battery_status}" in res_text else "",
         "{window_width}": str(win_w),
         "{screen_width}": str(scr_w),
         "{window_height}": str(win_h),
@@ -1749,6 +1811,7 @@ class MainMenuView(Widget):
         self.menu_data = menu_data or load_menu()[0]
         self.menu_stack = [self.menu_data]
         self.selected_rows = [0]
+        self.scroll_offsets = [0]
         self.show_shortcuts = True
         self.can_focus = True
         self._canvas = bashmenu_ui.PrebakedWallpaperCanvas()
@@ -1759,37 +1822,153 @@ class MainMenuView(Widget):
     def current_row(self) -> int:
         return self.selected_rows[-1]
 
+    def current_scroll_offset(self) -> int:
+        if not hasattr(self, "scroll_offsets") or not self.scroll_offsets:
+            self.scroll_offsets = [0]
+        return self.scroll_offsets[-1]
+
     def set_current_row(self, row: int) -> None:
         opts = self.current_menu().get("items", self.current_menu().get("options", []))
         if not opts:
             return
         old_row = self.selected_rows[-1]
         new_row = max(0, min(row, len(opts) - 1))
-        if old_row == new_row:
-            return
 
-        self.selected_rows[-1] = new_row
-
-        # Check if the scroll offset changes between old_row and new_row
         visible_rows = getattr(self, "visible_option_rows", None)
         w = max(40, self.size.width or 80)
         h = max(10, self.size.height or 24)
 
+        if not hasattr(self, "scroll_offsets") or not self.scroll_offsets:
+            self.scroll_offsets = [0]
+        old_scroll = self.scroll_offsets[-1]
+        max_scroll = max(0, len(opts) - visible_rows) if visible_rows and visible_rows > 0 else 0
+
         if visible_rows and visible_rows > 0:
-            old_scroll = 0 if old_row < visible_rows else old_row - visible_rows + 1
-            new_scroll = 0 if new_row < visible_rows else new_row - visible_rows + 1
-            if old_scroll == new_scroll:
-                # Menu option indices map directly to terminal line rows:
-                # Row 0: Top frame border, Rows 1-2: Top margins, Row 3+: Options
-                y_old = 3 + (old_row - old_scroll)
-                y_new = 3 + (new_row - new_scroll)
-                if 0 <= y_old < h and 0 <= y_new < h:
-                    r_old = Region(0, y_old, w, 1)
-                    r_new = Region(0, y_new, w, 1)
-                    self.refresh(r_old, r_new)
-                    return
+            if new_row < old_scroll:
+                new_scroll = new_row
+            elif new_row >= old_scroll + visible_rows:
+                new_scroll = new_row - visible_rows + 1
+            else:
+                new_scroll = old_scroll
+            new_scroll = max(0, min(new_scroll, max_scroll))
+        else:
+            new_scroll = 0
+
+        self.scroll_offsets[-1] = new_scroll
+
+        if old_row == new_row and old_scroll == new_scroll:
+            return
+
+        self.selected_rows[-1] = new_row
+
+        if visible_rows and visible_rows > 0 and old_scroll == new_scroll:
+            # Menu option indices map directly to terminal line rows:
+            # Row 0: Top frame border, Rows 1-2: Top margins, Row 3+: Options
+            y_old = 3 + (old_row - old_scroll)
+            y_new = 3 + (new_row - new_scroll)
+            if 0 <= y_old < h and 0 <= y_new < h:
+                r_old = Region(0, y_old, w, 1)
+                r_new = Region(0, y_new, w, 1)
+                self.refresh(r_old, r_new)
+                return
 
         self.refresh()
+
+    def scroll_down(self, step: int = 1) -> None:
+        opts = self.current_menu().get("items", self.current_menu().get("options", []))
+        if not opts:
+            return
+        visible_rows = getattr(self, "visible_option_rows", None)
+        if not visible_rows or visible_rows <= 0:
+            return
+        max_scroll = max(0, len(opts) - visible_rows)
+        curr_scroll = self.current_scroll_offset()
+        if max_scroll == 0:
+            orig = self.current_row()
+            idx = orig + 1
+            while idx < len(opts) and is_divider(opts[idx]):
+                idx += 1
+            if idx < len(opts):
+                self.set_current_row(idx)
+            return
+
+        new_scroll = min(max_scroll, curr_scroll + step)
+        if new_scroll != curr_scroll:
+            self.scroll_offsets[-1] = new_scroll
+            curr_row = self.current_row()
+            if curr_row < new_scroll:
+                target = new_scroll
+                while target < len(opts) and is_divider(opts[target]):
+                    target += 1
+                if target < len(opts):
+                    self.selected_rows[-1] = target
+            elif curr_row >= new_scroll + visible_rows:
+                target = new_scroll + visible_rows - 1
+                while target >= new_scroll and is_divider(opts[target]):
+                    target -= 1
+                if target >= 0:
+                    self.selected_rows[-1] = target
+            self.refresh()
+        else:
+            orig = self.current_row()
+            idx = orig + 1
+            while idx < len(opts) and is_divider(opts[idx]):
+                idx += 1
+            if idx < len(opts):
+                self.set_current_row(idx)
+
+    def scroll_up(self, step: int = 1) -> None:
+        opts = self.current_menu().get("items", self.current_menu().get("options", []))
+        if not opts:
+            return
+        visible_rows = getattr(self, "visible_option_rows", None)
+        if not visible_rows or visible_rows <= 0:
+            return
+        max_scroll = max(0, len(opts) - visible_rows)
+        curr_scroll = self.current_scroll_offset()
+        if max_scroll == 0:
+            orig = self.current_row()
+            idx = orig - 1
+            while idx >= 0 and is_divider(opts[idx]):
+                idx -= 1
+            if idx >= 0:
+                self.set_current_row(idx)
+            return
+
+        new_scroll = max(0, curr_scroll - step)
+        if new_scroll != curr_scroll:
+            self.scroll_offsets[-1] = new_scroll
+            curr_row = self.current_row()
+            if curr_row >= new_scroll + visible_rows:
+                target = new_scroll + visible_rows - 1
+                while target >= new_scroll and is_divider(opts[target]):
+                    target -= 1
+                if target >= 0:
+                    self.selected_rows[-1] = target
+            elif curr_row < new_scroll:
+                target = new_scroll
+                while target < len(opts) and is_divider(opts[target]):
+                    target += 1
+                if target < len(opts):
+                    self.selected_rows[-1] = target
+            self.refresh()
+        else:
+            orig = self.current_row()
+            idx = orig - 1
+            while idx >= 0 and is_divider(opts[idx]):
+                idx -= 1
+            if idx >= 0:
+                self.set_current_row(idx)
+
+    def on_mouse_scroll_down(self, event) -> None:
+        self.scroll_down(step=1)
+        event.prevent_default()
+        event.stop()
+
+    def on_mouse_scroll_up(self, event) -> None:
+        self.scroll_up(step=1)
+        event.prevent_default()
+        event.stop()
 
     def get_plugin_lines_and_limits(self, total_content_rows: int) -> tuple[list[str], int, int]:
         """The `get_plugin_lines_and_limits` method returns the capped plugin
@@ -1883,10 +2062,12 @@ class MainMenuView(Widget):
         # Status and help gutters wrapping (cached per second/width to avoid re-evaluating during rapid navigation)
         avail_w = max(20, w - 6)
         screen_div_w = max(20, w - 2)
-        max_gutter_w = max(5, avail_w // 2)
+        avail_both = max(4, w - 11)
+        left_gutter_w = avail_both // 2
+        right_gutter_w = avail_both - left_gutter_w
 
         now_sec = int(time.time())
-        gutter_key = (now_sec, max_gutter_w, avail_w, self.show_shortcuts)
+        gutter_key = (now_sec, left_gutter_w, right_gutter_w, avail_w, self.show_shortcuts)
         cached_gutters = getattr(self, "_cached_gutters", None)
         if cached_gutters and cached_gutters[0] == gutter_key:
             help_lines, status_lines = cached_gutters[1], cached_gutters[2]
@@ -1896,20 +2077,20 @@ class MainMenuView(Widget):
             else:
                 full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [ESC]: Back"
             raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
-            help_lines = wrap_gutter_items(raw_help_items, max_gutter_w, max_lines=2, config=self.config, spread=True)
+            help_lines = wrap_gutter_items(raw_help_items, left_gutter_w, max_lines=2, config=self.config, spread=True)
 
             status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
             raw_badges = split_gutter_badges(status_gutter_raw)
-            init_extra_vars = {"window_width": avail_w, "screen_width": screen_div_w}
+            init_extra_vars = {"window_width": right_gutter_w, "screen_width": screen_div_w}
             all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars).strip() for b in raw_badges if b.strip()]
             all_badges = [b for b in all_badges if b]
-            status_lines = wrap_gutter_items(all_badges, max_gutter_w, max_lines=2, config=self.config, bottom_up=True)
+            status_lines = wrap_gutter_items(all_badges, right_gutter_w, max_lines=2, config=self.config, bottom_up=True)
             self._cached_gutters = (gutter_key, help_lines, status_lines)
 
         gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))
         gutter_y_start = h - 1 - gutter_rows
 
-        total_content_rows = max(1, h - 4 - gutter_rows)
+        total_content_rows = max(1, h - 5 - gutter_rows)
         self.total_content_rows = total_content_rows
         raw_plugin_lines, separator_rows, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
         self.visible_option_rows = visible_option_rows
@@ -1957,18 +2138,25 @@ class MainMenuView(Widget):
                 total_content_rows,
                 raw_plugin_lines,
                 separator_rows,
+                gutter_rows,
             )
 
-        scroll_start = 0
-        if curr_row >= visible_option_rows:
+        scroll_start = self.current_scroll_offset()
+        max_scroll = max(0, len(options) - visible_option_rows)
+        if curr_row < scroll_start:
+            scroll_start = curr_row
+        elif curr_row >= scroll_start + visible_option_rows:
             scroll_start = curr_row - visible_option_rows + 1
+        scroll_start = max(0, min(scroll_start, max_scroll))
+        if hasattr(self, "scroll_offsets") and self.scroll_offsets:
+            self.scroll_offsets[-1] = scroll_start
 
         cached_hg = getattr(self, "_cached_raw_hg_lines", None)
         if cached_hg and cached_hg[0] == gutter_key:
             raw_hg_lines = cached_hg[1]
         else:
             raw_hg_lines = self._render_raw_gutter_lines(
-                help_lines, status_lines, gutter_rows, avail_w, theme_styles
+                help_lines, status_lines, gutter_rows, avail_w, theme_styles, w=w
             )
             self._cached_raw_hg_lines = (gutter_key, raw_hg_lines)
 
@@ -2009,6 +2197,7 @@ class MainMenuView(Widget):
         total_content_rows: int,
         raw_plugin_lines: list,
         separator_rows: int,
+        gutter_rows: int = 1,
     ) -> None:
         """Pre-bake static frame borders, margins, options, and plugin rows onto the canvas."""
         grid = None
@@ -2050,6 +2239,11 @@ class MainMenuView(Widget):
         b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
         b_tee_l = borders.get("left_tee") or borders.get("border_tee_left") or b_v_left
         b_tee_r = borders.get("right_tee") or borders.get("border_tee_right") or b_v_right
+        b_gt_border = borders.get("gutter_border") or b_h_bot
+        b_gt_l_tee = borders.get("gutter_left_tee") or b_tee_l
+        b_gt_r_tee = borders.get("gutter_right_tee") or b_tee_r
+        b_gt_top_tee = borders.get("gutter_top_tee") or borders.get("top_tee", "┬")
+        b_gt_bot_tee = borders.get("gutter_bottom_tee") or borders.get("bottom_tee", "┴")
         title_l_cap = borders.get("title_left_cap", " ") or " "
         title_r_cap = borders.get("title_right_cap", " ") or " "
 
@@ -2133,8 +2327,25 @@ class MainMenuView(Widget):
             canvas.set_static_line(curr_y, Text(f"{b_v_left}  " + " " * avail_w + f"  {b_v_right}", style=border_style))
             curr_y += 1
 
-        # Bottom border at h - 1
-        bot_bar = Text(b_bl + b_h_bot * max(0, w - 2) + b_br, style=border_style)
+        # Gutter top border & window bottom border
+        avail_both = max(4, w - 11)
+        left_gutter_w = avail_both // 2
+        sep_x = left_gutter_w + 5
+        left_seg_len = max(0, sep_x - 1)
+        right_seg_len = max(0, w - 2 - sep_x)
+
+        gutter_border_y = h - 2 - gutter_rows
+        gt_bar = Text(
+            b_gt_l_tee + b_gt_border * left_seg_len + b_gt_top_tee + b_gt_border * right_seg_len + b_gt_r_tee,
+            style=border_style,
+        )
+        canvas.set_static_line(gutter_border_y, gt_bar)
+
+        # Bottom border at h - 1 with bottom tee connecting the vertical separator
+        bot_bar = Text(
+            b_bl + b_h_bot * left_seg_len + b_gt_bot_tee + b_h_bot * right_seg_len + b_br,
+            style=border_style,
+        )
         canvas.set_static_line(h - 1, bot_bar)
 
         # 4. Pre-bake options
@@ -2173,14 +2384,23 @@ class MainMenuView(Widget):
         gutter_rows: int,
         avail_w: int,
         theme_styles: dict,
+        w: int | None = None,
     ) -> list[Text]:
         theme_name = self.config.get("theme", "dracula")
         borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
         b_v_left = borders.get("border_vertical_left", borders.get("border_vertical", "│"))
         b_v_right = borders.get("border_vertical_right", borders.get("border_vertical", "│"))
+        b_gt_sep = borders.get("gutter_separator") or borders.get("border_vertical", "│")
         border_style = theme_styles.get("border", Style(color="blue"))
         gutter_style = theme_styles.get("gutter", Style(color="cyan", bold=True))
         help_text_style = theme_styles.get("help_text", Style(color="cyan"))
+
+        if w is None:
+            w = avail_w + 6
+
+        avail_both = max(4, w - 11)
+        left_gutter_w = avail_both // 2
+        right_gutter_w = avail_both - left_gutter_w
 
         status_offset = gutter_rows - len(status_lines)
         raw_lines = []
@@ -2188,26 +2408,35 @@ class MainMenuView(Widget):
             h_text = help_lines[r] if r < len(help_lines) else ""
             s_idx = r - status_offset
             s_text = status_lines[s_idx] if 0 <= s_idx < len(status_lines) else ""
-            h_len = get_visible_len(h_text, self.config)
-            s_len = get_visible_len(s_text, self.config)
-            footer_spaces = max(0, avail_w - h_len - s_len)
 
-            hg_content = Text()
-            if h_text:
-                hg_content.append_text(bashmenu_ui.formatting_to_rich_text(h_text, default_style=help_text_style, theme=theme_styles))
-            if footer_spaces > 0:
-                hg_content.append(" " * footer_spaces, style=border_style)
-            if s_text:
-                hg_content.append_text(bashmenu_ui.formatting_to_rich_text(s_text, default_style=gutter_style, theme=theme_styles))
+            h_rich = (
+                bashmenu_ui.formatting_to_rich_text(h_text, default_style=help_text_style, theme=theme_styles)
+                if h_text
+                else Text()
+            )
+            if h_rich.cell_len > left_gutter_w:
+                h_rich.truncate(left_gutter_w)
+            h_pad = max(0, left_gutter_w - h_rich.cell_len)
+            if h_pad > 0:
+                h_rich.append(" " * h_pad)
 
-            if hg_content.cell_len > avail_w:
-                hg_content.truncate(avail_w)
-            hg_pad_w = max(0, avail_w - hg_content.cell_len)
-            if hg_pad_w > 0:
-                hg_content.append(" " * hg_pad_w, style=border_style)
+            s_rich = (
+                bashmenu_ui.formatting_to_rich_text(s_text, default_style=gutter_style, theme=theme_styles)
+                if s_text
+                else Text()
+            )
+            if s_rich.cell_len > right_gutter_w:
+                s_rich.truncate(right_gutter_w)
+            s_pad = max(0, right_gutter_w - s_rich.cell_len)
+            status_cell = Text(" " * s_pad)
+            status_cell.append_text(s_rich)
 
             hg_line = Text(f"{b_v_left}  ", style=border_style)
-            hg_line.append_text(hg_content)
+            hg_line.append_text(h_rich)
+            hg_line.append("  ", style=border_style)
+            hg_line.append(b_gt_sep, style=border_style)
+            hg_line.append("  ", style=border_style)
+            hg_line.append_text(status_cell)
             hg_line.append(f"  {b_v_right}", style=border_style)
             raw_lines.append(hg_line)
         return raw_lines
@@ -2429,10 +2658,7 @@ class MainMenuView(Widget):
             total_content_rows = max(1, (self.size.height or 24) - 5)
             _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
 
-        scroll_start = 0
-        curr_row = self.current_row()
-        if curr_row >= visible_option_rows:
-            scroll_start = curr_row - visible_option_rows + 1
+        scroll_start = self.current_scroll_offset()
 
         if 0 <= rendered_row < visible_option_rows:
             target_idx = scroll_start + rendered_row
@@ -2467,10 +2693,7 @@ class MainMenuView(Widget):
             total_content_rows = max(1, (self.size.height or 24) - 5)
             _, _, visible_option_rows = self.get_plugin_lines_and_limits(total_content_rows)
 
-        scroll_start = 0
-        curr_row = self.current_row()
-        if curr_row >= visible_option_rows:
-            scroll_start = curr_row - visible_option_rows + 1
+        scroll_start = self.current_scroll_offset()
 
         if 0 <= rendered_row < visible_option_rows:
             target_idx = scroll_start + rendered_row
@@ -2558,6 +2781,8 @@ def process_item_action(screen, item, config):
         while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
             start_idx += 1
         screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
+        if hasattr(screen.menu_view, "scroll_offsets"):
+            screen.menu_view.scroll_offsets.append(0)
         screen.menu_view.refresh()
 
     elif "set_theme" in item:
@@ -2583,6 +2808,8 @@ def process_item_action(screen, item, config):
         while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
             start_idx += 1
         screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
+        if hasattr(screen.menu_view, "scroll_offsets"):
+            screen.menu_view.scroll_offsets.append(0)
         screen.menu_view.refresh()
 
     elif item_type in ["message", "popup", "info"]:
@@ -3109,10 +3336,18 @@ class BashMenuScreen(Screen):
             process_item_action(self, item, mv.config)
 
     def on_mouse_scroll_down(self, event) -> None:
-        self.action_move_down()
+        mv = getattr(self, "menu_view", None)
+        if mv:
+            mv.scroll_down(step=1)
+        event.prevent_default()
+        event.stop()
 
     def on_mouse_scroll_up(self, event) -> None:
-        self.action_move_up()
+        mv = getattr(self, "menu_view", None)
+        if mv:
+            mv.scroll_up(step=1)
+        event.prevent_default()
+        event.stop()
 
     def action_move_up(self) -> None:
         mv = self.menu_view
@@ -3165,6 +3400,8 @@ class BashMenuScreen(Screen):
         if len(mv.menu_stack) > 1:
             mv.menu_stack.pop()
             mv.selected_rows.pop()
+            if hasattr(mv, "scroll_offsets") and len(mv.scroll_offsets) > 1:
+                mv.scroll_offsets.pop()
             mv.refresh()
         else:
             self.app.exit()
@@ -3258,6 +3495,7 @@ class BashMenuScreen(Screen):
         mv.menu_data, _ = load_menu()
         mv.menu_stack = [mv.menu_data]
         mv.selected_rows = [0]
+        mv.scroll_offsets = [0]
         mv.show_shortcuts = get_config_value(mv.config, "settings.show_menu_shortcuts", True)
         self.plugin_buffer.config = mv.config
         get_plugin_outputs(mv.config)
@@ -3391,7 +3629,7 @@ class BashMenuApp(App):
             if task is not None and not task.done():
                 self._inactivity_timer.reset()
                 return
-        self.setup_inactivity_timer()
+            self.setup_inactivity_timer()
 
     def _trigger_inactivity_timeout(self) -> None:
         """The `_trigger_inactivity_timeout` method executes the screensaver

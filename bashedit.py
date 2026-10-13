@@ -1739,12 +1739,11 @@ class BashEditScreen(Screen):
             self.action_help_manual()
             return
 
-        if key_lower in ["alt+t", "meta+t"]:
-            if self.display_theme_colors:
-                event.prevent_default()
-                event.stop()
-                self.action_toggle_theme_colors()
-                return
+        if key_lower in ["alt+t", "meta+t"] and self.display_theme_colors:
+            event.prevent_default()
+            event.stop()
+            self.action_toggle_theme_colors()
+            return
 
         if key_lower in ["ctrl+n", "ctrl_n"] or char_lower in ["\x0e"]:
             event.prevent_default()
@@ -2388,7 +2387,6 @@ class BashEditScreen(Screen):
             target_path = temp_target
 
         try:
-            bash_bin = "/usr/bin/env bash"
             cmd = f'bash "{rich_script}" --no-file "{target_path}"'
             app_obj = getattr(self, "app", None)
             driver = getattr(app_obj, "_driver", None) if app_obj else None

@@ -523,6 +523,10 @@ Short 12-hour and 24-hour current time (excludes seconds; optimal for performanc
 Current battery percentage (e.g. 84% or N/A). Includes a 5-second
 performance cache.
 .TP
+.B {battery_stat}, {battery_status}
+Current battery charging status (e.g. Charging, Discharging, Full, or N/A). Includes a 5-second
+performance cache.
+.TP
 .B {theme}
 Active color theme name from bashmenu.yml (e.g. tokyo_night, dracula).
 .TP
@@ -630,7 +634,9 @@ and \fBborder_vertical\fR as shorthands), \fBborder_top_left\fR,
 \fBborder_top_right\fR, \fBborder_bottom_left\fR, \fBborder_bottom_right\fR,
 \fBborder_tee_top\fR / \fBtop_tee\fR, \fBborder_tee_bottom\fR / \fBbottom_tee\fR,
 \fBborder_tee_left\fR / \fBleft_tee\fR, \fBborder_tee_right\fR / \fBright_tee\fR,
-\fBborder_cross\fR, \fBtitle_left_cap\fR, \fBtitle_right_cap\fR, and \fBshadow_char\fR.
+\fBborder_cross\fR, \fBgutter_border\fR, \fBgutter_separator\fR, \fBgutter_left_tee\fR,
+\fBgutter_right_tee\fR, \fBgutter_top_tee\fR, \fBgutter_bottom_tee\fR,
+\fBtitle_left_cap\fR, \fBtitle_right_cap\fR, and \fBshadow_char\fR.
 Omitted keys fall back to standard single-line box drawing characters.
 Dividers strictly follow a 4-tier style priority: theme divider definitions
 override plugin divider definitions in bashmenu.yml, which override declared

@@ -268,6 +268,9 @@ class TestPluginSystem(unittest.TestCase):
                             self.assertTrue(line.startswith("┌") and line.endswith("┐"))
                         elif idx == h - 1:
                             self.assertTrue(line.startswith("└") and line.endswith("┘"))
+                        elif line.startswith("├") and line.endswith("┤"):
+                            # Gutter top border
+                            self.assertEqual(line_cells, w)
                         else:
                             self.assertTrue(
                                 line.startswith("│  ") and line.endswith("  │"),
@@ -360,9 +363,9 @@ class TestPluginSystem(unittest.TestCase):
         ):
             rendered_drac = mv_drac.render().plain
             drac_lines = rendered_drac.split("\n")
-            # No tee lines should be produced for plugins
+            # Only the gutter top border should have border tees for dracula (none produced for plugins)
             drac_tee_lines = [line for line in drac_lines if line.startswith("├") or line.endswith("┤")]
-            self.assertEqual(len(drac_tee_lines), 0)
+            self.assertEqual(len(drac_tee_lines), 1)
 
         # 4. Geometry update verification
         mock_pb = MagicMock()

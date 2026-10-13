@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-
-import shutil
-import tempfile
 
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -22,6 +21,21 @@ class TestImprovements(unittest.TestCase):
         result = bashmenu.interpolate_placeholders(text, config)
         self.assertNotIn("{date_time_12_short}", result)
         self.assertTrue("AM" in result or "PM" in result)
+
+    def test_battery_stat_interpolation(self):
+        """Verify {battery_stat} and {battery_status} placeholder interpolation and caching."""
+        config = bashmenu.load_config()[0]
+        stat = bashmenu.get_battery_status()
+        self.assertIsInstance(stat, str)
+        self.assertTrue(len(stat) > 0)
+
+        res1 = bashmenu.interpolate_placeholders("Battery Status: {battery_stat}", config)
+        self.assertNotIn("{battery_stat}", res1)
+        self.assertIn(stat, res1)
+
+        res2 = bashmenu.interpolate_placeholders("Battery Status: {battery_status}", config)
+        self.assertNotIn("{battery_status}", res2)
+        self.assertIn(stat, res2)
 
     def test_file_picker_allow_new(self):
         fp = bashmenu_ui.FilePickerModalScreen("Test Picker", mode="file", allow_new=True)
@@ -193,6 +207,7 @@ class TestImprovements(unittest.TestCase):
     def test_message_modal_dialog_sizing_and_shadow(self):
         """Verify MessageModalScreen dialog and drop shadow alignment without OK button clipping."""
         import asyncio
+
         from textual.app import App
 
         class ModalApp(App):
@@ -397,7 +412,6 @@ class TestImprovements(unittest.TestCase):
         import asyncio
 
         from textual.app import App
-        from textual.events import MouseScrollDown, MouseScrollUp
         from textual.widgets import Label
 
         from bashedit import BashEditScreen
@@ -1187,6 +1201,7 @@ class TestImprovements(unittest.TestCase):
             "{cache_dir}",
             "{cache}",
             "{battery}",
+            "{battery_stat}",
             "{localip}",
             "{date_time_12}",
             "{date_time_12_short}",
@@ -1214,13 +1229,13 @@ class TestImprovements(unittest.TestCase):
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         with open(os.path.join(base_dir, "bashmenu.md"), "r", encoding="utf-8") as f:
             md_content = f.read()
-        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}", "{theme}", "{app.<key.path>}"]:
+        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}", "{battery_stat}", "{theme}", "{app.<key.path>}"]:
             self.assertIn(ep, md_content, f"Missing {ep} in bashmenu.md")
 
         # 4. Man page verification
         with open(os.path.join(base_dir, "bashmenu.1"), "r", encoding="utf-8") as f:
             man_content = f.read()
-        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}", "{theme}", "{app.<key.path>}"]:
+        for ep in ["{param}", "{file_picker}", "{dir_picker}", "{localip}", "{cache_dir}", "{battery}", "{battery_stat}", "{theme}", "{app.<key.path>}"]:
             self.assertIn(ep, man_content, f"Missing {ep} in bashmenu.1")
 
     def test_theme_window_borders(self):
@@ -2264,8 +2279,9 @@ class TestImprovements(unittest.TestCase):
     def test_bashmenu_f3_launches_bashedit(self):
         """Verify pressing F3 launches bashedit from the main menu."""
         import asyncio
-        from bashmenu import BashMenuApp, BashMenuScreen
+
         from bashedit import BashEditScreen
+        from bashmenu import BashMenuApp, BashMenuScreen
 
         async def run_check():
             app = BashMenuApp()
@@ -2302,7 +2318,9 @@ class TestImprovements(unittest.TestCase):
     def test_menuedit_footer_dynamic_spreading(self):
         """Verify menuedit.MenuEditScreen spreads footer items and pipe separators across available width."""
         import asyncio
+
         from textual.app import App
+
         import menuedit
 
         class MenuApp(App):
@@ -2330,8 +2348,8 @@ class TestImprovements(unittest.TestCase):
 
     def test_menuedit_lookup_glyphs(self):
         """Verify menuedit.MenuEditScreen and ItemEditModal support Ctrl+N and F5 glyph lookup."""
-        import menuedit
         import bashmenu_ui
+        import menuedit
 
         # 1. Check MenuEditScreen bindings and footer item
         screen_bindings = {b.key: b.action for b in menuedit.MenuEditScreen.BINDINGS}
@@ -2391,8 +2409,8 @@ class TestImprovements(unittest.TestCase):
 
     def test_menuedit_help_modal(self):
         """Verify menuedit.MenuEditScreen has F1 / ? help binding and pushes HA Bash Menu manual modal."""
-        import menuedit
         import bashmenu_ui
+        import menuedit
 
         # 1. Verify BINDINGS
         screen_bindings = {b.key: b.action for b in menuedit.MenuEditScreen.BINDINGS}
@@ -2425,8 +2443,10 @@ class TestImprovements(unittest.TestCase):
     def test_menuedit_prevent_root_collapse_and_f2_toggle_children(self):
         """Verify top root node cannot be collapsed, F2 toggles children, and F3/F4/F5 mappings."""
         import asyncio
+
         from textual.app import App
         from textual.widgets import Tree
+
         import menuedit
 
         # 1. Check MenuEditScreen keybindings
@@ -2483,9 +2503,11 @@ class TestImprovements(unittest.TestCase):
     def test_bashedit_f1_to_f6_function_key_bindings_and_no_aliases(self):
         """Verify F1-F6 bindings, footer labels, on_key routing, and absence of old aliases."""
         import asyncio
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
+
         from textual.app import App
         from textual.widgets import Label
+
         import bashedit
 
         # 1. BINDINGS mapping verification
@@ -2528,6 +2550,7 @@ class TestImprovements(unittest.TestCase):
                 rows = list(legend.query(".footer_row"))
                 row1_items = list(rows[0].query(".footer_item"))
                 row2_items = list(rows[1].query(".footer_item"))
+                self.assertTrue(len(row2_items) > 0)
 
                 # All 8 items on row 1 must be F1-F8 in numerical order
                 expected_first_8 = [
@@ -2601,7 +2624,9 @@ class TestImprovements(unittest.TestCase):
         import asyncio
         import os
         import tempfile
+
         from textual.app import App
+
         import bashedit
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
@@ -2674,8 +2699,11 @@ class TestImprovements(unittest.TestCase):
     def test_bashedit_markdown_viewer_uses_no_file(self):
         """Verify action_toggle_markdown launches rich.sh with --no-file flag."""
         import asyncio
+        import subprocess
         from unittest.mock import patch
+
         from textual.app import App
+
         import bashedit
 
         class MarkdownTestApp(App):
@@ -2699,6 +2727,245 @@ class TestImprovements(unittest.TestCase):
                 cmd = executed_cmds[0]
                 self.assertIn("rich.sh", cmd)
                 self.assertIn("--no-file", cmd)
+
+        asyncio.run(run_checks())
+
+    def test_help_modal_anchor_slug_resolution(self):
+        """Verify MessageModalScreen correctly normalizes slugs and resolves anchor targets without delay."""
+        import asyncio
+
+        from textual.app import App
+        from textual.containers import VerticalScroll
+
+        import bashmenu_ui
+
+        sample_doc = """# Manual
+- [1. Section](#1-first-section)
+- [4.4 Wallpaper Backgrounds & Image Preparation](#44-wallpaper-backgrounds--image-preparation)
+- [7.4 Background Footer Plugins](#74-background-footer-plugins)
+
+## 1. First Section
+Content 1
+
+### 4.4 Wallpaper Backgrounds & Image Preparation
+Content 4.4
+
+### 7.4 Background Footer Plugins
+Content 7.4
+"""
+
+        class TestModalApp(App):
+            def on_mount(self):
+                self.push_screen(bashmenu_ui.MessageModalScreen("Help", sample_doc, is_help=True, is_markdown=True))
+
+        async def run_checks():
+            app = TestModalApp()
+            async with app.run_test():
+                modal = app.screen
+                anchors = modal._compute_anchor_lines()
+                self.assertIn("44-wallpaper-backgrounds-image-preparation", anchors)
+                y_44 = anchors["44-wallpaper-backgrounds-image-preparation"]
+                y_74 = anchors["74-background-footer-plugins"]
+                self.assertLess(y_44, y_74)
+
+                scroller = modal.query_one("#scroll_container", VerticalScroll)
+                scroll_calls = []
+                orig_scroll_to = scroller.scroll_to
+
+                def mock_scroll_to(*a, **kw):
+                    scroll_calls.append((a, kw))
+                    return orig_scroll_to(*a, **kw)
+
+                scroller.scroll_to = mock_scroll_to
+                modal.goto_anchor("44-wallpaper-backgrounds--image-preparation")
+                self.assertEqual(len(scroll_calls), 1)
+                _, kw = scroll_calls[0]
+                self.assertFalse(kw.get("animate", True))
+                self.assertEqual(kw.get("y"), y_44)
+
+        asyncio.run(run_checks())
+
+    def test_help_modal_keyboard_link_navigation(self):
+        """Verify Tab and Shift+Tab navigate markdown links, update footer, and Enter follows link."""
+        import asyncio
+
+        from textual.app import App
+        from textual.widgets import Label
+
+        import bashmenu_ui
+
+        sample_doc = """# Test Links
+- [Alpha](#alpha)
+- [Beta](#beta)
+- [Gamma](#gamma)
+
+## Alpha
+A
+## Beta
+B
+## Gamma
+G
+"""
+
+        class TestModalApp(App):
+            def on_mount(self):
+                self.push_screen(bashmenu_ui.MessageModalScreen("Help", sample_doc, is_help=True, is_markdown=True))
+
+        async def run_checks():
+            app = TestModalApp()
+            async with app.run_test():
+                modal = app.screen
+                footer = modal.query_one("#footer", Label)
+                self.assertIn("TAB", str(footer.render()))
+
+                # Initial state
+                self.assertEqual(modal.active_link_idx, -1)
+
+                # Tab forward through links
+                modal.action_next_link()
+                self.assertEqual(modal.active_link_idx, 0)
+                self.assertIn("1/3", str(footer.render()))
+                self.assertIn("Alpha", str(footer.render()))
+
+                modal.action_next_link()
+                self.assertEqual(modal.active_link_idx, 1)
+                self.assertIn("2/3", str(footer.render()))
+                self.assertIn("Beta", str(footer.render()))
+
+                modal.action_next_link()
+                self.assertEqual(modal.active_link_idx, 2)
+                self.assertIn("3/3", str(footer.render()))
+
+                # Wrap around forward
+                modal.action_next_link()
+                self.assertEqual(modal.active_link_idx, 0)
+
+                # Shift+Tab backwards (wraps to end)
+                modal.action_prev_link()
+                self.assertEqual(modal.active_link_idx, 2)
+
+                # Shift+Tab to previous
+                modal.action_prev_link()
+                self.assertEqual(modal.active_link_idx, 1)
+
+                # Press Enter to follow link
+                followed_links = []
+                modal.handle_link = lambda href: followed_links.append(href)
+                modal.action_confirm_or_follow_link()
+                self.assertEqual(followed_links, ["#beta"])
+                self.assertEqual(modal.active_link_idx, -1)
+
+                # Press Enter with no link active dismisses modal
+                dismissed = []
+                modal.dismiss = lambda res: dismissed.append(res)
+                modal.action_confirm_or_follow_link()
+                self.assertEqual(dismissed, [None])
+
+                # Escape dismisses modal
+                dismissed.clear()
+                modal.action_close_modal()
+                self.assertEqual(dismissed, [None])
+
+        asyncio.run(run_checks())
+
+    def test_help_modal_on_click_style_detection(self):
+        """Verify on_click accurately detects links from event styles and screen coordinates."""
+        from unittest.mock import MagicMock
+
+        from rich.style import Style
+
+        import bashmenu_ui
+
+        modal = bashmenu_ui.MessageModalScreen("Help", "# Title", is_markdown=True)
+        handled = []
+        modal.handle_link = lambda href: handled.append(href)
+
+        # 1. Direct event style
+        ev1 = MagicMock()
+        ev1.style = Style(link="https://bashmenu.org")
+        modal.on_click(ev1)
+        self.assertEqual(handled, ["https://bashmenu.org"])
+
+        # 2. Screen-level compositor style at cursor position
+        ev2 = MagicMock()
+        ev2.style = None
+        ev2.screen_x = 15
+        ev2.screen_y = 7
+        modal.get_style_at = MagicMock(return_value=Style(link="#44-target"))
+        modal.on_click(ev2)
+        self.assertEqual(handled, ["https://bashmenu.org", "#44-target"])
+
+    def test_gutter_border_theme_definitions(self):
+        """Verify all themes define gutter border, separator, and tee characters."""
+        import bashmenu_ui
+
+        themes = [
+            "dracula", "nord", "cyberpunk", "gruvbox", "qbasic", "pacman",
+            "industry", "matrix", "monochrome", "synthwave", "amber_crt",
+            "hotdog_stand", "tokyo_night", "everforest", "rose_pine",
+            "twilight", "train_ride",
+        ]
+        for t in themes:
+            borders = bashmenu_ui.get_theme_window_borders(t)
+            for k in [
+                "gutter_border", "gutter_separator", "gutter_left_tee",
+                "gutter_right_tee", "gutter_top_tee", "gutter_bottom_tee",
+            ]:
+                self.assertIn(k, borders, f"Theme {t} missing key {k}")
+                self.assertTrue(len(borders[k]) > 0, f"Theme {t} has empty key {k}")
+
+    def test_gutter_border_and_separator_rendering(self):
+        """Verify MainMenuView renders gutter top border, vertical separator with margins, and bottom tee."""
+        import asyncio
+
+        from textual.app import App
+
+        import bashmenu
+        import bashmenu_ui
+
+        class TestMenuApp(App):
+            def compose(self):
+                yield bashmenu.MainMenuView(id="menu_view")
+
+        async def run_checks():
+            app = TestMenuApp()
+            async with app.run_test(size=(80, 24)):
+                mv = app.query_one("#menu_view", bashmenu.MainMenuView)
+                rendered = mv.render()
+                lines = str(rendered).split("\n")
+                self.assertEqual(len(lines), 24)
+
+                borders = bashmenu_ui.get_theme_window_borders("dracula")
+                b_gt_l_tee = borders["gutter_left_tee"]
+                b_gt_r_tee = borders["gutter_right_tee"]
+                b_gt_top_tee = borders["gutter_top_tee"]
+                b_gt_bot_tee = borders["gutter_bottom_tee"]
+                b_gt_sep = borders["gutter_separator"]
+
+                # Row 20: Gutter top border
+                top_border_line = lines[20]
+                self.assertEqual(len(top_border_line), 80)
+                self.assertTrue(top_border_line.startswith(b_gt_l_tee))
+                self.assertTrue(top_border_line.endswith(b_gt_r_tee))
+                self.assertIn(b_gt_top_tee, top_border_line)
+
+                # Column index of top tee
+                sep_x = top_border_line.index(b_gt_top_tee)
+
+                # Rows 21, 22: Gutter content rows with separator and 2-space margins
+                for y in (21, 22):
+                    g_line = lines[y]
+                    self.assertEqual(len(g_line), 80)
+                    # Separator must align with sep_x
+                    self.assertEqual(g_line[sep_x], b_gt_sep)
+                    # 2-space margins on either side of separator
+                    self.assertEqual(g_line[sep_x - 2:sep_x], "  ")
+                    self.assertEqual(g_line[sep_x + 1:sep_x + 3], "  ")
+
+                # Row 23: Bottom border with bottom tee aligned at sep_x
+                bot_line = lines[23]
+                self.assertEqual(len(bot_line), 80)
+                self.assertEqual(bot_line[sep_x], b_gt_bot_tee)
 
         asyncio.run(run_checks())
 

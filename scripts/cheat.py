@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Cheat CLI - A lightweight terminal-based cheatsheet manager.
 

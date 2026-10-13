@@ -1,2 +1,6 @@
-- [ ] Mouse navigation, selection sluggish, clicking links large delay.
+- [X] Mouse navigation, selection sluggish, clicking links large delay.
 - [ ] Try altering image manipulation to minimize too much ansi character clustering, as it's distorting too much.
+- [X] Add a center divider with two spaces on either side between the help gutter and the status gutter, perhaps even a full line above it.
+- [ ] Add a new menu item type "directory" that lists the contents of a directory as menu items. 
+- [ ] Add notepad function.
+- [ ] Add a theme creator with a live view. The user can optionally select an existing theme as a base for the new one.

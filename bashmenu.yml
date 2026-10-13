@@ -5,7 +5,7 @@
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
 version: 0.0.1
-theme: dracula
+theme: matrix
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
@@ -48,8 +48,8 @@ settings:
   show_menu_shortcuts: true
   use_nerd_fonts: true
   nerd_font_width: auto
-  status_gutter: '| Theme: {theme} | {user} | Battery: {battery} | {user.localip}
-    | [b]{date_time_24_short}[/b]'
+  status_gutter: '| Theme: {theme} | {user} | Battery: {battery} ({battery_stat})
+    | {user.localip} | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
   background:

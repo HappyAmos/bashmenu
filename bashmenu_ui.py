@@ -11,7 +11,7 @@ import threading
 import time
 import unicodedata
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from rich._palettes import EIGHT_BIT_PALETTE
 from rich.cells import cell_len
@@ -159,6 +159,7 @@ PLACEHOLDER_SECTIONS = [
         "System Status & Network",
         [
             ("{battery}", "Current battery capacity percentage"),
+            ("{battery_stat}", "Current battery charging status (Charging, Discharging, Full)"),
             ("{localip}", "Primary outbound IPv4 address"),
             ("{user-mode}", "Privilege level (User or Root)"),
             ("{version}", "BashMenu application version"),
@@ -1013,6 +1014,12 @@ DEFAULT_WINDOW_BORDER = {
     "title_left_cap": "[",
     "title_right_cap": "]",
     "shadow_char": "░",
+    "gutter_border": "─",
+    "gutter_separator": "│",
+    "gutter_left_tee": "├",
+    "gutter_right_tee": "┤",
+    "gutter_top_tee": "┬",
+    "gutter_bottom_tee": "┴",
 }
 
 
@@ -1107,6 +1114,12 @@ def get_theme_window_borders(
         "title_left_cap": ["title_left_cap", "title_cap_left", "window_title_left_cap", "window_title_cap_left"],
         "title_right_cap": ["title_right_cap", "title_cap_right", "window_title_right_cap", "window_title_cap_right"],
         "shadow_char": ["shadow_char", "window_shadow_char"],
+        "gutter_border": ["gutter_border", "window_gutter_border"],
+        "gutter_separator": ["gutter_separator", "window_gutter_separator"],
+        "gutter_left_tee": ["gutter_left_tee", "gutter_tee_left", "window_gutter_left_tee"],
+        "gutter_right_tee": ["gutter_right_tee", "gutter_tee_right", "window_gutter_right_tee"],
+        "gutter_top_tee": ["gutter_top_tee", "gutter_tee_top", "window_gutter_top_tee"],
+        "gutter_bottom_tee": ["gutter_bottom_tee", "gutter_tee_bottom", "window_gutter_bottom_tee"],
     }
 
     for target_key, candidate_keys in aliases.items():
@@ -1122,6 +1135,19 @@ def get_theme_window_borders(
     borders["right_tee"] = borders["border_tee_right"]
     borders["top_tee"] = borders["border_tee_top"]
     borders["bottom_tee"] = borders["border_tee_bottom"]
+
+    if "gutter_border" not in borders or not borders["gutter_border"]:
+        borders["gutter_border"] = borders.get("border_horizontal_bottom", borders.get("border_horizontal", "─"))
+    if "gutter_separator" not in borders or not borders["gutter_separator"]:
+        borders["gutter_separator"] = borders.get("border_vertical", "│")
+    if "gutter_left_tee" not in borders or not borders["gutter_left_tee"]:
+        borders["gutter_left_tee"] = borders.get("left_tee", "├")
+    if "gutter_right_tee" not in borders or not borders["gutter_right_tee"]:
+        borders["gutter_right_tee"] = borders.get("right_tee", "┤")
+    if "gutter_top_tee" not in borders or not borders["gutter_top_tee"]:
+        borders["gutter_top_tee"] = borders.get("top_tee", "┬")
+    if "gutter_bottom_tee" not in borders or not borders["gutter_bottom_tee"]:
+        borders["gutter_bottom_tee"] = borders.get("bottom_tee", "┴")
 
     return borders
 
@@ -1154,12 +1180,16 @@ def get_theme_divider(
     return None
 
 
+_last_applied_theme_borders = None
+
+
 def apply_theme_to_textual_borders(
     theme_name: str | dict = "dracula",
     config: dict | None = None,
     raw_theme_data: dict | None = None,
 ) -> None:
     """Synchronize Textual's global border rendering characters with the active theme borders."""
+    global _last_applied_theme_borders
     with contextlib.suppress(Exception):
         import textual._border as tb
 
@@ -1177,6 +1207,9 @@ def apply_theme_to_textual_borders(
             (b_v_left, " ", b_v_right),
             (b_bl, b_h_bot, b_br),
         )
+        if _last_applied_theme_borders == new_box:
+            return
+        _last_applied_theme_borders = new_box
         tb.BORDER_CHARS["thick"] = new_box
         tb.BORDER_CHARS["solid"] = new_box
         if hasattr(tb.get_box, "cache_clear"):
@@ -2256,7 +2289,9 @@ class MessageModalScreen(ModalScreen[None]):
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "close_modal", "Close"),
-        Binding("enter", "close_modal", "Close"),
+        Binding("enter", "confirm_or_follow_link", "Close/Open Link"),
+        Binding("tab", "next_link", "Next Link", show=False),
+        Binding("shift+tab", "prev_link", "Previous Link", show=False),
     ]
 
     def __init__(
@@ -2275,7 +2310,9 @@ class MessageModalScreen(ModalScreen[None]):
         self.is_help = is_help
         self.no_formatting = no_formatting
         self.is_markdown = is_markdown
-        self._cached_anchor_lines = None
+        self._cached_anchor_lines: dict[str, int] | None = None
+        self._cached_links: list[dict[str, Any]] | None = None
+        self.active_link_idx: int = -1
         if is_help:
             self.add_class("help_modal")
 
@@ -2297,7 +2334,10 @@ class MessageModalScreen(ModalScreen[None]):
                     yield Static(content, id="message")
             with Horizontal(id="buttons"):
                 yield Button("OK", variant="primary", id="btn_ok")
-            yield Label("[ENTER/ESC] Close", id="footer")
+            if self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
+                yield Label("[ENTER/ESC] Close | [TAB] Links", id="footer", markup=False)
+            else:
+                yield Label("[ENTER/ESC] Close", id="footer", markup=False)
 
         with ModalFrame(id="modal_frame"):
             with Horizontal(id="dialog_hrow"):
@@ -2305,6 +2345,74 @@ class MessageModalScreen(ModalScreen[None]):
                     yield from _render_dialog()
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
+
+    @staticmethod
+    def _norm_slug(s: str) -> str:
+        s = s.lower()
+        s = re.sub(r"[^\w\s-]", "", s)
+        return re.sub(r"[\s-]+", "-", s).strip("-")
+
+    @staticmethod
+    def _add_or_merge_link(links: list[dict[str, Any]], text: str, url: str, y: int) -> None:
+        if not url or not text:
+            return
+        if links and links[-1]["url"] == url and links[-1]["y"] == y - 1:
+            links[-1]["text"] = f"{links[-1]['text']} {text}".strip()
+        else:
+            links.append({"text": text, "url": url, "y": y})
+
+    def _ensure_anchors_and_links(self) -> None:
+        if self._cached_anchor_lines is None or self._cached_links is None:
+            self._cached_anchor_lines, self._cached_links = self._compute_anchors_and_links()
+
+    def _compute_anchor_lines(self) -> dict[str, int]:
+        self._ensure_anchors_and_links()
+        return self._cached_anchor_lines or {}
+
+    def _compute_anchors_and_links(self) -> tuple[dict[str, int], list[dict[str, Any]]]:
+        anchors: dict[str, int] = {}
+        links: list[dict[str, Any]] = []
+        with contextlib.suppress(Exception):
+            from rich.console import Console
+
+            width = 100
+            with contextlib.suppress(Exception):
+                scroller = self.query_one("#scroll_container", VerticalScroll)
+                if scroller.size.width > 20:
+                    width = scroller.size.width
+            c = Console(width=width)
+            text_str = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
+            lines = c.render_lines(Markdown(text_str, hyperlinks=True))
+            for y, line_segs in enumerate(lines):
+                line_str = "".join(s.text for s in line_segs).strip()
+                if line_str and not line_str.startswith(("•", "-", "*")) and not set(line_str).issubset(set("─-=")):
+                    slug = self._norm_slug(line_str)
+                    if slug and slug not in anchors:
+                        anchors[slug] = y
+                    no_num = re.sub(r"^[0-9]+-", "", slug)
+                    if no_num and no_num not in anchors:
+                        anchors[no_num] = y
+
+                cur_url = None
+                cur_text: list[str] = []
+                for seg in line_segs:
+                    url = seg.style.link if seg.style else None
+                    if url:
+                        if url == cur_url:
+                            cur_text.append(seg.text)
+                        else:
+                            if cur_url:
+                                self._add_or_merge_link(links, "".join(cur_text).strip(), cur_url, y)
+                            cur_url = url
+                            cur_text = [seg.text]
+                    else:
+                        if cur_url:
+                            self._add_or_merge_link(links, "".join(cur_text).strip(), cur_url, y)
+                            cur_url = None
+                            cur_text = []
+                if cur_url:
+                    self._add_or_merge_link(links, "".join(cur_text).strip(), cur_url, y)
+        return anchors, links
 
     def handle_link(self, href: str) -> None:
         if not href:
@@ -2320,6 +2428,7 @@ class MessageModalScreen(ModalScreen[None]):
                     self.app.open_url(href)
                 except Exception:  # noqa: BLE001
                     import webbrowser
+
                     webbrowser.open(href)
         else:
             clean_path = href.removeprefix("file://")
@@ -2336,8 +2445,12 @@ class MessageModalScreen(ModalScreen[None]):
                     msg_widget = self.query_one("#message", Static)
                     msg_widget.update(Markdown(new_text, hyperlinks=True))
                     self._cached_anchor_lines = None
+                    self._cached_links = None
+                    self.active_link_idx = -1
                     scroller = self.query_one("#scroll_container", VerticalScroll)
                     scroller.scroll_to(y=0, animate=False)
+                    self._ensure_anchors_and_links()
+                    self._update_footer()
 
     def goto_anchor(self, anchor: str) -> None:
         if not anchor:
@@ -2347,45 +2460,35 @@ class MessageModalScreen(ModalScreen[None]):
             md.goto_anchor(anchor)
             return
 
-        if self._cached_anchor_lines is None:
-            self._cached_anchor_lines = self._compute_anchor_lines()
+        self._ensure_anchors_and_links()
 
-        norm_target = re.sub(r"[^a-zA-Z0-9]+", " ", anchor).lower().strip()
-        target_y = self._cached_anchor_lines.get(norm_target)
-        if target_y is None:
-            for k, y in self._cached_anchor_lines.items():
-                if k.startswith(norm_target) or norm_target.startswith(k):
-                    target_y = y
-                    break
-        if target_y is None:
-            tw = norm_target.split()
-            if len(tw) >= 2:
+        norm_target = self._norm_slug(anchor)
+        target_y = None
+        if self._cached_anchor_lines:
+            target_y = self._cached_anchor_lines.get(norm_target)
+            if target_y is None:
+                no_num = re.sub(r"^[0-9]+-", "", norm_target)
+                target_y = self._cached_anchor_lines.get(no_num)
+            if target_y is None:
                 for k, y in self._cached_anchor_lines.items():
-                    kw = k.split()
-                    if len(kw) >= 2 and kw[:2] == tw[:2]:
+                    if k.startswith(norm_target) or norm_target.startswith(k):
                         target_y = y
                         break
+            if target_y is None:
+                tw = norm_target.split("-")
+                if len(tw) >= 2:
+                    for k, y in self._cached_anchor_lines.items():
+                        kw = k.split("-")
+                        if len(kw) >= 2 and kw[:2] == tw[:2]:
+                            target_y = y
+                            break
 
         if target_y is not None:
+            self.active_link_idx = -1
+            self._update_footer()
             with contextlib.suppress(Exception):
                 scroller = self.query_one("#scroll_container", VerticalScroll)
-                scroller.scroll_to(y=max(0, target_y), animate=True)
-
-    def _compute_anchor_lines(self) -> dict[str, int]:
-        anchors: dict[str, int] = {}
-        with contextlib.suppress(Exception):
-            from rich.console import Console
-            c = Console(width=100)
-            text_str = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
-            lines = c.render_lines(Markdown(text_str, hyperlinks=True))
-            for y, line_segs in enumerate(lines):
-                line_str = "".join(s.text for s in line_segs).strip()
-                if not line_str or line_str.startswith(("•", "-")) or set(line_str).issubset(set("─-=")):
-                    continue
-                clean = re.sub(r"[^a-zA-Z0-9]+", " ", line_str).lower().strip()
-                if clean and clean not in anchors:
-                    anchors[clean] = y
-        return anchors
+                scroller.scroll_to(y=max(0, target_y), animate=False)
 
     @on(TextualMarkdown.LinkClicked)
     def on_markdown_link_clicked(self, event: TextualMarkdown.LinkClicked) -> None:
@@ -2397,6 +2500,83 @@ class MessageModalScreen(ModalScreen[None]):
         apply_modal_theme(self, self.theme)
         with contextlib.suppress(Exception):
             apply_button_theme(self.query_one("#btn_ok", Button), theme=self.theme, button_type="button_primary")
+        if self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
+            self._ensure_anchors_and_links()
+            self._update_footer()
+
+    def _jump_to_active_link(self) -> None:
+        if self._cached_links and 0 <= self.active_link_idx < len(self._cached_links):
+            target = self._cached_links[self.active_link_idx]
+            target_y = target["y"]
+            with contextlib.suppress(Exception):
+                scroller = self.query_one("#scroll_container", VerticalScroll)
+                scroller.scroll_to(y=max(0, target_y - 2), animate=False)
+            self._update_footer()
+
+    def _update_footer(self) -> None:
+        with contextlib.suppress(Exception):
+            footer = self.query_one("#footer", Label)
+            if self._cached_links and 0 <= self.active_link_idx < len(self._cached_links):
+                target = self._cached_links[self.active_link_idx]
+                label_text = target["text"]
+                if len(label_text) > 34:
+                    label_text = label_text[:31] + "..."
+                idx_str = f"{self.active_link_idx + 1}/{len(self._cached_links)}"
+                footer.update(f"[ESC] Close | [TAB/Shift+TAB] ({idx_str}) | [ENTER] -> {label_text}")
+            elif self._cached_links:
+                footer.update("[ENTER/ESC] Close | [TAB] Links")
+            else:
+                footer.update("[ENTER/ESC] Close")
+
+    def action_next_link(self) -> None:
+        self._ensure_anchors_and_links()
+        if not self._cached_links:
+            self.app.action_focus_next()
+            return
+        if self.active_link_idx == -1:
+            scroll_y = 0
+            with contextlib.suppress(Exception):
+                scroll_y = self.query_one("#scroll_container", VerticalScroll).scroll_y
+            idx = 0
+            for i, link in enumerate(self._cached_links):
+                if link["y"] >= scroll_y:
+                    idx = i
+                    break
+            self.active_link_idx = idx
+        else:
+            self.active_link_idx = (self.active_link_idx + 1) % len(self._cached_links)
+        self._jump_to_active_link()
+
+    def action_prev_link(self) -> None:
+        self._ensure_anchors_and_links()
+        if not self._cached_links:
+            self.app.action_focus_previous()
+            return
+        if self.active_link_idx == -1:
+            scroll_y = 0
+            with contextlib.suppress(Exception):
+                scroll_y = self.query_one("#scroll_container", VerticalScroll).scroll_y
+            idx = len(self._cached_links) - 1
+            for i in reversed(range(len(self._cached_links))):
+                if self._cached_links[i]["y"] <= scroll_y:
+                    idx = i
+                    break
+            self.active_link_idx = idx
+        elif self.active_link_idx <= 0:
+            self.active_link_idx = len(self._cached_links) - 1
+        else:
+            self.active_link_idx -= 1
+        self._jump_to_active_link()
+
+    def action_confirm_or_follow_link(self) -> None:
+        if self._cached_links and 0 <= self.active_link_idx < len(self._cached_links):
+            target = self._cached_links[self.active_link_idx]
+            href = target["url"]
+            self.active_link_idx = -1
+            self._update_footer()
+            self.handle_link(href)
+        else:
+            self.dismiss(None)
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -2408,11 +2588,26 @@ class MessageModalScreen(ModalScreen[None]):
         style = getattr(event, "style", None)
         if style and getattr(style, "link", None):
             link = style.link
-        elif widget and hasattr(widget, "get_style_at"):
+
+        if not link and hasattr(self, "screen"):
+            sx = getattr(event, "screen_x", None)
+            sy = getattr(event, "screen_y", None)
+            if sx is not None and sy is not None:
+                with contextlib.suppress(Exception):
+                    st = self.screen.get_style_at(sx, sy)
+                    if getattr(st, "link", None):
+                        link = st.link
+
+        if not link and widget and hasattr(widget, "get_style_at"):
             with contextlib.suppress(Exception):
-                st = widget.get_style_at(event.x, event.y)
-                if getattr(st, "link", None):
-                    link = st.link
+                sx = getattr(event, "screen_x", event.x)
+                sy = getattr(event, "screen_y", event.y)
+                if hasattr(widget, "region"):
+                    local_x = sx - widget.region.x
+                    local_y = sy - widget.region.y
+                    st = widget.get_style_at(local_x, local_y)
+                    if getattr(st, "link", None):
+                        link = st.link
 
         if link:
             self.handle_link(link)
@@ -3007,7 +3202,7 @@ class FilePickerModalScreen(ModalScreen[str]):
             self.dismiss(None)
 
     def _submit_selection(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             options_list = self.query_one("#options_list", OptionList)
             idx = options_list.highlighted
             if idx is not None and 0 <= idx < len(self.entries):
@@ -3024,8 +3219,6 @@ class FilePickerModalScreen(ModalScreen[str]):
                     return
                 self.dismiss(selected["path"])
                 return
-        except Exception:
-            pass
         if self.mode == "dir":
             self.dismiss(self.current_path)
 

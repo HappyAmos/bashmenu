@@ -13,6 +13,12 @@ dracula:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: COLOR_BLACK
     title: [201, -1]
@@ -97,6 +103,12 @@ nord:
     bottom_tee: "┴"
     title_left_cap: "«"
     title_right_cap: "»"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: COLOR_BLACK
     title: [111, -1]
@@ -181,6 +193,12 @@ cyberpunk:
     bottom_tee: "┻"
     title_left_cap: "【"
     title_right_cap: "】"
+    gutter_border: "━"
+    gutter_separator: "┃"
+    gutter_left_tee: "┣"
+    gutter_right_tee: "┫"
+    gutter_top_tee: "┳"
+    gutter_bottom_tee: "┻"
   256:
     background: COLOR_BLACK
     title: [226, -1]
@@ -265,6 +283,12 @@ gruvbox:
     bottom_tee: "┴"
     title_left_cap: "〔"
     title_right_cap: "〕"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: -1
     title: [214, -1]
@@ -351,6 +375,12 @@ qbasic:
     bottom_tee: "{ascii:207}"
     title_left_cap: "{ascii:181}"
     title_right_cap: "{ascii:198}"
+    gutter_border: "{ascii:196}"
+    gutter_separator: "{ascii:179}"
+    gutter_left_tee: "{ascii:199}"
+    gutter_right_tee: "{ascii:182}"
+    gutter_top_tee: "{ascii:194}"
+    gutter_bottom_tee: "{ascii:207}"
   256:
     background: 19
     title: [226, 19]
@@ -437,6 +467,12 @@ pacman:
     bottom_tee: "{ascii:219}"
     title_left_cap: "{ascii:219}"
     title_right_cap: "{ascii:219}"
+    gutter_border: "{ascii:220}"
+    gutter_separator: "{ascii:221}"
+    gutter_left_tee: "{ascii:219}"
+    gutter_right_tee: "{ascii:219}"
+    gutter_top_tee: "{ascii:219}"
+    gutter_bottom_tee: "{ascii:219}"
   256:
     background: COLOR_BLACK
     title: [226, -1]
@@ -521,6 +557,12 @@ industry:
     bottom_tee: "{ascii:202}"
     title_left_cap: "«"
     title_right_cap: "»"
+    gutter_border: "{ascii:205}"
+    gutter_separator: "{ascii:186}"
+    gutter_left_tee: "{ascii:204}"
+    gutter_right_tee: "{ascii:185}"
+    gutter_top_tee: "{ascii:203}"
+    gutter_bottom_tee: "{ascii:202}"
   256:
     background: 234
     title: [214, 234]
@@ -605,6 +647,12 @@ matrix:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: COLOR_BLACK
     title: [46, -1]
@@ -689,6 +737,12 @@ monochrome:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: COLOR_BLACK
     title: [255, -1]
@@ -773,6 +827,12 @@ synthwave:
     bottom_tee: "┴"
     title_left_cap: "«"
     title_right_cap: "»"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: COLOR_BLACK
     title: [207, -1]
@@ -857,6 +917,12 @@ amber_crt:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: COLOR_BLACK
     title: [214, -1]
@@ -941,6 +1007,12 @@ hotdog_stand:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: 196
     title: [226, 196]
@@ -1025,6 +1097,12 @@ tokyo_night:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: 234
     title: [111, -1]
@@ -1109,6 +1187,12 @@ everforest:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: 235
     title: [142, -1]
@@ -1193,6 +1277,12 @@ rose_pine:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: 234
     title: [175, -1]
@@ -1282,6 +1372,12 @@ twilight:
     bottom_tee: "┴"
     title_left_cap: "⟦"
     title_right_cap: "⟧"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: 233
     title: [153, -1]
@@ -1372,6 +1468,12 @@ train_ride:
     bottom_tee: "┴"
     title_left_cap: "["
     title_right_cap: "]"
+    gutter_border: "─"
+    gutter_separator: "│"
+    gutter_left_tee: "├"
+    gutter_right_tee: "┤"
+    gutter_top_tee: "┬"
+    gutter_bottom_tee: "┴"
   256:
     background: 233
     title: [110, -1]
