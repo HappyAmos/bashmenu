@@ -426,6 +426,10 @@ items:
                   - Change Theme:
                       type: theme_selector
                       icon: '{nf::#f03d8}'
+                  - Theme Editor:
+                      type: python
+                      action: action_theme_editor
+                      icon: '{nf::#f0426}'
                   - Edit Configuration File [{bashmenu_dir}/bashmenu.yml]:
                       type: editor
                       action: '{bashmenu_dir}/bashmenu.yml'

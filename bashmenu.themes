@@ -1449,8 +1449,9 @@ train_ride:
   background:
     image: "assets/wallpapers/mountain-train.png"
     opacity: 0.85
-    scaling: "cover"
-    clustering: 0
+    scaling: "stretch"
+    clustering: 16
+    quantization: 16
     mode: "halfblock"
   divider:
     char: "─"

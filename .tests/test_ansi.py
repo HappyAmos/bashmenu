@@ -1021,6 +1021,65 @@ class TestMouseSupportAndCloseButtons(unittest.TestCase):
         mv.on_mouse_move(DummyMoveEvent(3))
         self.assertEqual(mv.current_row(), 0)
 
+    def test_mainmenu_help_gutter_mouse_clicks(self):
+        """Verify MainMenuView handles mouse clicks on help gutter shortcuts."""
+        mv = bashmenu.MainMenuView()
+
+        class DummyScreen:
+            def __init__(self):
+                self.actions = []
+
+            def action_help(self):
+                self.actions.append("help")
+
+            def action_themes(self):
+                self.actions.append("themes")
+
+            def action_editor(self):
+                self.actions.append("editor")
+
+            def action_edit_menu(self):
+                self.actions.append("edit")
+
+            def action_refresh(self):
+                self.actions.append("refresh")
+
+            def action_toggle_shortcuts(self):
+                self.actions.append("keys")
+
+            def action_quit(self):
+                self.actions.append("quit")
+
+            def action_select_option(self):
+                self.actions.append("select")
+
+        scr = DummyScreen()
+        mv._screen = scr
+
+        line = (
+            "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor"
+            " | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [ESC]: Back"
+        )
+        # Test [F1]: Help
+        f1_x = line.find("[F1]") + 2
+        mv._handle_gutter_click(f1_x, line)
+        self.assertIn("help", scr.actions)
+
+        # Test [F2]: Themes
+        f2_x = line.find("[F2]") + 2
+        mv._handle_gutter_click(f2_x, line)
+        self.assertIn("themes", scr.actions)
+
+        # Test [F4]: Edit
+        f4_x = line.find("[F4]") + 2
+        mv._handle_gutter_click(f4_x, line)
+        self.assertIn("edit", scr.actions)
+
+        # Test [ESC]: Back
+        esc_x = line.find("[ESC]") + 2
+        mv._handle_gutter_click(esc_x, line)
+        self.assertIn("quit", scr.actions)
+
     def test_menuedit_footer_click(self):
         """Verify MenuEditScreen handles clicks on interactive footer labels."""
         screen = menuedit.MenuEditScreen()

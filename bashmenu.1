@@ -33,6 +33,9 @@ Built-in Nano-style text editor engine.
 .I menuedit.py
 Interactive TUI menu tree editor for managing bashmenu.mnu.
 .TP
+.I themeedit.py
+Interactive TUI visual theme creator and palette editor.
+.TP
 .I bashmenu.yml
 Settings configuration database in YAML format.
 .TP
@@ -309,6 +312,29 @@ Paste cutbuffer or system clipboard text at cursor.
 .TP
 .B Ctrl+Z, Ctrl+Y
 Undo or redo edit operations.
+.SS Visual Theme Editor (themeedit.py)
+Interactive split-screen theme designer with a quarter-scale live preview of the main menu and real-time color and glyph inspector.
+.TP
+.B c, ENTER
+Open 256-color picker modal dialog (ColorPickerModal) for focused color field.
+.TP
+.B a
+Open box-drawing and character glyph picker modal dialog (AsciiPickerModal) for focused border/glyph field.
+.TP
+.B t
+Clone existing theme as a base (ThemeCloneModal).
+.TP
+.B d
+Auto-derive 16-color and 8-color fallback palettes from the active 256-color palette.
+.TP
+.B s
+Save theme to bashmenu.themes and optionally activate it in bashmenu.yml (SaveThemeModal).
+.TP
+.B F1, ?
+Display theme editor keyboard shortcuts and help modal.
+.TP
+.B ESC, q
+Exit theme editor (prompts to save if modifications exist).
 .SH CONFIGURATION & SCHEMA SPECIFICATIONS
 .SS Settings Store (bashmenu.yml)
 Stores nested, dot-notation accessible key-value settings. Any nested path (e.g.
@@ -663,7 +689,10 @@ Float factor between 0.0 (transparent) and 1.0 (opaque), default 0.35. Lower val
 Image scaling mode: "cover" (maintains aspect ratio, auto-cropping) or "stretch".
 .TP
 .B clustering
-Integer delta threshold between 0 and 128 (default: 64). Controls horizontal pixel run clustering to collapse subtle photo gradient variations into unified terminal spans, eliminating cursor and scrolling latency on heavy photographic wallpapers.
+Integer delta threshold between 0 and 128 (default: 0). Default 0 preserves full photographic fidelity and gradients without horizontal run-length streaking. Values above 0 merge neighboring spans for high-latency connections.
+.TP
+.B quantization
+Color channel quantization step between 1 and 32 (default: 1). Default 1 retains full 24-bit TrueColor depth without banding.
 .SH MODULARITY & PLUGINS
 .SS Dynamic Block Injection
 The inject_block type installs templates inside profile files (e.g. .bashrc).

@@ -2044,7 +2044,8 @@ class MainMenuView(Widget):
         img_spec = None
         opacity = 0.35
         scaling = "cover"
-        clustering = 64
+        clustering = 0
+        quantization = 1
         has_bg = False
 
         if not user_disabled and (user_has_bg or theme_has_bg):
@@ -2052,7 +2053,8 @@ class MainMenuView(Widget):
             if img_spec:
                 opacity = user_bg.get("opacity") if "opacity" in user_bg else theme_bg_dict.get("opacity", 0.35)
                 scaling = user_bg.get("scaling") or theme_bg_dict.get("scaling", "cover")
-                clustering = user_bg.get("clustering") if "clustering" in user_bg else theme_bg_dict.get("clustering", 64)
+                clustering = user_bg.get("clustering") if "clustering" in user_bg else theme_bg_dict.get("clustering", 0)
+                quantization = user_bg.get("quantization") if "quantization" in user_bg else theme_bg_dict.get("quantization", 1)
                 has_bg = True
 
         img_path = interpolate_placeholders(str(img_spec).strip(), self.config) if (img_spec and has_bg) else ""
@@ -2112,6 +2114,7 @@ class MainMenuView(Widget):
             round(opacity, 3),
             scaling,
             clustering,
+            quantization,
             tuple(raw_plugin_lines),
             separator_rows,
             gutter_rows,
@@ -2139,6 +2142,7 @@ class MainMenuView(Widget):
                 raw_plugin_lines,
                 separator_rows,
                 gutter_rows,
+                quantization=quantization,
             )
 
         scroll_start = self.current_scroll_offset()
@@ -2198,6 +2202,7 @@ class MainMenuView(Widget):
         raw_plugin_lines: list,
         separator_rows: int,
         gutter_rows: int = 1,
+        quantization: int = 1,
     ) -> None:
         """Pre-bake static frame borders, margins, options, and plugin rows onto the canvas."""
         grid = None
@@ -2210,12 +2215,14 @@ class MainMenuView(Widget):
                     scaling=scaling,
                     base_dir=BASHMENU_DIR,
                     clustering=clustering,
+                    quantization=quantization,
                 )
                 self._wallpaper_compositor = compositor
             else:
                 compositor.opacity = opacity
                 compositor.scaling = scaling
                 compositor.clustering = clustering
+                compositor.quantization = quantization
 
             theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(theme_styles)
             grid = compositor.get_grid(w, h, theme_bg_rgb)
@@ -2608,7 +2615,8 @@ class MainMenuView(Widget):
 
         opacity = user_bg.get("opacity") if "opacity" in user_bg else theme_bg_dict.get("opacity", 0.35)
         scaling = user_bg.get("scaling") or theme_bg_dict.get("scaling", "cover")
-        clustering = user_bg.get("clustering") if "clustering" in user_bg else theme_bg_dict.get("clustering", 64)
+        clustering = user_bg.get("clustering") if "clustering" in user_bg else theme_bg_dict.get("clustering", 0)
+        quantization = user_bg.get("quantization") if "quantization" in user_bg else theme_bg_dict.get("quantization", 1)
 
         img_path = interpolate_placeholders(str(img_spec).strip(), self.config)
 
@@ -2620,12 +2628,14 @@ class MainMenuView(Widget):
                 scaling=scaling,
                 base_dir=BASHMENU_DIR,
                 clustering=clustering,
+                quantization=quantization,
             )
             self._wallpaper_compositor = compositor
         else:
             compositor.opacity = opacity
             compositor.scaling = scaling
             compositor.clustering = clustering
+            compositor.quantization = quantization
 
         theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(theme_styles)
         grid = compositor.get_grid(width, height, theme_bg_rgb)
@@ -2650,8 +2660,6 @@ class MainMenuView(Widget):
         rendered_row = event.y - 3
         curr_menu = self.current_menu()
         options = curr_menu.get("items", curr_menu.get("options", []))
-        if not options:
-            return
 
         visible_option_rows = getattr(self, "visible_option_rows", None)
         if visible_option_rows is None:
@@ -2661,21 +2669,69 @@ class MainMenuView(Widget):
         scroll_start = self.current_scroll_offset()
 
         if 0 <= rendered_row < visible_option_rows:
-            target_idx = scroll_start + rendered_row
-            if 0 <= target_idx < len(options):
-                opt = options[target_idx]
-                if not is_divider(opt):
-                    self.set_current_row(target_idx)
-                    scr = None
-                    with contextlib.suppress(Exception):
-                        scr = self.screen
-                    if not scr:
-                        scr = getattr(self, "_screen", None)
+            if options:
+                target_idx = scroll_start + rendered_row
+                if 0 <= target_idx < len(options):
+                    opt = options[target_idx]
+                    if not is_divider(opt):
+                        self.set_current_row(target_idx)
+                        scr = None
+                        with contextlib.suppress(Exception):
+                            scr = self.screen
+                        if not scr:
+                            scr = getattr(self, "_screen", None)
 
-                    if event.button == 3 and scr and hasattr(scr, "action_edit_menu"):
-                        scr.action_edit_menu()
-                    elif event.button == 1 and scr and hasattr(scr, "action_select_option"):
-                        scr.action_select_option()
+                        if event.button == 3 and scr and hasattr(scr, "action_edit_menu"):
+                            scr.action_edit_menu()
+                        elif event.button == 1 and scr and hasattr(scr, "action_select_option"):
+                            scr.action_select_option()
+            return
+
+        # Handle clicks on the interactive help gutter
+        h = max(10, self.size.height or 24)
+        cached_gutters = getattr(self, "_cached_gutters", None)
+        if cached_gutters:
+            help_lines, status_lines = cached_gutters[1], cached_gutters[2]
+            gutter_rows = min(2, max(1, max(len(help_lines), len(status_lines))))
+            gutter_y_start = h - 1 - gutter_rows
+            if gutter_y_start <= event.y < h - 1:
+                r_idx = event.y - gutter_y_start
+                if 0 <= r_idx < len(help_lines):
+                    self._handle_gutter_click(event.x, help_lines[r_idx])
+
+    def _handle_gutter_click(self, click_x: int, line_str: str) -> None:
+        scr = None
+        with contextlib.suppress(Exception):
+            scr = self.screen
+        if not scr:
+            scr = getattr(self, "_screen", None)
+        if not scr:
+            return
+
+        x_cursor = 2
+        for raw_item in line_str.split("|"):
+            item = raw_item.strip()
+            item_len = len(raw_item)
+            if x_cursor <= click_x <= x_cursor + item_len + 1:
+                item_lower = item.lower()
+                if ("help" in item_lower or "f1" in item_lower) and hasattr(scr, "action_help"):
+                    scr.action_help()
+                elif ("theme" in item_lower or "f2" in item_lower) and hasattr(scr, "action_themes"):
+                    scr.action_themes()
+                elif ("editor" in item_lower or "f3" in item_lower) and hasattr(scr, "action_editor"):
+                    scr.action_editor()
+                elif ("edit" in item_lower or "f4" in item_lower) and hasattr(scr, "action_edit_menu"):
+                    scr.action_edit_menu()
+                elif ("refresh" in item_lower or "f5" in item_lower) and hasattr(scr, "action_refresh"):
+                    scr.action_refresh()
+                elif ("keys" in item_lower or "f6" in item_lower) and hasattr(scr, "action_toggle_shortcuts"):
+                    scr.action_toggle_shortcuts()
+                elif ("back" in item_lower or "esc" in item_lower) and hasattr(scr, "action_quit"):
+                    scr.action_quit()
+                elif ("select" in item_lower or "enter" in item_lower) and hasattr(scr, "action_select_option"):
+                    scr.action_select_option()
+                return
+            x_cursor += item_len + 1
 
     def on_mouse_move(self, event) -> None:
         rendered_row = event.y - 3
@@ -2946,6 +3002,21 @@ def process_item_action(screen, item, config):
         elif "gorillas" in str(action_name):
             import gorillas
             screen.app.push_screen(gorillas.GorillasScreen(), lambda res: screen.menu_view.refresh())
+        elif action_name in ("theme_editor", "action_theme_editor") or "themeedit" in str(action_name):
+            import themeedit
+            active_theme = getattr(screen.app, "theme_name", "dracula")
+            screen.app.push_screen(
+                themeedit.ThemeEditScreen(initial_theme=active_theme),
+                lambda res: screen.refresh_environment(),
+            )
+
+    elif item_type in ("theme_editor", "theme_edit"):
+        import themeedit
+        active_theme = getattr(screen.app, "theme_name", "dracula")
+        screen.app.push_screen(
+            themeedit.ThemeEditScreen(initial_theme=active_theme),
+            lambda res: screen.refresh_environment(),
+        )
 
     elif item_type == "inject_block":
         target_path_str = interpolate_placeholders(item.get("target", ""), config)
@@ -3431,6 +3502,16 @@ class BashMenuScreen(Screen):
                 title_chain=title_chain,
                 theme=getattr(self.app, "theme_styles", None),
             ),
+            lambda res: self.refresh_environment(),
+        )
+
+    def action_theme_editor(self) -> None:
+        """Launch the interactive Visual Theme Editor."""
+        active_theme = getattr(self.app, "theme_name", "dracula")
+        import themeedit
+
+        self.app.push_screen(
+            themeedit.ThemeEditScreen(initial_theme=active_theme),
             lambda res: self.refresh_environment(),
         )
 

@@ -37,6 +37,7 @@ Textual interface.
   formatting parsers, and theme color conversion helpers.
 - `bashedit.py`: Menu editor utility.
 - `menuedit.py`: Visual tree editor for `bashmenu.mnu` (invoked via `F4`).
+- `themeedit.py`: Visual theme creator and palette editor.
 - `scripts/gorillas.py`: Classic QBasic Gorillas game implemented as a Textual TUI.
 - `bashmenu.yml`: Main Yaml configuration file (stores active settings
   like `theme:`).
@@ -597,9 +598,7 @@ Textual interface.
     - **Differential Line & Status Decoupling:**
       * `set_current_row()` calculates visible screen row coordinates and issues `self.refresh(Region(0, y_old, w, 1), Region(0, y_new, w, 1))` when scrolling offset is unchanged, cutting terminal stdout bytes from ~36 KB down to ~600 bytes.
       * Periodic clock and plugin ticks must refresh only the bottom two status lines (`Region(0, max(0, h - 3), w, 2)`), decoupled from main wallpaper redraws.
-    - **Horizontal Span Clustering & Quantization (`clustering`):**
-      * Natural photographic wallpapers contain smooth micro-gradients that cause Rich to emit 24-bit escape codes for every individual cell, saturating the PTY buffer.
-      * Built-in `clustering` (default `64`, range `0`–`128`) clusters adjacent cells with imperceptible color differences into unified Rich style runs.
+      * Built-in `clustering` (default `0`, range `0`–`128`) and `quantization` (default `1`, range `1`–`32`). Setting `clustering: 0` and `quantization: 1` preserves full truecolor photographic fidelity; when enabled, clustering caps runs at 4 cells to prevent horizontal streaking.
       * Wallpapers must be pre-processed without Floyd-Steinberg dithering (`+dither` in ImageMagick, `--nofs` in `pngquant`) to prevent checkerboard stippling from defeating span aggregation.
 
 

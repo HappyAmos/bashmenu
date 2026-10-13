@@ -277,6 +277,43 @@ class TestWallpaperCompositor(unittest.TestCase):
             self.assertNotEqual(lines1[4], lines2[4])
             self.assertNotEqual(lines1[6], lines2[6])
 
+    def test_compositor_clustering_and_quantization_defaults(self):
+        """Verify default WallpaperCompositor has clustering=0 and quantization=1, producing high color fidelity."""
+        compositor = bashmenu_ui.WallpaperCompositor(
+            self.wallpaper_path, opacity=0.85, scaling="cover", base_dir=self.test_dir
+        )
+        self.assertEqual(compositor.clustering, 0)
+        self.assertEqual(compositor.quantization, 1)
+
+        grid = compositor.get_grid(80, 24, (15, 20, 32))
+        self.assertIsNotNone(grid)
+        unique_styles = {(str(cell[0]), cell[1]) for row in grid for cell in row}
+        # Unquantized twilight.png with clustering=0 should have over 200 distinct styles
+        self.assertGreater(len(unique_styles), 200)
+
+    def test_compositor_run_capping_when_clustering_enabled(self):
+        """Verify that when clustering is enabled (> 0), horizontal runs on continuous gradients are capped to prevent streaking."""
+        compositor = bashmenu_ui.WallpaperCompositor(
+            self.wallpaper_path, opacity=0.85, scaling="cover", base_dir=self.test_dir, clustering=128
+        )
+        grid = compositor.get_grid(80, 24, (15, 20, 32))
+        self.assertIsNotNone(grid)
+
+        # Check maximum run length in gradient row (row 16)
+        row16 = grid[16]
+        curr_run = 1
+        max_run = 1
+        for c in range(1, len(row16)):
+            if row16[c] == row16[c - 1]:
+                curr_run += 1
+            else:
+                max_run = max(max_run, curr_run)
+                curr_run = 1
+        max_run = max(max_run, curr_run)
+        # Without capping, clustering=128 produces an 80-cell streak across row 16.
+        # With capping at 4, the run length is constrained.
+        self.assertLessEqual(max_run, 12)
+
 
 if __name__ == "__main__":
     unittest.main()

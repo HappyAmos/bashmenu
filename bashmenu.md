@@ -16,6 +16,7 @@ editor for Linux systems.
   - [3.1 Main Menu Engine (`bashmenu.py`)](#31-main-menu-engine-bashmenupy)
   - [3.2 Visual Menu Editor (`menuedit.py`)](#32-visual-menu-editor-menueditpy)
   - [3.3 Built-in Text Editor (`bashedit.py`)](#33-built-in-text-editor-basheditpy)
+  - [3.4 Visual Theme Editor (`themeedit.py`)](#34-visual-theme-editor-themeeditpy)
 - [4. Configuration & Schema Specifications](#4-configuration--schema-specifications)
   - [4.1 Settings Store (`bashmenu.yml`)](#41-settings-store-bashmenuyml)
   - [4.2 Menu Structure (`bashmenu.mnu`)](#42-menu-structure-bashmenumnu)
@@ -50,6 +51,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 | `bashmenu_ui.py` | Shared UI library — modal screens, theme engine, formatting helpers. |
 | `bashedit.py` | Built-in Nano-style text editor engine. |
 | `menuedit.py` | Interactive TUI visual editor for `bashmenu.mnu` (run via `F4`). |
+| `themeedit.py` | Interactive TUI visual theme creator and palette editor. |
 | `bashmenu.yml` | YAML user settings configuration store. |
 | `bashmenu.mnu` | YAML menu layout structure and action definitions. |
 | `bashmenu.themes` | YAML color themes for 256, 16, and 8 color modes. |
@@ -190,6 +192,25 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `Ctrl+C` | Copy line or active selection block. |
 | `Ctrl+V` | Paste cutbuffer / clipboard text. |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo edit operations. |
+
+### 3.4 Visual Theme Editor (`themeedit.py`)
+
+The visual theme editor provides a split-screen interface featuring a live, quarter-scale preview of the main menu (including simulated options, indicators, dividers, plugins, gutter borders, and drop shadows) alongside an inspector panel for editing theme characters and color tokens.
+
+| Keybinding | Action |
+| :--- | :--- |
+| `c` / `ENTER` | Open 256-color picker modal (`ColorPickerModal`) for the focused color field. |
+| `a` | Open box-drawing & glyph picker modal (`AsciiPickerModal`) for the focused character field. |
+| `t` | Clone existing theme as a base (`ThemeCloneModal`). |
+| `d` | Auto-derive 16-color and 8-color fallback palettes from current 256-color palette. |
+| `s` | Save theme to `bashmenu.themes` and optionally activate in `bashmenu.yml` (`SaveThemeModal`). |
+| `F1` / `?` | Display theme editor help modal. |
+| `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |
+
+*Launching Theme Editor:*
+- Directly via command line: `./themeedit.py [theme_name]`
+- Inside HA Bash Menu via `F2` (Theme Picker) by pressing `e` on any highlighted theme.
+- Via the main menu under `Bashmenu Settings -> Theme Editor`.
 
 ---
 
@@ -454,8 +475,9 @@ settings:
     image: "{bashmenu_dir}/assets/wallpapers/twilight.png"
     opacity: 0.35    # Float between 0.0 (transparent) and 1.0 (opaque)
     scaling: "cover" # "cover" (crops to fill aspect ratio) or "stretch"
-    clustering: 64   # Integer 0 to 128 (default: 64). Higher values merge subtle color differences
-                     # into solid horizontal spans for maximum terminal scroll responsiveness.
+    clustering: 0    # Integer 0 to 128 (default: 0). Default 0 preserves full photographic fidelity.
+                     # Values > 0 merge subtle color differences for high-latency connections.
+    quantization: 1  # Integer >= 1 (default: 1). 1 preserves full 24-bit TrueColor depth.
 ```
 
 ```yaml
@@ -465,7 +487,7 @@ twilight:
     image: "{bashmenu_dir}/assets/wallpapers/twilight.png"
     opacity: 0.35
     scaling: "cover"
-    clustering: 64
+    clustering: 0
 ```
 
 > [!NOTE]
@@ -477,7 +499,8 @@ twilight:
 | `image` | String | (theme) | Path to wallpaper image (PNG/JPG). Supports `{bashmenu_dir}` and placeholders. |
 | `opacity` | Float | `0.35` | Blending factor ($0.0$ to $1.0$). Lower values blend more theme background tint. |
 | `scaling` | String | `"cover"` | Scaling mode: `"cover"` (aspect ratio fill with auto-crop) or `"stretch"`. |
-| `clustering` | Integer | `64` | Horizontal delta threshold ($0$ to $128$). Controls how aggressively subtle neighboring pixel variations collapse into unified terminal spans. Set to $64$–$96$ for smooth, lag-free scrolling on photos. |
+| `clustering` | Integer | `0` | Horizontal delta threshold ($0$ to $128$). Default $0$ preserves true photographic detail without horizontal streaking. |
+| `quantization` | Integer | `1` | Color channel quantization ($1$ to $32$). Default $1$ retains full 24-bit TrueColor depth without color banding. |
 
 ---
 

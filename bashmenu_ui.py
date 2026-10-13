@@ -1430,13 +1430,15 @@ class WallpaperCompositor:
         opacity: float = 0.35,
         scaling: str = "cover",
         base_dir: str | None = None,
-        clustering: int = 64,
+        clustering: int = 0,
+        quantization: int = 1,
     ) -> None:
         self.image_path = str(image_path).strip() if image_path else ""
         self.opacity = max(0.0, min(1.0, float(opacity)))
         self.scaling = scaling or "cover"
         self.base_dir = base_dir or os.getcwd()
         self.clustering = max(0, int(clustering))
+        self.quantization = max(1, int(quantization))
         self._raw_image = None
         self._cached_key = None
         self._cached_grid = None
@@ -1457,11 +1459,11 @@ class WallpaperCompositor:
                     expanded = cand2
             if os.path.exists(expanded) and os.path.isfile(expanded):
                 img = Image.open(expanded).convert("RGB")
-                # Pre-downscale high-res images to a lightweight thumbnail bounding box
-                # to prevent memory pressure and slow Lanczos downsampling on larger wallpapers.
-                max_thumb_w, max_thumb_h = 320, 200
-                if img.width > max_thumb_w or img.height > max_thumb_h:
-                    img.thumbnail((max_thumb_w, max_thumb_h), Image.Resampling.BILINEAR)
+                # Downscale excessively large images (e.g. 4K/8K) to 1920x1080 bounding box
+                # using LANCZOS to conserve memory while retaining full photographic fidelity.
+                max_w, max_h = 1920, 1080
+                if img.width > max_w or img.height > max_h:
+                    img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
                 self._raw_image = img
             else:
                 self._raw_image = None
@@ -1475,7 +1477,15 @@ class WallpaperCompositor:
         if not self._raw_image or width <= 0 or height <= 0:
             return None
 
-        cache_key = (width, height, theme_bg_rgb, round(self.opacity, 3), self.scaling, self.clustering)
+        cache_key = (
+            width,
+            height,
+            theme_bg_rgb,
+            round(self.opacity, 3),
+            self.scaling,
+            self.clustering,
+            self.quantization,
+        )
         if self._cached_key == cache_key and self._cached_grid is not None:
             return self._cached_grid
 
@@ -1494,9 +1504,9 @@ class WallpaperCompositor:
                 new_h = max(1, int(img.width / target_ratio))
                 top = (img.height - new_h) // 2
                 cropped = img.crop((0, top, img.width, top + new_h))
-            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.BILINEAR)
+            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
         else:
-            resized = img.resize((pixel_w, pixel_h), Image.Resampling.BILINEAR)
+            resized = img.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
 
         pixels = resized.load()
         grid = []
@@ -1504,7 +1514,7 @@ class WallpaperCompositor:
         inv_op = 1.0 - op
         t_r, t_g, t_b = theme_bg_rgb
         style_cache: dict[tuple[int, int, int, int, int, int], tuple[Style, str]] = {}
-        quant = 16
+        quant = self.quantization
 
         delta_threshold = self.clustering
 
@@ -1512,23 +1522,34 @@ class WallpaperCompositor:
             row_cache = []
             anchor_cell = None
             anchor_k = None
+            cluster_run = 0
             for c in range(width):
                 orig_r1, orig_g1, orig_b1 = pixels[c, r * 2][:3]
                 orig_r2, orig_g2, orig_b2 = pixels[c, r * 2 + 1][:3]
 
-                r1 = (int(orig_r1 * op + t_r * inv_op) // quant) * quant
-                g1 = (int(orig_g1 * op + t_g * inv_op) // quant) * quant
-                b1 = (int(orig_b1 * op + t_b * inv_op) // quant) * quant
+                blended_r1 = int(orig_r1 * op + t_r * inv_op)
+                blended_g1 = int(orig_g1 * op + t_g * inv_op)
+                blended_b1 = int(orig_b1 * op + t_b * inv_op)
+                blended_r2 = int(orig_r2 * op + t_r * inv_op)
+                blended_g2 = int(orig_g2 * op + t_g * inv_op)
+                blended_b2 = int(orig_b2 * op + t_b * inv_op)
 
-                r2 = (int(orig_r2 * op + t_r * inv_op) // quant) * quant
-                g2 = (int(orig_g2 * op + t_g * inv_op) // quant) * quant
-                b2 = (int(orig_b2 * op + t_b * inv_op) // quant) * quant
+                if quant > 1:
+                    r1 = (blended_r1 // quant) * quant
+                    g1 = (blended_g1 // quant) * quant
+                    b1 = (blended_b1 // quant) * quant
+                    r2 = (blended_r2 // quant) * quant
+                    g2 = (blended_g2 // quant) * quant
+                    b2 = (blended_b2 // quant) * quant
+                else:
+                    r1, g1, b1 = blended_r1, blended_g1, blended_b1
+                    r2, g2, b2 = blended_r2, blended_g2, blended_b2
 
                 k = (r1, g1, b1, r2, g2, b2)
 
-                # Cluster adjacent cells with imperceptible color differences into the same
-                # style run, preventing excessive Rich Segment fragmentation in terminal output.
-                if anchor_k is not None:
+                # If clustering is enabled (> 0), merge near-identical adjacent cells,
+                # but cap the run length (max 4 cells) to prevent horizontal streaking.
+                if delta_threshold > 0 and anchor_k is not None and cluster_run < 4:
                     delta = (
                         abs(k[0] - anchor_k[0])
                         + abs(k[1] - anchor_k[1])
@@ -1538,9 +1559,11 @@ class WallpaperCompositor:
                         + abs(k[5] - anchor_k[5])
                     )
                     if delta <= delta_threshold:
+                        cluster_run += 1
                         row_cache.append(anchor_cell)
                         continue
 
+                cluster_run = 0
                 cached = style_cache.get(k)
                 if cached is None:
                     avg_r = (r1 + r2) // 2
@@ -2716,7 +2739,7 @@ class ConfirmModalScreen(ModalScreen[str]):
                         yield Button("Yes", variant="primary", id="btn_yes")
                         yield Button("No", variant="default", id="btn_no")
                         yield Button("Cancel", variant="default", id="btn_cancel")
-                    yield Label("[Y] Yes | [N] No | [C / ESC] Cancel", id="footer")
+                    yield Label("[Y] Yes | [N] No | [C / ESC] Cancel", id="footer", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
@@ -2846,7 +2869,7 @@ class ToggleModalScreen(ModalScreen[str]):
                         yield Button("True", variant="success", id="btn_true")
                         yield Button("False", variant="error", id="btn_false")
                         yield Button("Cancel", variant="default", id="btn_cancel")
-                    yield Label("[T] True | [F] False | [C / ESC] Cancel", id="footer")
+                    yield Label("[T] True | [F] False | [C / ESC] Cancel", id="footer", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
@@ -2988,7 +3011,7 @@ class InputModalScreen(ModalScreen[str]):
                     with Horizontal(id="buttons"):
                         yield Button("OK", variant="primary", id="btn_ok")
                         yield Button("Cancel", variant="default", id="btn_cancel")
-                    yield Label("[ENTER] OK | [ESC] Cancel", id="footer")
+                    yield Label("[ENTER] OK | [ESC] Cancel", id="footer", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
@@ -3170,7 +3193,7 @@ class FilePickerModalScreen(ModalScreen[str]):
                             footer_text = "[ENTER] Open/Select | [N] New File | [ESC] Cancel"
                         else:
                             footer_text = "[ENTER] Open/Select | [ESC] Cancel"
-                    yield Label(footer_text, id="footer")
+                    yield Label(footer_text, id="footer", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
@@ -3430,13 +3453,26 @@ class ThemePickerModalScreen(ModalScreen[str]):
         border: solid $accent;
     }
     #footer {
-        text-align: center;
+        height: 1;
+        width: 100%;
+        align: center middle;
         margin-top: 1;
+    }
+    .footer_item {
+        color: $accent;
+    }
+    .footer_item:hover {
+        text-style: underline bold;
+        color: $text;
+    }
+    .footer_sep {
+        color: $text-muted;
     }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("e", "edit_theme", "Edit Theme"),
     ]
 
     def __init__(self, current_theme: str = "dracula", theme: dict | None = None):
@@ -3453,7 +3489,12 @@ class ThemePickerModalScreen(ModalScreen[str]):
                         yield Label("Select Color Theme", id="title")
                         yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
                     yield OptionList(id="options_list")
-                    yield Label("[ENTER] Select Theme | [ESC] Cancel", id="footer")
+                    with Horizontal(id="footer"):
+                        yield Label("[ENTER] Select", id="lbl_ft_select", classes="footer_item", markup=False)
+                        yield Label(" | ", classes="footer_sep", markup=False)
+                        yield Label("[e] Edit/Create", id="lbl_ft_edit", classes="footer_item", markup=False)
+                        yield Label(" | ", classes="footer_sep", markup=False)
+                        yield Label("[ESC] Cancel", id="lbl_ft_cancel", classes="footer_item", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
@@ -3474,13 +3515,40 @@ class ThemePickerModalScreen(ModalScreen[str]):
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
-        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+        if not widget:
+            return
+        w_id = getattr(widget, "id", None)
+        if w_id == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", []):
+            self.dismiss(None)
+        elif w_id == "lbl_ft_select":
+            opt_list = self.query_one("#options_list", OptionList)
+            idx = opt_list.highlighted
+            if idx is not None and 0 <= idx < len(self.theme_keys):
+                self.dismiss(self.theme_keys[idx])
+        elif w_id == "lbl_ft_edit":
+            self.action_edit_theme()
+        elif w_id == "lbl_ft_cancel":
             self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         idx = event.option_index
         if 0 <= idx < len(self.theme_keys):
             self.dismiss(self.theme_keys[idx])
+
+    def action_edit_theme(self) -> None:
+        opt_list = self.query_one("#options_list", OptionList)
+        idx = opt_list.highlighted
+        chosen_theme = (
+            self.theme_keys[idx]
+            if (idx is not None and 0 <= idx < len(self.theme_keys))
+            else self.current_theme
+        )
+        import themeedit
+
+        self.app.push_screen(
+            themeedit.ThemeEditScreen(initial_theme=chosen_theme),
+            lambda res: self.dismiss(None),
+        )
 
     def action_cancel(self) -> None:
         self.dismiss(None)

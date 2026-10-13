@@ -2923,9 +2923,12 @@ G
         import bashmenu
         import bashmenu_ui
 
+        test_cfg, _ = bashmenu.load_config()
+        test_cfg["theme"] = "dracula"
+
         class TestMenuApp(App):
             def compose(self):
-                yield bashmenu.MainMenuView(id="menu_view")
+                yield bashmenu.MainMenuView(config=test_cfg, id="menu_view")
 
         async def run_checks():
             app = TestMenuApp()

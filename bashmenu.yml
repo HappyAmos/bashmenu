@@ -5,7 +5,7 @@
 # or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
 # ==============================================================================
 version: 0.0.1
-theme: matrix
+theme: pacman
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
@@ -54,4 +54,4 @@ settings:
     milliseconds: 300000
   background:
     enabled: true
-    clustering: 64
+    clustering: 0
