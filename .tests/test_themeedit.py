@@ -232,10 +232,10 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.pause()
                 self.assertEqual(modal.active_tab, "fg")
 
-                # Toggle constant name output
-                grid.set_code(196)
+                # Select constant name via swatch
+                btn_swatch = modal.query_one("#swatch_COLOR_RED", themeedit.Button)
+                await pilot.click(btn_swatch)
                 await pilot.pause()
-                modal.action_toggle_const_name()
                 self.assertEqual(modal.fg_val, "COLOR_RED")
 
                 # Verify confirm selection returns both layers
@@ -535,6 +535,40 @@ class TestThemeEditor(unittest.TestCase):
         self.assertIn("█", lines[9])
 
 
+    def test_ascii_grid_widget_navigation(self):
+        """Verify AsciiGridWidget arrow navigation and underline on active cell."""
+        grid = themeedit.AsciiGridWidget(initial_code=196)
+        self.assertEqual(grid.cursor_code, 196)
+
+        # Right arrow moves +1
+        grid.action_cursor_right()
+        self.assertEqual(grid.cursor_code, 197)
+
+        # Down arrow moves +16
+        grid.action_cursor_down()
+        self.assertEqual(grid.cursor_code, 213)
+
+        # Left arrow moves -1
+        grid.action_cursor_left()
+        self.assertEqual(grid.cursor_code, 212)
+
+        # Up arrow moves -16
+        grid.action_cursor_up()
+        self.assertEqual(grid.cursor_code, 196)
+
+        # Render output should have 16 lines
+        rendered = grid.render()
+        lines = rendered.plain.splitlines()
+        self.assertEqual(len(lines), 16)
+
+        # Active cell is underlined in rendered Text
+        active_found = False
+        for span in rendered.spans:
+            if getattr(span.style, "underline", False):
+                active_found = True
+                break
+        self.assertTrue(active_found, "Selected ASCII code must be underlined.")
+
     def test_ascii_picker_modal_shows_cp437_codes(self):
         """Verify AsciiPickerModal displays recognized CP437 ASCII code numbers and macro format."""
         async def _run():
@@ -543,11 +577,21 @@ class TestThemeEditor(unittest.TestCase):
             async with app.run_test(size=(100, 30)) as pilot:
                 app.push_screen(modal)
                 await pilot.pause()
-                opt_list = modal.query_one("#glyph_list")
-                prompts = [str(opt.prompt) for opt in opt_list._options if hasattr(opt, "prompt")]
-                self.assertTrue(any("(ASCII: 196 -> {ascii:196})" in p for p in prompts))
-                self.assertTrue(any("(ASCII: 205 -> {ascii:205})" in p for p in prompts))
-                self.assertTrue(any("(ASCII: 179 -> {ascii:179})" in p for p in prompts))
+
+                # Preview bar displays initial CP437 code 196 format
+                p_bar = modal.query_one("#preview_bar", themeedit.Static)
+                self.assertIn("(ASCII: 196 -> {ascii:196})", p_bar.render().plain)
+
+                # Move cursor to 205 ('═')
+                grid = modal.query_one("#ascii_grid", themeedit.AsciiGridWidget)
+                grid.set_code(205)
+                await pilot.pause()
+                self.assertIn("(ASCII: 205 -> {ascii:205})", p_bar.render().plain)
+
+                # Move cursor to 179 ('│')
+                grid.set_code(179)
+                await pilot.pause()
+                self.assertIn("(ASCII: 179 -> {ascii:179})", p_bar.render().plain)
 
         asyncio.run(_run())
 

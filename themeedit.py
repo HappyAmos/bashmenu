@@ -26,8 +26,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Input, Label, OptionList, Static
-from textual.widgets.option_list import Option
+from textual.widgets import Button, Checkbox, Input, Label, Static
 
 import bashmenu
 import bashmenu_ui
@@ -58,6 +57,27 @@ UNICODE_TO_CP437: dict[str, int] = {}
 for _b in range(256):
     with contextlib.suppress(Exception):
         UNICODE_TO_CP437[bytes([_b]).decode("cp437")] = _b
+
+CP437_CONTROL_GLYPHS: dict[int, str] = {
+    0: "·", 1: "☺", 2: "☻", 3: "♥", 4: "♦", 5: "♣", 6: "♠", 7: "•",
+    8: "◘", 9: "○", 10: "◙", 11: "♂", 12: "♀", 13: "♪", 14: "♫", 15: "☼",
+    16: "►", 17: "◄", 18: "↕", 19: "‼", 20: "¶", 21: "§", 22: "▬", 23: "↨",
+    24: "↑", 25: "↓", 26: "→", 27: "←", 28: "∟", 29: "↔", 30: "▲", 31: "▼",
+    127: "⌂",
+}
+for _c, _g in CP437_CONTROL_GLYPHS.items():
+    UNICODE_TO_CP437[_g] = _c
+
+
+def get_cp437_glyph(code: int) -> str:
+    """Return visual character representation for CP437 byte code."""
+    if code in CP437_CONTROL_GLYPHS:
+        return CP437_CONTROL_GLYPHS[code]
+    try:
+        return bytes([code % 256]).decode("cp437", errors="replace")
+    except (ValueError, UnicodeDecodeError, OverflowError):
+        return "?"
+
 
 
 def get_rgb_from_color_idx(idx: int | str) -> tuple[int, int, int]:
@@ -252,12 +272,13 @@ class ColorGridWidget(Widget):
 
         return grid_text
 
-    def set_code(self, code: int) -> None:
+    def set_code(self, code: int, notify: bool = True) -> None:
         """Update cursor code and refresh visual display."""
         if 0 <= code <= 255:
             self.cursor_code = code
             self.refresh()
-            self.post_message(self.ColorHighlighted(self.cursor_code))
+            if notify:
+                self.post_message(self.ColorHighlighted(self.cursor_code))
 
     def on_click(self, event: Any) -> None:
         x = getattr(event, "x", 0)
@@ -306,7 +327,7 @@ class ColorPickerModal(ModalScreen[Any]):
     }
     #dialog {
         width: 78;
-        height: 29;
+        height: 31;
         border: thick #555;
         background: #181818;
         padding: 0 1;
@@ -409,15 +430,14 @@ class ColorPickerModal(ModalScreen[Any]):
         text-style: underline bold;
     }
     #btn_row {
-        height: 2;
-        margin-top: 0;
+        height: 3;
+        margin-top: 1;
         align: center middle;
     }
     #btn_row Button {
-        height: 1;
-        min-width: 12;
+        height: 3;
+        min-width: 16;
         margin: 0 1;
-        border: none;
     }
     """
 
@@ -430,7 +450,6 @@ class ColorPickerModal(ModalScreen[Any]):
         Binding("f", "select_fg_tab", "Foreground", show=False),
         Binding("b", "select_bg_tab", "Background", show=False),
         Binding("i", "action_inherit", "Inherit", show=False),
-        Binding("c", "toggle_const_name", "Toggle Constant Name", show=False),
     ]
 
     def __init__(
@@ -472,8 +491,6 @@ class ColorPickerModal(ModalScreen[Any]):
                 self.bg_val = -1
 
         self.active_tab = "fg"
-        self.use_const_fg = isinstance(self.fg_val, str) and self.fg_val in STANDARD_CONST_MAP
-        self.use_const_bg = isinstance(self.bg_val, str) and self.bg_val in STANDARD_CONST_MAP
 
     @property
     def selected_color(self) -> Any:
@@ -507,13 +524,6 @@ class ColorPickerModal(ModalScreen[Any]):
                 if 0 <= num <= 255:
                     return num
         return 0
-
-    def _format_val(self, code: int, use_const: bool) -> Any:
-        if code == -1:
-            return -1
-        if use_const and code in CODE_TO_CONST:
-            return CODE_TO_CONST[code]
-        return code
 
     def compose(self) -> ComposeResult:
         with bashmenu_ui.ModalFrame(id="modal_frame"):
@@ -557,9 +567,6 @@ class ColorPickerModal(ModalScreen[Any]):
                     with Horizontal(id="btn_row"):
                         yield Button("Select (Enter)", variant="primary", id="btn_select")
                         yield Button("Inherit (-1)", variant="default", id="btn_inherit")
-                        use_c = self.use_const_fg if self.active_tab == "fg" else self.use_const_bg
-                        c_text = "Name: ON" if use_c else "Name: OFF"
-                        yield Button(c_text, variant="default", id="btn_toggle_const")
                         yield Button("Cancel (Esc)", variant="error", id="btn_cancel")
 
                 yield bashmenu_ui.ShadowWidget(id="shadow_right")
@@ -624,11 +631,6 @@ class ColorPickerModal(ModalScreen[Any]):
                 btn_fg.variant = "default"
                 btn_bg.variant = "primary"
 
-        with contextlib.suppress(Exception):
-            btn_c = self.query_one("#btn_toggle_const", Button)
-            use_c = self.use_const_fg if self.active_tab == "fg" else self.use_const_bg
-            btn_c.label = "Name: ON" if use_c else "Name: OFF"
-
     def _update_preview(self) -> None:
         p_bar = self.query_one("#preview_bar", Static)
         parsed_fg = bashmenu_ui.parse_color_val(self.fg_val) or "white"
@@ -658,9 +660,9 @@ class ColorPickerModal(ModalScreen[Any]):
     def on_color_grid_widget_color_highlighted(self, event: ColorGridWidget.ColorHighlighted) -> None:
         code = event.color_code
         if self.active_tab == "fg":
-            self.fg_val = self._format_val(code, self.use_const_fg)
+            self.fg_val = code
         else:
-            self.bg_val = self._format_val(code, self.use_const_bg)
+            self.bg_val = code
 
         self._sync_tabs_ui()
         self._update_preview()
@@ -681,8 +683,6 @@ class ColorPickerModal(ModalScreen[Any]):
             self._confirm()
         elif btn_id == "btn_inherit":
             self.action_inherit()
-        elif btn_id == "btn_toggle_const":
-            self.action_toggle_const_name()
         elif btn_id == "btn_cancel":
             self.dismiss(None)
         elif btn_id.startswith("swatch_"):
@@ -692,12 +692,12 @@ class ColorPickerModal(ModalScreen[Any]):
             else:
                 code = STANDARD_CONST_MAP.get(swatch_name, 0)
                 grid = self.query_one("#color_grid", ColorGridWidget)
-                grid.set_code(code)
+                grid.set_code(code, notify=False)
                 grid.focus()
                 if self.active_tab == "fg":
-                    self.fg_val = swatch_name if self.use_const_fg else code
+                    self.fg_val = swatch_name
                 else:
-                    self.bg_val = swatch_name if self.use_const_bg else code
+                    self.bg_val = swatch_name
                 self._sync_tabs_ui()
                 self._update_preview()
 
@@ -743,18 +743,6 @@ class ColorPickerModal(ModalScreen[Any]):
         self._sync_tabs_ui()
         self._update_preview()
 
-    def action_toggle_const_name(self) -> None:
-        if self.active_tab == "fg":
-            self.use_const_fg = not self.use_const_fg
-            grid = self.query_one("#color_grid", ColorGridWidget)
-            self.fg_val = self._format_val(grid.cursor_code, self.use_const_fg)
-        else:
-            self.use_const_bg = not self.use_const_bg
-            grid = self.query_one("#color_grid", ColorGridWidget)
-            self.bg_val = self._format_val(grid.cursor_code, self.use_const_bg)
-        self._sync_tabs_ui()
-        self._update_preview()
-
     def action_confirm_selection(self) -> None:
         self._confirm()
 
@@ -773,8 +761,129 @@ class ColorPickerModal(ModalScreen[Any]):
         self.dismiss(None)
 
 
+class AsciiGridWidget(Widget):
+    """Interactive 16x16 2D CP437 ASCII character grid with keyboard navigation."""
+
+    can_focus = True
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("left", "cursor_left", "Left", show=False),
+        Binding("right", "cursor_right", "Right", show=False),
+        Binding("up", "cursor_up", "Up", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
+        Binding("home", "cursor_home", "Home", show=False),
+        Binding("end", "cursor_end", "End", show=False),
+        Binding("pageup", "cursor_page_up", "Page Up", show=False),
+        Binding("pagedown", "cursor_page_down", "Page Down", show=False),
+        Binding("enter", "select_glyph", "Select", show=False),
+    ]
+
+    class GlyphHighlighted(Message):
+        """Emitted when highlighted character index changes."""
+
+        def __init__(self, code: int, glyph: str) -> None:
+            super().__init__()
+            self.code = code
+            self.glyph = glyph
+
+    class GlyphSelected(Message):
+        """Emitted when Enter is pressed on a glyph."""
+
+        def __init__(self, code: int, glyph: str) -> None:
+            super().__init__()
+            self.code = code
+            self.glyph = glyph
+
+    def __init__(self, initial_code: int = 196, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.cursor_code = max(0, min(255, initial_code))
+
+    def render(self) -> Text:
+        grid_text = Text()
+        for row in range(16):
+            for col in range(16):
+                code = row * 16 + col
+                glyph = get_cp437_glyph(code)
+                is_sel = (code == self.cursor_code)
+                cell_str = f" {glyph}  "
+
+                if is_sel:
+                    style = Style(color="color(255)", bgcolor="color(237)", bold=True, underline=True)
+                else:
+                    if 128 <= code <= 255:
+                        style = Style(color="color(231)")
+                    elif 32 <= code <= 126:
+                        style = Style(color="color(250)")
+                    else:
+                        style = Style(color="color(243)")
+
+                grid_text.append(cell_str, style=style)
+            if row < 15:
+                grid_text.append("\n")
+
+        return grid_text
+
+    def set_code(self, code: int, notify: bool = True) -> None:
+        """Update cursor code and refresh visual display."""
+        if 0 <= code <= 255:
+            self.cursor_code = code
+            self.refresh()
+            if notify:
+                self.post_message(self.GlyphHighlighted(self.cursor_code, get_cp437_glyph(self.cursor_code)))
+
+    def on_click(self, event: Any) -> None:
+        x = getattr(event, "x", 0)
+        y = getattr(event, "y", 0)
+        col = x // 4
+        row = y
+        if 0 <= col < 16 and 0 <= row < 16:
+            code = row * 16 + col
+            self.set_code(code)
+
+    def action_cursor_left(self) -> None:
+        self.set_code((self.cursor_code - 1) % 256)
+
+    def action_cursor_right(self) -> None:
+        self.set_code((self.cursor_code + 1) % 256)
+
+    def action_cursor_up(self) -> None:
+        self.set_code((self.cursor_code - 16) % 256)
+
+    def action_cursor_down(self) -> None:
+        self.set_code((self.cursor_code + 16) % 256)
+
+    def action_cursor_home(self) -> None:
+        self.set_code(0)
+
+    def action_cursor_end(self) -> None:
+        self.set_code(255)
+
+    def action_cursor_page_up(self) -> None:
+        self.set_code((self.cursor_code - 64) % 256)
+
+    def action_cursor_page_down(self) -> None:
+        self.set_code((self.cursor_code + 64) % 256)
+
+    def action_select_glyph(self) -> None:
+        self.post_message(self.GlyphSelected(self.cursor_code, get_cp437_glyph(self.cursor_code)))
+
+
+QUICK_BORDER_SWATCHES: list[tuple[str, int]] = [
+    ("─", 196),
+    ("│", 179),
+    ("═", 205),
+    ("║", 186),
+    ("┌", 218),
+    ("┐", 191),
+    ("└", 192),
+    ("┘", 217),
+    ("█", 219),
+    ("░", 176),
+]
+
+
 class AsciiPickerModal(ModalScreen[str]):
-    """Categorized box-drawing and glyph picker modal."""
+    """Interactive 2D CP437 ASCII character and box-drawing glyph picker modal."""
 
     DEFAULT_CSS = """
     AsciiPickerModal {
@@ -782,16 +891,16 @@ class AsciiPickerModal(ModalScreen[str]):
         background: rgba(0, 0, 0, 0.65);
     }
     #dialog {
-        width: 74;
-        height: 25;
+        width: 78;
+        height: 31;
         border: thick #555;
         background: #181818;
-        padding: 1 2;
+        padding: 0 1;
     }
     #title_bar {
         height: 1;
         width: 100%;
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
     #title {
         width: 1fr;
@@ -813,49 +922,154 @@ class AsciiPickerModal(ModalScreen[str]):
         background: #333;
         color: #fff;
     }
-    #glyph_list {
-        height: 13;
-        border: solid #555;
+    #tabs_row {
+        height: 2;
+        width: 100%;
+        align: center middle;
+        margin-bottom: 0;
     }
-    #footer_lbl {
+    #tabs_row Button, .tab_btn {
+        height: 1;
+        min-width: 20;
+        margin: 0 1;
+        padding: 0 1;
+        border: none !important;
+    }
+    #grid_container {
+        height: 16;
+        width: 100%;
+        align: center middle;
+    }
+    AsciiGridWidget {
+        width: 64;
+        height: 16;
+    }
+    AsciiGridWidget:focus {
+        border: none;
+    }
+    #preview_bar {
+        height: 2;
+        width: 100%;
+        margin-top: 0;
+        border: solid #555;
         text-align: center;
+    }
+    #swatch_row {
+        height: 1;
+        width: 100%;
+        align: center middle;
+        margin-top: 0;
+    }
+    .swatch_lbl {
+        color: #888;
+        margin-right: 1;
+    }
+    #swatch_row Button, .btn_swatch {
+        height: 1;
+        min-width: 4;
+        padding: 0 1;
+        margin: 0;
+        border: none !important;
+        background: #252525;
+        color: #ccc;
+    }
+    .btn_swatch:hover {
+        text-style: underline bold;
+        color: #fff;
+    }
+    #btn_row {
+        height: 3;
         margin-top: 1;
+        align: center middle;
+    }
+    #btn_row Button {
+        height: 3;
+        min-width: 16;
+        margin: 0 1;
     }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "confirm_selection", "Select"),
+        Binding("1", "select_extended_tab", "Extended", show=False),
+        Binding("2", "select_standard_tab", "Standard", show=False),
+        Binding("3", "select_all_tab", "All", show=False),
+        Binding("tab", "cycle_range_tab", "Next Range", show=False),
     ]
 
-    GLYPH_CATEGORIES: ClassVar[list[tuple[str, list[str]]]] = [
-        ("Single Lines & Corners", ["─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"]),
-        ("Rounded Corners", ["╭", "╮", "╰", "╯"]),
-        ("Double Lines & Corners", ["═", "║", "╔", "╗", "╚", "╝", "╠", "╣", "╦", "╩", "╬"]),
-        ("Heavy & Thick Lines", ["━", "┃", "┏", "┓", "┗", "┛", "┣", "┫", "┳", "┻", "╋"]),
-        ("Blocks & Shading", ["░", "▒", "▓", "█", "▀", "▄", "▌", "▐", "■", "▞", "▚"]),
-        ("Title Caps & Brackets", ["[", "]", "⟦", "⟧", "(", ")", "<", ">", "{", "}", "╡", "╞", "╢", "╟"]),
-        ("Indicators & Pointers", [">", "*", "◆", "▶", "❯", "➜", "➔", "•", "⦿", "󰖟", "⚙", "ℹ"]),
-    ]
-
-    def __init__(self, property_name: str, current_char: str, theme_styles: dict | None = None):
+    def __init__(self, property_name: str, current_char: str, theme_styles: dict | None = None) -> None:
         super().__init__()
         self.property_name = property_name
         self.current_char = current_char
         self.theme_styles = theme_styles or {}
+        self.active_range = "extended" if self._parse_initial_code(current_char) >= 128 else "standard"
+
+    def _parse_initial_code(self, val: str) -> int:
+        if not val:
+            return 196
+        v = str(val).strip()
+        m = re.search(r"\{ascii:\s*(\d+)", v, re.IGNORECASE)
+        if m:
+            with contextlib.suppress(Exception):
+                return int(m.group(1)) % 256
+        if v in UNICODE_TO_CP437:
+            return UNICODE_TO_CP437[v]
+        if len(v) == 1:
+            try:
+                b = v.encode("cp437")
+                return b[0]
+            except (UnicodeEncodeError, ValueError, OverflowError):
+                return ord(v[0]) % 256
+        return 196
 
     def compose(self) -> ComposeResult:
         with bashmenu_ui.ModalFrame(id="modal_frame"):
             with Horizontal(id="dialog_hrow"):
                 with Vertical(id="dialog"):
                     with Horizontal(id="title_bar"):
-                        yield Label(f"ASCII / Box Glyph Picker: [{self.property_name}]", id="title")
+                        yield Label(f"ASCII / Character Picker: [{self.property_name}]", id="title")
                         yield Label(
                             bashmenu_ui.format_close_button_label(self.theme_styles),
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
-                    yield OptionList(id="glyph_list")
-                    yield Label("[ENTER] Select Character | [ESC] Cancel", id="footer_lbl")
+                    with Horizontal(id="tabs_row"):
+                        yield Button(
+                            "[1] Extended (128-255)",
+                            id="btn_tab_ext",
+                            classes="tab_btn",
+                            variant="primary" if self.active_range == "extended" else "default",
+                        )
+                        yield Button(
+                            "[2] Standard (32-126)",
+                            id="btn_tab_std",
+                            classes="tab_btn",
+                            variant="primary" if self.active_range == "standard" else "default",
+                        )
+                        yield Button(
+                            "[3] All (0-255)",
+                            id="btn_tab_all",
+                            classes="tab_btn",
+                            variant="primary" if self.active_range == "all" else "default",
+                        )
+
+                    with Horizontal(id="grid_container"):
+                        init_code = self._parse_initial_code(self.current_char)
+                        yield AsciiGridWidget(initial_code=init_code, id="ascii_grid")
+
+                    yield Static(id="preview_bar")
+
+                    with Horizontal(id="swatch_row"):
+                        yield Label("Quick Borders: ", classes="swatch_lbl")
+                        for g, c in QUICK_BORDER_SWATCHES:
+                            yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
+
+                    with Horizontal(id="btn_row"):
+                        yield Button("Select (Enter)", variant="primary", id="btn_select")
+                        yield Button("Select Macro", variant="default", id="btn_select_macro")
+                        yield Button("Cancel (Esc)", variant="error", id="btn_cancel")
+
                 yield bashmenu_ui.ShadowWidget(id="shadow_right")
             yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
@@ -866,31 +1080,136 @@ class AsciiPickerModal(ModalScreen[str]):
         with contextlib.suppress(Exception):
             btn_close = self.query_one("#btn_close_x", Label)
             btn_close.update(bashmenu_ui.format_close_button_label(ts))
+
         border_style = ts.get("border") or ts.get("accent")
         if border_style and border_style.color and border_style.color.name:
             css_border = bashmenu_ui.parse_css_color(border_style.color.name)
             if css_border:
                 with contextlib.suppress(Exception):
-                    self.query_one("#glyph_list").styles.border = ("solid", css_border)
+                    self.query_one("#preview_bar").styles.border = ("solid", css_border)
 
-        opt_list = self.query_one("#glyph_list", OptionList)
-        seen_glyphs = set()
-        for cat_name, glyphs in self.GLYPH_CATEGORIES:
-            opt_list.add_option(Option(f"── {cat_name} ──", disabled=True))
-            for g in glyphs:
-                if g in seen_glyphs:
-                    continue
-                seen_glyphs.add(g)
-                cp_code = UNICODE_TO_CP437.get(g)
-                if cp_code is not None:
-                    prompt = f"  '{g}'   (ASCII: {cp_code} -> {{ascii:{cp_code}}})"
-                else:
-                    prompt = f"  '{g}'   (Unicode: {ord(g[0]):d} / 0x{ord(g[0]):04x})"
-                opt_list.add_option(Option(prompt, id=g))
+        btn_prim = ts.get("button_primary") or ts.get("selection")
+        if btn_prim:
+            css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
+            css_p_fg = bashmenu_ui.parse_css_color(btn_prim.color.name) if btn_prim.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_select")
+                if css_p_bg:
+                    b.styles.background = css_p_bg
+                if css_p_fg:
+                    b.styles.color = css_p_fg
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if event.option.id:
-            self.dismiss(str(event.option.id))
+        btn_err = ts.get("button_error") or ts.get("button_cancel")
+        if btn_err:
+            css_e_bg = bashmenu_ui.parse_css_color(btn_err.bgcolor.name) if btn_err.bgcolor else None
+            css_e_fg = bashmenu_ui.parse_css_color(btn_err.color.name) if btn_err.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_cancel")
+                if css_e_bg:
+                    b.styles.background = css_e_bg
+                if css_e_fg:
+                    b.styles.color = css_e_fg
+
+        self._sync_tabs_ui()
+        self._update_preview()
+        with contextlib.suppress(Exception):
+            self.query_one("#ascii_grid", AsciiGridWidget).focus()
+
+    def _sync_tabs_ui(self) -> None:
+        with contextlib.suppress(Exception):
+            btn_ext = self.query_one("#btn_tab_ext", Button)
+            btn_std = self.query_one("#btn_tab_std", Button)
+            btn_all = self.query_one("#btn_tab_all", Button)
+            btn_ext.variant = "primary" if self.active_range == "extended" else "default"
+            btn_std.variant = "primary" if self.active_range == "standard" else "default"
+            btn_all.variant = "primary" if self.active_range == "all" else "default"
+
+    def _update_preview(self) -> None:
+        p_bar = self.query_one("#preview_bar", Static)
+        grid = self.query_one("#ascii_grid", AsciiGridWidget)
+        code = grid.cursor_code
+        glyph = get_cp437_glyph(code)
+
+        txt = Text()
+        txt.append(f" Character: '{glyph}' ", style=Style(color="white", bold=True))
+        txt.append(f" (ASCII: {code} -> {{ascii:{code}}})  Hex: 0x{code:02X}")
+        p_bar.update(txt)
+
+    def on_ascii_grid_widget_glyph_highlighted(self, event: AsciiGridWidget.GlyphHighlighted) -> None:
+        self._update_preview()
+
+    def on_ascii_grid_widget_glyph_selected(self, event: AsciiGridWidget.GlyphSelected) -> None:
+        self._confirm()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        btn_id = event.button.id
+        if not btn_id:
+            return
+
+        if btn_id == "btn_tab_ext":
+            self.action_select_extended_tab()
+        elif btn_id == "btn_tab_std":
+            self.action_select_standard_tab()
+        elif btn_id == "btn_tab_all":
+            self.action_select_all_tab()
+        elif btn_id == "btn_select":
+            self._confirm()
+        elif btn_id == "btn_select_macro":
+            self._confirm(as_macro=True)
+        elif btn_id == "btn_cancel":
+            self.dismiss(None)
+        elif btn_id.startswith("swatch_ascii_"):
+            code_str = btn_id.replace("swatch_ascii_", "")
+            with contextlib.suppress(ValueError):
+                code = int(code_str)
+                grid = self.query_one("#ascii_grid", AsciiGridWidget)
+                grid.set_code(code)
+                grid.focus()
+                self._update_preview()
+
+    def action_select_extended_tab(self) -> None:
+        self.active_range = "extended"
+        grid = self.query_one("#ascii_grid", AsciiGridWidget)
+        if grid.cursor_code < 128:
+            grid.set_code(128)
+        grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_select_standard_tab(self) -> None:
+        self.active_range = "standard"
+        grid = self.query_one("#ascii_grid", AsciiGridWidget)
+        if grid.cursor_code < 32 or grid.cursor_code > 126:
+            grid.set_code(32)
+        grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_select_all_tab(self) -> None:
+        self.active_range = "all"
+        grid = self.query_one("#ascii_grid", AsciiGridWidget)
+        grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_cycle_range_tab(self) -> None:
+        if self.active_range == "extended":
+            self.action_select_standard_tab()
+        elif self.active_range == "standard":
+            self.action_select_all_tab()
+        else:
+            self.action_select_extended_tab()
+
+    def action_confirm_selection(self) -> None:
+        self._confirm()
+
+    def _confirm(self, as_macro: bool = False) -> None:
+        grid = self.query_one("#ascii_grid", AsciiGridWidget)
+        code = grid.cursor_code
+        if as_macro or str(self.current_char).strip().startswith("{ascii:"):
+            self.dismiss(f"{{ascii:{code}}}")
+        else:
+            self.dismiss(get_cp437_glyph(code))
 
     def on_click(self, event: Any) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -1058,17 +1377,10 @@ class ThemePreviewWidget(Static):
         """Render complete simulated BashMenu frame with active borders and styles."""
         parent = getattr(self, "parent", None)
         if parent and getattr(parent, "size", None) and parent.size.width > 20 and parent.size.height > 10:
-            inner_pw = parent.size.width - 4
-            inner_ph = parent.size.height - 4
-            if inner_pw < 58:
-                w = max(40, inner_pw - 2)
-            else:
-                w = max(56, min(inner_pw - 4, 76))
-
-            if inner_ph < 16:
-                num_rows = max(12, inner_ph - 2)
-            else:
-                num_rows = max(14, min(inner_ph - 4, 24))
+            inner_pw = max(40, parent.size.width - 2)
+            inner_ph = max(12, parent.size.height - 2)
+            w = max(38, inner_pw - 2)
+            num_rows = inner_ph
         else:
             w = 56
             num_rows = 12
@@ -1266,7 +1578,7 @@ class ThemePreviewWidget(Static):
 
         body_slots = num_rows - 5
         if body_slots <= 7:
-            body_items = [
+            min_items = [
                 make_opt_line(1, "Web Applications", False),
                 make_opt_line(2, "System Utilities", True),
                 make_div_line(),
@@ -1275,6 +1587,9 @@ class ThemePreviewWidget(Static):
                 r_pl_c1,
                 r_pl_b,
             ]
+            body_items = min_items[:body_slots]
+            while len(body_items) < body_slots:
+                body_items.append(wrap_line(Text("", style=text_style)))
         else:
             use_c2 = body_slots >= 11
             pl_lines = [r_pl_h, r_pl_c1] + ([r_pl_c2] if use_c2 else []) + [r_pl_b]
@@ -1412,7 +1727,8 @@ class ThemeEditScreen(Screen):
         width: 1fr;
         height: 100%;
         border: solid #444;
-        padding: 1 1;
+        padding: 0;
+        overflow: hidden;
         align: center middle;
     }
     #inspector_panel {
