@@ -600,6 +600,42 @@ Textual interface.
       * Periodic clock and plugin ticks must refresh only the bottom two status lines (`Region(0, max(0, h - 3), w, 2)`), decoupled from main wallpaper redraws.
       * Built-in `clustering` (default `0`, range `0`–`128`) and `quantization` (default `1`, range `1`–`32`). Setting `clustering: 0` and `quantization: 1` preserves full truecolor photographic fidelity; when enabled, clustering caps runs at 4 cells to prevent horizontal streaking.
       * Wallpapers must be pre-processed without Floyd-Steinberg dithering (`+dither` in ImageMagick, `--nofs` in `pngquant`) to prevent checkerboard stippling from defeating span aggregation.
+43. **Theme Editor & Interactive 2D Modal Pickers (Color & CP437 ASCII Architecture):**
+    - **Interactive 16×16 2D Grids vs Lists (`ColorGridWidget`, `AsciiGridWidget`):**
+      * For 256-entry domains (256-color palettes and CP437 ASCII character sets 0–255),
+        use a 16×16 2D interactive grid with focusable navigation (`can_focus = True`).
+      * Keyboard bindings: Left/Right (±1), Up/Down (±16), Home/End (start/end of range),
+        PageUp/PageDown (±64), and Enter (confirm).
+      * Active cell styling: The highlighted cursor cell must be rendered with bold and
+        underline (`underline=True, bold=True`) so selection is unmistakable.
+      * Mouse click mapping: Map mouse event coordinates directly via `col = event.x // cell_width`
+        (e.g., 4 columns per cell) and `row = event.y`.
+    - **Range Tabs & Quick Swatches (`AsciiPickerModal`, `ColorPickerModal`):**
+      * For ASCII/glyph selection, group characters into range tabs modeled after `scripts/ascii.sh`:
+        `[1] Extended (128-255)` (box drawing, shading, symbols), `[2] Standard (32-126)`
+        (printable ASCII), and `[3] All (0-255)`.
+      * Provide quick 1-click swatches for high-frequency tokens (box borders `─`, `│`, `═`,
+        `║`, `┌`, `┐`, `└`, `┘`, `█`, `░`, or named ANSI color constants `Black`, `Red`, etc.).
+      * Dual FG/BG layer pickers must support layer switching via Tab or dedicated buttons,
+        clearly labeled with active layer and current value.
+    - **Event Decoupling on Programmatic Navigation (`notify: bool = True`):**
+      * Grid `set_code(code, notify=True)` methods must support an optional `notify=False` parameter.
+      * When a swatch button is clicked (e.g., selecting named constant `"COLOR_RED"`), pass
+        `notify=False` to prevent the emitted highlight event from asynchronously overwriting
+        the constant name with the numeric code (`196`).
+    - **Standard Textual Button Sizing Invariant in Modals:**
+      * Textual button variants apply top and bottom borders that consume 2 lines of vertical space.
+      * Never flatten modal dialog buttons to `height: 1` or strip borders with `border: none;`,
+        as this collapses content height to 0 and hides button labels.
+      * Always use standard button sizing in modal `#btn_row` containers:
+        `#btn_row { height: 3; margin-top: 1; align: center middle; }` and
+        `#btn_row Button { height: 3; min-width: 16; margin: 0 1; }`.
+    - **Split-Screen Editor Preview Maximization (`ThemePreviewWidget`):**
+      * Editor preview panels must eliminate wasted inner margins (`padding: 0; overflow: hidden;`).
+      * Dynamically compute preview frame width `w = max(38, parent.size.width - 4)` and
+        height `num_rows = max(12, parent.size.height - 2)` from `parent.size`.
+      * Dynamically pad or expand body slots with option lines, dividers, plugin status cards,
+        and bordered spacer rows to ensure the simulated window frame spans 100% of the pane interior.
 
 
 
