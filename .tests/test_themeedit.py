@@ -882,6 +882,19 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.click(panel, offset=(0, 0))
                 self.assertEqual(screen.focused.id, "color_background")
 
+                # 9. Visual haptic feedback (flash inversion)
+                from unittest.mock import patch
+
+                with patch.object(preview, "set_timer") as mock_timer:
+                    await pilot.click(preview, offset=(15, 1))
+                    self.assertIsNotNone(preview._flash_range)
+                    rendered = preview.render()
+                    has_reverse = any(span.style and span.style.reverse is True for span in rendered.spans)
+                    self.assertTrue(has_reverse)
+                    mock_timer.assert_called_once()
+                    preview._clear_flash()
+                    self.assertIsNone(preview._flash_range)
+
         asyncio.run(_run())
 
 

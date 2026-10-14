@@ -1395,9 +1395,17 @@ class ThemePreviewWidget(Static):
         self._hit_map: dict[tuple[int, int], tuple[str, str]] = {}
         self._last_w = 56
         self._last_h = 12
+        self._flash_range: tuple[int, int, int] | None = None
+        self._flash_timer = None
+
+    def _clear_flash(self) -> None:
+        """Clear active flash inversion and restore normal appearance."""
+        self._flash_range = None
+        self._flash_timer = None
+        self.refresh()
 
     def on_click(self, event: events.Click) -> None:
-        """Handle mouse click on preview element and emit ElementClicked message."""
+        """Handle mouse click on preview element, flash clicked item, and emit ElementClicked message."""
         pos = (event.x, event.y)
         hit = self._hit_map.get(pos)
         if not hit and (
@@ -1405,12 +1413,30 @@ class ThemePreviewWidget(Static):
         ):
             hit = ("color_background", "color_background")
         if hit:
+            # Determine contiguous element range on this row for haptic visual feedback
+            target_key = hit[0]
+            ey = event.y
+            x1 = event.x
+            while x1 > 0 and self._hit_map.get((x1 - 1, ey), (None,))[0] == target_key:
+                x1 -= 1
+            x2 = event.x + 1
+            while self._hit_map.get((x2, ey), (None,))[0] == target_key:
+                x2 += 1
+
+            self._flash_range = (ey, x1, x2)
+            if getattr(self, "_flash_timer", None) is not None:
+                with contextlib.suppress(Exception):
+                    self._flash_timer.stop()
+            self._flash_timer = self.set_timer(0.15, self._clear_flash)
+            self.refresh()
+
             self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1]))
 
     def update_theme(self, theme_dict: dict, theme_name: str = "custom") -> None:
         """Update active theme definition and trigger instant re-render."""
         self.theme_dict = theme_dict
         self.theme_name = theme_name
+        self._flash_range = None
         self.refresh()
 
     def render(self) -> Text:
@@ -1541,8 +1567,7 @@ class ThemePreviewWidget(Static):
         top_line.append(b_tl + b_h_top * pad_l, style=b_style)
         top_line.append(title_text, style=t_style)
         top_line.append(b_h_top * pad_r + b_tr, style=b_style)
-        out.append_text(top_line)
-        out.append("\n")
+        lines: list[Text] = [top_line]
 
         set_hit_range(0, 0, 1, "prop_border_top_left", "color_border")
         set_hit_range(0, 1, 1 + pad_l, "color_border", "prop_border_horizontal")
@@ -1681,8 +1706,7 @@ class ThemePreviewWidget(Static):
             body_items.extend(pl_lines)
 
         for idx, (line_item, meta) in enumerate(body_items):
-            out.append_text(line_item)
-            out.append("\n")
+            lines.append(line_item)
             y = 1 + idx
             kind = meta[0]
             if kind == "div" and meta[1]:  # Screen-width divider
@@ -1737,8 +1761,7 @@ class ThemePreviewWidget(Static):
         gt_line.append(b_gt_top_tee, style=b_style)
         gt_line.append(b_gt_border * rem_right + b_gt_r_tee, style=b_style)
         gt_line.append(shadow_ch * 2, style=shadow_style)
-        out.append_text(gt_line)
-        out.append("\n")
+        lines.append(gt_line)
 
         y_gt = 1 + len(body_items)
         set_hit_range(y_gt, 0, 1, "prop_gutter_left_tee", "color_border")
@@ -1780,8 +1803,7 @@ class ThemePreviewWidget(Static):
         g_content.append_text(status_cell)
         g_content.append("  " + b_v_right, style=b_style)
         g_content.append(shadow_ch * 2, style=shadow_style)
-        out.append_text(g_content)
-        out.append("\n")
+        lines.append(g_content)
 
         y_gc = y_gt + 1
         set_hit_range(y_gc, 0, 1, "color_border", "prop_border_vertical")
@@ -1801,8 +1823,7 @@ class ThemePreviewWidget(Static):
         bot_line.append(b_gt_bot_tee, style=b_style)
         bot_line.append(b_h_bot * rem_right + b_br, style=b_style)
         bot_line.append(shadow_ch * 2, style=shadow_style)
-        out.append_text(bot_line)
-        out.append("\n")
+        lines.append(bot_line)
 
         y_bot = y_gt + 2
         set_hit_range(y_bot, 0, 1, "prop_border_bottom_left", "color_border")
@@ -1815,10 +1836,22 @@ class ThemePreviewWidget(Static):
         # Bottom Drop Shadow
         bot_shadow = Text()
         bot_shadow.append("  " + shadow_ch * w, style=shadow_style)
-        out.append_text(bot_shadow)
+        lines.append(bot_shadow)
 
         y_sh = y_gt + 3
         set_hit_range(y_sh, 2, 2 + w, "color_shadow", "prop_shadow_char")
+
+        # Apply brief inverted colors to clicked item (haptic feedback)
+        if getattr(self, "_flash_range", None):
+            fy, fx1, fx2 = self._flash_range
+            if 0 <= fy < len(lines):
+                lines[fy].stylize(Style(reverse=True), fx1, fx2)
+
+        out = Text()
+        for idx, line in enumerate(lines):
+            out.append_text(line)
+            if idx < len(lines) - 1:
+                out.append("\n")
 
         return out
 
