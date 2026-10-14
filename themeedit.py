@@ -3429,11 +3429,16 @@ class ThemeEditApp(App):
 
     def on_mount(self) -> None:
         bashmenu_ui.apply_theme_to_textual_borders(self.configured_theme)
+
+        def _on_app_exit(_res: Any = None) -> None:
+            self.exit()
+
         self.push_screen(
             ThemeEditScreen(
                 initial_theme=self.theme_name,
                 configured_theme=self.configured_theme,
-            )
+            ),
+            _on_app_exit,
         )
 
 

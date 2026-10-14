@@ -3679,9 +3679,12 @@ class ThemePickerModalScreen(ModalScreen[str]):
         )
         import themeedit
 
+        def _on_editor_exit(_res: Any = None) -> None:
+            self.dismiss(None)
+
         self.app.push_screen(
             themeedit.ThemeEditScreen(initial_theme=chosen_theme, is_new=False),
-            lambda res: self.dismiss(None),
+            _on_editor_exit,
         )
 
     def action_create_theme(self) -> None:
@@ -3697,6 +3700,10 @@ class ThemePickerModalScreen(ModalScreen[str]):
             if not choice:
                 return
             import themeedit
+
+            def _on_create_exit(_res: Any = None) -> None:
+                self.dismiss(None)
+
             if choice == "base":
                 self.app.push_screen(
                     themeedit.ThemeEditScreen(
@@ -3704,7 +3711,7 @@ class ThemePickerModalScreen(ModalScreen[str]):
                         is_new=True,
                         base_theme=sel_theme,
                     ),
-                    lambda res: self.dismiss(None),
+                    _on_create_exit,
                 )
             elif choice == "scratch":
                 self.app.push_screen(
@@ -3713,7 +3720,7 @@ class ThemePickerModalScreen(ModalScreen[str]):
                         is_new=True,
                         base_theme=None,
                     ),
-                    lambda res: self.dismiss(None),
+                    _on_create_exit,
                 )
 
         self.app.push_screen(

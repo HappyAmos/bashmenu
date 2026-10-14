@@ -832,6 +832,49 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertIn("bashmenu.themes", hdr_text)
                 self.assertIn("[Untitled]", hdr_text)
 
+                # Test exiting from the launched ThemeEditScreen
+                # Dirty prompt appears, confirm Yes -> exits cleanly to parent without ScreenError
+                await pilot.press("escape")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, bashmenu_ui.ConfirmModalScreen)
+                await pilot.press("y")
+                await pilot.pause()
+                self.assertNotIn(new_screen, app.screen_stack)
+
+        asyncio.run(_run())
+
+    def test_theme_picker_modal_edit_action_clean_exit(self):
+        """Verify ThemePickerModalScreen Edit action launches ThemeEditScreen and exits without ScreenError."""
+        from textual.screen import Screen
+        from textual.widgets import Label
+
+        import bashmenu_ui
+
+        class ParentScreen(Screen):
+            def compose(self):
+                yield Label("Parent Menu")
+
+        class MockApp(themeedit.App):
+            def on_mount(self):
+                self.push_screen(ParentScreen())
+
+        async def _run():
+            app = MockApp()
+            async with app.run_test(size=(120, 36)) as pilot:
+                modal = bashmenu_ui.ThemePickerModalScreen(current_theme="dracula")
+                app.push_screen(modal)
+                await pilot.pause()
+
+                # Press 'e' to edit dracula theme
+                await pilot.press("e")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, themeedit.ThemeEditScreen)
+
+                # Exit cleanly from ThemeEditScreen without ScreenError
+                await pilot.press("escape")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, ParentScreen)
+
         asyncio.run(_run())
 
     def test_save_vs_save_as_distinction(self):
