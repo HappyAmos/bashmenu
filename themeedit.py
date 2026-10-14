@@ -387,18 +387,26 @@ class ColorPickerModal(ModalScreen[Any]):
         color: #888;
         margin-right: 1;
     }
-    .btn_swatch {
+    #swatch_row Button, .btn_swatch {
         height: 1;
         min-width: 5;
         padding: 0 1;
         margin: 0;
-        border: none;
+        border: none !important;
         background: #252525;
         color: #ccc;
     }
+    #swatch_inherit { background: #333333; color: #cccccc; }
+    #swatch_COLOR_BLACK { background: #000000; color: #ffffff; }
+    #swatch_COLOR_RED { background: #d70000; color: #ffffff; }
+    #swatch_COLOR_GREEN { background: #008700; color: #ffffff; }
+    #swatch_COLOR_YELLOW { background: #af8700; color: #000000; }
+    #swatch_COLOR_BLUE { background: #005fd7; color: #ffffff; }
+    #swatch_COLOR_MAGENTA { background: #af00d7; color: #ffffff; }
+    #swatch_COLOR_CYAN { background: #00afaf; color: #000000; }
+    #swatch_COLOR_WHITE { background: #ffffff; color: #000000; }
     .btn_swatch:hover {
-        background: #444;
-        color: #fff;
+        text-style: underline bold;
     }
     #btn_row {
         height: 2;
