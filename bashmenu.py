@@ -698,7 +698,7 @@ _cmd_substitution_cache = {}
 _CMD_CACHE_TTL = 30.0
 
 COMMAND_PATTERN = re.compile(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}")
-ASCII_PATTERN = re.compile(r"\{ascii:(\d+)\}")
+ASCII_PATTERN = re.compile(r"\{ascii:\s*(\d+)[a-zA-Z_\-]*\s*\}", re.IGNORECASE)
 DOT_VAR_PATTERN = re.compile(r"\{([a-zA-Z0-9_\-]+(?:\.[a-zA-Z0-9_\-]+)+)\}")
 
 
@@ -713,7 +713,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         code_str = match.group(1)
         try:
             code = int(code_str)
-            return bytes([code]).decode("cp437", errors="replace")
+            return bytes([code % 256]).decode("cp437", errors="replace")
         except (ValueError, OverflowError):
             return match.group(0)
 

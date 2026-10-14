@@ -13,6 +13,7 @@ import argparse
 import contextlib
 import copy
 import os
+import re
 from typing import Any, ClassVar
 
 import yaml
@@ -650,34 +651,71 @@ class ThemePreviewWidget(Static):
                 v = bashmenu.resolve_glyph(v, {})
             return v.replace("\ufe0f", "").replace("\ufe0e", "")
 
-        b_tl = _resolve(borders.get("border_top_left", "┌"))
-        b_tr = _resolve(borders.get("border_top_right", "┐"))
-        b_bl = _resolve(borders.get("border_bottom_left", "└"))
-        b_br = _resolve(borders.get("border_bottom_right", "┘"))
-        b_h_top = _resolve(borders.get("border_horizontal_top", borders.get("border_horizontal", "─")))
-        b_h_bot = _resolve(borders.get("border_horizontal_bottom", borders.get("border_horizontal", "─")))
-        b_v_left = _resolve(borders.get("border_vertical_left", borders.get("border_vertical", "│")))
-        b_v_right = _resolve(borders.get("border_vertical_right", borders.get("border_vertical", "│")))
-        b_tee_l = _resolve(borders.get("left_tee", "├"))
-        b_tee_r = _resolve(borders.get("right_tee", "┤"))
-        b_cap_l = _resolve(borders.get("title_left_cap", "["))
-        b_cap_r = _resolve(borders.get("title_right_cap", "]"))
-        b_gt_border = _resolve(borders.get("gutter_border", "─"))
-        b_gt_sep = _resolve(borders.get("gutter_separator", "│"))
-        b_gt_l_tee = _resolve(borders.get("gutter_left_tee", "├"))
-        b_gt_r_tee = _resolve(borders.get("gutter_right_tee", "┤"))
-        b_gt_top_tee = _resolve(borders.get("gutter_top_tee", "┬"))
-        b_gt_bot_tee = _resolve(borders.get("gutter_bottom_tee", "┴"))
-        shadow_ch = _resolve(borders.get("shadow_char", "░"))
+        def _resolve_border_char(val: Any, fallback: str = " ") -> str:
+            if not val:
+                return fallback
+            v = _resolve(val)
+            if not v:
+                return fallback
+            if "{" in v:
+                m = re.search(r"\{ascii:\s*(\d+)", v, re.IGNORECASE)
+                if m:
+                    try:
+                        code = int(m.group(1))
+                        v = bytes([code % 256]).decode("cp437", errors="replace")
+                    except (ValueError, OverflowError):
+                        v = fallback
+                elif v.startswith("{") and v.endswith("}"):
+                    return fallback
+            if len(v) > 1:
+                if v.startswith("{"):
+                    return fallback
+                return v[0]
+            return v if v else fallback
 
-        indicator = _resolve(self.theme_dict.get("indicator", ">")) or ">"
+        b_tl = _resolve_border_char(borders.get("border_top_left"), "┌")
+        b_tr = _resolve_border_char(borders.get("border_top_right"), "┐")
+        b_bl = _resolve_border_char(borders.get("border_bottom_left"), "└")
+        b_br = _resolve_border_char(borders.get("border_bottom_right"), "┘")
+        b_h_top = _resolve_border_char(borders.get("border_horizontal_top", borders.get("border_horizontal")), "─")
+        b_h_bot = _resolve_border_char(borders.get("border_horizontal_bottom", borders.get("border_horizontal")), "─")
+        b_v_left = _resolve_border_char(borders.get("border_vertical_left", borders.get("border_vertical")), "│")
+        b_v_right = _resolve_border_char(borders.get("border_vertical_right", borders.get("border_vertical")), "│")
+        b_tee_l = _resolve_border_char(borders.get("left_tee", borders.get("border_tee_left")), "├")
+        b_tee_r = _resolve_border_char(borders.get("right_tee", borders.get("border_tee_right")), "┤")
+        b_cap_l = _resolve_border_char(borders.get("title_left_cap"), "[")
+        b_cap_r = _resolve_border_char(borders.get("title_right_cap"), "]")
+        b_gt_border = _resolve_border_char(borders.get("gutter_border"), "─")
+        b_gt_sep = _resolve_border_char(borders.get("gutter_separator"), "│")
+        b_gt_l_tee = _resolve_border_char(borders.get("gutter_left_tee"), "├")
+        b_gt_r_tee = _resolve_border_char(borders.get("gutter_right_tee"), "┤")
+        b_gt_top_tee = _resolve_border_char(borders.get("gutter_top_tee"), "┬")
+        b_gt_bot_tee = _resolve_border_char(borders.get("gutter_bottom_tee"), "┴")
+        shadow_ch = _resolve_border_char(borders.get("shadow_char"), "░")
+
+        ind_val = self.theme_dict.get("indicator", ">")
+        indicator = _resolve(ind_val)
+        if "{" in indicator:
+            m = re.search(r"\{ascii:\s*(\d+)", indicator, re.IGNORECASE)
+            if m:
+                try:
+                    code = int(m.group(1))
+                    indicator = bytes([code % 256]).decode("cp437", errors="replace")
+                except (ValueError, OverflowError):
+                    indicator = ">"
+            elif indicator.startswith("{") and indicator.endswith("}"):
+                indicator = ">"
+        if not indicator:
+            indicator = ">"
+        if len(indicator) > 2:
+            indicator = indicator[0]
 
         divider_def = self.theme_dict.get("divider", {})
         if isinstance(divider_def, dict):
-            div_char = _resolve(divider_def.get("char", "─")) or "─"
-            div_len = divider_def.get("length", "{window_width}")
+            div_char = _resolve_border_char(divider_def.get("char"), "─")
+            div_len = str(divider_def.get("length", "{window_width}"))
         else:
-            div_char = "─"
+            div_char = _resolve_border_char(divider_def, "─")
             div_len = "{window_width}"
 
         out = Text()
@@ -698,8 +736,11 @@ class ThemePreviewWidget(Static):
         def wrap_line(inner_text: Text) -> Text:
             line = Text()
             line.append(b_v_left + "  ", style=b_style)
-            line.append_text(inner_text)
-            rem = inner_w - len(inner_text.plain)
+            curr_inner = inner_text.copy()
+            if curr_inner.cell_len > inner_w:
+                curr_inner.truncate(inner_w)
+            line.append_text(curr_inner)
+            rem = max(0, inner_w - curr_inner.cell_len)
             if rem > 0:
                 line.append(" " * rem, style=text_style)
             line.append("  " + b_v_right, style=b_style)
@@ -716,7 +757,9 @@ class ThemePreviewWidget(Static):
         # Row 2: Option 2 (Selected with indicator)
         r2 = Text()
         r2.append(f"  {indicator} [2] System Utilities", style=sel_style)
-        rem_sel = inner_w - len(r2.plain)
+        if r2.cell_len > inner_w:
+            r2.truncate(inner_w)
+        rem_sel = max(0, inner_w - r2.cell_len)
         if rem_sel > 0:
             r2.append(" " * rem_sel, style=sel_style)
         l2 = Text()
@@ -771,7 +814,7 @@ class ThemePreviewWidget(Static):
         left_gw = 23
         right_gw = avail_both - left_gw
         sep_x = 3 + left_gw + 2
-        rem_right = w - 2 - sep_x
+        rem_right = max(0, w - 2 - sep_x)
 
         gt_line = Text()
         gt_line.append(b_gt_l_tee + b_gt_border * (sep_x - 1), style=b_style)
@@ -800,7 +843,7 @@ class ThemePreviewWidget(Static):
         g_content.append(b_v_left + "  ", style=b_style)
         g_content.append_text(h_part)
         g_content.append("  ", style=text_style)
-        g_content.append(b_gt_sep, style=b_style)
+        g_content.append(b_gt_sep[0] if b_gt_sep else "│", style=b_style)
         g_content.append("  ", style=text_style)
         g_content.append_text(status_cell)
         g_content.append("  " + b_v_right, style=b_style)

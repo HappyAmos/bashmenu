@@ -8,7 +8,9 @@ AsciiPickerModal, ColorPickerModal, SaveThemeModal, and live inspector synchroni
 
 import asyncio
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 # Ensure the parent directory is in the import path
@@ -17,6 +19,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from rich.text import Text
 from textual.widgets import Input
 
+import bashmenu
+import bashmenu_ui
 import themeedit
 
 
@@ -340,6 +344,56 @@ class TestThemeEditor(unittest.TestCase):
         self.assertIn("╔", plain)
         self.assertIn("■", plain)
 
+    def test_theme_preview_resilient_to_malformed_ascii_macro(self):
+        """Verify ThemePreviewWidget renders without layout distortion when malformed macros like {ascii:219s} are present."""
+        theme_malformed = {
+            "indicator": "{ascii:219s}",
+            "divider": {"char": "{ascii:205invalid}", "length": "{window_width}"},
+            "window": {
+                "border_horizontal": "{ascii:196s}",
+                "gutter_separator": "{ascii:219s}",
+                "border_top_left": "{invalid_macro}",
+                "shadow_char": "{ascii:176s}",
+            },
+            "256": {
+                "background": "COLOR_BLACK",
+                "title": [201, -1],
+                "border": [61, -1],
+                "text": [255, -1],
+                "selection": [255, 61],
+                "shortcut_key": [201, -1],
+                "divider": [61, -1],
+                "plugin": [212, -1],
+                "gutter": [239, -1],
+                "help_text": [117, -1],
+                "shadow": [236, "COLOR_BLACK"],
+            },
+        }
+
+        # 1. bashmenu.interpolate_placeholders should resolve {ascii:219s} cleanly to █
+        resolved = bashmenu.interpolate_placeholders("{ascii:219s}", {})
+        self.assertEqual(resolved, "█")
+
+        # 2. ThemePreviewWidget should not leak raw macros or distort line widths
+        widget = themeedit.ThemePreviewWidget(theme_malformed, theme_name="malformed_test")
+        rendered = widget.render()
+        lines = rendered.plain.splitlines()
+
+        # Check line widths: Row 0 has 56 columns (no drop shadow), Rows 1-11 have 58 columns
+        self.assertEqual(len(lines), 12)
+        self.assertEqual(len(lines[0]), 56)
+        for i, line in enumerate(lines[1:], start=1):
+            self.assertEqual(
+                len(line),
+                58,
+                f"Row {i} width is {len(line)}, expected 58. Line content:\n{line}",
+            )
+
+        # Gutter content row (Row 9) must contain █ instead of raw '{ascii:219s}'
+        self.assertNotIn("{ascii:219s}", lines[9])
+        self.assertIn("█", lines[9])
+
+
     def test_ascii_picker_modal_shows_cp437_codes(self):
         """Verify AsciiPickerModal displays recognized CP437 ASCII code numbers and macro format."""
         async def _run():
@@ -481,11 +535,6 @@ class TestThemeEditor(unittest.TestCase):
 
     def test_save_vs_save_as_distinction(self):
         """Verify Save directly overwrites existing themes, but prompts for untitled/new themes and Save As."""
-        import shutil
-        import tempfile
-        import bashmenu
-        import bashmenu_ui
-
         async def _run():
             with tempfile.NamedTemporaryFile(suffix=".themes", delete=False) as tmp:
                 tmp_path = tmp.name
