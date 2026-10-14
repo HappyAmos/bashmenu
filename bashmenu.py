@@ -16,6 +16,7 @@ import curses
 import datetime
 import functools
 import getpass
+import importlib
 import os
 import re
 import shutil
@@ -3557,8 +3558,8 @@ class BashMenuScreen(Screen):
         )
 
     def action_refresh_menu(self) -> None:
-        """Reload configuration, menu files, and plugin outputs (F5 shortcut)."""
-        self.refresh_environment(clear_plugins=True)
+        """Reload configurations, themes, menus, caches, and source files (F5 hot-reload)."""
+        self.refresh_environment(clear_plugins=True, reload_modules=True)
 
     def action_toggle_shortcuts(self) -> None:
         mv = self.menu_view
@@ -3567,12 +3568,45 @@ class BashMenuScreen(Screen):
         save_config(mv.config)
         mv.refresh()
 
-    def refresh_environment(self, clear_plugins: bool = True) -> None:
+    def refresh_environment(self, clear_plugins: bool = True, reload_modules: bool = False) -> None:
+        # 1. Hot-reload source modules if requested (skips pytest runner to avoid wiping active mocks)
+        if reload_modules and "pytest" not in sys.modules:
+            for mod_name in ("ymlcheck", "bashmenu_ui", "bashedit", "menuedit", "themeedit"):
+                if mod_name in sys.modules and sys.modules[mod_name] is not None:
+                    with contextlib.suppress(Exception):
+                        importlib.reload(sys.modules[mod_name])
+            if (
+                "bashmenu" in sys.modules
+                and sys.modules["bashmenu"] is not None
+                and getattr(sys.modules["bashmenu"], "__name__", "") != "__main__"
+            ):
+                with contextlib.suppress(Exception):
+                    importlib.reload(sys.modules["bashmenu"])
+
+        # 2. Invalidate theme file caches and border cache
+        with contextlib.suppress(Exception):
+            bashmenu_ui._themes_file_cache.clear()
+            bashmenu_ui._themes_last_stat_check.clear()
+            bashmenu_ui._theme_styles_cache.clear()
+            bashmenu_ui._last_applied_theme_borders = None
+
+        # 3. Clear plugin output and display caches
         if clear_plugins:
             with _plugin_lock:
                 _plugin_output_cache.clear()
                 _plugin_display_cache.clear()
                 _plugin_fetching.clear()
+
+        # 4. Clear command output, battery, and profile path caches
+        global _last_battery_time, _last_battery_stat_time
+        _cmd_substitution_cache.clear()
+        _last_battery_time = 0.0
+        _last_battery_stat_time = 0.0
+        with contextlib.suppress(Exception):
+            get_powershell_profile_path.cache_clear()
+            get_shell_profile_path.cache_clear()
+
+        # 5. Reload configuration (bashmenu.yml) and menu data (bashmenu.mnu)
         mv = self.menu_view
         mv.config, _ = load_config()
         mv.menu_data, _ = load_menu()
@@ -3580,11 +3614,50 @@ class BashMenuScreen(Screen):
         mv.selected_rows = [0]
         mv.scroll_offsets = [0]
         mv.show_shortcuts = get_config_value(mv.config, "settings.show_menu_shortcuts", True)
-        self.plugin_buffer.config = mv.config
+
+        # 6. Re-read and apply active theme styles, borders, and background
+        theme_name = mv.config.get("theme", "dracula")
+        new_styles = bashmenu_ui.init_theme_colors(theme_name)
+        self.theme_styles = new_styles
+        mv.theme_styles = new_styles
+        app_obj = None
+        with contextlib.suppress(Exception):
+            app_obj = getattr(self, "_app", None) or getattr(self, "app", None)
+        if app_obj:
+            app_obj.theme_styles = new_styles
+            app_obj.theme_name = theme_name
+        bashmenu_ui.apply_theme_to_textual_borders(theme_name)
+
+        bg_style = new_styles.get("background")
+        bg_hex = get_hex_from_style(bg_style, "#000000")
+        if hasattr(self, "styles"):
+            with contextlib.suppress(Exception):
+                self.styles.background = bg_hex
+        if hasattr(self, "plugin_buffer") and hasattr(self.plugin_buffer, "styles"):
+            with contextlib.suppress(Exception):
+                self.plugin_buffer.styles.background = bg_hex
+        if hasattr(mv, "styles"):
+            with contextlib.suppress(Exception):
+                mv.styles.background = bg_hex
+
+        # 7. Invalidate pre-baked wallpaper canvas and compositor grid cache
+        canvas = getattr(mv, "_canvas", None)
+        if canvas and hasattr(canvas, "invalidate"):
+            canvas.invalidate()
+            if getattr(canvas, "compositor", None):
+                canvas.compositor._cached_key = None
+                canvas.compositor._cached_grid = None
+
+        # 8. Update plugin buffer geometry and trigger UI widget refresh
+        if hasattr(self, "plugin_buffer"):
+            self.plugin_buffer.config = mv.config
         get_plugin_outputs(mv.config)
         self._update_plugin_buffer_geometry()
         mv.refresh()
-        self.plugin_buffer.refresh()
+        if hasattr(self, "plugin_buffer"):
+            self.plugin_buffer.refresh()
+
+        # 9. Re-arm periodic refresh timer and inactivity timeout
         if hasattr(self, "_refresh_timer") and self._refresh_timer:
             with contextlib.suppress(Exception):
                 new_interval = self._determine_refresh_interval()

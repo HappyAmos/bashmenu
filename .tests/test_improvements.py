@@ -2972,6 +2972,103 @@ G
 
         asyncio.run(run_checks())
 
+    def test_action_refresh_menu_full_hot_reload(self):
+        """Test that action_refresh_menu (F5) executes a full hot-reload:
+        config, menu, theme colors, borders, caches, wallpaper canvas, and source modules.
+        """
+        from rich.style import Style
+
+        import bashmenu
+        import bashmenu_ui
+
+        screen = bashmenu.BashMenuScreen()
+        mock_app = MagicMock()
+        screen._app = mock_app
+
+        mock_mv = MagicMock()
+        mock_pb = MagicMock()
+        mock_canvas = MagicMock()
+        mock_mv._canvas = mock_canvas
+
+        # Populate caches to verify they get cleared on F5
+        bashmenu._cmd_substitution_cache["echo test"] = (123456.0, "test")
+        bashmenu._last_battery_time = 999.0
+        bashmenu._last_battery_stat_time = 999.0
+        bashmenu_ui._themes_file_cache["dummy"] = (123.0, {})
+        bashmenu_ui._theme_styles_cache[("dummy", 1)] = {}
+        bashmenu_ui._last_applied_theme_borders = (("a", "b", "c"),)
+
+        with (
+            patch.object(bashmenu.BashMenuScreen, "menu_view", mock_mv),
+            patch.object(bashmenu.BashMenuScreen, "plugin_buffer", mock_pb),
+            patch("bashmenu.load_config", return_value=({"theme": "matrix", "settings": {}}, "")),
+            patch("bashmenu.load_menu", return_value=({"items": []}, "")),
+            patch("bashmenu.get_plugin_outputs"),
+            patch("bashmenu_ui.init_theme_colors", return_value={"background": Style()}) as mock_init_theme,
+            patch("bashmenu_ui.apply_theme_to_textual_borders") as mock_apply_borders,
+        ):
+            screen.action_refresh_menu()
+
+            # 1. Config and menu reloaded
+            self.assertEqual(mock_mv.config, {"theme": "matrix", "settings": {}})
+            self.assertEqual(mock_mv.menu_stack, [{"items": []}])
+
+            # 2. Theme caches cleared
+            self.assertEqual(len(bashmenu_ui._themes_file_cache), 0)
+            self.assertEqual(len(bashmenu_ui._theme_styles_cache), 0)
+            self.assertIsNone(bashmenu_ui._last_applied_theme_borders)
+
+            # 3. Theme initialized and borders applied
+            mock_init_theme.assert_called_with("matrix")
+            mock_apply_borders.assert_called_with("matrix")
+
+            # 4. Command and battery caches cleared
+            self.assertEqual(len(bashmenu._cmd_substitution_cache), 0)
+            self.assertEqual(bashmenu._last_battery_time, 0.0)
+            self.assertEqual(bashmenu._last_battery_stat_time, 0.0)
+
+            # 5. Canvas invalidated
+            mock_canvas.invalidate.assert_called_once()
+
+            # 6. Inactivity timer rearmed and views refreshed
+            mock_app.setup_inactivity_timer.assert_called_once()
+            mock_mv.refresh.assert_called_once()
+            mock_pb.refresh.assert_called_once()
+
+    def test_refresh_environment_reloads_source_modules(self):
+        """Test that refresh_environment(reload_modules=True) reloads helper Python modules."""
+        import sys
+
+        import bashmenu
+
+        screen = bashmenu.BashMenuScreen()
+        mock_mv = MagicMock()
+        mock_pb = MagicMock()
+
+        reloaded_modules = []
+
+        def fake_reload(mod):
+            reloaded_modules.append(getattr(mod, "__name__", str(mod)))
+            return mod
+
+        with (
+            patch.object(bashmenu.BashMenuScreen, "menu_view", mock_mv),
+            patch.object(bashmenu.BashMenuScreen, "plugin_buffer", mock_pb),
+            patch("bashmenu.load_config", return_value=({"settings": {}}, "")),
+            patch("bashmenu.load_menu", return_value=({"items": []}, "")),
+            patch("bashmenu.get_plugin_outputs"),
+            patch("importlib.reload", side_effect=fake_reload),
+        ):
+            sys_modules_pytest = sys.modules.pop("pytest", None)
+            try:
+                screen.refresh_environment(clear_plugins=False, reload_modules=True)
+            finally:
+                if sys_modules_pytest is not None:
+                    sys.modules["pytest"] = sys_modules_pytest
+
+            for expected in ("ymlcheck", "bashmenu_ui"):
+                self.assertIn(expected, reloaded_modules)
+
 
 if __name__ == "__main__":
     unittest.main()
