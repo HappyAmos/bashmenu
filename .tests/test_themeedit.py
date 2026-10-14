@@ -211,6 +211,12 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertEqual(modal.bg_val, -1)
                 self.assertEqual(modal.active_tab, "fg")
 
+                # Verify tab button labels explicitly indicate Foreground and Background
+                btn_fg = modal.query_one("#btn_tab_fg", themeedit.Button)
+                btn_bg = modal.query_one("#btn_tab_bg", themeedit.Button)
+                self.assertIn("Foreground", str(btn_fg.label))
+                self.assertIn("Background", str(btn_bg.label))
+
                 # Switch layer to BG via action
                 modal.action_switch_layer()
                 self.assertEqual(modal.active_tab, "bg")
@@ -234,6 +240,37 @@ class TestThemeEditor(unittest.TestCase):
 
                 # Verify confirm selection returns both layers
                 self.assertEqual(modal.selected_color, ["COLOR_RED", 61])
+
+        asyncio.run(_run())
+
+    def test_theme_preview_occupies_at_least_half_of_preview_pane(self):
+        """Verify ThemePreviewWidget occupies >= 50% of preview pane area across resolutions."""
+        async def _run():
+            for width, height in [(100, 30), (120, 36), (140, 40), (160, 45)]:
+                app = themeedit.ThemeEditApp("dracula")
+                async with app.run_test(size=(width, height)) as pilot:
+                    screen = themeedit.ThemeEditScreen()
+                    app.push_screen(screen)
+                    await pilot.pause()
+
+                    panel = screen.query_one("#preview_panel")
+                    prev = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+                    rendered = prev.render().plain.splitlines()
+
+                    inner_pw = max(1, panel.size.width - 4)
+                    inner_ph = max(1, panel.size.height - 4)
+                    panel_area = inner_pw * inner_ph
+
+                    prev_w = max(len(l) for l in rendered)
+                    prev_h = len(rendered)
+                    prev_area = prev_w * prev_h
+
+                    ratio = prev_area / panel_area
+                    self.assertGreaterEqual(
+                        ratio,
+                        0.50,
+                        f"At {width}x{height}, preview ({prev_area}) was {ratio:.1%} of pane ({panel_area}), expected >= 50%",
+                    )
 
         asyncio.run(_run())
 

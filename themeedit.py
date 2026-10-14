@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 import yaml
 from rich.style import Style
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -341,11 +342,12 @@ class ColorPickerModal(ModalScreen[Any]):
         align: center middle;
         margin-bottom: 0;
     }
-    .tab_btn {
+    #tabs_row Button, .tab_btn {
         height: 1;
-        min-width: 20;
+        min-width: 22;
         margin: 0 1;
-        border: none;
+        padding: 0 1;
+        border: none !important;
     }
     #tab_hint {
         color: #888;
@@ -518,8 +520,8 @@ class ColorPickerModal(ModalScreen[Any]):
                         )
                     with Horizontal(id="tabs_row"):
                         if self.is_pair:
-                            yield Button(f"[1] FG: {self.fg_val}", id="btn_tab_fg", classes="tab_btn", variant="primary")
-                            yield Button(f"[2] BG: {self.bg_val}", id="btn_tab_bg", classes="tab_btn", variant="default")
+                            yield Button(f"[1] Foreground: {self.fg_val}", id="btn_tab_fg", classes="tab_btn", variant="primary")
+                            yield Button(f"[2] Background: {self.bg_val}", id="btn_tab_bg", classes="tab_btn", variant="default")
                             yield Label("(Tab: Switch Layer)", id="tab_hint")
                         else:
                             yield Label(f"Editing Single Color: {self.token_name}", id="tab_single")
@@ -605,8 +607,8 @@ class ColorPickerModal(ModalScreen[Any]):
         with contextlib.suppress(Exception):
             btn_fg = self.query_one("#btn_tab_fg", Button)
             btn_bg = self.query_one("#btn_tab_bg", Button)
-            btn_fg.label = f"[1] FG: {self.fg_val}"
-            btn_bg.label = f"[2] BG: {self.bg_val}"
+            btn_fg.label = f"[1] Foreground: {self.fg_val}"
+            btn_bg.label = f"[2] Background: {self.bg_val}"
             if self.active_tab == "fg":
                 btn_fg.variant = "primary"
                 btn_bg.variant = "default"
@@ -1046,7 +1048,23 @@ class ThemePreviewWidget(Static):
 
     def render(self) -> Text:
         """Render complete simulated BashMenu frame with active borders and styles."""
-        w = 56
+        parent = getattr(self, "parent", None)
+        if parent and getattr(parent, "size", None) and parent.size.width > 20 and parent.size.height > 10:
+            inner_pw = parent.size.width - 4
+            inner_ph = parent.size.height - 4
+            if inner_pw < 58:
+                w = max(40, inner_pw - 2)
+            else:
+                w = max(56, min(inner_pw - 4, 76))
+
+            if inner_ph < 16:
+                num_rows = max(12, inner_ph - 2)
+            else:
+                num_rows = max(14, min(inner_ph - 4, 24))
+        else:
+            w = 56
+            num_rows = 12
+
         inner_w = w - 6  # Borders (2) + Margins (4)
         t_dict = dict(self.theme_dict)
         if 256 not in t_dict and "256" in t_dict:
@@ -1172,71 +1190,109 @@ class ThemePreviewWidget(Static):
             line.append(shadow_ch * 2, style=shadow_style)
             return line
 
-        # Row 1: Option 1 (Unselected)
-        r1 = Text()
-        r1.append("    [1] ", style=key_style)
-        r1.append("Web Applications", style=text_style)
-        out.append_text(wrap_line(r1))
-        out.append("\n")
+        def make_opt_line(num: int, label: str, is_sel: bool) -> Text:
+            if is_sel:
+                r = Text()
+                r.append(f"  {indicator} [{num}] {label}", style=sel_style)
+                if r.cell_len > inner_w:
+                    r.truncate(inner_w)
+                rem_sel = max(0, inner_w - r.cell_len)
+                if rem_sel > 0:
+                    r.append(" " * rem_sel, style=sel_style)
+                line = Text()
+                line.append(b_v_left + "  ", style=b_style)
+                line.append_text(r)
+                line.append("  " + b_v_right, style=b_style)
+                line.append(shadow_ch * 2, style=shadow_style)
+                return line
+            else:
+                r = Text()
+                r.append(f"    [{num}] ", style=key_style)
+                r.append(label, style=text_style)
+                return wrap_line(r)
 
-        # Row 2: Option 2 (Selected with indicator)
-        r2 = Text()
-        r2.append(f"  {indicator} [2] System Utilities", style=sel_style)
-        if r2.cell_len > inner_w:
-            r2.truncate(inner_w)
-        rem_sel = max(0, inner_w - r2.cell_len)
-        if rem_sel > 0:
-            r2.append(" " * rem_sel, style=sel_style)
-        l2 = Text()
-        l2.append(b_v_left + "  ", style=b_style)
-        l2.append_text(r2)
-        l2.append("  " + b_v_right, style=b_style)
-        l2.append(shadow_ch * 2, style=shadow_style)
-        out.append_text(l2)
-        out.append("\n")
+        def make_div_line() -> Text:
+            if "{screen_width}" in div_len:
+                div_row = Text()
+                div_row.append(b_tee_l + div_char * (w - 2) + b_tee_r, style=div_style)
+                div_row.append(shadow_ch * 2, style=shadow_style)
+                return div_row
+            else:
+                r_div = Text()
+                r_div.append(div_char * inner_w, style=div_style)
+                return wrap_line(r_div)
 
-        # Row 3: Divider
-        if "{screen_width}" in div_len:
-            div_row = Text()
-            div_row.append(b_tee_l + div_char * (w - 2) + b_tee_r, style=div_style)
-            div_row.append(shadow_ch * 2, style=shadow_style)
-            out.append_text(div_row)
-        else:
-            r_div = Text()
-            r_div.append(div_char * inner_w, style=div_style)
-            out.append_text(wrap_line(r_div))
-        out.append("\n")
-
-        # Row 4: Option 3
-        r3 = Text()
-        r3.append("    [3] ", style=key_style)
-        r3.append("Theme Settings", style=text_style)
-        out.append_text(wrap_line(r3))
-        out.append("\n")
-
-        # Row 5: Plugin Header
         pl_box_w = max(24, inner_w - 6)
         title_pl = " Weather Dashboard "
         dash_len = max(0, pl_box_w - 3 - len(title_pl))
-        r_pl_h = Text(f"┌─{title_pl}" + "─" * dash_len + "┐", style=plug_style)
-        out.append_text(wrap_line(r_pl_h))
-        out.append("\n")
+        r_pl_h = wrap_line(Text(f"┌─{title_pl}" + "─" * dash_len + "┐", style=plug_style))
+        r_pl_c1 = wrap_line(
+            Text(
+                "│ 72°F Sunny • Orion Up 3d"
+                + " " * max(0, pl_box_w - 2 - len(" 72°F Sunny • Orion Up 3d"))
+                + "│",
+                style=plug_style,
+            )
+        )
+        r_pl_c2 = wrap_line(
+            Text(
+                "│ Humidity 45% • Wind 5mph"
+                + " " * max(0, pl_box_w - 2 - len(" Humidity 45% • Wind 5mph"))
+                + "│",
+                style=plug_style,
+            )
+        )
+        r_pl_b = wrap_line(Text("└" + "─" * (pl_box_w - 2) + "┘", style=plug_style))
 
-        # Row 6: Plugin Content
-        cont_pl = " 72°F Sunny • Orion Up 3d"
-        rem_cont = max(0, pl_box_w - 2 - len(cont_pl))
-        r_pl_c = Text(f"│{cont_pl}" + " " * rem_cont + "│", style=plug_style)
-        out.append_text(wrap_line(r_pl_c))
-        out.append("\n")
+        raw_options = [
+            (1, "Web Applications", False),
+            (2, "System Utilities", True),
+            (3, "Administration Tools", False),
+            (4, "Network Diagnostics", False),
+            (5, "Theme Settings", False),
+            (6, "Security & Firewall", False),
+            (7, "Development Tools", False),
+            (8, "Backup & Storage", False),
+            (9, "Exit to Shell", False),
+        ]
 
-        # Row 7: Plugin Bottom
-        r_pl_b = Text("└" + "─" * (pl_box_w - 2) + "┘", style=plug_style)
-        out.append_text(wrap_line(r_pl_b))
-        out.append("\n")
+        body_slots = num_rows - 5
+        if body_slots <= 7:
+            body_items = [
+                make_opt_line(1, "Web Applications", False),
+                make_opt_line(2, "System Utilities", True),
+                make_div_line(),
+                make_opt_line(3, "Theme Settings", False),
+                r_pl_h,
+                r_pl_c1,
+                r_pl_b,
+            ]
+        else:
+            use_c2 = body_slots >= 11
+            pl_lines = [r_pl_h, r_pl_c1] + ([r_pl_c2] if use_c2 else []) + [r_pl_b]
+            rem_slots = body_slots - len(pl_lines)
+            n_opts = max(1, rem_slots - 1)
+            opts = raw_options[:min(n_opts, len(raw_options))]
+            body_items = []
+            div_placed = False
+            for idx, (num, label, is_sel) in enumerate(opts):
+                if idx == min(2, len(opts) - 1) and not div_placed:
+                    body_items.append(make_div_line())
+                    div_placed = True
+                body_items.append(make_opt_line(num, label, is_sel))
+            if not div_placed:
+                body_items.insert(min(2, len(body_items)), make_div_line())
+            while len(body_items) + len(pl_lines) < body_slots:
+                body_items.append(wrap_line(Text("", style=text_style)))
+            body_items.extend(pl_lines)
 
-        # Row 8: Gutter Top Border
+        for line_item in body_items:
+            out.append_text(line_item)
+            out.append("\n")
+
+        # Gutter Top Border
         avail_both = max(4, w - 11)
-        left_gw = 23
+        left_gw = max(23, int(avail_both * 0.55)) if w > 56 else 23
         right_gw = avail_both - left_gw
         sep_x = 3 + left_gw + 2
         rem_right = max(0, w - 2 - sep_x)
@@ -1249,15 +1305,23 @@ class ThemePreviewWidget(Static):
         out.append_text(gt_line)
         out.append("\n")
 
-        # Row 9: Gutter Content Row
-        h_part = Text("[F1] Help | [F2] Themes", style=help_style)
+        # Gutter Content Row
+        if left_gw >= 38:
+            h_text = "[F1] Help | [F2] Themes | [F4] Edit"
+        else:
+            h_text = "[F1] Help | [F2] Themes"
+        h_part = Text(h_text, style=help_style)
         if h_part.cell_len > left_gw:
             h_part.truncate(left_gw)
         h_pad = max(0, left_gw - h_part.cell_len)
         if h_pad > 0:
             h_part.append(" " * h_pad)
 
-        s_part = Text(f"{self.theme_name} | 12:45", style=gutter_style)
+        if right_gw >= 24:
+            s_text = f"Theme: {self.theme_name} | 12:45"
+        else:
+            s_text = f"{self.theme_name} | 12:45"
+        s_part = Text(s_text, style=gutter_style)
         if s_part.cell_len > right_gw:
             s_part.truncate(right_gw)
         s_pad = max(0, right_gw - s_part.cell_len)
@@ -1276,7 +1340,7 @@ class ThemePreviewWidget(Static):
         out.append_text(g_content)
         out.append("\n")
 
-        # Row 10: Bottom Border
+        # Bottom Border
         bot_line = Text()
         bot_line.append(b_bl + b_h_bot * (sep_x - 1), style=b_style)
         bot_line.append(b_gt_bot_tee, style=b_style)
@@ -1285,7 +1349,7 @@ class ThemePreviewWidget(Static):
         out.append_text(bot_line)
         out.append("\n")
 
-        # Row 11: Bottom Drop Shadow
+        # Bottom Drop Shadow
         bot_shadow = Text()
         bot_shadow.append("  " + shadow_ch * w, style=shadow_style)
         out.append_text(bot_shadow)
@@ -1822,6 +1886,10 @@ class ThemeEditScreen(Screen):
         file_name = os.path.basename(self.themes_filepath) if self.themes_filepath else "bashmenu.themes"
         theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
         h_title.update(f"{l_cap} BashMenu Theme Editor — {file_name} [{theme_disp}]{dirty_flag} {r_cap}")
+
+    def on_resize(self, event: events.Resize) -> None:
+        """Handle screen resize and refresh preview canvas dimensions."""
+        self._sync_preview()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""
