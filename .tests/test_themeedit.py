@@ -157,9 +157,113 @@ class TestThemeEditor(unittest.TestCase):
 
                 self.assertIn(modal, app.screen_stack)
                 # Dismiss modal with selected color
-                modal.dismiss(202)
+                modal.dismiss([202, -1])
                 await pilot.pause()
                 self.assertNotIn(modal, app.screen_stack)
+
+        asyncio.run(_run())
+
+    def test_color_grid_widget_navigation(self):
+        """Verify ColorGridWidget arrow navigation and underline on active cell."""
+        grid = themeedit.ColorGridWidget(initial_code=0)
+        self.assertEqual(grid.cursor_code, 0)
+
+        # Right arrow moves +1
+        grid.action_cursor_right()
+        self.assertEqual(grid.cursor_code, 1)
+
+        # Down arrow moves +16
+        grid.action_cursor_down()
+        self.assertEqual(grid.cursor_code, 17)
+
+        # Left arrow moves -1
+        grid.action_cursor_left()
+        self.assertEqual(grid.cursor_code, 16)
+
+        # Up arrow moves -16
+        grid.action_cursor_up()
+        self.assertEqual(grid.cursor_code, 0)
+
+        # Render output should have 16 lines
+        rendered = grid.render()
+        lines = rendered.plain.splitlines()
+        self.assertEqual(len(lines), 16)
+
+        # The active cell (0) is underlined in the rendered Text object
+        active_found = False
+        for span in rendered.spans:
+            if getattr(span.style, "underline", False):
+                active_found = True
+                break
+        self.assertTrue(active_found, "Selected color code must be underlined.")
+
+    def test_color_picker_modal_dual_layer_fg_bg(self):
+        """Verify ColorPickerModal supports dual FG/BG layers, Tab switching, and swatch names."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(100, 30)) as pilot:
+                modal = themeedit.ColorPickerModal("title", [201, -1], bg_color_val="COLOR_BLACK")
+                app.push_screen(modal)
+                await pilot.pause()
+
+                self.assertTrue(modal.is_pair)
+                self.assertEqual(modal.fg_val, 201)
+                self.assertEqual(modal.bg_val, -1)
+                self.assertEqual(modal.active_tab, "fg")
+
+                # Switch layer to BG via action
+                modal.action_switch_layer()
+                self.assertEqual(modal.active_tab, "bg")
+
+                # Change BG color
+                grid = modal.query_one("#color_grid", themeedit.ColorGridWidget)
+                grid.set_code(61)
+                await pilot.pause()
+                self.assertEqual(modal.bg_val, 61)
+
+                # Switch back to FG
+                modal.action_switch_layer()
+                await pilot.pause()
+                self.assertEqual(modal.active_tab, "fg")
+
+                # Toggle constant name output
+                grid.set_code(196)
+                await pilot.pause()
+                modal.action_toggle_const_name()
+                self.assertEqual(modal.fg_val, "COLOR_RED")
+
+                # Verify confirm selection returns both layers
+                self.assertEqual(modal.selected_color, ["COLOR_RED", 61])
+
+        asyncio.run(_run())
+
+    def test_border_character_changes_update_preview(self):
+        """Verify that changing border_horizontal and border_vertical updates preview live."""
+        async def _run():
+            app = themeedit.ThemeEditApp("pacman")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                inp_h = screen.query_one("#prop_border_horizontal", Input)
+                inp_v = screen.query_one("#prop_border_vertical", Input)
+
+                # Change horizontal border to '='
+                inp_h.value = "="
+                await pilot.pause()
+
+                preview = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+                rendered = preview.render().plain
+
+                self.assertIn("=", rendered, "Preview should update when border_horizontal is changed.")
+
+                # Change vertical border to '#'
+                inp_v.value = "#"
+                await pilot.pause()
+
+                rendered2 = preview.render().plain
+                self.assertIn("#", rendered2, "Preview should update when border_vertical is changed.")
 
         asyncio.run(_run())
 

@@ -22,7 +22,9 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.message import Message
 from textual.screen import ModalScreen, Screen
+from textual.widget import Widget
 from textual.widgets import Button, Checkbox, Input, Label, OptionList, Static
 from textual.widgets.option_list import Option
 
@@ -134,8 +136,167 @@ def auto_derive_fallback_depths(palette_256: dict) -> tuple[dict, dict]:
 # ==============================================================================
 
 
+# ==============================================================================
+# PICKER MODAL SCREENS & WIDGETS
+# ==============================================================================
+
+STANDARD_CONST_MAP: dict[str, int] = {
+    "COLOR_BLACK": 0,
+    "COLOR_RED": 196,
+    "COLOR_GREEN": 46,
+    "COLOR_YELLOW": 226,
+    "COLOR_BLUE": 63,
+    "COLOR_MAGENTA": 201,
+    "COLOR_CYAN": 51,
+    "COLOR_WHITE": 231,
+    "COLOR_GREY": 244,
+    "COLOR_GRAY": 244,
+    "COLOR_BRIGHT_BLACK": 244,
+    "COLOR_BRIGHT_RED": 203,
+    "COLOR_BRIGHT_GREEN": 82,
+    "COLOR_BRIGHT_YELLOW": 227,
+    "COLOR_BRIGHT_BLUE": 75,
+    "COLOR_BRIGHT_MAGENTA": 207,
+    "COLOR_BRIGHT_CYAN": 87,
+    "COLOR_BRIGHT_WHITE": 255,
+    "COLOR_ORANGE": 208,
+    "COLOR_PURPLE": 129,
+    "COLOR_PINK": 211,
+    "COLOR_BROWN": 130,
+}
+
+CODE_TO_CONST: dict[int, str] = {
+    0: "COLOR_BLACK",
+    196: "COLOR_RED",
+    46: "COLOR_GREEN",
+    226: "COLOR_YELLOW",
+    63: "COLOR_BLUE",
+    201: "COLOR_MAGENTA",
+    51: "COLOR_CYAN",
+    231: "COLOR_WHITE",
+    244: "COLOR_GREY",
+    203: "COLOR_BRIGHT_RED",
+    82: "COLOR_BRIGHT_GREEN",
+    227: "COLOR_BRIGHT_YELLOW",
+    75: "COLOR_BRIGHT_BLUE",
+    207: "COLOR_BRIGHT_MAGENTA",
+    87: "COLOR_BRIGHT_CYAN",
+    255: "COLOR_BRIGHT_WHITE",
+    208: "COLOR_ORANGE",
+    129: "COLOR_PURPLE",
+    211: "COLOR_PINK",
+    130: "COLOR_BROWN",
+}
+
+
+class ColorGridWidget(Widget):
+    """Interactive 16x16 2D terminal color palette grid with keyboard navigation."""
+
+    can_focus = True
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("left", "cursor_left", "Left", show=False),
+        Binding("right", "cursor_right", "Right", show=False),
+        Binding("up", "cursor_up", "Up", show=False),
+        Binding("down", "cursor_down", "Down", show=False),
+        Binding("home", "cursor_home", "Home", show=False),
+        Binding("end", "cursor_end", "End", show=False),
+        Binding("pageup", "cursor_page_up", "Page Up", show=False),
+        Binding("pagedown", "cursor_page_down", "Page Down", show=False),
+        Binding("enter", "select_color", "Select", show=False),
+    ]
+
+    class ColorHighlighted(Message):
+        """Emitted when highlighted color index changes."""
+
+        def __init__(self, color_code: int) -> None:
+            super().__init__()
+            self.color_code = color_code
+
+    class ColorSelected(Message):
+        """Emitted when Enter is pressed on a color."""
+
+        def __init__(self, color_code: int) -> None:
+            super().__init__()
+            self.color_code = color_code
+
+    def __init__(self, initial_code: int = 0, **kwargs):
+        super().__init__(**kwargs)
+        self.cursor_code = max(0, min(255, initial_code))
+
+    def render(self) -> Text:
+        grid_text = Text()
+        for row in range(16):
+            for col in range(16):
+                code = row * 16 + col
+                is_sel = (code == self.cursor_code)
+                code_str = f"{code:4d}"
+
+                if is_sel:
+                    # While navigating, the currently selected number code is underlined
+                    if code == 0:
+                        style = Style(color="color(255)", bgcolor="color(237)", bold=True, underline=True)
+                    else:
+                        bg = "color(237)" if code != 237 else "color(233)"
+                        style = Style(color=f"color({code})", bgcolor=bg, bold=True, underline=True)
+                else:
+                    if code == 0:
+                        style = Style(color="color(242)")
+                    else:
+                        style = Style(color=f"color({code})")
+
+                grid_text.append(code_str, style=style)
+            if row < 15:
+                grid_text.append("\n")
+
+        return grid_text
+
+    def set_code(self, code: int) -> None:
+        """Update cursor code and refresh visual display."""
+        if 0 <= code <= 255:
+            self.cursor_code = code
+            self.refresh()
+            self.post_message(self.ColorHighlighted(self.cursor_code))
+
+    def on_click(self, event: Any) -> None:
+        x = getattr(event, "x", 0)
+        y = getattr(event, "y", 0)
+        col = x // 4
+        row = y
+        if 0 <= col < 16 and 0 <= row < 16:
+            code = row * 16 + col
+            self.set_code(code)
+
+    def action_cursor_left(self) -> None:
+        self.set_code((self.cursor_code - 1) % 256)
+
+    def action_cursor_right(self) -> None:
+        self.set_code((self.cursor_code + 1) % 256)
+
+    def action_cursor_up(self) -> None:
+        self.set_code((self.cursor_code - 16) % 256)
+
+    def action_cursor_down(self) -> None:
+        self.set_code((self.cursor_code + 16) % 256)
+
+    def action_cursor_home(self) -> None:
+        self.set_code(0)
+
+    def action_cursor_end(self) -> None:
+        self.set_code(255)
+
+    def action_cursor_page_up(self) -> None:
+        self.set_code((self.cursor_code - 64) % 256)
+
+    def action_cursor_page_down(self) -> None:
+        self.set_code((self.cursor_code + 64) % 256)
+
+    def action_select_color(self) -> None:
+        self.post_message(self.ColorSelected(self.cursor_code))
+
+
 class ColorPickerModal(ModalScreen[Any]):
-    """Interactive 256-color palette picker with live preview and constants."""
+    """Interactive 2D terminal color palette picker with live preview and constants."""
 
     DEFAULT_CSS = """
     ColorPickerModal {
@@ -144,15 +305,15 @@ class ColorPickerModal(ModalScreen[Any]):
     }
     #dialog {
         width: 78;
-        height: 27;
+        height: 29;
         border: thick #555;
         background: #181818;
-        padding: 1 2;
+        padding: 0 1;
     }
     #title_bar {
         height: 1;
         width: 100%;
-        margin-bottom: 1;
+        margin-bottom: 0;
     }
     #title {
         width: 1fr;
@@ -174,30 +335,92 @@ class ColorPickerModal(ModalScreen[Any]):
         background: #333;
         color: #fff;
     }
-    #color_palette_grid {
-        height: 12;
-        border: solid #555;
-        padding: 0 1;
-        overflow-y: auto;
+    #tabs_row {
+        height: 2;
+        width: 100%;
+        align: center middle;
+        margin-bottom: 0;
+    }
+    .tab_btn {
+        height: 1;
+        min-width: 20;
+        margin: 0 1;
+        border: none;
+    }
+    #tab_hint {
+        color: #888;
+        margin-left: 1;
+    }
+    #tab_single {
+        text-align: center;
+        text-style: bold;
+        color: #ccc;
+    }
+    #grid_container {
+        height: 16;
+        width: 100%;
+        align: center middle;
+    }
+    ColorGridWidget {
+        width: 64;
+        height: 16;
+    }
+    ColorGridWidget:focus {
+        border: none;
     }
     #preview_bar {
         height: 2;
-        margin-top: 1;
+        width: 100%;
+        margin-top: 0;
         border: solid #555;
         text-align: center;
     }
+    #swatch_row {
+        height: 1;
+        width: 100%;
+        align: center middle;
+        margin-top: 0;
+    }
+    .swatch_lbl {
+        color: #888;
+        margin-right: 1;
+    }
+    .btn_swatch {
+        height: 1;
+        min-width: 5;
+        padding: 0 1;
+        margin: 0;
+        border: none;
+        background: #252525;
+        color: #ccc;
+    }
+    .btn_swatch:hover {
+        background: #444;
+        color: #fff;
+    }
     #btn_row {
-        height: 3;
-        margin-top: 1;
+        height: 2;
+        margin-top: 0;
         align: center middle;
     }
     #btn_row Button {
+        height: 1;
+        min-width: 12;
         margin: 0 1;
+        border: none;
     }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("tab", "switch_layer", "Switch FG/BG"),
+        Binding("enter", "confirm_selection", "Select"),
+        Binding("1", "select_fg_tab", "Foreground", show=False),
+        Binding("2", "select_bg_tab", "Background", show=False),
+        Binding("f", "select_fg_tab", "Foreground", show=False),
+        Binding("b", "select_bg_tab", "Background", show=False),
+        Binding("i", "action_inherit", "Inherit", show=False),
+        Binding("c", "toggle_const_name", "Toggle Constant Name", show=False),
     ]
 
     def __init__(
@@ -212,7 +435,75 @@ class ColorPickerModal(ModalScreen[Any]):
         self.current_val = current_val
         self.bg_color_val = bg_color_val
         self.theme_styles = theme_styles or {}
-        self.selected_color = current_val
+
+        if token_name == "background":
+            self.is_pair = False
+            self.fg_val = current_val
+            self.bg_val = -1
+        else:
+            self.is_pair = True
+            if isinstance(current_val, (list, tuple)):
+                self.fg_val = current_val[0] if len(current_val) > 0 else -1
+                self.bg_val = current_val[1] if len(current_val) > 1 else -1
+            elif isinstance(current_val, str) and current_val.strip().startswith("[") and current_val.strip().endswith("]"):
+                try:
+                    parsed = yaml.safe_load(current_val)
+                    if isinstance(parsed, list):
+                        self.fg_val = parsed[0] if len(parsed) > 0 else -1
+                        self.bg_val = parsed[1] if len(parsed) > 1 else -1
+                    else:
+                        self.fg_val = current_val
+                        self.bg_val = -1
+                except (yaml.YAMLError, ValueError):
+                    self.fg_val = current_val
+                    self.bg_val = -1
+            else:
+                self.fg_val = current_val
+                self.bg_val = -1
+
+        self.active_tab = "fg"
+        self.use_const_fg = isinstance(self.fg_val, str) and self.fg_val in STANDARD_CONST_MAP
+        self.use_const_bg = isinstance(self.bg_val, str) and self.bg_val in STANDARD_CONST_MAP
+
+    @property
+    def selected_color(self) -> Any:
+        return [self.fg_val, self.bg_val] if self.is_pair else self.fg_val
+
+    @selected_color.setter
+    def selected_color(self, val: Any) -> None:
+        if self.is_pair:
+            if isinstance(val, (list, tuple)):
+                self.fg_val = val[0] if len(val) > 0 else -1
+                self.bg_val = val[1] if len(val) > 1 else -1
+            else:
+                if self.active_tab == "fg":
+                    self.fg_val = val
+                else:
+                    self.bg_val = val
+        else:
+            self.fg_val = val
+
+    def _val_to_code(self, val: Any) -> int:
+        if val is None or val == -1 or val == "-1":
+            return -1
+        if isinstance(val, int) and 0 <= val <= 255:
+            return val
+        if isinstance(val, str):
+            val_clean = val.strip()
+            if val_clean in STANDARD_CONST_MAP:
+                return STANDARD_CONST_MAP[val_clean]
+            if val_clean.isdigit():
+                num = int(val_clean)
+                if 0 <= num <= 255:
+                    return num
+        return 0
+
+    def _format_val(self, code: int, use_const: bool) -> Any:
+        if code == -1:
+            return -1
+        if use_const and code in CODE_TO_CONST:
+            return CODE_TO_CONST[code]
+        return code
 
     def compose(self) -> ComposeResult:
         with bashmenu_ui.ModalFrame(id="modal_frame"):
@@ -225,12 +516,42 @@ class ColorPickerModal(ModalScreen[Any]):
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
-                    yield OptionList(id="color_palette_grid")
+                    with Horizontal(id="tabs_row"):
+                        if self.is_pair:
+                            yield Button(f"[1] FG: {self.fg_val}", id="btn_tab_fg", classes="tab_btn", variant="primary")
+                            yield Button(f"[2] BG: {self.bg_val}", id="btn_tab_bg", classes="tab_btn", variant="default")
+                            yield Label("(Tab: Switch Layer)", id="tab_hint")
+                        else:
+                            yield Label(f"Editing Single Color: {self.token_name}", id="tab_single")
+
+                    with Horizontal(id="grid_container"):
+                        init_code = self._val_to_code(self.fg_val)
+                        if init_code == -1:
+                            init_code = 0
+                        yield ColorGridWidget(initial_code=init_code, id="color_grid")
+
                     yield Static(id="preview_bar")
+
+                    with Horizontal(id="swatch_row"):
+                        yield Label("Swatches: ", classes="swatch_lbl")
+                        yield Button("Inherit", id="swatch_inherit", classes="btn_swatch")
+                        yield Button("Black", id="swatch_COLOR_BLACK", classes="btn_swatch")
+                        yield Button("Red", id="swatch_COLOR_RED", classes="btn_swatch")
+                        yield Button("Green", id="swatch_COLOR_GREEN", classes="btn_swatch")
+                        yield Button("Yellow", id="swatch_COLOR_YELLOW", classes="btn_swatch")
+                        yield Button("Blue", id="swatch_COLOR_BLUE", classes="btn_swatch")
+                        yield Button("Magenta", id="swatch_COLOR_MAGENTA", classes="btn_swatch")
+                        yield Button("Cyan", id="swatch_COLOR_CYAN", classes="btn_swatch")
+                        yield Button("White", id="swatch_COLOR_WHITE", classes="btn_swatch")
+
                     with Horizontal(id="btn_row"):
-                        yield Button("Select", variant="primary", id="btn_select")
+                        yield Button("Select (Enter)", variant="primary", id="btn_select")
                         yield Button("Inherit (-1)", variant="default", id="btn_inherit")
-                        yield Button("Cancel", variant="error", id="btn_cancel")
+                        use_c = self.use_const_fg if self.active_tab == "fg" else self.use_const_bg
+                        c_text = "Name: ON" if use_c else "Name: OFF"
+                        yield Button(c_text, variant="default", id="btn_toggle_const")
+                        yield Button("Cancel (Esc)", variant="error", id="btn_cancel")
+
                 yield bashmenu_ui.ShadowWidget(id="shadow_right")
             yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
@@ -241,14 +562,14 @@ class ColorPickerModal(ModalScreen[Any]):
         with contextlib.suppress(Exception):
             btn_close = self.query_one("#btn_close_x", Label)
             btn_close.update(bashmenu_ui.format_close_button_label(ts))
+
         border_style = ts.get("border") or ts.get("accent")
         if border_style and border_style.color and border_style.color.name:
             css_border = bashmenu_ui.parse_css_color(border_style.color.name)
             if css_border:
                 with contextlib.suppress(Exception):
-                    self.query_one("#color_palette_grid").styles.border = ("solid", css_border)
-                with contextlib.suppress(Exception):
                     self.query_one("#preview_bar").styles.border = ("solid", css_border)
+
         btn_prim = ts.get("button_primary") or ts.get("selection")
         if btn_prim:
             css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
@@ -259,6 +580,7 @@ class ColorPickerModal(ModalScreen[Any]):
                     b.styles.background = css_p_bg
                 if css_p_fg:
                     b.styles.color = css_p_fg
+
         btn_err = ts.get("button_error") or ts.get("button_cancel")
         if btn_err:
             css_e_bg = bashmenu_ui.parse_css_color(btn_err.bgcolor.name) if btn_err.bgcolor else None
@@ -270,64 +592,167 @@ class ColorPickerModal(ModalScreen[Any]):
                 if css_e_fg:
                     b.styles.color = css_e_fg
 
-        grid = self.query_one("#color_palette_grid", OptionList)
-        options = []
-        sel_idx = 0
+        self._sync_tabs_ui()
+        self._update_preview()
 
-        # Special option: -1 / Inherit
-        options.append(Option(" [-1] Inherit / Transparent", id="-1"))
+        # Focus color grid so arrow keys immediately respond
+        with contextlib.suppress(Exception):
+            self.query_one("#color_grid", ColorGridWidget).focus()
 
-        # Standard Color Constants
-        for name in bashmenu_ui.COLOR_MAP:
-            options.append(Option(f" [{name}]", id=name))
+    def _sync_tabs_ui(self) -> None:
+        if not self.is_pair:
+            return
+        with contextlib.suppress(Exception):
+            btn_fg = self.query_one("#btn_tab_fg", Button)
+            btn_bg = self.query_one("#btn_tab_bg", Button)
+            btn_fg.label = f"[1] FG: {self.fg_val}"
+            btn_bg.label = f"[2] BG: {self.bg_val}"
+            if self.active_tab == "fg":
+                btn_fg.variant = "primary"
+                btn_bg.variant = "default"
+            else:
+                btn_fg.variant = "default"
+                btn_bg.variant = "primary"
 
-        # 256 Numeric Palette
-        for i in range(256):
-            c_label = f" Color {i:3d}  ■■■■■■"
-            options.append(Option(c_label, id=str(i)))
+        with contextlib.suppress(Exception):
+            btn_c = self.query_one("#btn_toggle_const", Button)
+            use_c = self.use_const_fg if self.active_tab == "fg" else self.use_const_bg
+            btn_c.label = "Name: ON" if use_c else "Name: OFF"
 
-        grid.add_options(options)
-
-        # Highlight currently selected color
-        curr_str = str(self.current_val)
-        for idx, opt in enumerate(options):
-            if str(opt.id) == curr_str:
-                sel_idx = idx
-                break
-
-        grid.highlighted = sel_idx
-        self._update_preview(self.current_val)
-
-    def _update_preview(self, val: Any) -> None:
+    def _update_preview(self) -> None:
         p_bar = self.query_one("#preview_bar", Static)
-        parsed_c = bashmenu_ui.parse_color_val(val)
-        bg_parsed = bashmenu_ui.parse_color_val(self.bg_color_val) or "color(233)"
+        parsed_fg = bashmenu_ui.parse_color_val(self.fg_val) or "white"
+
+        if self.bg_val == -1:
+            parsed_bg = bashmenu_ui.parse_color_val(self.bg_color_val) or "color(233)"
+        else:
+            parsed_bg = bashmenu_ui.parse_color_val(self.bg_val) or "color(233)"
+
+        grid = self.query_one("#color_grid", ColorGridWidget)
+        curr_code = grid.cursor_code
+        const_name = CODE_TO_CONST.get(curr_code)
+        const_str = f" ({const_name})" if const_name else ""
 
         txt = Text()
-        txt.append(" Sample Text ", style=Style(color=parsed_c or "white", bgcolor=bg_parsed, bold=True))
-        txt.append(f"  Token: {val}  (Hex/Parsed: {parsed_c})")
+        if self.token_name == "background":
+            bg_only = bashmenu_ui.parse_color_val(self.fg_val) or "color(233)"
+            txt.append(" Sample Text ", style=Style(color="white", bgcolor=bg_only, bold=True))
+            txt.append(f"  Selected: {self.fg_val}{const_str} (Parsed: {bg_only})")
+        else:
+            txt.append(" Sample Text ", style=Style(color=parsed_fg, bgcolor=parsed_bg, bold=True))
+            layer_label = "FOREGROUND" if self.active_tab == "fg" else "BACKGROUND"
+            txt.append(f"  [{layer_label}] Code: {curr_code}{const_str} | FG: {self.fg_val}  BG: {self.bg_val}")
+
         p_bar.update(txt)
 
-    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        opt_id = event.option.id
-        if opt_id == "-1":
-            self.selected_color = -1
-        elif opt_id and str(opt_id).isdigit():
-            self.selected_color = int(opt_id)
+    def on_color_grid_widget_color_highlighted(self, event: ColorGridWidget.ColorHighlighted) -> None:
+        code = event.color_code
+        if self.active_tab == "fg":
+            self.fg_val = self._format_val(code, self.use_const_fg)
         else:
-            self.selected_color = opt_id
-        self._update_preview(self.selected_color)
+            self.bg_val = self._format_val(code, self.use_const_bg)
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        self.dismiss(self.selected_color)
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def on_color_grid_widget_color_selected(self, event: ColorGridWidget.ColorSelected) -> None:
+        self._confirm()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn_select":
-            self.dismiss(self.selected_color)
-        elif event.button.id == "btn_inherit":
-            self.dismiss(-1)
-        elif event.button.id == "btn_cancel":
+        btn_id = event.button.id
+        if not btn_id:
+            return
+
+        if btn_id == "btn_tab_fg":
+            self.action_select_fg_tab()
+        elif btn_id == "btn_tab_bg":
+            self.action_select_bg_tab()
+        elif btn_id == "btn_select":
+            self._confirm()
+        elif btn_id == "btn_inherit":
+            self.action_inherit()
+        elif btn_id == "btn_toggle_const":
+            self.action_toggle_const_name()
+        elif btn_id == "btn_cancel":
             self.dismiss(None)
+        elif btn_id.startswith("swatch_"):
+            swatch_name = btn_id.replace("swatch_", "")
+            if swatch_name == "inherit":
+                self.action_inherit()
+            else:
+                code = STANDARD_CONST_MAP.get(swatch_name, 0)
+                grid = self.query_one("#color_grid", ColorGridWidget)
+                grid.set_code(code)
+                grid.focus()
+                if self.active_tab == "fg":
+                    self.fg_val = swatch_name if self.use_const_fg else code
+                else:
+                    self.bg_val = swatch_name if self.use_const_bg else code
+                self._sync_tabs_ui()
+                self._update_preview()
+
+    def action_switch_layer(self) -> None:
+        if not self.is_pair:
+            return
+        if self.active_tab == "fg":
+            self.action_select_bg_tab()
+        else:
+            self.action_select_fg_tab()
+
+    def action_select_fg_tab(self) -> None:
+        self.active_tab = "fg"
+        grid = self.query_one("#color_grid", ColorGridWidget)
+        c = self._val_to_code(self.fg_val)
+        if c != -1:
+            grid.cursor_code = c
+            grid.refresh()
+        grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_select_bg_tab(self) -> None:
+        if not self.is_pair:
+            return
+        self.active_tab = "bg"
+        grid = self.query_one("#color_grid", ColorGridWidget)
+        c = self._val_to_code(self.bg_val)
+        if c != -1:
+            grid.cursor_code = c
+            grid.refresh()
+        grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_inherit(self) -> None:
+        if self.active_tab == "fg":
+            self.fg_val = -1
+        else:
+            self.bg_val = -1
+        grid = self.query_one("#color_grid", ColorGridWidget)
+        grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_toggle_const_name(self) -> None:
+        if self.active_tab == "fg":
+            self.use_const_fg = not self.use_const_fg
+            grid = self.query_one("#color_grid", ColorGridWidget)
+            self.fg_val = self._format_val(grid.cursor_code, self.use_const_fg)
+        else:
+            self.use_const_bg = not self.use_const_bg
+            grid = self.query_one("#color_grid", ColorGridWidget)
+            self.bg_val = self._format_val(grid.cursor_code, self.use_const_bg)
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_confirm_selection(self) -> None:
+        self._confirm()
+
+    def _confirm(self) -> None:
+        if self.is_pair:
+            self.dismiss([self.fg_val, self.bg_val])
+        else:
+            self.dismiss(self.fg_val)
 
     def on_click(self, event: Any) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -1112,7 +1537,7 @@ class ThemeEditScreen(Screen):
     def _ensure_theme_structure(self) -> None:
         """Guarantee all essential theme blocks exist in the working copy."""
         self.current_theme.setdefault("indicator", ">")
-        self.current_theme.setdefault("window", {})
+        win = self.current_theme.setdefault("window", {})
         self.current_theme.setdefault("divider", {"char": "─", "length": "{window_width}"})
         if "256" in self.current_theme and 256 not in self.current_theme:
             self.current_theme[256] = self.current_theme.pop("256")
@@ -1122,22 +1547,49 @@ class ThemeEditScreen(Screen):
             self.current_theme[8] = self.current_theme.pop("8")
         self.current_theme.setdefault(256, {})
 
-        # Fill default window borders if missing
+        # Inherit base horizontal & vertical borders if specific directional keys exist
+        if "border_horizontal" not in win or not win["border_horizontal"]:
+            win["border_horizontal"] = win.get("border_horizontal_top") or win.get("border_horizontal_bottom", "─")
+        if "border_vertical" not in win or not win["border_vertical"]:
+            win["border_vertical"] = win.get("border_vertical_left") or win.get("border_vertical_right", "│")
+
+        # Synchronize tees aliases before filling defaults
+        if "border_tee_left" not in win and "left_tee" in win:
+            win["border_tee_left"] = win["left_tee"]
+        if "border_tee_right" not in win and "right_tee" in win:
+            win["border_tee_right"] = win["right_tee"]
+        if "border_tee_top" not in win and "top_tee" in win:
+            win["border_tee_top"] = win["top_tee"]
+        if "border_tee_bottom" not in win and "bottom_tee" in win:
+            win["border_tee_bottom"] = win["bottom_tee"]
+
+        if "left_tee" not in win and "border_tee_left" in win:
+            win["left_tee"] = win["border_tee_left"]
+        if "right_tee" not in win and "border_tee_right" in win:
+            win["right_tee"] = win["border_tee_right"]
+        if "top_tee" not in win and "border_tee_top" in win:
+            win["top_tee"] = win["border_tee_top"]
+        if "bottom_tee" not in win and "border_tee_bottom" in win:
+            win["bottom_tee"] = win["border_tee_bottom"]
+
+        # Fill default window borders if missing (excluding directional overrides so base borders work)
+        directional_keys = {"border_horizontal_top", "border_horizontal_bottom", "border_vertical_left", "border_vertical_right"}
         for k, v in bashmenu_ui.DEFAULT_WINDOW_BORDER.items():
-            self.current_theme["window"].setdefault(k, v)
+            if k not in directional_keys:
+                win.setdefault(k, v)
 
     def on_mount(self) -> None:
         """Initialize mounted state, apply configured theme styles, and baseline snapshot."""
-        self._mounted_ready = True
-        self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
-        self._initial_theme_name = "" if getattr(self, "is_new", False) else self.theme_name
-        self._force_dirty = getattr(self, "is_new", False)
         app_theme = getattr(self.app, "theme_name", None)
         if app_theme and (not getattr(self, "configured_theme", None) or self.configured_theme == "dracula"):
             self.configured_theme = app_theme
             self.configured_theme_styles = getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors(app_theme)
         self.apply_theme()
         self._sync_preview()
+        self._mounted_ready = True
+        self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
+        self._initial_theme_name = "" if getattr(self, "is_new", False) else self.theme_name
+        self._force_dirty = getattr(self, "is_new", False)
 
     def apply_theme(self) -> None:
         """Apply configured theme styles to ThemeEditScreen and its subwidgets."""
@@ -1383,18 +1835,45 @@ class ThemeEditScreen(Screen):
             return
 
         if inp_id == "prop_indicator":
+            if str(self.current_theme.get("indicator", "")) == val:
+                return
             self.current_theme["indicator"] = val
         elif inp_id == "prop_shadow_char":
-            self.current_theme["window"]["shadow_char"] = val
+            win = self.current_theme.setdefault("window", {})
+            if str(win.get("shadow_char", "")) == val:
+                return
+            win["shadow_char"] = val
         elif inp_id.startswith("prop_divider_"):
             sub_k = inp_id.replace("prop_divider_", "")
-            self.current_theme.setdefault("divider", {})[sub_k] = val
+            div = self.current_theme.setdefault("divider", {})
+            if str(div.get(sub_k, "")) == val:
+                return
+            div[sub_k] = val
         elif inp_id.startswith("prop_"):
             border_k = inp_id.replace("prop_", "")
-            self.current_theme["window"][border_k] = val
+            win = self.current_theme.setdefault("window", {})
+            if str(win.get(border_k, "")) == val:
+                return
+            win[border_k] = val
+            if border_k == "border_horizontal":
+                win["border_horizontal_top"] = val
+                win["border_horizontal_bottom"] = val
+            elif border_k == "border_vertical":
+                win["border_vertical_left"] = val
+                win["border_vertical_right"] = val
+            elif border_k == "left_tee":
+                win["border_tee_left"] = val
+            elif border_k == "right_tee":
+                win["border_tee_right"] = val
+            elif border_k == "top_tee":
+                win["border_tee_top"] = val
+            elif border_k == "bottom_tee":
+                win["border_tee_bottom"] = val
         elif inp_id.startswith("color_"):
             tok = inp_id.replace("color_", "")
-            pal = self.current_theme.setdefault(256, {})
+            pal = self._get_pal_256()
+            if str(pal.get(tok, "")) == val:
+                return
             try:
                 # Parse python/yaml lists e.g. [201, -1] or scalar 233
                 parsed = yaml.safe_load(val)
