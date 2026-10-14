@@ -26,7 +26,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Input, Label, Static
+from textual.widgets import Button, Checkbox, Input, Label, Select, Static
 
 import bashmenu
 import bashmenu_ui
@@ -419,12 +419,12 @@ class ColorPickerModal(ModalScreen[Any]):
     }
     #swatch_inherit { background: #333333; color: #cccccc; }
     #swatch_COLOR_BLACK { background: #000000; color: #ffffff; }
-    #swatch_COLOR_RED { background: #d70000; color: #ffffff; }
-    #swatch_COLOR_GREEN { background: #008700; color: #ffffff; }
-    #swatch_COLOR_YELLOW { background: #af8700; color: #000000; }
-    #swatch_COLOR_BLUE { background: #005fd7; color: #ffffff; }
-    #swatch_COLOR_MAGENTA { background: #af00d7; color: #ffffff; }
-    #swatch_COLOR_CYAN { background: #00afaf; color: #000000; }
+    #swatch_COLOR_RED { background: #ff0000; color: #ffffff; }
+    #swatch_COLOR_GREEN { background: #00ff00; color: #000000; }
+    #swatch_COLOR_YELLOW { background: #ffff00; color: #000000; }
+    #swatch_COLOR_BLUE { background: #0055ff; color: #ffffff; }
+    #swatch_COLOR_MAGENTA { background: #ff00ff; color: #ffffff; }
+    #swatch_COLOR_CYAN { background: #00ffff; color: #000000; }
     #swatch_COLOR_WHITE { background: #ffffff; color: #000000; }
     #swatch_COLOR_GREY, #swatch_COLOR_GRAY { background: #808080; color: #ffffff; }
     #swatch_COLOR_BRIGHT_BLACK { background: #555555; color: #ffffff; }
@@ -649,6 +649,31 @@ class ColorPickerModal(ModalScreen[Any]):
                     b.styles.background = css_e_bg
                 if css_e_fg:
                     b.styles.color = css_e_fg
+
+        # Explicitly apply vibrant color backgrounds and contrast text to all swatch buttons
+        for btn in self.query(".btn_swatch"):
+            bid = getattr(btn, "id", "")
+            cname = bid.replace("swatch_", "")
+            if cname == "inherit":
+                btn.styles.background = "#333333"
+                btn.styles.color = "#cccccc"
+            elif cname in bashmenu_ui.COLOR_MAP:
+                hex_c = bashmenu_ui.COLOR_MAP[cname]
+                btn.styles.background = hex_c
+                if cname in {
+                    "COLOR_YELLOW",
+                    "COLOR_CYAN",
+                    "COLOR_WHITE",
+                    "COLOR_BRIGHT_GREEN",
+                    "COLOR_BRIGHT_YELLOW",
+                    "COLOR_BRIGHT_CYAN",
+                    "COLOR_BRIGHT_WHITE",
+                    "COLOR_PINK",
+                    "COLOR_ORANGE",
+                }:
+                    btn.styles.color = "#000000"
+                else:
+                    btn.styles.color = "#ffffff"
 
         self._sync_tabs_ui()
         self._update_preview()
@@ -1405,6 +1430,330 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
 
 
 # ==============================================================================
+# BACKGROUND / WALLPAPER CONFIGURATION MODAL SCREEN
+# ==============================================================================
+
+
+class BackgroundConfigModal(ModalScreen[dict | None]):
+    """Interactive modal dialog for configuring wallpaper image and background parameters."""
+
+    DEFAULT_CSS = """
+    BackgroundConfigModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.65);
+    }
+    BackgroundConfigModal #dialog {
+        width: 76;
+        height: 28;
+        border: thick #555;
+        background: #181818;
+        padding: 0 1;
+    }
+    BackgroundConfigModal #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 0;
+    }
+    BackgroundConfigModal #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: #eee;
+    }
+    BackgroundConfigModal .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    BackgroundConfigModal .btn_close_x:hover {
+        background: #333;
+        color: #fff;
+    }
+    BackgroundConfigModal .field_label {
+        color: #aaa;
+        height: 1;
+        margin-top: 1;
+    }
+    BackgroundConfigModal .field_row {
+        height: 1;
+        width: 100%;
+        margin-bottom: 0;
+    }
+    BackgroundConfigModal .field_row Input {
+        width: 1fr;
+        height: 1;
+        padding: 0 1;
+        border: none;
+        background: #252525;
+        color: #fff;
+    }
+    BackgroundConfigModal .field_row Button {
+        height: 1;
+        min-width: 12;
+        margin-left: 1;
+        padding: 0 1;
+        border: none;
+    }
+    BackgroundConfigModal .split_row {
+        height: 3;
+        width: 100%;
+        margin-top: 0;
+    }
+    BackgroundConfigModal .split_col {
+        width: 1fr;
+        height: 100%;
+    }
+    BackgroundConfigModal .split_col_left {
+        margin-right: 1;
+    }
+    BackgroundConfigModal .split_col_right {
+        margin-left: 1;
+    }
+    BackgroundConfigModal .split_col Input {
+        height: 1;
+        padding: 0 1;
+        border: none;
+        background: #252525;
+        color: #fff;
+    }
+    BackgroundConfigModal .split_col Select {
+        height: 1;
+        border: none;
+        background: #252525;
+        color: #fff;
+    }
+    BackgroundConfigModal .split_col Select > SelectCurrent {
+        height: 1;
+        border: none !important;
+        padding: 0 1;
+        background: #252525;
+        color: #fff;
+    }
+    BackgroundConfigModal #btn_row {
+        height: 3;
+        margin-top: 1;
+        align: center middle;
+    }
+    BackgroundConfigModal #btn_row Button {
+        height: 3;
+        min-width: 16;
+        margin: 0 1;
+    }
+    BackgroundConfigModal #btn_row Button:focus {
+        border: heavy #fff;
+        text-style: bold;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "apply", "Apply"),
+    ]
+
+    def __init__(
+        self,
+        current_background: dict | str | None = None,
+        theme_styles: dict | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.theme_styles = theme_styles or {}
+        if isinstance(current_background, dict):
+            self.bg_cfg = copy.deepcopy(current_background)
+        elif isinstance(current_background, str):
+            self.bg_cfg = {"image": current_background}
+        else:
+            self.bg_cfg = {}
+
+    def compose(self) -> ComposeResult:
+        with bashmenu_ui.ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label("Configure Background Wallpaper", id="title")
+                        yield Label(
+                            bashmenu_ui.format_close_button_label(self.theme_styles),
+                            id="btn_close_x",
+                            classes="btn_close_x",
+                        )
+
+                    curr_img = str(self.bg_cfg.get("image", ""))
+                    curr_op = str(self.bg_cfg.get("opacity", 0.85))
+                    curr_sc = str(self.bg_cfg.get("scaling", "cover"))
+                    curr_md = str(self.bg_cfg.get("mode", "halfblock"))
+                    curr_cl = str(self.bg_cfg.get("clustering", 0))
+                    curr_qu = str(self.bg_cfg.get("quantization", 1))
+
+                    scaling_options = [
+                        ("cover (fill window)", "cover"),
+                        ("stretch (exact fit)", "stretch"),
+                        ("fit (proportional)", "fit"),
+                        ("center (original size)", "center"),
+                        ("tile (repeat pattern)", "tile"),
+                    ]
+                    mode_options = [
+                        ("halfblock (▀▄ dual-pixel)", "halfblock"),
+                        ("quarterblock (▖▗ quad-pixel)", "quarterblock"),
+                    ]
+
+                    valid_scaling = [val for _, val in scaling_options]
+                    valid_modes = [val for _, val in mode_options]
+
+                    yield Label("Wallpaper Image File:", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(
+                            value=curr_img,
+                            placeholder="e.g. assets/wallpapers/twilight.png",
+                            id="input_bg_image",
+                        )
+                        yield Button("Browse...", id="btn_browse_bg", variant="primary")
+
+                    with Horizontal(classes="split_row"):
+                        with Vertical(classes="split_col split_col_left"):
+                            yield Label("Opacity (0.0 to 1.0):", classes="field_label")
+                            yield Input(value=curr_op, id="input_bg_opacity", placeholder="0.85")
+                        with Vertical(classes="split_col split_col_right"):
+                            yield Label("Scaling Mode:", classes="field_label")
+                            yield Select[str](
+                                options=scaling_options,
+                                value=curr_sc if curr_sc in valid_scaling else "cover",
+                                id="select_bg_scaling",
+                                allow_blank=False,
+                            )
+
+                    with Horizontal(classes="split_row"):
+                        with Vertical(classes="split_col split_col_left"):
+                            yield Label("Rendering Mode:", classes="field_label")
+                            yield Select[str](
+                                options=mode_options,
+                                value=curr_md if curr_md in valid_modes else "halfblock",
+                                id="select_bg_mode",
+                                allow_blank=False,
+                            )
+                        with Vertical(classes="split_col split_col_right"):
+                            yield Label("Clustering (0=none, 16-128):", classes="field_label")
+                            yield Input(value=curr_cl, id="input_bg_clustering", placeholder="0")
+
+                    yield Label("Palette Quantization (1=off, 16-256):", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(value=curr_qu, id="input_bg_quantization", placeholder="1")
+
+                    with Horizontal(id="btn_row"):
+                        yield Button("Apply", variant="primary", id="btn_apply_bg")
+                        yield Button("Remove Wallpaper", variant="error", id="btn_remove_bg")
+                        yield Button("Cancel", variant="default", id="btn_cancel_bg")
+
+                yield bashmenu_ui.ShadowWidget(id="shadow_right")
+            yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        ts = self.theme_styles or getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors()
+        self.theme_styles = ts
+        bashmenu_ui.apply_modal_theme(self, ts)
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(ts))
+        border_style = ts.get("border") or ts.get("accent")
+        if border_style and border_style.color and border_style.color.name:
+            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+            if css_border:
+                with contextlib.suppress(Exception):
+                    self.query_one("#dialog").styles.border = ("thick", css_border)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        btn_id = event.button.id
+        if btn_id == "btn_browse_bg":
+            start_dir = os.path.join(bashmenu.BASHMENU_DIR, "assets", "wallpapers")
+            if not os.path.isdir(start_dir):
+                start_dir = os.path.join(os.getcwd(), "assets", "wallpapers")
+            if not os.path.isdir(start_dir):
+                start_dir = os.getcwd()
+
+            def _on_file_picked(picked_file: str | None) -> None:
+                if picked_file:
+                    with contextlib.suppress(Exception):
+                        rel = os.path.relpath(picked_file, bashmenu.BASHMENU_DIR)
+                        if not rel.startswith(".."):
+                            picked_file = rel
+                    with contextlib.suppress(Exception):
+                        inp = self.query_one("#input_bg_image", Input)
+                        inp.value = picked_file
+                        inp.focus()
+
+            self.app.push_screen(
+                bashmenu_ui.FilePickerModalScreen(
+                    "Choose Wallpaper Image",
+                    start_dir=start_dir,
+                    mode="file",
+                    theme=self.theme_styles,
+                ),
+                _on_file_picked,
+            )
+        elif btn_id == "btn_apply_bg":
+            self.action_apply()
+        elif btn_id == "btn_remove_bg":
+            self.dismiss({})
+        elif btn_id == "btn_cancel_bg":
+            self.dismiss(None)
+
+    def on_click(self, event: Any) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_apply(self) -> None:
+        img_val = self.query_one("#input_bg_image", Input).value.strip()
+        if not img_val:
+            self.dismiss({})
+            return
+
+        opacity_str = self.query_one("#input_bg_opacity", Input).value.strip()
+        try:
+            opacity_val = max(0.0, min(1.0, float(opacity_str)))
+        except ValueError:
+            opacity_val = 0.85
+
+        scaling_sel = self.query_one("#select_bg_scaling", Select)
+        scaling_val = str(scaling_sel.value) if scaling_sel.value and scaling_sel.value != Select.BLANK else "cover"
+
+        mode_sel = self.query_one("#select_bg_mode", Select)
+        mode_val = str(mode_sel.value) if mode_sel.value and mode_sel.value != Select.BLANK else "halfblock"
+
+        clustering_str = self.query_one("#input_bg_clustering", Input).value.strip()
+        try:
+            clustering_val = max(0, int(clustering_str))
+        except ValueError:
+            clustering_val = 0
+
+        quantization_str = self.query_one("#input_bg_quantization", Input).value.strip()
+        try:
+            quantization_val = max(1, int(quantization_str))
+        except ValueError:
+            quantization_val = 1
+
+        cfg_dict: dict[str, Any] = {
+            "image": img_val,
+            "opacity": opacity_val,
+            "scaling": scaling_val,
+            "mode": mode_val,
+        }
+        if clustering_val > 0:
+            cfg_dict["clustering"] = clustering_val
+        if quantization_val > 1:
+            cfg_dict["quantization"] = quantization_val
+
+        self.dismiss(cfg_dict)
+
+
+# ==============================================================================
 # LIVE PREVIEW CANVAS WIDGET
 # ==============================================================================
 
@@ -1888,6 +2237,48 @@ class ThemePreviewWidget(Static):
             if idx < len(lines) - 1:
                 out.append("\n")
 
+        bg_spec = styles.get("theme_background")
+        if isinstance(bg_spec, dict) and bg_spec.get("image"):
+            img_path = str(bg_spec.get("image", "")).strip()
+            if img_path:
+                with contextlib.suppress(Exception):
+                    opacity = float(bg_spec.get("opacity", 0.85))
+                    scaling = str(bg_spec.get("scaling", "cover"))
+                    clustering = int(bg_spec.get("clustering", 0) or 0)
+                    quantization = int(bg_spec.get("quantization", 1) or 1)
+                    cached_comp = getattr(self, "_wallpaper_compositor", None)
+                    if (
+                        cached_comp is not None
+                        and getattr(cached_comp, "image_path", None) == img_path
+                        and getattr(cached_comp, "opacity", None) == opacity
+                        and getattr(cached_comp, "scaling", None) == scaling
+                        and getattr(cached_comp, "clustering", None) == clustering
+                        and getattr(cached_comp, "quantization", None) == quantization
+                    ):
+                        compositor = cached_comp
+                    else:
+                        compositor = bashmenu_ui.WallpaperCompositor(
+                            img_path,
+                            opacity=opacity,
+                            scaling=scaling,
+                            base_dir=bashmenu.BASHMENU_DIR,
+                            clustering=clustering,
+                            quantization=quantization,
+                        )
+                        self._wallpaper_compositor = compositor
+
+                    if compositor and compositor._raw_image:
+                        theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
+                        grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
+                        if grid:
+                            out = bashmenu_ui.composite_menu_text(
+                                out,
+                                grid,
+                                w + 3,
+                                len(lines),
+                                theme_default_bg=theme_bg_rgb,
+                            )
+
         return out
 
 
@@ -2007,6 +2398,7 @@ class ThemeEditScreen(Screen):
         Binding("a", "pick_ascii", "ASCII Picker"),
         Binding("t", "clone_theme", "Clone Base"),
         Binding("d", "derive_palettes", "Derive 16/8"),
+        Binding("b", "configure_background", "Background"),
         Binding("s", "save_theme", "Save"),
         Binding("S", "save_as_theme", "Save As"),
         Binding("w", "save_as_theme", "Save As", show=False),
@@ -2384,6 +2776,23 @@ class ThemeEditScreen(Screen):
                     yield Label("Length Mode:", classes="prop_label")
                     yield Input(value=div_len, id="prop_divider_length", classes="prop_input")
 
+                yield Label("▼ Wallpaper & Background", classes="section_header")
+                bg_data = self.current_theme.get("background")
+                bg_img = ""
+                if isinstance(bg_data, dict):
+                    bg_img = str(bg_data.get("image", ""))
+                elif isinstance(bg_data, str):
+                    bg_img = bg_data
+                with Horizontal(classes="prop_row"):
+                    yield Label("Wallpaper:", classes="prop_label")
+                    yield Input(
+                        value=bg_img,
+                        placeholder="(None / disabled)",
+                        id="prop_wallpaper_image",
+                        classes="prop_input",
+                    )
+                    yield Button("Config", classes="btn_prop_action", id="btn_config_background")
+
                 yield Label("▼ 256-Color Palette Tokens", classes="section_header")
                 pal_256 = self.current_theme.get(256) or self.current_theme.get("256") or {}
                 for tok in self.COLOR_TOKENS:
@@ -2406,6 +2815,8 @@ class ThemeEditScreen(Screen):
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[d] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
             with Horizontal(classes="footer_row"):
+                yield Label("[b] Background", classes="footer_item", id="lbl_background", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[s] Save", classes="footer_item", id="lbl_save", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[S] Save As", classes="footer_item", id="lbl_save_as", markup=False)
@@ -2533,6 +2944,39 @@ class ThemeEditScreen(Screen):
             if str(div.get(sub_k, "")) == val:
                 return
             div[sub_k] = val
+        elif inp_id == "prop_wallpaper_image":
+            val_clean = val.strip()
+            curr_bg = self.current_theme.get("background")
+            if not val_clean:
+                if "background" in self.current_theme or "wallpaper" in self.current_theme:
+                    self.current_theme.pop("background", None)
+                    self.current_theme.pop("wallpaper", None)
+                    self.is_dirty = True
+                    self._sync_preview()
+                return
+            if isinstance(curr_bg, dict):
+                if curr_bg.get("image") == val_clean:
+                    return
+                curr_bg["image"] = val_clean
+            elif isinstance(curr_bg, str):
+                if curr_bg == val_clean:
+                    return
+                self.current_theme["background"] = {
+                    "image": val_clean,
+                    "opacity": 0.85,
+                    "scaling": "cover",
+                    "mode": "halfblock",
+                }
+            else:
+                self.current_theme["background"] = {
+                    "image": val_clean,
+                    "opacity": 0.85,
+                    "scaling": "cover",
+                    "mode": "halfblock",
+                }
+            self.is_dirty = True
+            self._sync_preview()
+            return
         elif inp_id.startswith("prop_"):
             border_k = inp_id.replace("prop_", "")
             win = self.current_theme.setdefault("window", {})
@@ -2602,6 +3046,9 @@ class ThemeEditScreen(Screen):
                 _on_ascii_picked,
             )
 
+        elif btn_id == "btn_config_background":
+            self.action_configure_background()
+
         elif btn_id.startswith("btn_color_"):
             tok = btn_id.replace("btn_color_", "")
             pal_256 = self._get_pal_256()
@@ -2639,6 +3086,8 @@ class ThemeEditScreen(Screen):
             self.action_clone_theme()
         elif w_id == "lbl_derive":
             self.action_derive_palettes()
+        elif w_id == "lbl_background":
+            self.action_configure_background()
         elif w_id == "lbl_save":
             self.action_save_theme()
         elif w_id == "lbl_save_as":
@@ -2764,6 +3213,14 @@ class ThemeEditScreen(Screen):
             self.query_one("#prop_divider_char", Input).value = div_char
             self.query_one("#prop_divider_length", Input).value = div_len
 
+            bg_data = self.current_theme.get("background")
+            bg_img = ""
+            if isinstance(bg_data, dict):
+                bg_img = str(bg_data.get("image", ""))
+            elif isinstance(bg_data, str):
+                bg_img = bg_data
+            self.query_one("#prop_wallpaper_image", Input).value = bg_img
+
             for k, _ in self.BORDER_PROPERTIES:
                 b_val = str(self.current_theme.get("window", {}).get(k, ""))
                 self.query_one(f"#prop_{k}", Input).value = b_val
@@ -2772,6 +3229,30 @@ class ThemeEditScreen(Screen):
             for tok in self.COLOR_TOKENS:
                 c_val = str(pal_256.get(tok, -1))
                 self.query_one(f"#color_{tok}", Input).value = c_val
+
+    def action_configure_background(self) -> None:
+        """Open the background and wallpaper configuration dialog (b shortcut)."""
+        curr_bg = self.current_theme.get("background")
+        self.app.push_screen(
+            BackgroundConfigModal(current_background=curr_bg, theme_styles=self.configured_theme_styles),
+            self._on_background_configured,
+        )
+
+    def _on_background_configured(self, result: dict[str, Any] | None) -> None:
+        """Handle background configuration result from modal."""
+        if result is None:
+            return
+        if result:
+            self.current_theme["background"] = result
+        else:
+            self.current_theme.pop("background", None)
+            self.current_theme.pop("wallpaper", None)
+
+        self.is_dirty = True
+        img_val = result.get("image", "") if result else ""
+        with contextlib.suppress(Exception):
+            self.query_one("#prop_wallpaper_image", Input).value = img_val
+        self._sync_preview()
 
     def action_derive_palettes(self) -> None:
         """Calculate closest 16-color and 8-color fallback palettes from 256."""

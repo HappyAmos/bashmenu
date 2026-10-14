@@ -953,6 +953,182 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_background_config_modal_controls_and_dismissal(self):
+        """Verify BackgroundConfigModal controls, browse button, and dismissal actions."""
+        from textual.widgets import Select
+
+        curr_bg = {
+            "image": "assets/wallpapers/twilight.png",
+            "opacity": 0.75,
+            "scaling": "fit",
+            "mode": "quarterblock",
+            "clustering": 32,
+            "quantization": 64,
+        }
+
+        class ModalApp(themeedit.App):
+            def __init__(self):
+                super().__init__()
+                self.modal_result = "unset"
+
+            def on_mount(self):
+                def _cb(res):
+                    self.modal_result = res
+
+                self.push_screen(themeedit.BackgroundConfigModal(current_background=curr_bg), _cb)
+
+        async def _run():
+            app = ModalApp()
+            async with app.run_test() as pilot:
+                self.assertIsInstance(app.screen, themeedit.BackgroundConfigModal)
+                modal = app.screen
+
+                img_inp = modal.query_one("#input_bg_image", Input)
+                self.assertEqual(img_inp.value, "assets/wallpapers/twilight.png")
+
+                op_inp = modal.query_one("#input_bg_opacity", Input)
+                self.assertEqual(op_inp.value, "0.75")
+
+                sc_sel = modal.query_one("#select_bg_scaling", Select)
+                self.assertEqual(sc_sel.value, "fit")
+
+                md_sel = modal.query_one("#select_bg_mode", Select)
+                self.assertEqual(md_sel.value, "quarterblock")
+
+                cl_inp = modal.query_one("#input_bg_clustering", Input)
+                self.assertEqual(cl_inp.value, "32")
+
+                qu_inp = modal.query_one("#input_bg_quantization", Input)
+                self.assertEqual(qu_inp.value, "64")
+
+                # Test Apply button
+                btn_apply = modal.query_one("#btn_apply_bg")
+                await pilot.click(btn_apply)
+                await pilot.pause()
+                self.assertEqual(
+                    app.modal_result,
+                    {
+                        "image": "assets/wallpapers/twilight.png",
+                        "opacity": 0.75,
+                        "scaling": "fit",
+                        "mode": "quarterblock",
+                        "clustering": 32,
+                        "quantization": 64,
+                    },
+                )
+
+        asyncio.run(_run())
+
+    def test_background_config_modal_remove_and_cancel(self):
+        """Verify BackgroundConfigModal remove wallpaper and cancel buttons."""
+        class RemoveApp(themeedit.App):
+            def __init__(self):
+                super().__init__()
+                self.modal_result = "unset"
+
+            def on_mount(self):
+                def _cb(res):
+                    self.modal_result = res
+
+                self.push_screen(
+                    themeedit.BackgroundConfigModal(current_background="assets/wallpapers/test.png"),
+                    _cb,
+                )
+
+        async def _run_remove():
+            app = RemoveApp()
+            async with app.run_test() as pilot:
+                btn_remove = app.screen.query_one("#btn_remove_bg")
+                await pilot.click(btn_remove)
+                await pilot.pause()
+                self.assertEqual(app.modal_result, {})
+
+        asyncio.run(_run_remove())
+
+        class CancelApp(themeedit.App):
+            def __init__(self):
+                super().__init__()
+                self.modal_result = "unset"
+
+            def on_mount(self):
+                def _cb(res):
+                    self.modal_result = res
+
+                self.push_screen(
+                    themeedit.BackgroundConfigModal(current_background="assets/wallpapers/test.png"),
+                    _cb,
+                )
+
+        async def _run_cancel():
+            app = CancelApp()
+            async with app.run_test() as pilot:
+                btn_cancel = app.screen.query_one("#btn_cancel_bg")
+                await pilot.click(btn_cancel)
+                await pilot.pause()
+                self.assertIsNone(app.modal_result)
+
+        asyncio.run(_run_cancel())
+
+    def test_theme_editor_background_shortcut_and_inspector(self):
+        """Verify ThemeEditScreen background shortcut [b] and inspector wallpaper controls."""
+        app = themeedit.ThemeEditApp()
+
+        async def _run():
+            async with app.run_test() as pilot:
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                # Summary input and button exist in inspector
+                wp_input = screen.query_one("#prop_wallpaper_image", Input)
+                self.assertIsNotNone(wp_input)
+                btn_cfg = screen.query_one("#btn_config_background")
+                self.assertIsNotNone(btn_cfg)
+
+                # Press 'b' to open modal
+                await pilot.press("b")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, themeedit.BackgroundConfigModal)
+
+                # Cancel modal
+                await pilot.press("escape")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, themeedit.ThemeEditScreen)
+
+        asyncio.run(_run())
+
+    def test_theme_preview_widget_with_wallpaper(self):
+        """Verify ThemePreviewWidget renders safely with background wallpaper configured."""
+        sample_theme = {
+            "indicator": ">",
+            "divider": {"char": "─", "length": "{window_width}"},
+            "window": dict(bashmenu_ui.DEFAULT_WINDOW_BORDER),
+            "background": {
+                "image": "assets/wallpapers/twilight.png",
+                "opacity": 0.5,
+                "scaling": "cover",
+                "mode": "halfblock",
+            },
+            256: {
+                "background": "COLOR_BLACK",
+                "title": [201, -1],
+                "border": [61, -1],
+                "text": [255, -1],
+                "highlight": [255, 201],
+                "selection": [255, 61],
+                "shortcut_key": [201, -1],
+                "divider": [61, -1],
+                "plugin": [81, -1],
+                "gutter": [61, -1],
+                "help_text": [81, -1],
+                "shadow": [235, "COLOR_BLACK"],
+            },
+        }
+        widget = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_wp")
+        rendered = widget.render()
+        self.assertIsInstance(rendered, Text)
+        self.assertIn("Bash Menu", rendered.plain)
+
 
 if __name__ == "__main__":
     unittest.main()
+
