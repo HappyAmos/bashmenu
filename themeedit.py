@@ -144,8 +144,8 @@ class ColorPickerModal(ModalScreen[Any]):
     #dialog {
         width: 78;
         height: 27;
-        border: thick $accent;
-        background: $surface;
+        border: thick #555;
+        background: #181818;
         padding: 1 2;
     }
     #title_bar {
@@ -157,7 +157,7 @@ class ColorPickerModal(ModalScreen[Any]):
         width: 1fr;
         text-align: center;
         text-style: bold;
-        color: $accent;
+        color: #eee;
     }
     .btn_close_x {
         dock: right;
@@ -170,19 +170,19 @@ class ColorPickerModal(ModalScreen[Any]):
         background: transparent;
     }
     .btn_close_x:hover {
-        background: $accent;
-        color: $text;
+        background: #333;
+        color: #fff;
     }
     #color_palette_grid {
         height: 12;
-        border: solid $accent;
+        border: solid #555;
         padding: 0 1;
         overflow-y: auto;
     }
     #preview_bar {
         height: 2;
         margin-top: 1;
-        border: solid $accent;
+        border: solid #555;
         text-align: center;
     }
     #btn_row {
@@ -220,7 +220,7 @@ class ColorPickerModal(ModalScreen[Any]):
                     with Horizontal(id="title_bar"):
                         yield Label(f"Pick Color: [{self.token_name}]", id="title")
                         yield Label(
-                            bashmenu_ui.format_close_button_label(),
+                            bashmenu_ui.format_close_button_label(self.theme_styles),
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
@@ -234,6 +234,41 @@ class ColorPickerModal(ModalScreen[Any]):
             yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
+        ts = self.theme_styles or getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors()
+        self.theme_styles = ts
+        bashmenu_ui.apply_modal_theme(self, ts)
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(ts))
+        border_style = ts.get("border") or ts.get("accent")
+        if border_style and border_style.color and border_style.color.name:
+            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+            if css_border:
+                with contextlib.suppress(Exception):
+                    self.query_one("#color_palette_grid").styles.border = ("solid", css_border)
+                with contextlib.suppress(Exception):
+                    self.query_one("#preview_bar").styles.border = ("solid", css_border)
+        btn_prim = ts.get("button_primary") or ts.get("selection")
+        if btn_prim:
+            css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
+            css_p_fg = bashmenu_ui.parse_css_color(btn_prim.color.name) if btn_prim.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_select")
+                if css_p_bg:
+                    b.styles.background = css_p_bg
+                if css_p_fg:
+                    b.styles.color = css_p_fg
+        btn_err = ts.get("button_error") or ts.get("button_cancel")
+        if btn_err:
+            css_e_bg = bashmenu_ui.parse_css_color(btn_err.bgcolor.name) if btn_err.bgcolor else None
+            css_e_fg = bashmenu_ui.parse_css_color(btn_err.color.name) if btn_err.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_cancel")
+                if css_e_bg:
+                    b.styles.background = css_e_bg
+                if css_e_fg:
+                    b.styles.color = css_e_fg
+
         grid = self.query_one("#color_palette_grid", OptionList)
         options = []
         sel_idx = 0
@@ -313,8 +348,8 @@ class AsciiPickerModal(ModalScreen[str]):
     #dialog {
         width: 74;
         height: 25;
-        border: thick $accent;
-        background: $surface;
+        border: thick #555;
+        background: #181818;
         padding: 1 2;
     }
     #title_bar {
@@ -326,7 +361,7 @@ class AsciiPickerModal(ModalScreen[str]):
         width: 1fr;
         text-align: center;
         text-style: bold;
-        color: $accent;
+        color: #eee;
     }
     .btn_close_x {
         dock: right;
@@ -339,12 +374,12 @@ class AsciiPickerModal(ModalScreen[str]):
         background: transparent;
     }
     .btn_close_x:hover {
-        background: $accent;
-        color: $text;
+        background: #333;
+        color: #fff;
     }
     #glyph_list {
         height: 13;
-        border: solid $accent;
+        border: solid #555;
     }
     #footer_lbl {
         text-align: center;
@@ -366,10 +401,11 @@ class AsciiPickerModal(ModalScreen[str]):
         ("Indicators & Pointers", [">", "*", "◆", "▶", "❯", "➜", "➔", "•", "⦿", "󰖟", "⚙", "ℹ"]),
     ]
 
-    def __init__(self, property_name: str, current_char: str):
+    def __init__(self, property_name: str, current_char: str, theme_styles: dict | None = None):
         super().__init__()
         self.property_name = property_name
         self.current_char = current_char
+        self.theme_styles = theme_styles or {}
 
     def compose(self) -> ComposeResult:
         with bashmenu_ui.ModalFrame(id="modal_frame"):
@@ -378,7 +414,7 @@ class AsciiPickerModal(ModalScreen[str]):
                     with Horizontal(id="title_bar"):
                         yield Label(f"ASCII / Box Glyph Picker: [{self.property_name}]", id="title")
                         yield Label(
-                            bashmenu_ui.format_close_button_label(),
+                            bashmenu_ui.format_close_button_label(self.theme_styles),
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
@@ -388,6 +424,19 @@ class AsciiPickerModal(ModalScreen[str]):
             yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
+        ts = self.theme_styles or getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors()
+        self.theme_styles = ts
+        bashmenu_ui.apply_modal_theme(self, ts)
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(ts))
+        border_style = ts.get("border") or ts.get("accent")
+        if border_style and border_style.color and border_style.color.name:
+            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+            if css_border:
+                with contextlib.suppress(Exception):
+                    self.query_one("#glyph_list").styles.border = ("solid", css_border)
+
         opt_list = self.query_one("#glyph_list", OptionList)
         seen_glyphs = set()
         for cat_name, glyphs in self.GLYPH_CATEGORIES:
@@ -427,8 +476,8 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
     #dialog {
         width: 60;
         height: 20;
-        border: thick $accent;
-        background: $surface;
+        border: thick #555;
+        background: #181818;
         padding: 1 2;
     }
     #title_bar {
@@ -440,7 +489,7 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
         width: 1fr;
         text-align: center;
         text-style: bold;
-        color: $accent;
+        color: #eee;
     }
     .btn_close_x {
         dock: right;
@@ -453,8 +502,8 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
         background: transparent;
     }
     .btn_close_x:hover {
-        background: $accent;
-        color: $text;
+        background: #333;
+        color: #fff;
     }
     #input_theme_name {
         margin: 1 0;
@@ -476,9 +525,10 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
         Binding("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, current_name: str):
+    def __init__(self, current_name: str, theme_styles: dict | None = None):
         super().__init__()
         self.current_name = current_name
+        self.theme_styles = theme_styles or {}
 
     def compose(self) -> ComposeResult:
         with bashmenu_ui.ModalFrame(id="modal_frame"):
@@ -487,7 +537,7 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
                     with Horizontal(id="title_bar"):
                         yield Label("Save Theme to Disk", id="title")
                         yield Label(
-                            bashmenu_ui.format_close_button_label(),
+                            bashmenu_ui.format_close_button_label(self.theme_styles),
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
@@ -499,6 +549,34 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
                         yield Button("Cancel", variant="error", id="btn_cancel")
                 yield bashmenu_ui.ShadowWidget(id="shadow_right")
             yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        ts = self.theme_styles or getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors()
+        self.theme_styles = ts
+        bashmenu_ui.apply_modal_theme(self, ts)
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(ts))
+        btn_prim = ts.get("button_primary") or ts.get("selection")
+        if btn_prim:
+            css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
+            css_p_fg = bashmenu_ui.parse_css_color(btn_prim.color.name) if btn_prim.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_save")
+                if css_p_bg:
+                    b.styles.background = css_p_bg
+                if css_p_fg:
+                    b.styles.color = css_p_fg
+        btn_err = ts.get("button_error") or ts.get("button_cancel")
+        if btn_err:
+            css_e_bg = bashmenu_ui.parse_css_color(btn_err.bgcolor.name) if btn_err.bgcolor else None
+            css_e_fg = bashmenu_ui.parse_css_color(btn_err.color.name) if btn_err.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_cancel")
+                if css_e_bg:
+                    b.styles.background = css_e_bg
+                if css_e_fg:
+                    b.styles.color = css_e_fg
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_save":
@@ -758,19 +836,33 @@ class ThemeEditScreen(Screen):
     DEFAULT_CSS = """
     ThemeEditScreen {
         layout: vertical;
-        background: $surface;
+        background: #121212;
     }
     #header {
         dock: top;
         height: 1;
         width: 100%;
-        background: $accent;
-        color: $surface;
+        background: #242424;
+        color: #eee;
     }
     #header_title {
         width: 1fr;
         text-align: center;
         text-style: bold;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        background: #3a3a3a;
+        color: #fff;
     }
     #workspace {
         height: 1fr;
@@ -779,23 +871,23 @@ class ThemeEditScreen(Screen):
     #preview_panel {
         width: 1fr;
         height: 100%;
-        border: solid $accent;
+        border: solid #444;
         padding: 1 1;
         align: center middle;
     }
     #inspector_panel {
         width: 1fr;
         height: 100%;
-        border: solid $accent;
+        border: solid #444;
         padding: 0 1;
         overflow-y: auto;
     }
     .section_header {
         text-style: bold;
-        color: $accent;
+        color: #ddd;
         margin-top: 1;
         margin-bottom: 0;
-        background: $accent 15%;
+        background: #252525;
         padding: 0 1;
     }
     .prop_row {
@@ -807,6 +899,7 @@ class ThemeEditScreen(Screen):
     .prop_label {
         width: 16;
         text-style: bold;
+        color: #ccc;
     }
     .prop_input {
         width: 1fr;
@@ -818,8 +911,8 @@ class ThemeEditScreen(Screen):
     #footer {
         dock: bottom;
         height: 2;
-        background: $surface;
-        color: $accent;
+        background: #181818;
+        color: #bbb;
     }
     .footer_row {
         height: 1;
@@ -827,14 +920,14 @@ class ThemeEditScreen(Screen):
         align: center middle;
     }
     .footer_item {
-        color: $accent;
+        color: #bbb;
     }
     .footer_item:hover {
         text-style: underline;
-        color: $text;
+        color: #fff;
     }
     .footer_sep {
-        color: $text-muted;
+        color: #555;
     }
     """
 
@@ -896,11 +989,22 @@ class ThemeEditScreen(Screen):
         ("gutter_bottom_tee", "Gutter Bot Tee"),
     ]
 
-    def __init__(self, initial_theme: str = "tokyo_night", themes_filepath: str | None = None):
+    def __init__(
+        self,
+        initial_theme: str | None = None,
+        themes_filepath: str | None = None,
+        configured_theme: str | None = None,
+    ):
         super().__init__()
         self.themes_filepath = themes_filepath or os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.themes")
         self.raw_themes_data = bashmenu_ui.load_themes_file(self.themes_filepath) or {}
-        self.theme_name = initial_theme if initial_theme in self.raw_themes_data else "dracula"
+
+        cfg, _ = bashmenu.load_config()
+        self.configured_theme = configured_theme or cfg.get("theme", "dracula")
+        self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
+
+        target_theme = initial_theme or self.configured_theme
+        self.theme_name = target_theme if target_theme in self.raw_themes_data else "dracula"
         if not self.raw_themes_data:
             # Fallback basic template
             self.raw_themes_data = {"custom": {"window": {}, "256": {"background": "COLOR_BLACK"}}}
@@ -947,16 +1051,155 @@ class ThemeEditScreen(Screen):
             self.current_theme["window"].setdefault(k, v)
 
     def on_mount(self) -> None:
-        """Initialize mounted state and baseline snapshot after widgets are composed."""
+        """Initialize mounted state, apply configured theme styles, and baseline snapshot."""
         self._mounted_ready = True
         self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
         self._initial_theme_name = self.theme_name
         self._force_dirty = False
+        app_theme = getattr(self.app, "theme_name", None)
+        if app_theme and (not getattr(self, "configured_theme", None) or self.configured_theme == "dracula"):
+            self.configured_theme = app_theme
+            self.configured_theme_styles = getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors(app_theme)
+        self.apply_theme()
         self._sync_preview()
 
+    def apply_theme(self) -> None:
+        """Apply configured theme styles to ThemeEditScreen and its subwidgets."""
+        with contextlib.suppress(Exception):
+            self.configured_theme_styles = bashmenu_ui.resolve_theme_dict(
+                getattr(self, "configured_theme_styles", None) or getattr(self.app, "theme_styles", None), self.app
+            )
+            t_name = (
+                self.configured_theme_styles.get("theme_name")
+                if isinstance(self.configured_theme_styles, dict)
+                else getattr(self, "configured_theme", "dracula")
+            )
+            if t_name:
+                self.configured_theme = t_name
+                bashmenu_ui.apply_theme_to_textual_borders(t_name)
+
+            ts = self.configured_theme_styles
+            bg_style = ts.get("background")
+            if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
+                css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                if css_bg:
+                    with contextlib.suppress(Exception):
+                        self.styles.background = css_bg
+                    for wid in ["#workspace", "#preview_panel", "#inspector_panel"]:
+                        with contextlib.suppress(Exception):
+                            self.query_one(wid).styles.background = css_bg
+
+            hdr_style = ts.get("header") or ts.get("title")
+            if hdr_style:
+                if hdr_style.bgcolor and hdr_style.bgcolor.name:
+                    css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
+                    if css_hdr_bg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#header").styles.background = css_hdr_bg
+                if hdr_style.color and hdr_style.color.name:
+                    css_hdr_fg = bashmenu_ui.parse_css_color(hdr_style.color.name)
+                    if css_hdr_fg:
+                        with contextlib.suppress(Exception):
+                            self.query_one("#header_title", Label).styles.color = css_hdr_fg
+
+            with contextlib.suppress(Exception):
+                btn_close = self.query_one("#btn_close_x", Label)
+                btn_close.update(bashmenu_ui.format_close_button_label(ts))
+
+            border_style = ts.get("border") or ts.get("accent")
+            if border_style and border_style.color and border_style.color.name:
+                css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+                if css_border:
+                    for pid in ["#preview_panel", "#inspector_panel"]:
+                        with contextlib.suppress(Exception):
+                            self.query_one(pid).styles.border = ("solid", css_border)
+                    with contextlib.suppress(Exception):
+                        for inp in self.query(".prop_input"):
+                            inp.styles.border = ("solid", css_border)
+
+            accent_style = ts.get("accent") or ts.get("title") or ts.get("help_text")
+            if accent_style and accent_style.color and accent_style.color.name:
+                css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
+                if css_accent:
+                    with contextlib.suppress(Exception):
+                        for sh in self.query(".section_header"):
+                            sh.styles.color = css_accent
+                            sh.styles.background = f"{css_accent} 15%"
+
+            text_style = ts.get("text")
+            if text_style and text_style.color and text_style.color.name:
+                css_text = bashmenu_ui.parse_css_color(text_style.color.name)
+                if css_text:
+                    with contextlib.suppress(Exception):
+                        for pl in self.query(".prop_label"):
+                            pl.styles.color = css_text
+                    with contextlib.suppress(Exception):
+                        for inp in self.query(".prop_input"):
+                            inp.styles.color = css_text
+
+            btn_style = ts.get("button_primary") or ts.get("selection") or accent_style
+            if btn_style:
+                css_btn_bg = bashmenu_ui.parse_css_color(btn_style.bgcolor.name) if btn_style.bgcolor else None
+                css_btn_fg = bashmenu_ui.parse_css_color(btn_style.color.name) if btn_style.color else None
+                with contextlib.suppress(Exception):
+                    for btn in self.query(".btn_prop_action"):
+                        if css_btn_bg:
+                            btn.styles.background = css_btn_bg
+                        if css_btn_fg:
+                            btn.styles.color = css_btn_fg
+
+            footer_style = ts.get("footer") or ts.get("background")
+            if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
+                css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
+                if css_ftr_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#footer").styles.background = css_ftr_bg
+
+            help_style = ts.get("help_text") or ts.get("shortcut_key") or accent_style
+            if help_style and help_style.color and help_style.color.name:
+                css_help = bashmenu_ui.parse_css_color(help_style.color.name)
+                if css_help:
+                    with contextlib.suppress(Exception):
+                        for item in self.query(".footer_item"):
+                            item.styles.color = css_help
+
+            sep_style = ts.get("border") or ts.get("divider") or ts.get("footer")
+            if sep_style and sep_style.color and sep_style.color.name:
+                css_sep = bashmenu_ui.parse_css_color(sep_style.color.name)
+                if css_sep:
+                    with contextlib.suppress(Exception):
+                        for sep in self.query(".footer_sep"):
+                            sep.styles.color = css_sep
+                            sep.styles.auto_color = False
+
+            # Scrollbars
+            sb_style = ts.get("scrollbar") or border_style or accent_style
+            if sb_style:
+                css_sb_fg = (
+                    bashmenu_ui.parse_css_color(sb_style.color.name)
+                    if (sb_style.color and sb_style.color.name)
+                    else None
+                )
+                css_sb_bg = (
+                    bashmenu_ui.parse_css_color(sb_style.bgcolor.name)
+                    if (sb_style.bgcolor and sb_style.bgcolor.name)
+                    else None
+                )
+                for w in [self, self.query_one("#inspector_panel")]:
+                    with contextlib.suppress(Exception):
+                        if css_sb_fg:
+                            w.styles.scrollbar_color = css_sb_fg
+                        if css_sb_bg:
+                            w.styles.scrollbar_background = css_sb_bg
+
     def compose(self) -> ComposeResult:
-        with Vertical(id="header"):
+        with Horizontal(id="header"):
             yield Label(f"BashMenu Theme Editor — [{self.theme_name}]", id="header_title")
+            yield Label(
+                bashmenu_ui.format_close_button_label(self.configured_theme_styles),
+                id="btn_close_x",
+                classes="btn_close_x",
+            )
 
         with Horizontal(id="workspace"):
             with Vertical(id="preview_panel"):
@@ -1036,7 +1279,10 @@ class ThemeEditScreen(Screen):
         preview.update_theme(self.current_theme, theme_name=self.theme_name)
         h_title = self.query_one("#header_title", Label)
         dirty_flag = " *" if self.is_dirty else ""
-        h_title.update(f"BashMenu Theme Editor — [{self.theme_name}]{dirty_flag}")
+        borders = getattr(self, "configured_theme_styles", {}).get("window_borders") or bashmenu_ui.get_theme_window_borders(getattr(self, "configured_theme", "dracula"))
+        l_cap = borders.get("title_left_cap", "[").strip() or "["
+        r_cap = borders.get("title_right_cap", "]").strip() or "]"
+        h_title.update(f"{l_cap} BashMenu Theme Editor — [{self.theme_name}]{dirty_flag} {r_cap}")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""
@@ -1101,7 +1347,10 @@ class ThemeEditScreen(Screen):
                         inp = self.query_one(target_input_id, Input)
                         inp.value = glyph
 
-            self.app.push_screen(AsciiPickerModal(prop_k, curr_val), _on_ascii_picked)
+            self.app.push_screen(
+                AsciiPickerModal(prop_k, curr_val, theme_styles=self.configured_theme_styles),
+                _on_ascii_picked,
+            )
 
         elif btn_id.startswith("btn_color_"):
             tok = btn_id.replace("btn_color_", "")
@@ -1116,14 +1365,20 @@ class ThemeEditScreen(Screen):
                         inp = self.query_one(target_input_id, Input)
                         inp.value = str(chosen)
 
-            self.app.push_screen(ColorPickerModal(tok, curr_val, bg_color_val=bg_val), _on_color_picked)
+            self.app.push_screen(
+                ColorPickerModal(tok, curr_val, bg_color_val=bg_val, theme_styles=self.configured_theme_styles),
+                _on_color_picked,
+            )
 
     def on_click(self, event: Any) -> None:
-        """Handle mouse clicks on interactive footer shortcut items."""
+        """Handle mouse clicks on interactive footer shortcut items and header close button."""
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
         if not widget:
             return
         w_id = getattr(widget, "id", None)
+        if w_id == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", []):
+            self.action_exit_editor()
+            return
         if w_id == "lbl_help":
             self.action_show_help()
         elif w_id == "lbl_color":
@@ -1152,6 +1407,7 @@ class ThemeEditScreen(Screen):
             bashmenu_ui.MessageModalScreen(
                 "HA Bash Menu Manual",
                 help_text,
+                theme=self.configured_theme_styles,
                 is_help=True,
                 is_markdown=True,
             )
@@ -1170,7 +1426,10 @@ class ThemeEditScreen(Screen):
                 if c is not None:
                     focused.value = str(c)
 
-            self.app.push_screen(ColorPickerModal(tok, curr_val, bg_color_val=bg_val), _cb)
+            self.app.push_screen(
+                ColorPickerModal(tok, curr_val, bg_color_val=bg_val, theme_styles=self.configured_theme_styles),
+                _cb,
+            )
             return
 
         # Default fallback to color_background
@@ -1186,7 +1445,10 @@ class ThemeEditScreen(Screen):
                 if c is not None:
                     inp.value = str(c)
 
-            self.app.push_screen(ColorPickerModal(tok, curr_val, bg_color_val=bg_val), _cb_def)
+            self.app.push_screen(
+                ColorPickerModal(tok, curr_val, bg_color_val=bg_val, theme_styles=self.configured_theme_styles),
+                _cb_def,
+            )
 
     def action_pick_ascii(self) -> None:
         """Trigger box-drawing ASCII modal for focused property or default."""
@@ -1199,7 +1461,10 @@ class ThemeEditScreen(Screen):
                 if g:
                     focused.value = g
 
-            self.app.push_screen(AsciiPickerModal(prop_k, curr_val), _cb_a)
+            self.app.push_screen(
+                AsciiPickerModal(prop_k, curr_val, theme_styles=self.configured_theme_styles),
+                _cb_a,
+            )
             return
 
         # Default fallback to prop_border_top_left
@@ -1213,7 +1478,10 @@ class ThemeEditScreen(Screen):
                 if g:
                     inp.value = g
 
-            self.app.push_screen(AsciiPickerModal(prop_k, curr_val), _cb_a_def)
+            self.app.push_screen(
+                AsciiPickerModal(prop_k, curr_val, theme_styles=self.configured_theme_styles),
+                _cb_a_def,
+            )
 
     def action_clone_theme(self) -> None:
         """Open theme picker to clone an existing theme as a base."""
@@ -1226,7 +1494,10 @@ class ThemeEditScreen(Screen):
                 self._populate_all_inputs()
                 self._sync_preview()
 
-        self.app.push_screen(bashmenu_ui.ThemePickerModalScreen(self.theme_name), _on_theme_chosen)
+        self.app.push_screen(
+            bashmenu_ui.ThemePickerModalScreen(self.theme_name, theme=self.configured_theme_styles),
+            _on_theme_chosen,
+        )
 
     def _populate_all_inputs(self) -> None:
         """Reflect current_theme values across all inspector input fields."""
@@ -1261,6 +1532,7 @@ class ThemeEditScreen(Screen):
                 "Palettes Derived",
                 "Successfully calculated and synchronized 16-color and 8-color\n"
                 "fallback tiers from the active 256 palette.",
+                theme=self.configured_theme_styles,
             )
         )
 
@@ -1309,6 +1581,7 @@ class ThemeEditScreen(Screen):
                         bashmenu_ui.MessageModalScreen(
                             "Theme Validation Error",
                             f"Theme schema issues detected:\n{err_msg}",
+                            theme=self.configured_theme_styles,
                         )
                     )
                     return
@@ -1324,6 +1597,9 @@ class ThemeEditScreen(Screen):
                     cfg_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.yml")
                     with open(cfg_path, "w", encoding="utf-8") as f:
                         yaml.dump(cfg, f, sort_keys=False, default_flow_style=False)
+                    self.configured_theme = self.theme_name
+                    self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
+                    self.apply_theme()
 
                 self.is_dirty = False
                 self._sync_preview()
@@ -1332,14 +1608,22 @@ class ThemeEditScreen(Screen):
                         "Theme Saved",
                         f"Successfully saved theme '{self.theme_name}' to disk!\n"
                         + ("Active theme updated in bashmenu.yml." if set_active else ""),
+                        theme=self.configured_theme_styles,
                     )
                 )
             except Exception as e:  # noqa: BLE001
                 self.app.push_screen(
-                    bashmenu_ui.MessageModalScreen("Save Failed", f"Error saving theme to disk:\n{e}")
+                    bashmenu_ui.MessageModalScreen(
+                        "Save Failed",
+                        f"Error saving theme to disk:\n{e}",
+                        theme=self.configured_theme_styles,
+                    )
                 )
 
-        self.app.push_screen(SaveThemeModal(self.theme_name), _on_save_confirmed)
+        self.app.push_screen(
+            SaveThemeModal(self.theme_name, theme_styles=self.configured_theme_styles),
+            _on_save_confirmed,
+        )
 
     def action_exit_editor(self) -> None:
         """Safely exit application, checking for unsaved changes."""
@@ -1361,6 +1645,7 @@ class ThemeEditScreen(Screen):
                 bashmenu_ui.ConfirmModalScreen(
                     "Unsaved Changes",
                     "You have unsaved changes. Are you sure you want to exit without saving?",
+                    theme=self.configured_theme_styles,
                 ),
                 _on_confirm,
             )
@@ -1378,17 +1663,26 @@ class ThemeEditApp(App):
 
     TITLE = "BashMenu Theme Editor"
 
-    def __init__(self, theme_name: str = "tokyo_night", **kwargs):
+    def __init__(self, theme_name: str | None = None, **kwargs):
         super().__init__(**kwargs)
-        self.theme_name = theme_name
+        cfg, _ = bashmenu.load_config()
+        self.configured_theme = cfg.get("theme", "dracula")
+        self.theme_name = theme_name or self.configured_theme
+        self.theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
 
     def on_mount(self) -> None:
-        self.push_screen(ThemeEditScreen(initial_theme=self.theme_name))
+        bashmenu_ui.apply_theme_to_textual_borders(self.configured_theme)
+        self.push_screen(
+            ThemeEditScreen(
+                initial_theme=self.theme_name,
+                configured_theme=self.configured_theme,
+            )
+        )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="BashMenu Theme Editor")
-    parser.add_argument("theme", nargs="?", default="tokyo_night", help="Theme name to edit or clone")
+    parser.add_argument("theme", nargs="?", default=None, help="Theme name to edit or clone")
     args = parser.parse_args()
 
     app = ThemeEditApp(theme_name=args.theme)

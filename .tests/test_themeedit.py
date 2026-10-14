@@ -385,6 +385,54 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_theme_editor_applies_configured_theme_styles(self):
+        """Verify ThemeEditScreen applies configured theme styles and borders to editor UI."""
+        import bashmenu_ui
+
+        async def _run():
+            screen = themeedit.ThemeEditScreen(
+                initial_theme="tokyo_night",
+                configured_theme="pacman",
+            )
+            app = themeedit.ThemeEditApp("tokyo_night")
+            async with app.run_test(size=(120, 36)) as pilot:
+                app.push_screen(screen)
+                await pilot.pause()
+
+                self.assertEqual(screen.configured_theme, "pacman")
+                ts = screen.configured_theme_styles
+                self.assertIsNotNone(ts)
+
+                # Workspace and screen should have background from configured theme
+                bg_style = ts.get("background")
+                if bg_style and bg_style.bgcolor:
+                    css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                    self.assertEqual(screen.styles.background.hex.lower(), css_bg.lower())
+
+                # Panel borders should use configured border color
+                border_style = ts.get("border")
+                if border_style and border_style.color:
+                    css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+                    prev_panel = screen.query_one("#preview_panel")
+                    self.assertEqual(prev_panel.styles.border.top[1].hex.lower(), css_border.lower())
+
+                # Header close button should be formatted with theme
+                btn_close = screen.query_one("#header #btn_close_x")
+                self.assertEqual(btn_close.render().plain, bashmenu_ui.format_close_button_label(ts).plain)
+
+                # Header title cap styling
+                borders = ts.get("window_borders") or bashmenu_ui.get_theme_window_borders("pacman")
+                l_cap = borders.get("title_left_cap", "[").strip() or "["
+                h_title = screen.query_one("#header_title")
+                self.assertIn(l_cap, h_title.render().plain)
+
+                # Test header close button click triggers exit
+                await pilot.click(btn_close)
+                await pilot.pause()
+                self.assertNotIn(screen, app.screen_stack)
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()
