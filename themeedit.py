@@ -326,8 +326,8 @@ class ColorPickerModal(ModalScreen[Any]):
         background: rgba(0, 0, 0, 0.65);
     }
     #dialog {
-        width: 78;
-        height: 31;
+        width: 80;
+        height: 29;
         border: thick #555;
         background: #181818;
         padding: 0 1;
@@ -398,7 +398,7 @@ class ColorPickerModal(ModalScreen[Any]):
         border: solid #555;
         text-align: center;
     }
-    #swatch_row {
+    .swatch_row, #swatch_row {
         height: 1;
         width: 100%;
         align: center middle;
@@ -408,9 +408,9 @@ class ColorPickerModal(ModalScreen[Any]):
         color: #888;
         margin-right: 1;
     }
-    #swatch_row Button, .btn_swatch {
+    .swatch_row Button, #swatch_row Button, .btn_swatch {
         height: 1;
-        min-width: 5;
+        min-width: 4;
         padding: 0 1;
         margin: 0;
         border: none !important;
@@ -426,6 +426,19 @@ class ColorPickerModal(ModalScreen[Any]):
     #swatch_COLOR_MAGENTA { background: #af00d7; color: #ffffff; }
     #swatch_COLOR_CYAN { background: #00afaf; color: #000000; }
     #swatch_COLOR_WHITE { background: #ffffff; color: #000000; }
+    #swatch_COLOR_GREY, #swatch_COLOR_GRAY { background: #808080; color: #ffffff; }
+    #swatch_COLOR_BRIGHT_BLACK { background: #555555; color: #ffffff; }
+    #swatch_COLOR_BRIGHT_RED { background: #ff5555; color: #ffffff; }
+    #swatch_COLOR_BRIGHT_GREEN { background: #55ff55; color: #000000; }
+    #swatch_COLOR_BRIGHT_YELLOW { background: #ffff55; color: #000000; }
+    #swatch_COLOR_BRIGHT_BLUE { background: #5555ff; color: #ffffff; }
+    #swatch_COLOR_BRIGHT_MAGENTA { background: #ff55ff; color: #ffffff; }
+    #swatch_COLOR_BRIGHT_CYAN { background: #55ffff; color: #000000; }
+    #swatch_COLOR_BRIGHT_WHITE { background: #ffffff; color: #000000; }
+    #swatch_COLOR_ORANGE { background: #ff8700; color: #000000; }
+    #swatch_COLOR_PURPLE { background: #af00ff; color: #ffffff; }
+    #swatch_COLOR_PINK { background: #ff87af; color: #000000; }
+    #swatch_COLOR_BROWN { background: #af5f00; color: #ffffff; }
     .btn_swatch:hover {
         text-style: underline bold;
     }
@@ -437,7 +450,7 @@ class ColorPickerModal(ModalScreen[Any]):
     }
     #btn_row {
         height: 3;
-        margin-top: 1;
+        margin-top: 0;
         align: center middle;
     }
     #btn_row Button {
@@ -561,8 +574,8 @@ class ColorPickerModal(ModalScreen[Any]):
 
                     yield Static(id="preview_bar")
 
-                    with Horizontal(id="swatch_row"):
-                        yield Label("Swatches: ", classes="swatch_lbl")
+                    with Horizontal(id="swatch_row", classes="swatch_row"):
+                        yield Label("Standard: ", classes="swatch_lbl")
                         yield Button("Inherit", id="swatch_inherit", classes="btn_swatch")
                         yield Button("Black", id="swatch_COLOR_BLACK", classes="btn_swatch")
                         yield Button("Red", id="swatch_COLOR_RED", classes="btn_swatch")
@@ -572,6 +585,25 @@ class ColorPickerModal(ModalScreen[Any]):
                         yield Button("Magenta", id="swatch_COLOR_MAGENTA", classes="btn_swatch")
                         yield Button("Cyan", id="swatch_COLOR_CYAN", classes="btn_swatch")
                         yield Button("White", id="swatch_COLOR_WHITE", classes="btn_swatch")
+                        yield Button("Grey", id="swatch_COLOR_GREY", classes="btn_swatch")
+
+                    with Horizontal(id="swatch_row_bright", classes="swatch_row"):
+                        yield Label("Bright:   ", classes="swatch_lbl")
+                        yield Button("Br-Black", id="swatch_COLOR_BRIGHT_BLACK", classes="btn_swatch")
+                        yield Button("Br-Red", id="swatch_COLOR_BRIGHT_RED", classes="btn_swatch")
+                        yield Button("Br-Green", id="swatch_COLOR_BRIGHT_GREEN", classes="btn_swatch")
+                        yield Button("Br-Yellow", id="swatch_COLOR_BRIGHT_YELLOW", classes="btn_swatch")
+                        yield Button("Br-Blue", id="swatch_COLOR_BRIGHT_BLUE", classes="btn_swatch")
+                        yield Button("Br-Mag", id="swatch_COLOR_BRIGHT_MAGENTA", classes="btn_swatch")
+                        yield Button("Br-Cyan", id="swatch_COLOR_BRIGHT_CYAN", classes="btn_swatch")
+                        yield Button("Br-White", id="swatch_COLOR_BRIGHT_WHITE", classes="btn_swatch")
+
+                    with Horizontal(id="swatch_row_ext", classes="swatch_row"):
+                        yield Label("Extended: ", classes="swatch_lbl")
+                        yield Button("Orange", id="swatch_COLOR_ORANGE", classes="btn_swatch")
+                        yield Button("Purple", id="swatch_COLOR_PURPLE", classes="btn_swatch")
+                        yield Button("Pink", id="swatch_COLOR_PINK", classes="btn_swatch")
+                        yield Button("Brown", id="swatch_COLOR_BROWN", classes="btn_swatch")
 
                     with Horizontal(id="btn_row"):
                         yield Button("Select (Enter)", variant="primary", id="btn_select")
@@ -1772,10 +1804,13 @@ class ThemePreviewWidget(Static):
         set_hit_range(y_gt, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Gutter Content Row
+        help_items = ["[F1] Help", "[F2] Themes"]
         if left_gw >= 38:
-            h_text = "[F1] Help | [F2] Themes | [F4] Edit"
+            help_items.append("[F4] Edit")
+        if hasattr(bashmenu, "format_spread_gutter_line"):
+            h_text = bashmenu.format_spread_gutter_line(help_items, left_gw)
         else:
-            h_text = "[F1] Help | [F2] Themes"
+            h_text = " | ".join(help_items)
         h_part = Text(h_text, style=help_style)
         if h_part.cell_len > left_gw:
             h_part.truncate(left_gw)
@@ -1949,9 +1984,10 @@ class ThemeEditScreen(Screen):
     .footer_row {
         height: 1;
         width: 100%;
-        align: center middle;
+        align: left middle;
     }
     .footer_item {
+        padding: 0 0;
         color: #bbb;
     }
     .footer_item:hover {
@@ -1959,6 +1995,7 @@ class ThemeEditScreen(Screen):
         color: #fff;
     }
     .footer_sep {
+        padding: 0 0;
         color: #555;
     }
     """
@@ -2150,6 +2187,7 @@ class ThemeEditScreen(Screen):
             self.configured_theme_styles = getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors(app_theme)
         self.apply_theme()
         self._sync_preview()
+        self.update_footer_layout()
         self._mounted_ready = True
         self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
         self._initial_theme_name = "" if getattr(self, "is_new", False) else self.theme_name
@@ -2284,6 +2322,8 @@ class ThemeEditScreen(Screen):
                         if css_sb_bg:
                             w.styles.scrollbar_background = css_sb_bg
 
+            self.update_footer_layout()
+
     def compose(self) -> ComposeResult:
         file_name = os.path.basename(self.themes_filepath) if self.themes_filepath else "bashmenu.themes"
         theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
@@ -2357,21 +2397,21 @@ class ThemeEditScreen(Screen):
         with Vertical(id="footer"):
             with Horizontal(classes="footer_row"):
                 yield Label("[F1] Help", classes="footer_item", id="lbl_help", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[c] Pick Color", classes="footer_item", id="lbl_color", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[a] ASCII/Glyphs", classes="footer_item", id="lbl_ascii", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[t] Clone/Base", classes="footer_item", id="lbl_clone", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[d] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
             with Horizontal(classes="footer_row"):
                 yield Label("[s] Save", classes="footer_item", id="lbl_save", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[S] Save As", classes="footer_item", id="lbl_save_as", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[r] Reset", classes="footer_item", id="lbl_reset", markup=False)
-                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[q/ESC] Exit", classes="footer_item", id="lbl_exit", markup=False)
 
     def _sync_preview(self) -> None:
@@ -2387,9 +2427,59 @@ class ThemeEditScreen(Screen):
         theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
         h_title.update(f"{l_cap} BashMenu Theme Editor — {file_name} [{theme_disp}]{dirty_flag} {r_cap}")
 
+    def update_footer_layout(self, width: int | None = None) -> None:
+        """Distribute footer keyboard shortcut labels and pipe separators equally across both footer rows."""
+        w = width
+        if w is None or w <= 0:
+            if hasattr(self, "size") and self.size and self.size.width:
+                w = self.size.width
+            elif hasattr(self, "app") and self.app and hasattr(self.app, "size") and self.app.size:
+                w = self.app.size.width
+            else:
+                w = 80
+
+        with contextlib.suppress(Exception):
+            footer = self.query_one("#footer")
+            rows = list(footer.query(".footer_row"))
+            for row in rows:
+                items = list(row.query(".footer_item"))
+                seps = list(row.query(".footer_sep"))
+                if not items:
+                    continue
+                num_items = len(items)
+                if num_items == 1:
+                    items[0].styles.margin = (0, 0, 0, 0)
+                    continue
+
+                item_lens = []
+                for it in items:
+                    t = str(it.renderable) if hasattr(it, "renderable") else ""
+                    item_lens.append(len(t) if t else len(getattr(it, "content", "")))
+
+                tot_text = sum(item_lens) + len(seps)
+                num_gaps = num_items - 1
+                rem = max(0, w - tot_text)
+                base_gap = rem // num_gaps
+                extra = rem % num_gaps
+
+                for i, it in enumerate(items):
+                    if i < num_gaps:
+                        total_gap = base_gap + (1 if i < extra else 0)
+                        left_gap = total_gap // 2
+                        right_gap = total_gap - left_gap
+                        it.styles.margin = (0, left_gap, 0, 0)
+                        if i < len(seps):
+                            seps[i].styles.margin = (0, right_gap, 0, 0)
+                    else:
+                        it.styles.margin = (0, 0, 0, 0)
+
     def on_resize(self, event: events.Resize) -> None:
-        """Handle screen resize and refresh preview canvas dimensions."""
+        """Handle screen resize, refresh preview canvas dimensions, and distribute footer spacing."""
         self._sync_preview()
+        w = None
+        if event is not None and hasattr(event, "size") and event.size:
+            w = event.size.width
+        self.update_footer_layout(width=w)
 
     @on(ThemePreviewWidget.ElementClicked)
     def on_preview_element_clicked(self, message: ThemePreviewWidget.ElementClicked) -> None:

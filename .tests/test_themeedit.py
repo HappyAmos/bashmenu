@@ -258,18 +258,74 @@ class TestThemeEditor(unittest.TestCase):
 
                 # Tab through widgets and track focused IDs
                 focused_ids = []
-                for _ in range(15):
+                for _ in range(35):
                     await pilot.press("tab")
                     await pilot.pause()
                     w = app.focused
                     if w and getattr(w, "id", None):
                         focused_ids.append(w.id)
 
-                # Verify all bottom buttons were reached via Tab
+                # Verify swatches (standard and extended) and all bottom buttons were reached via Tab
                 self.assertIn("swatch_inherit", focused_ids)
+                self.assertIn("swatch_COLOR_ORANGE", focused_ids)
                 self.assertIn("btn_select", focused_ids)
                 self.assertIn("btn_inherit", focused_ids)
                 self.assertIn("btn_cancel", focused_ids)
+
+        asyncio.run(_run())
+
+    def test_color_picker_modal_extended_swatches(self):
+        """Verify ColorPickerModal renders all bright and extended swatches and clicking updates color and grid."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(100, 30)) as pilot:
+                modal = themeedit.ColorPickerModal("title", 201)
+                app.push_screen(modal)
+                await pilot.pause()
+
+                # Verify extended color swatches are rendered
+                swatch_orange = modal.query_one("#swatch_COLOR_ORANGE", themeedit.Button)
+                swatch_purple = modal.query_one("#swatch_COLOR_PURPLE", themeedit.Button)
+                swatch_pink = modal.query_one("#swatch_COLOR_PINK", themeedit.Button)
+                swatch_brown = modal.query_one("#swatch_COLOR_BROWN", themeedit.Button)
+                swatch_br_red = modal.query_one("#swatch_COLOR_BRIGHT_RED", themeedit.Button)
+
+                self.assertIsNotNone(swatch_orange)
+                self.assertIsNotNone(swatch_purple)
+                self.assertIsNotNone(swatch_pink)
+                self.assertIsNotNone(swatch_brown)
+                self.assertIsNotNone(swatch_br_red)
+
+                # Click COLOR_ORANGE and verify FG is set to COLOR_ORANGE and grid code is 208
+                await pilot.click(swatch_orange)
+                await pilot.pause()
+                self.assertEqual(modal.fg_val, "COLOR_ORANGE")
+                grid = modal.query_one("#color_grid", themeedit.ColorGridWidget)
+                self.assertEqual(grid.cursor_code, 208)
+
+        asyncio.run(_run())
+
+    def test_theme_editor_footer_spread_layout(self):
+        """Verify update_footer_layout spreads footer items and separators proportionally across screen width."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                screen.update_footer_layout(width=120)
+                await pilot.pause()
+
+                footer = screen.query_one("#footer")
+                first_row = footer.query(".footer_row").first()
+                items = list(first_row.query(".footer_item"))
+                seps = list(first_row.query(".footer_sep"))
+
+                # Margins must be applied to items and separators spreading them across 120 width
+                has_item_margin = any(it.styles.margin.right > 0 or it.styles.margin.left > 0 for it in items)
+                has_sep_margin = any(s.styles.margin.right > 0 or s.styles.margin.left > 0 for s in seps)
+                self.assertTrue(has_item_margin or has_sep_margin, "Footer items/separators should have spacing margins applied.")
 
         asyncio.run(_run())
 

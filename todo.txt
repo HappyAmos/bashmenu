@@ -5,5 +5,6 @@
 - [ ] Add notepad function.
 - [X] Add a theme creator with a live view. The user can optionally select an existing theme as a base for the new one.
 - [X] Make the preview panel larger in the theme editor.
-- [ ] Make the help gutter of the theme editor spread out in the available space.
-- [ ] Add a "tab"to the theme editor to switch between 256, 16, and 8 color.
+- [X] Make the help gutter of the theme editor spread out in the available space.
+- [X] Add a "tab"to the theme editor to switch between 256, 16, and 8 color.(not necessary)
+- [ ] Add support for backgrounds in the theme editor, use a popup modal where everything can be configured, file picker to select wallpaper in assets/wallpaper directory, opacity, scaling, clustering, quantization, mode (halfblock or quarterblock).
