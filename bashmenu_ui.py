@@ -3412,6 +3412,135 @@ class FilePickerModalScreen(ModalScreen[str]):
         self.dismiss(None)
 
 
+class CreateThemePromptModal(ModalScreen[str | None]):
+    """Modal dialog prompting user whether to base a new theme on selected theme or start from scratch."""
+
+    DEFAULT_CSS = """
+    CreateThemePromptModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 66;
+        height: auto;
+        border: thick #555;
+        background: #181818;
+        padding: 1 2;
+    }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: #eee;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    #message {
+        text-align: center;
+        margin-bottom: 1;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    #footer {
+        text-align: center;
+        color: #888;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("b", "select_base", "Base on Selected"),
+        Binding("s", "select_scratch", "From Scratch"),
+        Binding("c", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, selected_theme: str, theme: dict | None = None):
+        super().__init__()
+        self.selected_theme = selected_theme
+        self.theme = theme or {}
+
+    def compose(self) -> ComposeResult:
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label("Create New Theme", id="title")
+                        yield Label(format_close_button_label(self.theme), id="btn_close_x", classes="btn_close_x")
+                    msg = (
+                        f"Would you like to base the new theme on '[bold]{self.selected_theme}[/bold]',\n"
+                        "or start from scratch with monochrome defaults?"
+                    )
+                    yield Static(formatting_to_rich_text(msg, theme=self.theme), id="message")
+                    with Horizontal(id="buttons"):
+                        yield Button(f"Base on '{self.selected_theme}'", variant="primary", id="btn_base")
+                        yield Button("From Scratch", variant="default", id="btn_scratch")
+                        yield Button("Cancel", variant="error", id="btn_cancel")
+                    yield Label("[B] Base on Selected  |  [S] From Scratch  |  [ESC] Cancel", id="footer", markup=False)
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        apply_modal_theme(self, self.theme)
+        with contextlib.suppress(Exception):
+            apply_button_theme(self.query_one("#btn_base", Button), self.theme, "button_primary")
+            apply_button_theme(self.query_one("#btn_scratch", Button), self.theme, "button_default")
+            apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_base":
+            self.dismiss("base")
+        elif event.button.id == "btn_scratch":
+            self.dismiss("scratch")
+        elif event.button.id == "btn_cancel":
+            self.dismiss(None)
+
+    def action_select_base(self) -> None:
+        self.dismiss("base")
+
+    def action_select_scratch(self) -> None:
+        self.dismiss("scratch")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class ThemePickerModalScreen(ModalScreen[str]):
     """Modal screen for interactive color theme selection with OptionList."""
 
@@ -3421,7 +3550,7 @@ class ThemePickerModalScreen(ModalScreen[str]):
         background: rgba(0, 0, 0, 0.6);
     }
     #dialog {
-        width: 60;
+        width: 62;
         height: 20;
         border: thick $accent;
         background: $surface;
@@ -3472,7 +3601,8 @@ class ThemePickerModalScreen(ModalScreen[str]):
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
-        Binding("e", "edit_theme", "Edit Theme"),
+        Binding("e", "edit_theme", "Edit"),
+        Binding("c", "create_theme", "Create"),
     ]
 
     def __init__(self, current_theme: str = "dracula", theme: dict | None = None):
@@ -3487,12 +3617,14 @@ class ThemePickerModalScreen(ModalScreen[str]):
                 with Vertical(id="dialog"):
                     with Horizontal(id="title_bar"):
                         yield Label("Select Color Theme", id="title")
-                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                        yield Label(format_close_button_label(self.theme), id="btn_close_x", classes="btn_close_x")
                     yield OptionList(id="options_list")
                     with Horizontal(id="footer"):
                         yield Label("[ENTER] Select", id="lbl_ft_select", classes="footer_item", markup=False)
                         yield Label(" | ", classes="footer_sep", markup=False)
-                        yield Label("[e] Edit/Create", id="lbl_ft_edit", classes="footer_item", markup=False)
+                        yield Label("[e] Edit", id="lbl_ft_edit", classes="footer_item", markup=False)
+                        yield Label(" | ", classes="footer_sep", markup=False)
+                        yield Label("[c] Create", id="lbl_ft_create", classes="footer_item", markup=False)
                         yield Label(" | ", classes="footer_sep", markup=False)
                         yield Label("[ESC] Cancel", id="lbl_ft_cancel", classes="footer_item", markup=False)
                 yield ShadowWidget(id="shadow_right")
@@ -3527,6 +3659,8 @@ class ThemePickerModalScreen(ModalScreen[str]):
                 self.dismiss(self.theme_keys[idx])
         elif w_id == "lbl_ft_edit":
             self.action_edit_theme()
+        elif w_id == "lbl_ft_create":
+            self.action_create_theme()
         elif w_id == "lbl_ft_cancel":
             self.dismiss(None)
 
@@ -3546,8 +3680,45 @@ class ThemePickerModalScreen(ModalScreen[str]):
         import themeedit
 
         self.app.push_screen(
-            themeedit.ThemeEditScreen(initial_theme=chosen_theme),
+            themeedit.ThemeEditScreen(initial_theme=chosen_theme, is_new=False),
             lambda res: self.dismiss(None),
+        )
+
+    def action_create_theme(self) -> None:
+        opt_list = self.query_one("#options_list", OptionList)
+        idx = opt_list.highlighted
+        sel_theme = (
+            self.theme_keys[idx]
+            if (idx is not None and 0 <= idx < len(self.theme_keys))
+            else self.current_theme
+        )
+
+        def _on_create_choice(choice: str | None) -> None:
+            if not choice:
+                return
+            import themeedit
+            if choice == "base":
+                self.app.push_screen(
+                    themeedit.ThemeEditScreen(
+                        initial_theme=sel_theme,
+                        is_new=True,
+                        base_theme=sel_theme,
+                    ),
+                    lambda res: self.dismiss(None),
+                )
+            elif choice == "scratch":
+                self.app.push_screen(
+                    themeedit.ThemeEditScreen(
+                        initial_theme="monochrome",
+                        is_new=True,
+                        base_theme=None,
+                    ),
+                    lambda res: self.dismiss(None),
+                )
+
+        self.app.push_screen(
+            CreateThemePromptModal(sel_theme, theme=self.theme),
+            _on_create_choice,
         )
 
     def action_cancel(self) -> None:

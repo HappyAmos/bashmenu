@@ -527,7 +527,7 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
 
     def __init__(self, current_name: str, theme_styles: dict | None = None):
         super().__init__()
-        self.current_name = current_name
+        self.current_name = "" if current_name == "untitled" else current_name
         self.theme_styles = theme_styles or {}
 
     def compose(self) -> ComposeResult:
@@ -939,6 +939,8 @@ class ThemeEditScreen(Screen):
         Binding("t", "clone_theme", "Clone Base"),
         Binding("d", "derive_palettes", "Derive 16/8"),
         Binding("s", "save_theme", "Save"),
+        Binding("S", "save_as_theme", "Save As"),
+        Binding("w", "save_as_theme", "Save As", show=False),
         Binding("r", "reset_theme", "Reset"),
         Binding("escape", "exit_editor", "Exit"),
         Binding("q", "exit_editor", "Exit", show=False),
@@ -994,6 +996,8 @@ class ThemeEditScreen(Screen):
         initial_theme: str | None = None,
         themes_filepath: str | None = None,
         configured_theme: str | None = None,
+        is_new: bool = False,
+        base_theme: str | None = None,
     ):
         super().__init__()
         self.themes_filepath = themes_filepath or os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.themes")
@@ -1003,19 +1007,48 @@ class ThemeEditScreen(Screen):
         self.configured_theme = configured_theme or cfg.get("theme", "dracula")
         self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
 
-        target_theme = initial_theme or self.configured_theme
-        self.theme_name = target_theme if target_theme in self.raw_themes_data else "dracula"
-        if not self.raw_themes_data:
-            # Fallback basic template
-            self.raw_themes_data = {"custom": {"window": {}, "256": {"background": "COLOR_BLACK"}}}
-            self.theme_name = "custom"
+        self.is_new = is_new
+        if is_new:
+            if base_theme and base_theme in self.raw_themes_data:
+                self.theme_name = "untitled"
+                self.current_theme = copy.deepcopy(self.raw_themes_data[base_theme])
+            else:
+                self.theme_name = "untitled"
+                if "monochrome" in self.raw_themes_data:
+                    self.current_theme = copy.deepcopy(self.raw_themes_data["monochrome"])
+                else:
+                    self.current_theme = {
+                        "indicator": ">",
+                        "divider": {"char": "─", "length": "{window_width}"},
+                        "window": copy.deepcopy(bashmenu_ui.DEFAULT_WINDOW_BORDER),
+                        256: {
+                            "background": "COLOR_BLACK",
+                            "title": [255, -1],
+                            "border": [245, -1],
+                            "text": [252, -1],
+                            "highlight": ["COLOR_BLACK", 255],
+                            "selection": [232, 250],
+                            "shortcut_key": [255, -1],
+                            "divider": [245, -1],
+                            "plugin": [250, -1],
+                            "gutter": [239, -1],
+                            "help_text": [248, -1],
+                            "shadow": [235, "COLOR_BLACK"],
+                        },
+                    }
+        else:
+            target_theme = initial_theme or self.configured_theme
+            self.theme_name = target_theme if target_theme in self.raw_themes_data else "dracula"
+            if not self.raw_themes_data:
+                # Fallback basic template
+                self.raw_themes_data = {"custom": {"window": {}, "256": {"background": "COLOR_BLACK"}}}
+                self.theme_name = "custom"
+            self.current_theme = copy.deepcopy(self.raw_themes_data.get(self.theme_name, {}))
 
-        # Active editable working copy
-        self.current_theme = copy.deepcopy(self.raw_themes_data.get(self.theme_name, {}))
         self._ensure_theme_structure()
         self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
-        self._initial_theme_name = self.theme_name
-        self._force_dirty = False
+        self._initial_theme_name = "" if is_new else self.theme_name
+        self._force_dirty = is_new
 
     @property
     def is_dirty(self) -> bool:
@@ -1054,8 +1087,8 @@ class ThemeEditScreen(Screen):
         """Initialize mounted state, apply configured theme styles, and baseline snapshot."""
         self._mounted_ready = True
         self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
-        self._initial_theme_name = self.theme_name
-        self._force_dirty = False
+        self._initial_theme_name = "" if getattr(self, "is_new", False) else self.theme_name
+        self._force_dirty = getattr(self, "is_new", False)
         app_theme = getattr(self.app, "theme_name", None)
         if app_theme and (not getattr(self, "configured_theme", None) or self.configured_theme == "dracula"):
             self.configured_theme = app_theme
@@ -1193,8 +1226,15 @@ class ThemeEditScreen(Screen):
                             w.styles.scrollbar_background = css_sb_bg
 
     def compose(self) -> ComposeResult:
+        file_name = os.path.basename(self.themes_filepath) if self.themes_filepath else "bashmenu.themes"
+        theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
+        dirty_flag = " *" if self.is_dirty else ""
         with Horizontal(id="header"):
-            yield Label(f"BashMenu Theme Editor — [{self.theme_name}]", id="header_title")
+            yield Label(
+                f"BashMenu Theme Editor — {file_name} [{theme_disp}]{dirty_flag}",
+                id="header_title",
+                markup=False,
+            )
             yield Label(
                 bashmenu_ui.format_close_button_label(self.configured_theme_styles),
                 id="btn_close_x",
@@ -1267,7 +1307,9 @@ class ThemeEditScreen(Screen):
                 yield Label("  |  ", classes="footer_sep", markup=False)
                 yield Label("[d] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
             with Horizontal(classes="footer_row"):
-                yield Label("[s] Save Theme", classes="footer_item", id="lbl_save", markup=False)
+                yield Label("[s] Save", classes="footer_item", id="lbl_save", markup=False)
+                yield Label("  |  ", classes="footer_sep", markup=False)
+                yield Label("[S] Save As", classes="footer_item", id="lbl_save_as", markup=False)
                 yield Label("  |  ", classes="footer_sep", markup=False)
                 yield Label("[r] Reset", classes="footer_item", id="lbl_reset", markup=False)
                 yield Label("  |  ", classes="footer_sep", markup=False)
@@ -1282,7 +1324,9 @@ class ThemeEditScreen(Screen):
         borders = getattr(self, "configured_theme_styles", {}).get("window_borders") or bashmenu_ui.get_theme_window_borders(getattr(self, "configured_theme", "dracula"))
         l_cap = borders.get("title_left_cap", "[").strip() or "["
         r_cap = borders.get("title_right_cap", "]").strip() or "]"
-        h_title.update(f"{l_cap} BashMenu Theme Editor — [{self.theme_name}]{dirty_flag} {r_cap}")
+        file_name = os.path.basename(self.themes_filepath) if self.themes_filepath else "bashmenu.themes"
+        theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
+        h_title.update(f"{l_cap} BashMenu Theme Editor — {file_name} [{theme_disp}]{dirty_flag} {r_cap}")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""
@@ -1391,6 +1435,8 @@ class ThemeEditScreen(Screen):
             self.action_derive_palettes()
         elif w_id == "lbl_save":
             self.action_save_theme()
+        elif w_id == "lbl_save_as":
+            self.action_save_as_theme()
         elif w_id == "lbl_reset":
             self.action_reset_theme()
         elif w_id == "lbl_exit":
@@ -1490,6 +1536,7 @@ class ThemeEditScreen(Screen):
                 self.theme_name = f"{theme_key}_custom"
                 self.current_theme = copy.deepcopy(self.raw_themes_data[theme_key])
                 self._ensure_theme_structure()
+                self.is_new = True
                 self.is_dirty = True
                 self._populate_all_inputs()
                 self._sync_preview()
@@ -1538,7 +1585,13 @@ class ThemeEditScreen(Screen):
 
     def action_reset_theme(self) -> None:
         """Revert working copy to loaded state."""
-        if self.theme_name in self.raw_themes_data:
+        if getattr(self, "is_new", False) or self.theme_name == "untitled":
+            self.current_theme = copy.deepcopy(getattr(self, "_initial_theme_snapshot", {}))
+            self._ensure_theme_structure()
+            self.is_dirty = True
+            self._populate_all_inputs()
+            self._sync_preview()
+        elif self.theme_name in self.raw_themes_data:
             self.current_theme = copy.deepcopy(self.raw_themes_data[self.theme_name])
             self._ensure_theme_structure()
             self.is_dirty = False
@@ -1546,84 +1599,101 @@ class ThemeEditScreen(Screen):
             self._sync_preview()
 
     def action_save_theme(self) -> None:
-        """Open Save Modal and persist validated theme to bashmenu.themes."""
+        """Save theme. If untitled or new, prompt for name (Save As); otherwise save directly to disk."""
+        if (
+            getattr(self, "is_new", False)
+            or not self.theme_name
+            or self.theme_name == "untitled"
+            or self.theme_name not in self.raw_themes_data
+        ):
+            self.action_save_as_theme()
+            return
+
+        self._save_theme_to_disk(self.theme_name, set_active=False)
+
+    def action_save_as_theme(self) -> None:
+        """Open Save Modal and persist validated theme to bashmenu.themes under a new or chosen name."""
         def _on_save_confirmed(result: tuple[str, bool] | None) -> None:
             if not result:
                 return
             new_name, set_active = result
-            self.theme_name = new_name
+            self._save_theme_to_disk(new_name, set_active=set_active)
 
-            # Ensure 16 and 8 fallback tiers exist before saving
-            if 16 not in self.current_theme or 8 not in self.current_theme:
-                pal_256 = self._get_pal_256()
-                p16, p8 = auto_derive_fallback_depths(pal_256)
-                self.current_theme[16] = p16
-                self.current_theme[8] = p8
-
-            # Save to bashmenu.themes
-            try:
-                self.raw_themes_data[self.theme_name] = copy.deepcopy(self.current_theme)
-
-                # Validate with ymlcheck before writing to disk
-                errs = []
-                for k_depth, v_keys in self.current_theme.items():
-                    depth_str = str(k_depth)
-                    if depth_str == "window":
-                        errs.extend(ymlcheck.validate_window_section(v_keys, f"{self.theme_name}.window"))
-                    elif depth_str == "divider":
-                        errs.extend(ymlcheck.validate_divider_section(v_keys, f"{self.theme_name}.divider"))
-                    elif depth_str in ("256", "16", "8"):
-                        errs.extend(ymlcheck.validate_depth_section(depth_str, v_keys, self.theme_name))
-
-                if errs:
-                    err_msg = "\n".join(f"- {e}" for e in errs)
-                    self.app.push_screen(
-                        bashmenu_ui.MessageModalScreen(
-                            "Theme Validation Error",
-                            f"Theme schema issues detected:\n{err_msg}",
-                            theme=self.configured_theme_styles,
-                        )
-                    )
-                    return
-
-                # Serialize cleanly to bashmenu.themes
-                with open(self.themes_filepath, "w", encoding="utf-8") as f:
-                    yaml.dump(self.raw_themes_data, f, sort_keys=False, default_flow_style=False)
-
-                # Optionally set as active theme in bashmenu.yml
-                if set_active:
-                    cfg, _ = bashmenu.load_config()
-                    cfg["theme"] = self.theme_name
-                    cfg_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.yml")
-                    with open(cfg_path, "w", encoding="utf-8") as f:
-                        yaml.dump(cfg, f, sort_keys=False, default_flow_style=False)
-                    self.configured_theme = self.theme_name
-                    self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
-                    self.apply_theme()
-
-                self.is_dirty = False
-                self._sync_preview()
-                self.app.push_screen(
-                    bashmenu_ui.MessageModalScreen(
-                        "Theme Saved",
-                        f"Successfully saved theme '{self.theme_name}' to disk!\n"
-                        + ("Active theme updated in bashmenu.yml." if set_active else ""),
-                        theme=self.configured_theme_styles,
-                    )
-                )
-            except Exception as e:  # noqa: BLE001
-                self.app.push_screen(
-                    bashmenu_ui.MessageModalScreen(
-                        "Save Failed",
-                        f"Error saving theme to disk:\n{e}",
-                        theme=self.configured_theme_styles,
-                    )
-                )
-
+        suggested_name = "" if (getattr(self, "is_new", False) or self.theme_name == "untitled") else self.theme_name
         self.app.push_screen(
-            SaveThemeModal(self.theme_name, theme_styles=self.configured_theme_styles),
+            SaveThemeModal(suggested_name, theme_styles=self.configured_theme_styles),
             _on_save_confirmed,
         )
+
+    def _save_theme_to_disk(self, target_name: str, set_active: bool = False) -> None:
+        """Serialize validated theme to bashmenu.themes and update state."""
+        # Ensure 16 and 8 fallback tiers exist before saving
+        if 16 not in self.current_theme or 8 not in self.current_theme:
+            pal_256 = self._get_pal_256()
+            p16, p8 = auto_derive_fallback_depths(pal_256)
+            self.current_theme[16] = p16
+            self.current_theme[8] = p8
+
+        try:
+            self.raw_themes_data[target_name] = copy.deepcopy(self.current_theme)
+
+            # Validate with ymlcheck before writing to disk
+            errs = []
+            for k_depth, v_keys in self.current_theme.items():
+                depth_str = str(k_depth)
+                if depth_str == "window":
+                    errs.extend(ymlcheck.validate_window_section(v_keys, f"{target_name}.window"))
+                elif depth_str == "divider":
+                    errs.extend(ymlcheck.validate_divider_section(v_keys, f"{target_name}.divider"))
+                elif depth_str in ("256", "16", "8"):
+                    errs.extend(ymlcheck.validate_depth_section(depth_str, v_keys, target_name))
+
+            if errs:
+                err_msg = "\n".join(f"- {e}" for e in errs)
+                self.app.push_screen(
+                    bashmenu_ui.MessageModalScreen(
+                        "Theme Validation Error",
+                        f"Theme schema issues detected:\n{err_msg}",
+                        theme=self.configured_theme_styles,
+                    )
+                )
+                return
+
+            # Serialize cleanly to bashmenu.themes
+            with open(self.themes_filepath, "w", encoding="utf-8") as f:
+                yaml.dump(self.raw_themes_data, f, sort_keys=False, default_flow_style=False)
+
+            # Optionally set as active theme in bashmenu.yml
+            if set_active:
+                cfg, _ = bashmenu.load_config()
+                cfg["theme"] = target_name
+                cfg_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.yml")
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    yaml.dump(cfg, f, sort_keys=False, default_flow_style=False)
+                self.configured_theme = target_name
+                self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
+                self.apply_theme()
+
+            self.theme_name = target_name
+            self.is_new = False
+            self.is_dirty = False
+            self._sync_preview()
+            self.app.push_screen(
+                bashmenu_ui.MessageModalScreen(
+                    "Theme Saved",
+                    f"Successfully saved theme '{target_name}' to disk!\n"
+                    + ("Active theme updated in bashmenu.yml." if set_active else ""),
+                    theme=self.configured_theme_styles,
+                )
+            )
+        except Exception as e:  # noqa: BLE001
+            self.app.push_screen(
+                bashmenu_ui.MessageModalScreen(
+                    "Save Failed",
+                    f"Error saving theme to disk:\n{e}",
+                    theme=self.configured_theme_styles,
+                )
+            )
 
     def action_exit_editor(self) -> None:
         """Safely exit application, checking for unsaved changes."""

@@ -177,7 +177,8 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertIn("[a] ASCII/Glyphs", footer_labels)
                 self.assertIn("[t] Clone/Base", footer_labels)
                 self.assertIn("[d] Derive 16/8", footer_labels)
-                self.assertIn("[s] Save Theme", footer_labels)
+                self.assertIn("[s] Save", footer_labels)
+                self.assertIn("[S] Save As", footer_labels)
                 self.assertIn("[r] Reset", footer_labels)
                 self.assertIn("[q/ESC] Exit", footer_labels)
 
@@ -224,7 +225,8 @@ class TestThemeEditor(unittest.TestCase):
 
                 footer_items = [lbl.render().plain for lbl in picker.query(".footer_item")]
                 self.assertIn("[ENTER] Select", footer_items)
-                self.assertIn("[e] Edit/Create", footer_items)
+                self.assertIn("[e] Edit", footer_items)
+                self.assertIn("[c] Create", footer_items)
                 self.assertIn("[ESC] Cancel", footer_items)
 
                 # Test clicking cancel
@@ -430,6 +432,114 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.click(btn_close)
                 await pilot.pause()
                 self.assertNotIn(screen, app.screen_stack)
+
+        asyncio.run(_run())
+
+    def test_theme_picker_modal_edit_and_create_actions(self):
+        """Verify ThemePickerModalScreen splits Edit and Create and launches CreateThemePromptModal."""
+        import bashmenu_ui
+
+        async def _run():
+            modal = bashmenu_ui.ThemePickerModalScreen(current_theme="dracula")
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                app.push_screen(modal)
+                await pilot.pause()
+
+                # Verify footer labels
+                foot_labels = [lbl.render().plain for lbl in modal.query(".footer_item")]
+                self.assertIn("[ENTER] Select", foot_labels)
+                self.assertIn("[e] Edit", foot_labels)
+                self.assertIn("[c] Create", foot_labels)
+                self.assertIn("[ESC] Cancel", foot_labels)
+
+                # Press 'c' to trigger create action
+                await pilot.press("c")
+                await pilot.pause()
+
+                # Verify CreateThemePromptModal opened
+                self.assertIsInstance(app.screen, bashmenu_ui.CreateThemePromptModal)
+                prompt_modal = app.screen
+                self.assertIn("dracula", prompt_modal.selected_theme)
+
+                # Test 'From Scratch' button
+                btn_scratch = prompt_modal.query_one("#btn_scratch")
+                await pilot.click(btn_scratch)
+                await pilot.pause()
+
+                # Should have launched ThemeEditScreen in is_new mode
+                self.assertIsInstance(app.screen, themeedit.ThemeEditScreen)
+                new_screen = app.screen
+                self.assertTrue(new_screen.is_new)
+                self.assertTrue(new_screen.is_dirty)
+                # Check header display has file name and Untitled
+                hdr_text = new_screen.query_one("#header_title").render().plain
+                self.assertIn("bashmenu.themes", hdr_text)
+                self.assertIn("[Untitled]", hdr_text)
+
+        asyncio.run(_run())
+
+    def test_save_vs_save_as_distinction(self):
+        """Verify Save directly overwrites existing themes, but prompts for untitled/new themes and Save As."""
+        import shutil
+        import tempfile
+        import bashmenu
+        import bashmenu_ui
+
+        async def _run():
+            with tempfile.NamedTemporaryFile(suffix=".themes", delete=False) as tmp:
+                tmp_path = tmp.name
+            real_themes = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.themes")
+            shutil.copyfile(real_themes, tmp_path)
+
+            try:
+                # 1. Existing theme: Save directly saves to disk without modal prompt
+                screen_existing = themeedit.ThemeEditScreen(
+                    initial_theme="dracula",
+                    themes_filepath=tmp_path,
+                    is_new=False,
+                )
+                app = themeedit.ThemeEditApp("dracula")
+                async with app.run_test(size=(120, 36)) as pilot:
+                    app.push_screen(screen_existing)
+                    await pilot.pause()
+
+                    # Trigger direct save
+                    screen_existing.action_save_theme()
+                    await pilot.pause()
+
+                    # Confirmation message modal should appear, NOT SaveThemeModal
+                    self.assertIsInstance(app.screen, bashmenu_ui.MessageModalScreen)
+                    self.assertEqual(app.screen.modal_title, "Theme Saved")
+                    app.screen.dismiss()
+                    await pilot.pause()
+
+                    # Trigger Save As: MUST open SaveThemeModal
+                    screen_existing.action_save_as_theme()
+                    await pilot.pause()
+                    self.assertIsInstance(app.screen, themeedit.SaveThemeModal)
+                    app.screen.dismiss(None)
+                    await pilot.pause()
+
+                    # 2. New / Untitled theme: Save MUST automatically open SaveThemeModal
+                    screen_new = themeedit.ThemeEditScreen(
+                        themes_filepath=tmp_path,
+                        is_new=True,
+                    )
+                    app.push_screen(screen_new)
+                    await pilot.pause()
+
+                    screen_new.action_save_theme()
+                    await pilot.pause()
+                    self.assertIsInstance(app.screen, themeedit.SaveThemeModal)
+                    # Verify input is empty for untitled theme
+                    name_input = app.screen.query_one("#input_theme_name")
+                    self.assertEqual(name_input.value, "")
+                    app.screen.dismiss(None)
+                    await pilot.pause()
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
 
         asyncio.run(_run())
 

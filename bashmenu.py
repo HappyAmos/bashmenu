@@ -3545,6 +3545,8 @@ class BashMenuScreen(Screen):
                     self.app.theme_styles = new_styles
                 self.menu_view.refresh()
                 self._update_plugin_buffer_geometry()
+            else:
+                self.refresh_environment()
 
         self.app.push_screen(
             bashmenu_ui.ThemePickerModalScreen(
