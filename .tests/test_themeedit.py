@@ -243,6 +243,66 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_color_picker_modal_tab_navigation_reaches_all_buttons(self):
+        """Verify pressing Tab moves focus from color grid to swatches and action buttons."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(100, 30)) as pilot:
+                modal = themeedit.ColorPickerModal("title", 201)
+                app.push_screen(modal)
+                await pilot.pause()
+
+                # Initially color_grid has focus
+                grid = modal.query_one("#color_grid", themeedit.ColorGridWidget)
+                self.assertTrue(grid.has_focus)
+
+                # Tab through widgets and track focused IDs
+                focused_ids = []
+                for _ in range(15):
+                    await pilot.press("tab")
+                    await pilot.pause()
+                    w = app.focused
+                    if w and getattr(w, "id", None):
+                        focused_ids.append(w.id)
+
+                # Verify all bottom buttons were reached via Tab
+                self.assertIn("swatch_inherit", focused_ids)
+                self.assertIn("btn_select", focused_ids)
+                self.assertIn("btn_inherit", focused_ids)
+                self.assertIn("btn_cancel", focused_ids)
+
+        asyncio.run(_run())
+
+    def test_ascii_picker_modal_tab_navigation_reaches_all_buttons(self):
+        """Verify pressing Tab moves focus from ASCII grid to swatches and action buttons."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(100, 30)) as pilot:
+                modal = themeedit.AsciiPickerModal("border", "─")
+                app.push_screen(modal)
+                await pilot.pause()
+
+                # Initially ascii_grid has focus
+                grid = modal.query_one("#ascii_grid", themeedit.AsciiGridWidget)
+                self.assertTrue(grid.has_focus)
+
+                # Tab through widgets and track focused IDs
+                focused_ids = []
+                for _ in range(16):
+                    await pilot.press("tab")
+                    await pilot.pause()
+                    w = app.focused
+                    if w and getattr(w, "id", None):
+                        focused_ids.append(w.id)
+
+                # Verify all bottom buttons were reached via Tab
+                self.assertIn("swatch_ascii_196", focused_ids)
+                self.assertIn("btn_select", focused_ids)
+                self.assertIn("btn_select_macro", focused_ids)
+                self.assertIn("btn_cancel", focused_ids)
+
+        asyncio.run(_run())
+
     def test_theme_preview_occupies_at_least_half_of_preview_pane(self):
         """Verify ThemePreviewWidget occupies >= 50% of preview pane area across resolutions."""
         async def _run():

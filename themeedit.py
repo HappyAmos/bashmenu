@@ -429,6 +429,12 @@ class ColorPickerModal(ModalScreen[Any]):
     .btn_swatch:hover {
         text-style: underline bold;
     }
+    .btn_swatch:focus {
+        text-style: underline bold reverse;
+    }
+    .tab_btn:focus {
+        text-style: underline bold reverse;
+    }
     #btn_row {
         height: 3;
         margin-top: 1;
@@ -439,11 +445,14 @@ class ColorPickerModal(ModalScreen[Any]):
         min-width: 16;
         margin: 0 1;
     }
+    #btn_row Button:focus {
+        border: heavy #fff;
+        text-style: bold;
+    }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
-        Binding("tab", "switch_layer", "Switch FG/BG"),
         Binding("enter", "confirm_selection", "Select"),
         Binding("1", "select_fg_tab", "Foreground", show=False),
         Binding("2", "select_bg_tab", "Background", show=False),
@@ -540,7 +549,7 @@ class ColorPickerModal(ModalScreen[Any]):
                         if self.is_pair:
                             yield Button(f"[1] Foreground: {self.fg_val}", id="btn_tab_fg", classes="tab_btn", variant="primary")
                             yield Button(f"[2] Background: {self.bg_val}", id="btn_tab_bg", classes="tab_btn", variant="default")
-                            yield Label("(Tab: Switch Layer)", id="tab_hint")
+                            yield Label("([1] FG | [2] BG)", id="tab_hint")
                         else:
                             yield Label(f"Editing Single Color: {self.token_name}", id="tab_single")
 
@@ -977,6 +986,12 @@ class AsciiPickerModal(ModalScreen[str]):
         text-style: underline bold;
         color: #fff;
     }
+    .btn_swatch:focus {
+        text-style: underline bold reverse;
+    }
+    .tab_btn:focus {
+        text-style: underline bold reverse;
+    }
     #btn_row {
         height: 3;
         margin-top: 1;
@@ -987,6 +1002,10 @@ class AsciiPickerModal(ModalScreen[str]):
         min-width: 16;
         margin: 0 1;
     }
+    #btn_row Button:focus {
+        border: heavy #fff;
+        text-style: bold;
+    }
     """
 
     BINDINGS: ClassVar[list[Binding]] = [
@@ -995,7 +1014,6 @@ class AsciiPickerModal(ModalScreen[str]):
         Binding("1", "select_extended_tab", "Extended", show=False),
         Binding("2", "select_standard_tab", "Standard", show=False),
         Binding("3", "select_all_tab", "All", show=False),
-        Binding("tab", "cycle_range_tab", "Next Range", show=False),
     ]
 
     def __init__(self, property_name: str, current_char: str, theme_styles: dict | None = None) -> None:
