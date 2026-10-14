@@ -19,7 +19,7 @@ from typing import Any, ClassVar
 import yaml
 from rich.style import Style
 from rich.text import Text
-from textual import events
+from textual import events, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -1380,10 +1380,32 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
 class ThemePreviewWidget(Static):
     """Simulated miniature live preview of BashMenu rendering the active theme."""
 
+    class ElementClicked(Message):
+        """Emitted when an interface element in the preview is clicked."""
+
+        def __init__(self, primary: str, secondary: str = "") -> None:
+            super().__init__()
+            self.primary = primary
+            self.secondary = secondary
+
     def __init__(self, theme_dict: dict, theme_name: str = "custom", **kwargs):
         super().__init__(**kwargs)
         self.theme_dict = theme_dict
         self.theme_name = theme_name
+        self._hit_map: dict[tuple[int, int], tuple[str, str]] = {}
+        self._last_w = 56
+        self._last_h = 12
+
+    def on_click(self, event: events.Click) -> None:
+        """Handle mouse click on preview element and emit ElementClicked message."""
+        pos = (event.x, event.y)
+        hit = self._hit_map.get(pos)
+        if not hit and (
+            0 <= event.x < getattr(self, "_last_w", 56) + 3 and 0 <= event.y <= getattr(self, "_last_h", 12) + 5
+        ):
+            hit = ("color_background", "color_background")
+        if hit:
+            self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1]))
 
     def update_theme(self, theme_dict: dict, theme_name: str = "custom") -> None:
         """Update active theme definition and trigger instant re-render."""
@@ -1402,6 +1424,15 @@ class ThemePreviewWidget(Static):
         else:
             w = 56
             num_rows = 12
+
+        self._hit_map.clear()
+        self._last_w = w
+        self._last_h = num_rows
+
+        def set_hit_range(y_row: int, x_start: int, x_end: int, primary: str, secondary: str = "") -> None:
+            sec = secondary or primary
+            for x_col in range(max(0, x_start), min(w + 3, x_end)):
+                self._hit_map[(x_col, y_row)] = (primary, sec)
 
         inner_w = w - 6  # Borders (2) + Margins (4)
         t_dict = dict(self.theme_dict)
@@ -1513,6 +1544,22 @@ class ThemePreviewWidget(Static):
         out.append_text(top_line)
         out.append("\n")
 
+        set_hit_range(0, 0, 1, "prop_border_top_left", "color_border")
+        set_hit_range(0, 1, 1 + pad_l, "color_border", "prop_border_horizontal")
+        t_pos = 1 + pad_l
+        set_hit_range(0, t_pos, t_pos + 1, "color_title", "color_title")
+        t_pos += 1
+        set_hit_range(0, t_pos, t_pos + len(b_cap_l), "prop_title_left_cap", "color_title")
+        t_pos += len(b_cap_l)
+        inner_title = " Bash Menu "
+        set_hit_range(0, t_pos, t_pos + len(inner_title), "color_title", "prop_title_left_cap")
+        t_pos += len(inner_title)
+        set_hit_range(0, t_pos, t_pos + len(b_cap_r), "prop_title_right_cap", "color_title")
+        t_pos += len(b_cap_r)
+        set_hit_range(0, t_pos, 1 + pad_l + len(title_text), "color_title", "color_title")
+        set_hit_range(0, 1 + pad_l + len(title_text), w - 1, "color_border", "prop_border_horizontal")
+        set_hit_range(0, w - 1, w, "prop_border_top_right", "color_border")
+
         # Helper to wrap inner rows with window borders
         def wrap_line(inner_text: Text) -> Text:
             line = Text()
@@ -1528,7 +1575,7 @@ class ThemePreviewWidget(Static):
             line.append(shadow_ch * 2, style=shadow_style)
             return line
 
-        def make_opt_line(num: int, label: str, is_sel: bool) -> Text:
+        def make_opt_line(num: int, label: str, is_sel: bool) -> tuple[Text, tuple]:
             if is_sel:
                 r = Text()
                 r.append(f"  {indicator} [{num}] {label}", style=sel_style)
@@ -1542,23 +1589,23 @@ class ThemePreviewWidget(Static):
                 line.append_text(r)
                 line.append("  " + b_v_right, style=b_style)
                 line.append(shadow_ch * 2, style=shadow_style)
-                return line
+                return line, ("opt", num, label, True)
             else:
                 r = Text()
                 r.append(f"    [{num}] ", style=key_style)
                 r.append(label, style=text_style)
-                return wrap_line(r)
+                return wrap_line(r), ("opt", num, label, False)
 
-        def make_div_line() -> Text:
+        def make_div_line() -> tuple[Text, tuple]:
             if "{screen_width}" in div_len:
                 div_row = Text()
                 div_row.append(b_tee_l + div_char * (w - 2) + b_tee_r, style=div_style)
                 div_row.append(shadow_ch * 2, style=shadow_style)
-                return div_row
+                return div_row, ("div", True)
             else:
                 r_div = Text()
                 r_div.append(div_char * inner_w, style=div_style)
-                return wrap_line(r_div)
+                return wrap_line(r_div), ("div", False)
 
         pl_box_w = max(24, inner_w - 6)
         title_pl = " Weather Dashboard "
@@ -1582,6 +1629,12 @@ class ThemePreviewWidget(Static):
         )
         r_pl_b = wrap_line(Text("└" + "─" * (pl_box_w - 2) + "┘", style=plug_style))
 
+        pl_h_item = (r_pl_h, ("pl", pl_box_w))
+        pl_c1_item = (r_pl_c1, ("pl", pl_box_w))
+        pl_c2_item = (r_pl_c2, ("pl", pl_box_w))
+        pl_b_item = (r_pl_b, ("pl", pl_box_w))
+        empty_item = (wrap_line(Text("", style=text_style)), ("empty",))
+
         raw_options = [
             (1, "Web Applications", False),
             (2, "System Utilities", True),
@@ -1601,16 +1654,16 @@ class ThemePreviewWidget(Static):
                 make_opt_line(2, "System Utilities", True),
                 make_div_line(),
                 make_opt_line(3, "Theme Settings", False),
-                r_pl_h,
-                r_pl_c1,
-                r_pl_b,
+                pl_h_item,
+                pl_c1_item,
+                pl_b_item,
             ]
             body_items = min_items[:body_slots]
             while len(body_items) < body_slots:
-                body_items.append(wrap_line(Text("", style=text_style)))
+                body_items.append(empty_item)
         else:
             use_c2 = body_slots >= 11
-            pl_lines = [r_pl_h, r_pl_c1] + ([r_pl_c2] if use_c2 else []) + [r_pl_b]
+            pl_lines = [pl_h_item, pl_c1_item] + ([pl_c2_item] if use_c2 else []) + [pl_b_item]
             rem_slots = body_slots - len(pl_lines)
             n_opts = max(1, rem_slots - 1)
             opts = raw_options[:min(n_opts, len(raw_options))]
@@ -1624,12 +1677,53 @@ class ThemePreviewWidget(Static):
             if not div_placed:
                 body_items.insert(min(2, len(body_items)), make_div_line())
             while len(body_items) + len(pl_lines) < body_slots:
-                body_items.append(wrap_line(Text("", style=text_style)))
+                body_items.append(empty_item)
             body_items.extend(pl_lines)
 
-        for line_item in body_items:
+        for idx, (line_item, meta) in enumerate(body_items):
             out.append_text(line_item)
             out.append("\n")
+            y = 1 + idx
+            kind = meta[0]
+            if kind == "div" and meta[1]:  # Screen-width divider
+                set_hit_range(y, 0, 1, "prop_left_tee", "color_divider")
+                set_hit_range(y, 1, w - 1, "color_divider", "prop_divider_char")
+                set_hit_range(y, w - 1, w, "prop_right_tee", "color_divider")
+                set_hit_range(y, w, w + 2, "color_shadow", "prop_shadow_char")
+            else:
+                set_hit_range(y, 0, 1, "color_border", "prop_border_vertical")
+                set_hit_range(y, 1, 3, "color_background", "color_border")
+                set_hit_range(y, w - 3, w - 1, "color_background", "color_border")
+                set_hit_range(y, w - 1, w, "color_border", "prop_border_vertical")
+                set_hit_range(y, w, w + 2, "color_shadow", "prop_shadow_char")
+
+                if kind == "opt":
+                    num, label, is_sel = meta[1], meta[2], meta[3]
+                    if is_sel:
+                        set_hit_range(y, 3, 5, "color_selection", "color_highlight")
+                        ind_len = len(indicator)
+                        set_hit_range(y, 5, 5 + ind_len, "prop_indicator", "color_selection")
+                        set_hit_range(y, 5 + ind_len, 6 + ind_len, "color_selection", "prop_indicator")
+                        sc_start = 6 + ind_len
+                        sc_str = f"[{num}]"
+                        set_hit_range(y, sc_start, sc_start + len(sc_str), "color_shortcut_key", "color_selection")
+                        set_hit_range(y, sc_start + len(sc_str), w - 3, "color_selection", "color_highlight")
+                    else:
+                        set_hit_range(y, 3, 7, "color_background", "color_text")
+                        sc_str = f"[{num}]"
+                        set_hit_range(y, 7, 7 + len(sc_str), "color_shortcut_key", "color_text")
+                        lbl_start = 7 + len(sc_str) + 1
+                        lbl_end = min(w - 3, lbl_start + len(label))
+                        set_hit_range(y, lbl_start, lbl_end, "color_text", "color_shortcut_key")
+                        set_hit_range(y, lbl_end, w - 3, "color_background", "color_text")
+                elif kind == "div":
+                    set_hit_range(y, 3, w - 3, "color_divider", "prop_divider_char")
+                elif kind == "pl":
+                    box_w = meta[1]
+                    set_hit_range(y, 3, 3 + box_w, "color_plugin", "color_accent")
+                    set_hit_range(y, 3 + box_w, w - 3, "color_background", "color_plugin")
+                elif kind == "empty":
+                    set_hit_range(y, 3, w - 3, "color_background", "color_text")
 
         # Gutter Top Border
         avail_both = max(4, w - 11)
@@ -1645,6 +1739,14 @@ class ThemePreviewWidget(Static):
         gt_line.append(shadow_ch * 2, style=shadow_style)
         out.append_text(gt_line)
         out.append("\n")
+
+        y_gt = 1 + len(body_items)
+        set_hit_range(y_gt, 0, 1, "prop_gutter_left_tee", "color_border")
+        set_hit_range(y_gt, 1, sep_x, "prop_gutter_border", "color_gutter")
+        set_hit_range(y_gt, sep_x, sep_x + 1, "prop_gutter_top_tee", "color_border")
+        set_hit_range(y_gt, sep_x + 1, w - 1, "prop_gutter_border", "color_gutter")
+        set_hit_range(y_gt, w - 1, w, "prop_gutter_right_tee", "color_border")
+        set_hit_range(y_gt, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Gutter Content Row
         if left_gw >= 38:
@@ -1681,6 +1783,18 @@ class ThemePreviewWidget(Static):
         out.append_text(g_content)
         out.append("\n")
 
+        y_gc = y_gt + 1
+        set_hit_range(y_gc, 0, 1, "color_border", "prop_border_vertical")
+        set_hit_range(y_gc, 1, 3, "color_background", "color_border")
+        set_hit_range(y_gc, 3, 3 + left_gw, "color_help_text", "color_gutter")
+        set_hit_range(y_gc, 3 + left_gw, sep_x, "color_background", "color_gutter")
+        set_hit_range(y_gc, sep_x, sep_x + 1, "prop_gutter_separator", "color_gutter")
+        set_hit_range(y_gc, sep_x + 1, sep_x + 3, "color_background", "color_gutter")
+        set_hit_range(y_gc, sep_x + 3, w - 3, "color_gutter", "color_help_text")
+        set_hit_range(y_gc, w - 3, w - 1, "color_background", "color_border")
+        set_hit_range(y_gc, w - 1, w, "color_border", "prop_border_vertical")
+        set_hit_range(y_gc, w, w + 2, "color_shadow", "prop_shadow_char")
+
         # Bottom Border
         bot_line = Text()
         bot_line.append(b_bl + b_h_bot * (sep_x - 1), style=b_style)
@@ -1690,10 +1804,21 @@ class ThemePreviewWidget(Static):
         out.append_text(bot_line)
         out.append("\n")
 
+        y_bot = y_gt + 2
+        set_hit_range(y_bot, 0, 1, "prop_border_bottom_left", "color_border")
+        set_hit_range(y_bot, 1, sep_x, "color_border", "prop_border_horizontal")
+        set_hit_range(y_bot, sep_x, sep_x + 1, "prop_gutter_bottom_tee", "color_border")
+        set_hit_range(y_bot, sep_x + 1, w - 1, "color_border", "prop_border_horizontal")
+        set_hit_range(y_bot, w - 1, w, "prop_border_bottom_right", "color_border")
+        set_hit_range(y_bot, w, w + 2, "color_shadow", "prop_shadow_char")
+
         # Bottom Drop Shadow
         bot_shadow = Text()
         bot_shadow.append("  " + shadow_ch * w, style=shadow_style)
         out.append_text(bot_shadow)
+
+        y_sh = y_gt + 3
+        set_hit_range(y_sh, 2, 2 + w, "color_shadow", "prop_shadow_char")
 
         return out
 
@@ -2232,6 +2357,36 @@ class ThemeEditScreen(Screen):
     def on_resize(self, event: events.Resize) -> None:
         """Handle screen resize and refresh preview canvas dimensions."""
         self._sync_preview()
+
+    @on(ThemePreviewWidget.ElementClicked)
+    def on_preview_element_clicked(self, message: ThemePreviewWidget.ElementClicked) -> None:
+        """Handle element click from live preview canvas and focus corresponding inspector property."""
+        target_id = message.primary
+        curr_focused = getattr(self, "focused", None)
+        if curr_focused and getattr(curr_focused, "id", None) == message.primary and message.secondary:
+            target_id = message.secondary
+        self.focus_inspector_target(target_id)
+
+    @on(events.Click, "#preview_panel")
+    def on_preview_panel_clicked(self, event: events.Click) -> None:
+        """Handle click in preview panel margin area and select background color."""
+        if event.widget and getattr(event.widget, "id", None) == "preview_panel":
+            self.focus_inspector_target("color_background")
+
+    def focus_inspector_target(self, target_id: str) -> None:
+        """Scroll to and focus an inspector input widget by element ID."""
+        try:
+            inp = self.query_one(f"#{target_id}", Input)
+            inp.scroll_visible()
+            inp.focus()
+            clean_name = target_id.replace("color_", "Color: ").replace("prop_", "Border: ").replace("_", " ").title()
+            with contextlib.suppress(Exception):
+                self.notify(f"Inspecting {clean_name}", title="Theme Element", timeout=1.5)
+        except Exception:  # noqa: BLE001
+            with contextlib.suppress(Exception):
+                elem = self.query_one(f"#{target_id}")
+                elem.scroll_visible()
+                elem.focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""

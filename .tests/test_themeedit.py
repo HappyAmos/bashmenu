@@ -837,6 +837,53 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_click_to_inspect_elements(self):
+        """Verify that left-clicking elements on ThemePreviewWidget focuses matching inspector inputs."""
+
+        async def _run():
+            app = themeedit.ThemeEditApp()
+            async with app.run_test() as pilot:
+                screen = app.screen
+                preview = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+
+                # 1. Click top-left corner (0, 0) -> prop_border_top_left
+                await pilot.click(preview, offset=(0, 0))
+                self.assertEqual(screen.focused.id, "prop_border_top_left")
+
+                # 2. Click title text -> color_title
+                await pilot.click(preview, offset=(preview._last_w // 2, 0))
+                self.assertEqual(screen.focused.id, "color_title")
+
+                # 3. Click selected option text (row 2, col 15) -> color_selection
+                await pilot.click(preview, offset=(15, 2))
+                self.assertEqual(screen.focused.id, "color_selection")
+
+                # 4. Click indicator glyph (row 2, col 5) -> prop_indicator
+                await pilot.click(preview, offset=(5, 2))
+                self.assertEqual(screen.focused.id, "prop_indicator")
+
+                # 5. Click shortcut key (row 1, col 8) -> color_shortcut_key
+                await pilot.click(preview, offset=(8, 1))
+                self.assertEqual(screen.focused.id, "color_shortcut_key")
+
+                # 6. Click unselected option label (row 1, col 15) -> color_text
+                await pilot.click(preview, offset=(15, 1))
+                self.assertEqual(screen.focused.id, "color_text")
+
+                # 7. Secondary toggle: Click horizontal border (col 2, row 0)
+                await pilot.click(preview, offset=(2, 0))
+                self.assertEqual(screen.focused.id, "color_border")
+                # Clicking again while color_border is focused toggles to character property
+                await pilot.click(preview, offset=(2, 0))
+                self.assertEqual(screen.focused.id, "prop_border_horizontal")
+
+                # 8. Click panel margin area -> color_background
+                panel = screen.query_one("#preview_panel")
+                await pilot.click(panel, offset=(0, 0))
+                self.assertEqual(screen.focused.id, "color_background")
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()
