@@ -870,12 +870,12 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.click(preview, offset=(15, 1))
                 self.assertEqual(screen.focused.id, "color_text")
 
-                # 7. Secondary toggle: Click horizontal border (col 2, row 0)
+                # 7. Repeated clicks: Click horizontal border (col 2, row 0)
                 await pilot.click(preview, offset=(2, 0))
                 self.assertEqual(screen.focused.id, "color_border")
-                # Clicking again while color_border is focused toggles to character property
+                # Repeated clicks consistently focus the same clicked target without toggling away
                 await pilot.click(preview, offset=(2, 0))
-                self.assertEqual(screen.focused.id, "prop_border_horizontal")
+                self.assertEqual(screen.focused.id, "color_border")
 
                 # 8. Click panel margin area -> color_background
                 panel = screen.query_one("#preview_panel")

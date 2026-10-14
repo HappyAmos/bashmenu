@@ -2394,11 +2394,7 @@ class ThemeEditScreen(Screen):
     @on(ThemePreviewWidget.ElementClicked)
     def on_preview_element_clicked(self, message: ThemePreviewWidget.ElementClicked) -> None:
         """Handle element click from live preview canvas and focus corresponding inspector property."""
-        target_id = message.primary
-        curr_focused = getattr(self, "focused", None)
-        if curr_focused and getattr(curr_focused, "id", None) == message.primary and message.secondary:
-            target_id = message.secondary
-        self.focus_inspector_target(target_id)
+        self.focus_inspector_target(message.primary)
 
     @on(events.Click, "#preview_panel")
     def on_preview_panel_clicked(self, event: events.Click) -> None:
