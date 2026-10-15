@@ -20,8 +20,8 @@ notebook:
           ```
 
           - [x] Item One
-          - [x] Item Two
-          - [x] Item Three
+          - [ ] Item Two
+          - [ ] Item Three
     - Local Network:
         type: note
         format: markdown
