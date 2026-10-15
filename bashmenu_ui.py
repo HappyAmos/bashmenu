@@ -10,6 +10,7 @@ import subprocess
 import threading
 import time
 import unicodedata
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -28,13 +29,23 @@ except ImportError:
 
 if hasattr(Heading, "LEVEL_ALIGN"):
     Heading.LEVEL_ALIGN["h1"] = "left"
+import yaml
 from rich.text import Text
-from textual import on
+from textual import events, on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, OptionList, RichLog, Static
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Input,
+    Label,
+    OptionList,
+    RichLog,
+    Static,
+    TextArea,
+)
 from textual.widgets import Markdown as TextualMarkdown
 from textual.widgets.option_list import Option
 
@@ -133,6 +144,8 @@ PLACEHOLDER_SECTIONS = [
             ("{templates}", "Alias for {templates_dir}"),
             ("{cache_dir}", "Cache directory path"),
             ("{cache}", "Alias for {cache_dir}"),
+            ("{notebooks_dir}", "Notebooks directory path"),
+            ("{notebooks}", "Alias for {notebooks_dir}"),
             ("{bashrc}", "Path to ~/.bashrc profile file"),
             ("{bash_aliases}", "Path to ~/.bash_aliases file"),
             ("{zshrc}", "Path to ~/.zshrc configuration file"),
@@ -2376,6 +2389,19 @@ class MessageModalScreen(ModalScreen[None]):
         return re.sub(r"[\s-]+", "-", s).strip("-")
 
     @staticmethod
+    def _extract_slug_variants(raw_title: str) -> set[str]:
+        clean_raw = re.sub(r"[`*]", "", raw_title).strip()
+        s_gfm = re.sub(r"[^\w\s-]", "", clean_raw.lower()).strip()
+        slug_exact = re.sub(r"\s", "-", s_gfm).strip("-")
+        slug_collapsed = re.sub(r"[\s-]+", "-", s_gfm).strip("-")
+        slug_no_num1 = re.sub(r"^[0-9]+-", "", slug_exact)
+        slug_no_num2 = re.sub(r"^[0-9]+-", "", slug_collapsed)
+        slug_no_und1 = slug_exact.replace("_", "")
+        slug_no_und2 = slug_collapsed.replace("_", "")
+        slug_no_num_und = slug_no_num2.replace("_", "")
+        return {x for x in (slug_exact, slug_collapsed, slug_no_num1, slug_no_num2, slug_no_und1, slug_no_und2, slug_no_num_und) if x}
+
+    @staticmethod
     def _add_or_merge_link(links: list[dict[str, Any]], text: str, url: str, y: int) -> None:
         if not url or not text:
             return
@@ -2383,6 +2409,10 @@ class MessageModalScreen(ModalScreen[None]):
             links[-1]["text"] = f"{links[-1]['text']} {text}".strip()
         else:
             links.append({"text": text, "url": url, "y": y})
+
+    def on_resize(self, event=None) -> None:
+        self._cached_anchor_lines = None
+        self._cached_links = None
 
     def _ensure_anchors_and_links(self) -> None:
         if self._cached_anchor_lines is None or self._cached_links is None:
@@ -2396,30 +2426,49 @@ class MessageModalScreen(ModalScreen[None]):
         anchors: dict[str, int] = {}
         links: list[dict[str, Any]] = []
         with contextlib.suppress(Exception):
-            from rich.console import Console
-
-            width = 100
-            with contextlib.suppress(Exception):
-                scroller = self.query_one("#scroll_container", VerticalScroll)
-                if scroller.size.width > 20:
-                    width = scroller.size.width
-            c = Console(width=width)
             text_str = self.message.markup if isinstance(self.message, Markdown) else str(self.message)
-            lines = c.render_lines(Markdown(text_str, hyperlinks=True))
-            for y, line_segs in enumerate(lines):
-                line_str = "".join(s.text for s in line_segs).strip()
-                if line_str and not line_str.startswith(("•", "-", "*")) and not set(line_str).issubset(set("─-=")):
-                    slug = self._norm_slug(line_str)
-                    if slug and slug not in anchors:
-                        anchors[slug] = y
-                    no_num = re.sub(r"^[0-9]+-", "", slug)
-                    if no_num and no_num not in anchors:
-                        anchors[no_num] = y
+            lines = None
+            with contextlib.suppress(Exception):
+                msg = self.query_one("#message", Static)
+                if not getattr(msg, "_render_cache", None) or not getattr(msg._render_cache, "lines", None):
+                    msg._render_content()
+                if getattr(msg, "_render_cache", None) and getattr(msg._render_cache, "lines", None):
+                    lines = msg._render_cache.lines
 
+            if lines is None:
+                from rich.console import Console
+
+                width = 100
+                with contextlib.suppress(Exception):
+                    scroller = self.query_one("#scroll_container", VerticalScroll)
+                    if scroller.size.width > 20:
+                        width = scroller.size.width
+                c = Console(width=width)
+                lines = c.render_lines(Markdown(text_str, hyperlinks=True))
+
+            heading_items = []
+            for line in text_str.splitlines():
+                m = re.match(r"^(#{1,6})\s+(.*)$", line)
+                if m:
+                    clean_title = re.sub(r"[`*]", "", m.group(2)).strip()
+                    heading_items.append((clean_title, self._extract_slug_variants(clean_title)))
+
+            for clean_title, slugs in heading_items:
+                search_prefix = clean_title[:25].lower()
+                for y, line in enumerate(lines):
+                    line_text = (line.text if hasattr(line, "text") else "".join(s.text for s in line)).strip().lower()
+                    if not line_text.startswith(("•", "*", "-")) and search_prefix in line_text:
+                        for slug in slugs:
+                            if slug not in anchors:
+                                anchors[slug] = y
+                        break
+
+            for y, line in enumerate(lines):
                 cur_url = None
                 cur_text: list[str] = []
-                for seg in line_segs:
-                    url = seg.style.link if seg.style else None
+                segments = line if hasattr(line, "__iter__") else []
+                for seg in segments:
+                    url = seg.style.link if getattr(seg, "style", None) else None
                     if url:
                         if url == cur_url:
                             cur_text.append(seg.text)
@@ -2485,13 +2534,19 @@ class MessageModalScreen(ModalScreen[None]):
 
         self._ensure_anchors_and_links()
 
+        clean_target = anchor.lower().strip("-")
         norm_target = self._norm_slug(anchor)
         target_y = None
         if self._cached_anchor_lines:
-            target_y = self._cached_anchor_lines.get(norm_target)
+            target_y = self._cached_anchor_lines.get(clean_target)
+            if target_y is None:
+                target_y = self._cached_anchor_lines.get(norm_target)
             if target_y is None:
                 no_num = re.sub(r"^[0-9]+-", "", norm_target)
                 target_y = self._cached_anchor_lines.get(no_num)
+            if target_y is None:
+                no_und = norm_target.replace("_", "")
+                target_y = self._cached_anchor_lines.get(no_und)
             if target_y is None:
                 for k, y in self._cached_anchor_lines.items():
                     if k.startswith(norm_target) or norm_target.startswith(k):
@@ -2523,9 +2578,7 @@ class MessageModalScreen(ModalScreen[None]):
         apply_modal_theme(self, self.theme)
         with contextlib.suppress(Exception):
             apply_button_theme(self.query_one("#btn_ok", Button), theme=self.theme, button_type="button_primary")
-        if self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
-            self._ensure_anchors_and_links()
-            self._update_footer()
+        self._update_footer()
 
     def _jump_to_active_link(self) -> None:
         if self._cached_links and 0 <= self.active_link_idx < len(self._cached_links):
@@ -2546,7 +2599,7 @@ class MessageModalScreen(ModalScreen[None]):
                     label_text = label_text[:31] + "..."
                 idx_str = f"{self.active_link_idx + 1}/{len(self._cached_links)}"
                 footer.update(f"[ESC] Close | [TAB/Shift+TAB] ({idx_str}) | [ENTER] -> {label_text}")
-            elif self._cached_links:
+            elif self._cached_links or self.is_markdown or isinstance(self.message, (Markdown, TextualMarkdown)):
                 footer.update("[ENTER/ESC] Close | [TAB] Links")
             else:
                 footer.update("[ENTER/ESC] Close")
@@ -3894,6 +3947,620 @@ class RichHelpModalScreen(MessageModalScreen):
             no_formatting=False,
             is_markdown=False,
         )
+
+
+
+class NotebookDumper(yaml.SafeDumper):
+    """YAML safe dumper that indents sequences under mapping keys."""
+
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow=False, indentless=False)
+
+
+def _multiline_str_representer(dumper, data):
+    if "\n" in data:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data)
+
+
+NotebookDumper.add_representer(str, _multiline_str_representer)
+
+
+def load_notebook(filepath: str) -> dict:
+    """Load notebook YAML data from filepath.
+
+    If file does not exist, initialize an empty notebook with title derived
+    from the filename and save it.
+    """
+    expanded_path = os.path.expanduser(filepath)
+    if not os.path.exists(expanded_path):
+        base = os.path.splitext(os.path.basename(expanded_path))[0]
+        title = base.replace("_", " ").title() if base else "Notebook"
+        data = {
+            "notebook": {
+                "title": title,
+                "format": "markdown",
+                "notes": [],
+            }
+        }
+        save_notebook(expanded_path, data)
+        return data
+
+    with open(expanded_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    if not isinstance(data, dict):
+        data = {}
+    if "notebook" not in data or not isinstance(data["notebook"], dict):
+        base = os.path.splitext(os.path.basename(expanded_path))[0]
+        title = base.replace("_", " ").title() if base else "Notebook"
+        data["notebook"] = {"title": title, "format": "markdown", "notes": []}
+    if "notes" not in data["notebook"] or not isinstance(data["notebook"]["notes"], list):
+        data["notebook"]["notes"] = []
+    return data
+
+
+def save_notebook(filepath: str, notebook_data: dict) -> None:
+    """Save notebook data dictionary to YAML file using clean indentation and literal multiline blocks."""
+    expanded_path = os.path.expanduser(filepath)
+    dir_name = os.path.dirname(expanded_path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    with open(expanded_path, "w", encoding="utf-8") as f:
+        yaml.dump(
+            notebook_data,
+            f,
+            Dumper=NotebookDumper,
+            sort_keys=False,
+            default_flow_style=False,
+            allow_unicode=True,
+        )
+
+
+def get_notebook_notes(notebook_data: dict) -> list[tuple[str, dict]]:
+    """Extract list of (title, note_dict) from notebook data.
+
+    Supports label-as-key notes:
+      - Title: { type: note, content: ... }
+    and explicit title mapping:
+      - { title: Title, content: ... }
+    """
+    if not isinstance(notebook_data, dict):
+        return []
+    nb = notebook_data.get("notebook", {})
+    if not isinstance(nb, dict):
+        return []
+    raw_notes = nb.get("notes", [])
+    if not isinstance(raw_notes, list):
+        return []
+
+    result = []
+    for item in raw_notes:
+        if isinstance(item, dict):
+            if len(item) == 1 and "title" not in item:
+                title, props = next(iter(item.items()))
+                if isinstance(props, dict):
+                    result.append((str(title), props))
+                else:
+                    result.append((str(title), {"content": str(props or ""), "type": "note"}))
+            elif "title" in item:
+                title = item.get("title", "Untitled")
+                result.append((str(title), item))
+    return result
+
+
+def get_note_by_title(notebook_data: dict, title: str) -> dict | None:
+    """Find note dictionary by title."""
+    for n_title, n_dict in get_notebook_notes(notebook_data):
+        if n_title == title:
+            return n_dict
+    return None
+
+
+def add_or_update_note(
+    notebook_data: dict,
+    title: str,
+    content: str,
+    note_type: str = "note",
+    note_format: str = "markdown",
+    orig_title: str | None = None,
+) -> None:
+    """Add a new note or update an existing note in the notebook data dictionary."""
+    if "notebook" not in notebook_data or not isinstance(notebook_data["notebook"], dict):
+        notebook_data["notebook"] = {"title": "Notebook", "format": "markdown", "notes": []}
+    notes_list = notebook_data["notebook"].setdefault("notes", [])
+
+    target_title = orig_title if orig_title is not None else title
+    updated = False
+
+    for idx, item in enumerate(notes_list):
+        if isinstance(item, dict):
+            if len(item) == 1 and "title" not in item:
+                k = next(iter(item.keys()))
+                if k == target_title:
+                    props = item[k] if isinstance(item[k], dict) else {}
+                    props["type"] = note_type
+                    props["format"] = note_format
+                    props["content"] = content
+                    notes_list[idx] = {title: props}
+                    updated = True
+                    break
+            elif item.get("title") == target_title:
+                props = {k: v for k, v in item.items() if k != "title"}
+                props["type"] = note_type
+                props["format"] = note_format
+                props["content"] = content
+                notes_list[idx] = {title: props}
+                updated = True
+                break
+
+    if not updated:
+        notes_list.append({
+            title: {
+                "type": note_type,
+                "format": note_format,
+                "content": content,
+            }
+        })
+
+
+def delete_note(notebook_data: dict, title: str) -> bool:
+    """Remove a note by title from notebook data."""
+    if "notebook" not in notebook_data or not isinstance(notebook_data["notebook"], dict):
+        return False
+    notes_list = notebook_data["notebook"].get("notes", [])
+    if not isinstance(notes_list, list):
+        return False
+
+    del_idx = None
+    for idx, item in enumerate(notes_list):
+        if isinstance(item, dict):
+            if len(item) == 1 and "title" not in item:
+                k = next(iter(item.keys()))
+                if k == title:
+                    del_idx = idx
+                    break
+            elif item.get("title") == title:
+                del_idx = idx
+                break
+
+    if del_idx is not None:
+        notes_list.pop(del_idx)
+        return True
+    return False
+
+
+TASK_LIST_RE = re.compile(r"^(\s*)([-*+]|\d+\.)\s+\[([ xX])\]\s*(.*)$")
+
+
+class NoteViewerModalScreen(ModalScreen[str | None]):
+    """Modal screen to view a formatted notebook note in Markdown or BBCode."""
+
+    DEFAULT_CSS = """
+    NoteViewerModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #modal_frame {
+        width: 80%;
+        height: 80%;
+        max-width: 100;
+        max-height: 90%;
+    }
+    NoteViewerModalScreen #dialog_hrow {
+        width: 1fr;
+        height: 1fr;
+    }
+    #dialog {
+        width: 1fr;
+        height: 100%;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    #scroll_container {
+        height: 1fr;
+        max-height: 100%;
+    }
+    #message {
+        width: 100%;
+    }
+    .markdown_block {
+        width: 100%;
+        height: auto;
+    }
+    Checkbox.markdown_checkbox {
+        border: none;
+        padding: 0;
+        margin: 0;
+        height: 1;
+        width: 100%;
+        background: transparent;
+    }
+    Checkbox.markdown_checkbox:focus {
+        background: $accent 25%;
+    }
+    Checkbox.markdown_checkbox:hover {
+        background: $accent 15%;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    #footer {
+        text-align: center;
+        margin-top: 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "close_modal", "Close"),
+        Binding("enter", "close_modal", "Close"),
+        Binding("e", "edit_note", "Edit"),
+        Binding("d", "delete_note", "Delete"),
+    ]
+
+    def __init__(
+        self,
+        title: str,
+        content: str,
+        note_format: str = "markdown",
+        theme: dict | None = None,
+        filepath: str = "",
+        note_title: str = "",
+        on_content_change: Callable[[str], None] | None = None,
+    ):
+        super().__init__()
+        self.modal_title = title
+        self.note_title = note_title or title
+        self.content = content or ""
+        self.note_format = (note_format or "markdown").lower()
+        self.theme = theme or {}
+        self.filepath = filepath
+        self.on_content_change = on_content_change
+        self.lines: list[str] = self.content.split("\n")
+
+    def _parse_blocks(self) -> list[tuple[str, Any]]:
+        """Parse note content lines into alternating markdown blocks and interactive checkbox items."""
+        blocks = []
+        current_md = []
+        in_fence = False
+        fence_token = ""
+
+        for line_idx, line in enumerate(self.lines):
+            stripped = line.strip()
+            if stripped.startswith(("```", "~~~")):
+                if not in_fence:
+                    in_fence = True
+                    fence_token = stripped[:3]
+                elif stripped.startswith(fence_token):
+                    in_fence = False
+                    fence_token = ""
+                current_md.append(line)
+                continue
+
+            if in_fence:
+                current_md.append(line)
+                continue
+
+            m = TASK_LIST_RE.match(line)
+            if m:
+                if current_md:
+                    blocks.append(("markdown", "\n".join(current_md)))
+                    current_md = []
+                indent, marker, check_char, text = m.groups()
+                is_checked = check_char.lower() == "x"
+                blocks.append(("checkbox", line_idx, indent, marker, is_checked, text))
+            else:
+                current_md.append(line)
+
+        if current_md:
+            blocks.append(("markdown", "\n".join(current_md)))
+
+        return blocks
+
+    def compose(self) -> ComposeResult:
+        blocks = self._parse_blocks() if self.note_format == "markdown" else []
+        has_checkboxes = any(b[0] == "checkbox" for b in blocks)
+
+        def _render_dialog():
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "Note", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+            with VerticalScroll(id="scroll_container"):
+                if not self.content.strip():
+                    yield Static(Markdown("*(Empty note — click Edit to add content)*"), id="message")
+                elif self.note_format == "bbcode":
+                    rendered = formatting_to_rich_text(self.content, theme=self.theme)
+                    yield Static(rendered, id="message")
+                elif not has_checkboxes:
+                    yield Static(Markdown(self.content, hyperlinks=True), id="message")
+                else:
+                    for b in blocks:
+                        if b[0] == "markdown":
+                            md_text = b[1]
+                            if md_text.strip():
+                                yield Static(Markdown(md_text, hyperlinks=True), classes="markdown_block")
+                        elif b[0] == "checkbox":
+                            line_idx, indent, _marker, is_checked, text = b[1], b[2], b[3], b[4], b[5]
+                            cb = Checkbox(text, value=is_checked, classes="markdown_checkbox", id=f"cb_{line_idx}")
+                            cb._line_idx = line_idx
+                            if indent:
+                                cb.styles.margin = (0, 0, 0, len(indent))
+                            yield cb
+            with Horizontal(id="buttons"):
+                yield Button("Edit [E]", variant="primary", id="btn_edit")
+                yield Button("Delete [D]", variant="error", id="btn_delete")
+                yield Button("Close [ESC]", variant="default", id="btn_close")
+            if has_checkboxes:
+                yield Label("[SPACE] Toggle | [E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
+            else:
+                yield Label("[E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
+
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    yield from _render_dialog()
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        apply_modal_theme(self, self.theme)
+        with contextlib.suppress(Exception):
+            apply_button_theme(self.query_one("#btn_edit", Button), theme=self.theme, button_type="button_primary")
+            apply_button_theme(self.query_one("#btn_delete", Button), theme=self.theme, button_type="button_danger")
+            apply_button_theme(self.query_one("#btn_close", Button), theme=self.theme, button_type="button_default")
+
+        cbs = self.query(Checkbox)
+        if cbs:
+            cbs.first().focus()
+
+    def on_key(self, event: events.Key) -> None:
+        if isinstance(self.focused, Checkbox):
+            cbs = list(self.query(Checkbox))
+            if self.focused in cbs:
+                idx = cbs.index(self.focused)
+                if event.key in ("down", "j") and idx < len(cbs) - 1:
+                    cbs[idx + 1].focus()
+                    event.prevent_default()
+                    event.stop()
+                elif event.key in ("up", "k") and idx > 0:
+                    cbs[idx - 1].focus()
+                    event.prevent_default()
+                    event.stop()
+
+    @on(Checkbox.Changed)
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        line_idx = getattr(event.checkbox, "_line_idx", None)
+        if line_idx is not None and 0 <= line_idx < len(self.lines):
+            m = TASK_LIST_RE.match(self.lines[line_idx])
+            if m:
+                indent, marker, _old_val, text = m.groups()
+                new_mark = "x" if event.checkbox.value else " "
+                self.lines[line_idx] = f"{indent}{marker} [{new_mark}] {text}"
+                self.content = "\n".join(self.lines)
+
+                if self.filepath and self.note_title:
+                    with contextlib.suppress(Exception):
+                        nb_data = load_notebook(self.filepath)
+                        add_or_update_note(nb_data, self.note_title, self.content)
+                        save_notebook(self.filepath, nb_data)
+
+                if self.on_content_change:
+                    with contextlib.suppress(Exception):
+                        self.on_content_change(self.content)
+
+    def action_edit_note(self) -> None:
+        self.dismiss("edit")
+
+    def action_delete_note(self) -> None:
+        self.dismiss("delete")
+
+    def action_close_modal(self) -> None:
+        self.dismiss("close")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_edit":
+            self.action_edit_note()
+        elif event.button.id == "btn_delete":
+            self.action_delete_note()
+        elif event.button.id in ("btn_close", "btn_close_x"):
+            self.action_close_modal()
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.action_close_modal()
+
+
+class NoteEditorModalScreen(ModalScreen[str | None]):
+    """Modal screen for editing note content using a Textual TextArea."""
+
+    DEFAULT_CSS = """
+    NoteEditorModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #modal_frame {
+        width: 85%;
+        height: 85%;
+        max-width: 110;
+        max-height: 90%;
+    }
+    NoteEditorModalScreen #dialog_hrow {
+        width: 1fr;
+        height: 1fr;
+    }
+    #dialog {
+        width: 1fr;
+        height: 100%;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    #text_editor {
+        height: 1fr;
+        width: 100%;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    #footer {
+        text-align: center;
+        margin-top: 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("ctrl+s", "save_note", "Save"),
+        Binding("escape", "cancel_note", "Cancel"),
+    ]
+
+    def __init__(
+        self,
+        title: str,
+        content: str = "",
+        note_format: str = "markdown",
+        theme: dict | None = None,
+    ):
+        super().__init__()
+        self.modal_title = title
+        self.initial_content = content or ""
+        self.note_format = (note_format or "markdown").lower()
+        self.theme = theme or {}
+
+    def compose(self) -> ComposeResult:
+        lang = "markdown" if self.note_format == "markdown" else None
+
+        def _render_dialog():
+            with Horizontal(id="title_bar"):
+                yield Label(self.modal_title or "Edit Note", id="title")
+                yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+            yield TextArea(
+                text=self.initial_content,
+                language=lang,
+                theme="vscode_dark",
+                soft_wrap=True,
+                id="text_editor",
+            )
+            with Horizontal(id="buttons"):
+                yield Button("Save [Ctrl+S]", variant="primary", id="btn_save")
+                yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
+            yield Label("[Ctrl+S] Save | [ESC] Cancel", id="footer", markup=False)
+
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    yield from _render_dialog()
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        apply_modal_theme(self, self.theme)
+        with contextlib.suppress(Exception):
+            apply_button_theme(self.query_one("#btn_save", Button), theme=self.theme, button_type="button_primary")
+            apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_default")
+        self.call_after_refresh(self._focus_editor)
+
+    def _focus_editor(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one("#text_editor", TextArea).focus()
+
+    def action_save_note(self) -> None:
+        try:
+            editor = self.query_one("#text_editor", TextArea)
+            self.dismiss(editor.text)
+        except (LookupError, AttributeError):
+            self.dismiss(self.initial_content)
+
+    def action_cancel_note(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_save":
+            self.action_save_note()
+        elif event.button.id in ("btn_cancel", "btn_close_x"):
+            self.action_cancel_note()
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.action_cancel_note()
 
 
 # Fallback synchronous wrapper functions (for headless / standalone use)

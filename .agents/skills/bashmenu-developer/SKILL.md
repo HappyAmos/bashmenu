@@ -207,4 +207,4 @@ description: Core developer guidelines for the multi-platform BashMenu
   5. `bashmenu.md`: Reference documentation (Sections 1, 2.1, 6.1, 6.2).
   6. `bashmenu.1`: Linux system man page.
 - **Scripts Documentation:** Every executable script in `scripts/` must be registered in `bashmenu.md`, `bashmenu.1`, and `README.md`. Verified by automated assertions in `.tests/test_improvements.py`.
-- **Directory Aliases & Macro Parity:** Document aliases (`{scripts}`, `{templates}`, `{cache}`) alongside canonical forms (`{scripts_dir}`, `{templates_dir}`, `{cache_dir}`). Document config namespaces (`{app.<key>}` alongside `{theme}`, `{settings.<key>}`).
+- **Directory Aliases & Macro Parity:** Document aliases (`{scripts}`, `{templates}`, `{cache}`, `{notebooks}`) alongside canonical forms (`{scripts_dir}`, `{templates_dir}`, `{cache_dir}`, `{notebooks_dir}`). Document config namespaces (`{app.<key>}` alongside `{theme}`, `{settings.<key>}`).

@@ -380,8 +380,8 @@ Row label. Can use dynamic placeholders.
 .B icon
 Icon tags utilizing brackets: {nf:[char]:[nerd-font hex]:[emoji]}.
 .TP
-.B action
-Shell command, script, or editor file path.
+.B action, file
+Shell command, script, editor file, or notebook YAML notes path ({notebooks_dir}/notes.yml).
 .TP
 .B template, target, block_id
 Path, destination, and unique tag for dynamic templates (inject_block).
@@ -416,6 +416,10 @@ True/False/Cancel settings toggle modal.
 .TP
 .B editor
 Opens file in built-in Nano-style editor.
+.TP
+.B notebook
+Opens dynamic notes collection menu from YAML file ({notebooks_dir}/notes.yml).
+Supports interactive task-list checkboxes, Markdown/BBCode modal viewers, full TextArea editor modals, and help gutter note creation ([N]).
 .TP
 .B confirm
 Launches Yes/No confirmation dialog box.
@@ -514,6 +518,9 @@ Templates and scripts folders paths.
 .TP
 .B {cache_dir}, {cache}
 Cache folder paths (defaults to ~/.cache/bashmenu). Sets $CACHE_DIR.
+.TP
+.B {notebooks_dir}, {notebooks}
+Custom notes and notebooks directory path ({bashmenu_dir}/notebooks).
 .TP
 .B {bashrc}, {zshrc}, {profile}, {bash_profile}, {zprofile}, {shell_profile}
 User shell profile configuration paths with intelligent existence fallback.
@@ -615,7 +622,7 @@ Renders dimmed contrast text (Rich Style(dim=True)).
 Renders reversed contrast text (Rich Style(reverse=True)).
 .TP
 .B [color=color_name]text[/color]
-Renders custom theme-colored text. Available color names include: text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, and divider.
+Renders custom theme-colored text. Supports active theme semantic tokens (text, border, title, highlight, footer, help_text, plugin, shortcut_key, accent, divider, background, selection, gutter, button_primary, button_error, button_cancel, button_success, window_close_button, scrollbar, whitespace), named ANSI/bright constants (COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_BLUE, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE, COLOR_GREY, COLOR_GRAY, COLOR_BRIGHT_BLACK, COLOR_BRIGHT_RED, COLOR_BRIGHT_GREEN, COLOR_BRIGHT_YELLOW, COLOR_BRIGHT_BLUE, COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN, COLOR_BRIGHT_WHITE, COLOR_ORANGE, COLOR_PURPLE, COLOR_PINK, COLOR_BROWN), 256-color palette numbers (0 to 255), and 24-bit TrueColor hex values (#rrggbb).
 .TP
 .B [table width=100%][tr][th]Col[/th][/tr][tr][td]Val[/td][/tr][/table]
 Renders an aligned box-drawing Unicode table with dynamically fitted or percentage-based column widths (e.g. 50/50, 33/33/33), bold headers, in-cell word wrapping, and optional row separators.
@@ -643,7 +650,7 @@ Supported Theme Elements: background, title, border, text, highlight, accent,
 footer, help_text (configures help text in bottom gutter and modal footers),
 plugin (configures text color of background plugin feeds), gutter, selection,
 shortcut_key, divider, button_primary, button_error,
-button_cancel, button_success, scrollbar, and whitespace (configures
+button_cancel, button_success, window_close_button, scrollbar, and whitespace (configures
 non-visible whitespace character color in the text editor).
 .PP
 .B Formatting Rule for Editor Compatibility:

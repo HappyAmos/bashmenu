@@ -267,15 +267,15 @@ class TestWallpaperCompositor(unittest.TestCase):
             self.assertIsNotNone(mv._canvas)
             self.assertTrue(mv._canvas.is_valid(mv._canvas._canvas_key))
 
-            # Navigate to row 3 (next selectable option after row 1 and divider row 2)
-            mv.set_current_row(3)
+            # Navigate to row 2 (Notes, next selectable option after row 1)
+            mv.set_current_row(2)
             frame2 = mv.render()
 
-            # Ensure row 1 and row 3 changed selection states (lines 4 and 6 in output)
+            # Ensure row 1 and row 2 changed selection states (lines 4 and 5 in output)
             lines1 = frame1.plain.splitlines()
             lines2 = frame2.plain.splitlines()
             self.assertNotEqual(lines1[4], lines2[4])
-            self.assertNotEqual(lines1[6], lines2[6])
+            self.assertNotEqual(lines1[5], lines2[5])
 
     def test_compositor_clustering_and_quantization_defaults(self):
         """Verify default WallpaperCompositor has clustering=0 and quantization=1, producing high color fidelity."""

@@ -41,6 +41,7 @@ TYPE_BADGES = {
     "python": "[PY ]",
     "inject_block": "[INJ]",
     "theme_selector": "[THM]",
+    "notebook": "[NBK]",
     "back": "[BCK]",
     "exit": "[EXT]",
     "{divider}": "[DIV]",
@@ -53,6 +54,7 @@ ITEM_TYPES = [
     ("config", "Config Setting (edits bashmenu.yml value)"),
     ("toggle", "Settings Toggle (True/False/Cancel toggle modal)"),
     ("editor", "File Editor (opens file in built-in editor)"),
+    ("notebook", "Notebook Menu (notes collection file)"),
     ("confirm", "Confirm Dialog (Yes/No/Cancel dialog)"),
     ("message", "Message Popup (alert / info text dialog)"),
     ("python", "Python Routine (built-in python function)"),
@@ -89,10 +91,17 @@ ITEM_EDIT_HELP_TEXT = """\
   Purpose: Payload executed when the entry is selected.
   Usage:   One editor field writes the type-specific key:
            command->command, script->script, editor->file,
-           toggle/config->key, python->python, else->action.
+           notebook->file, toggle/config->key, python->python,
+           else->action.
            Can embed dynamic directives: {param}, {file_picker},
            {dir_picker}.
   Example: command: "{scripts_dir}/backup.sh {param}"
+
+[bold cyan]Notebook File Path[/bold cyan]  (file)  [notebook]
+  Purpose: Path to the YAML notebook notes collection file.
+  Usage:   Defaults to {notebooks_dir}/notes.yml; macros
+           and ~ are expanded. Looks in notebooks/ first.
+  Example: file: "{notebooks_dir}/notes.yml"
 
 [bold cyan]Message / Prompt Text[/bold cyan]  (message | prompt)
   Purpose: Text shown to the user, or the prompt displayed
@@ -2395,27 +2404,40 @@ class MenuEditScreen(Screen):
                         parent_data = cursor_node.data
                         if isinstance(parent_data, dict):
                             if "submenu" in parent_data:
-                                parent_data.setdefault("submenu", {}).setdefault("items", []).append(final_item)
-                                parent_data.setdefault("submenu", {}).setdefault("options", []).append(final_item)
+                                sub = parent_data.setdefault("submenu", {})
+                                target_list = sub.setdefault("items", [])
+                                target_list.append(final_item)
+                                if "options" in sub:
+                                    sub["options"] = target_list
                             else:
-                                parent_data.setdefault("items", []).append(final_item)
-                                parent_data.setdefault("options", []).append(final_item)
+                                target_list = parent_data.setdefault("items", [])
+                                target_list.append(final_item)
+                                if "options" in parent_data:
+                                    parent_data["options"] = target_list
                     else:
                         res = self._find_item_parent_list(cursor_node.data)
                         if res:
                             opts, idx = res
                             opts.insert(idx + 1, final_item)
                         else:
-                            self.menu_data.setdefault("items", []).append(final_item)
-                            self.menu_data.setdefault("options", []).append(final_item)
+                            target_list = self.menu_data.setdefault("items", [])
+                            target_list.append(final_item)
+                            if "options" in self.menu_data:
+                                self.menu_data["options"] = target_list
 
                     self.modified = True
                     self.populate_tree(target_item=final_item)
                     self._save_menu_quietly()
 
-            self.app.push_screen(ItemEditModal(new_item, theme=self.theme_styles), edit_cb)
+            if app_obj:
+                app_obj.push_screen(ItemEditModal(new_item, theme=self.theme_styles), edit_cb)
 
-        self.app.push_screen(ItemTypePickerModal(theme=self.theme_styles), type_cb)
+        app_obj = getattr(self, "_app", None)
+        if not app_obj:
+            with contextlib.suppress(Exception):
+                app_obj = self.app
+        if app_obj:
+            app_obj.push_screen(ItemTypePickerModal(theme=self.theme_styles), type_cb)
 
     def action_delete_item(self) -> None:
         tree = self.query_one("#tree", Tree)

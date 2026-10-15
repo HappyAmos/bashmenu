@@ -3069,6 +3069,89 @@ G
             for expected in ("ymlcheck", "bashmenu_ui"):
                 self.assertIn(expected, reloaded_modules)
 
+    def test_menuedit_add_item_to_submenu_container_no_duplicate(self):
+        """Verify adding an item to a submenu container appends it exactly once."""
+        import menuedit
+
+        menu_data = {
+            "version": "0.0.1",
+            "title": "Main Menu",
+            "items": [
+                {
+                    "title": "Submenu 1",
+                    "type": "submenu",
+                    "submenu": {
+                        "title": "Submenu 1",
+                        "items": [],
+                        "options": [],
+                    },
+                }
+            ],
+        }
+        menu_data["options"] = menu_data["items"]
+        menu_data["items"][0]["submenu"]["options"] = menu_data["items"][0]["submenu"]["items"]
+
+        screen = menuedit.MenuEditScreen()
+        screen.menu_data = menu_data
+        mock_tree = MagicMock()
+        mock_sub_node = MagicMock()
+        mock_sub_node.data = menu_data["items"][0]
+        mock_tree.cursor_node = mock_sub_node
+        mock_tree.root = MagicMock()
+
+        mock_app = MagicMock()
+        screen._app = mock_app
+
+        with (
+            patch.object(screen, "query_one", return_value=mock_tree),
+            patch.object(screen, "_save_menu_quietly"),
+            patch.object(screen, "populate_tree"),
+        ):
+            screen.action_add_item()
+            self.assertTrue(mock_app.push_screen.called)
+            type_args = mock_app.push_screen.call_args[0]
+            type_cb = type_args[1]
+            mock_app.push_screen.reset_mock()
+
+            type_cb("command")
+            self.assertTrue(mock_app.push_screen.called)
+            edit_args = mock_app.push_screen.call_args[0]
+            edit_cb = edit_args[1]
+
+            final_item = {"type": "command", "title": "Added Command"}
+            edit_cb(final_item)
+
+            sub_items = menu_data["items"][0]["submenu"]["items"]
+            self.assertEqual(len(sub_items), 1)
+            self.assertEqual(sub_items[0]["title"], "Added Command")
+
+    def test_bashmenu_f7_status_gutter_editor(self):
+        """Verify F7 key opens status gutter editor modal and updates config."""
+        bindings = {b.key: b.action for b in bashmenu.BashMenuScreen.BINDINGS}
+        self.assertIn("f7", bindings)
+        self.assertEqual(bindings["f7"], "edit_status_gutter")
+
+        cfg = {"settings": {"status_gutter": "Old Format"}}
+        screen = bashmenu.BashMenuScreen(config=cfg)
+        mock_mv = MagicMock()
+        mock_mv.config = cfg
+
+        with patch.object(bashmenu.BashMenuScreen, "menu_view", mock_mv):
+            mock_app = MagicMock()
+            screen._app = mock_app
+
+            screen.action_edit_status_gutter()
+            mock_app.push_screen.assert_called_once()
+            modal, cb = mock_app.push_screen.call_args[0]
+            self.assertIsInstance(modal, bashmenu_ui.InputModalScreen)
+            self.assertEqual(modal.modal_title, "Configure Status Gutter")
+            self.assertEqual(modal.default_text, "Old Format")
+
+            with patch("bashmenu.save_config"):
+                cb("New Format | {user}")
+                self.assertEqual(cfg["settings"]["status_gutter"], "New Format | {user}")
+                mock_mv.refresh.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

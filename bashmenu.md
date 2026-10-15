@@ -23,6 +23,7 @@ editor for Linux systems.
   - [4.3 Color Themes Specification (`bashmenu.themes`)](#43-color-themes-specification-bashmenuthemes)
   - [4.4 Wallpaper Backgrounds & Image Preparation](#44-wallpaper-backgrounds--image-preparation)
 - [5. Complete Menu Option Types Reference](#5-complete-menu-option-types-reference)
+  - [5.1 Notebook Menu Option (`type: notebook`)](#51-notebook-menu-option-type-notebook)
 - [6. Dynamic Directives & Variables](#6-dynamic-directives--variables)
   - [6.1 Dynamic Input Directives](#61-dynamic-input-directives)
   - [6.2 System & Path Placeholders](#62-system--path-placeholders)
@@ -387,6 +388,7 @@ Color themes configure the visual palette for the main menu, visual menu editor,
 | `button_success` | Modal dialog success action button color. |
 | `scrollbar` | Scroll bar thumb (foreground) and track (background) colors. |
 | `whitespace` | Non-visible whitespace characters (spaces, tabs, newlines) display color in the text editor. |
+| `window_close_button` | Close 'x' button in window title bars and modal dialogs. |
 
 *Formatting Rule for Editor Compatibility:* Theme definitions maintain compact single-line flow-style bracket lists (e.g., `title: [201, -1]`). This enables `bashedit.py`'s `--display-theme-colors` feature to accurately parse inline bracketed color values and render live color swatch previews.
 
@@ -580,6 +582,7 @@ pngquant --nofs 24 --speed 1 --ext -clean.png input.png
 | `config` | Prompts user to edit setting value | `key`, `picker`, `start_dir` |
 | `toggle` | Interactive True/False/Cancel modal | `key`, `message`, `title` |
 | `editor` | Opens file inside built-in text editor | `action`, `show_whitespace` |
+| `notebook` | Opens dynamic notes collection menu from YAML file | `file`, `icon` |
 | `confirm` | Triggers a Yes/No confirmation dialog | `message`, `on_yes`, `on_no` |
 | `message` | Displays an informational pop-up dialog | `message`, `title` |
 | `python` | Dispatches internal Python utility function | `action` |
@@ -588,6 +591,54 @@ pngquant --nofs 24 --speed 1 --ext -clean.png input.png
 | `{divider}` | Renders an aesthetic horizontal line separator styled by the theme | *(automatic)* |
 | `back` | Navigates back to the preceding menu level| *(automatic)* |
 | `exit` | Shuts down the menu interface completely | *(automatic)* |
+
+### 5.1 Notebook Menu Option (`type: notebook`)
+The `notebook` option type turns a menu entry into a dynamic notes collection submenu backed by a structured YAML file.
+
+```yaml
+  - Notes:
+      type: notebook
+      file: "{notebooks_dir}/notes.yml"
+      icon: "{nf:/:#f1a7c}"
+```
+
+#### Notebook File Resolution
+When `file` is specified, the application resolves it dynamically using system placeholders (such as `{notebooks_dir}` and `{bashmenu_dir}`). If `file` is omitted or a relative path is given, the engine checks the `notebooks/` directory first (`{bashmenu_dir}/notebooks/notes.yml`), followed by the application root directory (`{bashmenu_dir}/notes.yml`). If the file does not exist, it is automatically initialized with standard metadata upon first access.
+
+#### Notebook YAML Schema
+Notebooks utilize a clean, human-readable YAML structure with note titles represented as parent mapping keys:
+
+```yaml
+notebook:
+  title: Notes
+  format: markdown
+  notes:
+    - Daily Tasks:
+        type: note
+        format: markdown
+        content: |-
+          # Daily Tasks
+          - [x] Review pull requests
+          - [ ] Update documentation
+    - Server Config:
+        type: note
+        format: markdown
+        content: |-
+          # Server Notes
+          Primary gateway IP: 192.168.1.1
+```
+
+#### Interactive Markdown Preview & Task Lists
+Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]` and `- [x]`):
+* **Keyboard Navigation:** Navigate between checkboxes using the arrow keys or `Tab`.
+* **Instant Toggle:** Press `Space` or click directly on any checkbox to toggle its checked state.
+* **Automatic Persistence:** Checked states are updated in the YAML file on disk immediately.
+
+#### Help Gutter & Note Actions
+* **Create Note (`[N]`):** When entering a notebook submenu, the bottom help gutter displays `[N]: New Note`. Pressing `n` or `N` prompts for a note title and opens the note editor.
+* **View Note (`ENTER`):** Opens `NoteViewerModalScreen` with wrapped, formatted Markdown or BBCode text and interactive widgets.
+* **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using Textual's full-screen TextArea editor modal.
+* **Delete Note (`[D]`):** Prompts for confirmation to remove the note from the YAML store.
 
 ---
 
@@ -651,6 +702,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{templates_dir}` / `{templates}` | Templates folder path (`settings.templates_dir`). |
 | `{scripts_dir}` / `{scripts}` | Scripts folder path (`settings.scripts_dir`). |
 | `{cache_dir}` / `{cache}` | Cache folder path (`settings.cache_dir`, default `~/.cache/bashmenu`). Sets `$CACHE_DIR`. |
+| `{notebooks_dir}` / `{notebooks}` | Custom notes and notebook collection directory path (`{bashmenu_dir}/notebooks`). |
 | `{bash_aliases}` | Path to `~/.bash_aliases`. |
 | `{bashrc}` | Path to `~/.bashrc`. |
 | `{zshrc}` | Path to `~/.zshrc`. |
@@ -742,6 +794,9 @@ The application includes a rich formatting parser allowing developers to use inl
 
 #### Theme Colors Available:
 
+The `[color=...]` tag accepts active theme semantic tokens, standard/bright ANSI constants, 256-color palette indices, and 24-bit TrueColor hex codes:
+
+##### 1. Active Theme Semantic Tokens:
 | Color Identifier | Target Element / Description |
 | :--- | :--- |
 | `color=text` | Standard text color of the active theme. |
@@ -754,6 +809,31 @@ The application includes a rich formatting parser allowing developers to use inl
 | `color=shortcut_key` | Direct action shortcut character badge color. |
 | `color=accent` | Accent indicator/status badge color. |
 | `color=divider` | Horizontal line divider color. |
+| `color=background` | Window and dialog background color. |
+| `color=selection` | Active item selection highlight color. |
+| `color=gutter` | Status and help gutter text color. |
+| `color=button_primary` | Primary action button color. |
+| `color=button_error` | Error / danger button color. |
+| `color=button_cancel` | Cancel / secondary button color. |
+| `color=button_success` | Success / confirmation button color. |
+| `color=window_close_button` | Window title bar close button ('x') color. |
+| `color=scrollbar` | Scrollbar thumb and track styling. |
+| `color=whitespace` | Non-visible editor whitespace display color. |
+
+##### 2. Named ANSI & Bright Color Constants:
+| Constant | Target ANSI Color |
+| :--- | :--- |
+| `COLOR_BLACK`, `COLOR_RED`, `COLOR_GREEN`, `COLOR_YELLOW` | Standard 16-color ANSI primary palette (0–3). |
+| `COLOR_BLUE`, `COLOR_MAGENTA`, `COLOR_CYAN`, `COLOR_WHITE` | Standard 16-color ANSI primary palette (4–7). |
+| `COLOR_GREY`, `COLOR_GRAY`, `COLOR_BRIGHT_BLACK` | Bright Black / Neutral Gray (ANSI 8). |
+| `COLOR_BRIGHT_RED`, `COLOR_BRIGHT_GREEN`, `COLOR_BRIGHT_YELLOW` | High-intensity bright ANSI colors (9–11). |
+| `COLOR_BRIGHT_BLUE`, `COLOR_BRIGHT_MAGENTA`, `COLOR_BRIGHT_CYAN` | High-intensity bright ANSI colors (12–14). |
+| `COLOR_BRIGHT_WHITE` | High-intensity bright white (ANSI 15). |
+| `COLOR_ORANGE`, `COLOR_PURPLE`, `COLOR_PINK`, `COLOR_BROWN` | Extended named color definitions. |
+
+##### 3. 256-Color Palette Indices & TrueColor Hex Values:
+* **256-Color Palette:** Integer index `0` to `255` (e.g. `[color=196]bright red[/color]`, `[color=214]orange[/color]`, `[color=61]slate blue[/color]`).
+* **24-Bit TrueColor Hex:** Standard HTML/CSS hex format (e.g. `[color=#ff5555]soft red[/color]`, `[color=#bd93f9]purple[/color]`).
 
 #### Key Features:
 * **Nesting Support**: Tags can be nested seamlessly (e.g. `[b]bold text [color=accent]with accented[/color] highlight[/b]`).

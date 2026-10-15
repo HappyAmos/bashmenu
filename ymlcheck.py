@@ -120,7 +120,7 @@ VALID_WINDOW_BORDER_KEYS = {
 VALID_OPTION_TYPES = {
     "command", "script", "submenu", "config", "toggle", "editor",
     "confirm", "message", "popup", "info", "python", "inject_block",
-    "theme_selector", "{divider}", "back", "exit", "action"
+    "theme_selector", "notebook", "{divider}", "back", "exit", "action"
 }
 
 

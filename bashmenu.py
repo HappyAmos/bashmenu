@@ -83,11 +83,37 @@ if BASHMENU_DIR not in sys.path:
 SCRIPTS_DIR = os.path.join(BASHMENU_DIR, "scripts")
 if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
+NOTEBOOKS_DIR = os.path.join(BASHMENU_DIR, "notebooks")
 
 try:
     import ymlcheck
 except ImportError:
     ymlcheck = None
+
+
+def resolve_notebook_path(raw_path: str | None = None, config: dict | None = None) -> str:
+    """Resolve a notebook file path, checking the notebooks/ directory first."""
+    if not raw_path:
+        nb_default = os.path.join(NOTEBOOKS_DIR, "notes.yml")
+        if os.path.exists(nb_default):
+            return nb_default
+        root_default = os.path.join(BASHMENU_DIR, "notes.yml")
+        if os.path.exists(root_default):
+            return root_default
+        return nb_default
+
+    interpolated = interpolate_placeholders(raw_path, config or {})
+    expanded = os.path.expanduser(interpolated)
+    if os.path.isabs(expanded):
+        return expanded
+
+    nb_candidate = os.path.join(NOTEBOOKS_DIR, expanded)
+    if os.path.exists(nb_candidate):
+        return nb_candidate
+    root_candidate = os.path.join(BASHMENU_DIR, expanded)
+    if os.path.exists(root_candidate):
+        return root_candidate
+    return nb_candidate
 
 def resolve_existing_path(primary: Path, fallback: Path | None = None) -> str:
     """Return primary path if it exists, or fallback if primary does not exist and fallback does."""
@@ -813,6 +839,8 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         "{templates_dir}": str(templates_dir_setting),
         "{cache}": str(cache_dir_setting),
         "{cache_dir}": str(cache_dir_setting),
+        "{notebooks}": NOTEBOOKS_DIR,
+        "{notebooks_dir}": NOTEBOOKS_DIR,
         "{bashrc}": BASHRC_PATH,
         "{bash_aliases}": BASH_ALIASES_PATH,
         "{vimrc}": VIMRC_PATH,
@@ -1097,6 +1125,61 @@ def build_dynamic_theme_submenu():
         "icon": "{nf::#f048}",
     })
     return {"title": "Select Color Theme", "items": items, "options": items}
+
+
+def build_dynamic_notebook_submenu(filepath, notebook_data=None, config=None):
+    """Construct a dynamic menu structure dictionary from a notebook YAML file."""
+    filepath = resolve_notebook_path(filepath, config=config)
+    if notebook_data is None:
+        notebook_data = bashmenu_ui.load_notebook(filepath)
+    nb_dict = notebook_data.get("notebook", {}) if isinstance(notebook_data, dict) else {}
+    nb_title = nb_dict.get("title", "Notebook")
+    notes_list = bashmenu_ui.get_notebook_notes(notebook_data)
+
+    items = [
+        {
+            "type": "{divider}",
+        }
+    ]
+    if notes_list:
+        for title, note_props in notes_list:
+            custom_icon = None
+            if isinstance(note_props, dict):
+                custom_icon = note_props.get("icon")
+            items.append({
+                "title": title,
+                "label": title,
+                "type": "notebook_note",
+                "_notebook_file": filepath,
+                "_note_title": title,
+                "icon": custom_icon or "{nf:󰎞:#f039e}",
+            })
+    else:
+        items.append({
+            "title": "(No notes yet — press [N] to create)",
+            "label": "(No notes yet — press [N] to create)",
+            "type": "notebook_empty",
+            "_notebook_file": filepath,
+            "icon": "    ",
+        })
+
+    items.append({
+        "type": "{divider}",
+    })
+    items.append({
+        "title": "Back",
+        "label": "Back",
+        "type": "back",
+        "icon": "{nf:󰁮:#f048}",
+    })
+    return {
+        "title": nb_title,
+        "items": items,
+        "options": items,
+        "_is_notebook": True,
+        "_notebook_file": filepath,
+        "_notebook_data": notebook_data,
+    }
 
 
 def inject_dynamic_menus(menu_item):
@@ -2070,15 +2153,18 @@ class MainMenuView(Widget):
         right_gutter_w = avail_both - left_gutter_w
 
         now_sec = int(time.time())
-        gutter_key = (now_sec, left_gutter_w, right_gutter_w, avail_w, self.show_shortcuts)
+        is_nb = bool(self.current_menu().get("_is_notebook"))
+        gutter_key = (now_sec, left_gutter_w, right_gutter_w, avail_w, self.show_shortcuts, is_nb)
         cached_gutters = getattr(self, "_cached_gutters", None)
         if cached_gutters and cached_gutters[0] == gutter_key:
             help_lines, status_lines = cached_gutters[1], cached_gutters[2]
         else:
-            if self.show_shortcuts:
-                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [ESC]: Back"
+            if is_nb:
+                full_help_str = "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [F1]: Help | [F2]: Themes | [F7]: Gutter | [ESC]: Back"
+            elif self.show_shortcuts:
+                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
             else:
-                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [ESC]: Back"
+                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
             raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
             help_lines = wrap_gutter_items(raw_help_items, left_gutter_w, max_lines=2, config=self.config, spread=True)
 
@@ -2688,7 +2774,7 @@ class MainMenuView(Widget):
                             scr.action_select_option()
             return
 
-        # Handle clicks on the interactive help gutter
+        # Handle clicks on the interactive help gutter and status gutter
         h = max(10, self.size.height or 24)
         cached_gutters = getattr(self, "_cached_gutters", None)
         if cached_gutters:
@@ -2697,7 +2783,18 @@ class MainMenuView(Widget):
             gutter_y_start = h - 1 - gutter_rows
             if gutter_y_start <= event.y < h - 1:
                 r_idx = event.y - gutter_y_start
-                if 0 <= r_idx < len(help_lines):
+                avail_both = max(4, (self.size.width or 80) - 11)
+                left_gutter_w = avail_both // 2
+                sep_x = left_gutter_w + 5
+                if event.x >= sep_x:
+                    scr = None
+                    with contextlib.suppress(Exception):
+                        scr = self.screen
+                    if not scr:
+                        scr = getattr(self, "_screen", None)
+                    if scr and hasattr(scr, "action_edit_status_gutter"):
+                        scr.action_edit_status_gutter()
+                elif 0 <= r_idx < len(help_lines):
                     self._handle_gutter_click(event.x, help_lines[r_idx])
 
     def _handle_gutter_click(self, click_x: int, line_str: str) -> None:
@@ -2727,9 +2824,13 @@ class MainMenuView(Widget):
                     scr.action_refresh()
                 elif ("keys" in item_lower or "f6" in item_lower) and hasattr(scr, "action_toggle_shortcuts"):
                     scr.action_toggle_shortcuts()
+                elif ("gutter" in item_lower or "f7" in item_lower) and hasattr(scr, "action_edit_status_gutter"):
+                    scr.action_edit_status_gutter()
                 elif ("back" in item_lower or "esc" in item_lower) and hasattr(scr, "action_quit"):
                     scr.action_quit()
-                elif ("select" in item_lower or "enter" in item_lower) and hasattr(scr, "action_select_option"):
+                elif ("new note" in item_lower or item_lower.startswith("[n]") or item_lower == "n") and hasattr(scr, "action_new_note"):
+                    scr.action_new_note()
+                elif ("select" in item_lower or "read" in item_lower or "enter" in item_lower) and hasattr(scr, "action_select_option"):
                     scr.action_select_option()
                 return
             x_cursor += item_len + 1
@@ -2830,6 +2931,47 @@ def process_item_action(screen, item, config):
     elif item_type == "back":
         screen.action_go_back()
 
+    elif item_type == "notebook":
+        filepath = resolve_notebook_path(item.get("file"), config=config)
+        try:
+            sub_menu = build_dynamic_notebook_submenu(filepath, config=config)
+            item["submenu"] = sub_menu
+            screen.menu_view.menu_stack.append(sub_menu)
+            sub_options = sub_menu.get("items", sub_menu.get("options", []))
+            start_idx = 0
+            while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
+                start_idx += 1
+            screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
+            if hasattr(screen.menu_view, "scroll_offsets"):
+                screen.menu_view.scroll_offsets.append(0)
+            screen.menu_view.refresh()
+        except (OSError, yaml.YAMLError, KeyError, TypeError, ValueError) as e:
+            theme = getattr(screen.app, "theme_styles", getattr(screen, "theme_styles", None))
+            screen.app.push_screen(bashmenu_ui.MessageModalScreen("Notebook Error", f"Failed to load notebook:\n{e}", theme=theme))
+
+    elif item_type == "theme_selector":
+        item["submenu"] = build_dynamic_theme_submenu()
+        sub_menu = item["submenu"]
+        screen.menu_view.menu_stack.append(sub_menu)
+        sub_options = sub_menu.get("items", sub_menu.get("options", []))
+        start_idx = 0
+        while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
+            start_idx += 1
+        screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
+        if hasattr(screen.menu_view, "scroll_offsets"):
+            screen.menu_view.scroll_offsets.append(0)
+        screen.menu_view.refresh()
+
+    elif item_type == "notebook_note":
+        filepath = item.get("_notebook_file", "")
+        note_title = item.get("_note_title", "")
+        if filepath and note_title and hasattr(screen, "open_note_viewer"):
+            screen.open_note_viewer(filepath, note_title)
+
+    elif item_type == "notebook_empty":
+        if hasattr(screen, "action_new_note"):
+            screen.action_new_note()
+
     elif "submenu" in item:
         sub_menu = item["submenu"]
         screen.menu_view.menu_stack.append(sub_menu)
@@ -2855,19 +2997,6 @@ def process_item_action(screen, item, config):
         screen.menu_view.refresh()
         if hasattr(screen, "_update_plugin_buffer_geometry"):
             screen._update_plugin_buffer_geometry()
-
-    elif item_type == "theme_selector":
-        item["submenu"] = build_dynamic_theme_submenu()
-        sub_menu = item["submenu"]
-        screen.menu_view.menu_stack.append(sub_menu)
-        sub_options = sub_menu.get("items", sub_menu.get("options", []))
-        start_idx = 0
-        while start_idx < len(sub_options) and is_divider(sub_options[start_idx]):
-            start_idx += 1
-        screen.menu_view.selected_rows.append(min(start_idx, max(0, len(sub_options) - 1)))
-        if hasattr(screen.menu_view, "scroll_offsets"):
-            screen.menu_view.scroll_offsets.append(0)
-        screen.menu_view.refresh()
 
     elif item_type in ["message", "popup", "info"]:
         msg_title = interpolate_placeholders(item.get("title", item.get("label", "Notice")), config)
@@ -3268,6 +3397,7 @@ class BashMenuScreen(Screen):
         Binding("f4", "edit_menu", "Edit Menu"),
         Binding("f5", "refresh_menu", "Refresh"),
         Binding("f6", "toggle_shortcuts", "Keys"),
+        Binding("f7", "edit_status_gutter", "Gutter"),
         Binding("escape", "go_back", "Back/Exit"),
     ]
 
@@ -3391,7 +3521,14 @@ class BashMenuScreen(Screen):
 
     def on_key(self, event: Key) -> None:
         mv = self.menu_view
-        opts = mv.current_menu().get("items", mv.current_menu().get("options", []))
+        curr_m = mv.current_menu()
+        if curr_m.get("_is_notebook") and (event.key in ("n", "N") or getattr(event, "character", None) in ("n", "N")):
+            self.action_new_note()
+            event.stop()
+            event.prevent_default()
+            return
+
+        opts = curr_m.get("items", curr_m.get("options", []))
         shortcut_chars = "123456789abcdefghijklmnopqrstuvwxyz"
 
         shortcut_map = {}
@@ -3567,6 +3704,152 @@ class BashMenuScreen(Screen):
         set_config_value(mv.config, "settings.show_menu_shortcuts", mv.show_shortcuts)
         save_config(mv.config)
         mv.refresh()
+
+    def action_edit_status_gutter(self) -> None:
+        """Launch the status gutter format configuration modal (F7)."""
+        current_val = str(get_config_value(self.menu_view.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}"))
+        prompt = (
+            "Enter status gutter format. Available options: {user}, {battery}, "
+            "{date}, {date_time_24}, {date_time_24_short}, {date_time_12}, "
+            "{date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}"
+        )
+        app_obj = getattr(self, "_app", None)
+        if not app_obj:
+            with contextlib.suppress(Exception):
+                app_obj = self.app
+        theme = getattr(app_obj, "theme_styles", getattr(self, "theme_styles", None))
+
+        def input_cb(new_val: str | None) -> None:
+            if new_val is not None:
+                set_config_value(self.menu_view.config, "settings.status_gutter", new_val.strip())
+                save_config(self.menu_view.config)
+                self.menu_view.refresh()
+
+        modal = bashmenu_ui.InputModalScreen("Configure Status Gutter", prompt, default_text=current_val, theme=theme)
+        if app_obj:
+            app_obj.push_screen(modal, input_cb)
+
+    def action_new_note(self) -> None:
+        """Prompt for a new note title and launch the note editor."""
+        curr_m = self.menu_view.current_menu()
+        if not curr_m.get("_is_notebook"):
+            return
+        filepath = curr_m.get("_notebook_file")
+        if not filepath:
+            return
+
+        theme = getattr(self.app, "theme_styles", getattr(self, "theme_styles", None))
+
+        def on_title_entered(title: str | None) -> None:
+            if not title or not title.strip():
+                return
+            clean_title = title.strip()
+            self.open_note_editor(filepath, clean_title, initial_content="", is_new=True)
+
+        self.app.push_screen(
+            bashmenu_ui.InputModalScreen("New Note", "Enter note title:", theme=theme),
+            on_title_entered,
+        )
+
+    def open_note_viewer(self, filepath: str, note_title: str) -> None:
+        """Open the formatted note viewer modal for an existing note."""
+        nb_data = bashmenu_ui.load_notebook(filepath)
+        note_dict = bashmenu_ui.get_note_by_title(nb_data, note_title)
+        if not note_dict:
+            return
+        content = note_dict.get("content", "")
+        note_format = note_dict.get("format", "markdown")
+        theme = getattr(self.app, "theme_styles", getattr(self, "theme_styles", None))
+
+        def on_viewer_dismissed(action: str | None) -> None:
+            if action == "edit":
+                reloaded_nb = bashmenu_ui.load_notebook(filepath)
+                reloaded_note = bashmenu_ui.get_note_by_title(reloaded_nb, note_title)
+                curr_content = reloaded_note.get("content", content) if reloaded_note else content
+                self.open_note_editor(filepath, note_title, initial_content=curr_content, is_new=False)
+            elif action == "delete":
+                self.confirm_delete_note(filepath, note_title)
+
+        self.app.push_screen(
+            bashmenu_ui.NoteViewerModalScreen(
+                title=note_title,
+                content=content,
+                note_format=note_format,
+                theme=theme,
+                filepath=filepath,
+                note_title=note_title,
+            ),
+            on_viewer_dismissed,
+        )
+
+    def open_note_editor(self, filepath: str, note_title: str, initial_content: str = "", is_new: bool = False) -> None:
+        """Open the raw note editor modal with Textual TextArea."""
+        theme = getattr(self.app, "theme_styles", getattr(self, "theme_styles", None))
+
+        def on_editor_saved(saved_content: str | None) -> None:
+            if saved_content is not None:
+                nb_data = bashmenu_ui.load_notebook(filepath)
+                bashmenu_ui.add_or_update_note(nb_data, note_title, saved_content)
+                bashmenu_ui.save_notebook(filepath, nb_data)
+                self.refresh_current_notebook(filepath, select_title=note_title)
+                self.open_note_viewer(filepath, note_title)
+            elif not is_new:
+                self.open_note_viewer(filepath, note_title)
+
+        self.app.push_screen(
+            bashmenu_ui.NoteEditorModalScreen(
+                title=f"Editing: {note_title}",
+                content=initial_content,
+                theme=theme,
+            ),
+            on_editor_saved,
+        )
+
+    def confirm_delete_note(self, filepath: str, note_title: str) -> None:
+        """Prompt confirmation before deleting a note."""
+        theme = getattr(self.app, "theme_styles", getattr(self, "theme_styles", None))
+
+        def on_confirm_delete(res: str | None) -> None:
+            if res == "yes":
+                nb_data = bashmenu_ui.load_notebook(filepath)
+                bashmenu_ui.delete_note(nb_data, note_title)
+                bashmenu_ui.save_notebook(filepath, nb_data)
+                self.refresh_current_notebook(filepath)
+
+        self.app.push_screen(
+            bashmenu_ui.ConfirmModalScreen(
+                "Delete Note",
+                f"Are you sure you want to delete note '{note_title}'?",
+                theme=theme,
+            ),
+            on_confirm_delete,
+        )
+
+    def refresh_current_notebook(self, filepath: str, select_title: str | None = None) -> None:
+        """Reload and rebuild current notebook menu items."""
+        nb_data = bashmenu_ui.load_notebook(filepath)
+        updated_sub = build_dynamic_notebook_submenu(filepath, notebook_data=nb_data, config=self.menu_view.config)
+        self.menu_view.menu_stack[-1] = updated_sub
+        opts = updated_sub.get("items", [])
+        target_idx = 0
+        if select_title:
+            for idx, opt in enumerate(opts):
+                if opt.get("_note_title") == select_title:
+                    target_idx = idx
+                    break
+        else:
+            while target_idx < len(opts) and is_divider(opts[target_idx]):
+                target_idx += 1
+        self.menu_view.selected_rows[-1] = min(target_idx, max(0, len(opts) - 1))
+        if len(self.menu_view.menu_stack) >= 2:
+            parent_menu = self.menu_view.menu_stack[-2]
+            p_items = parent_menu.get("items", parent_menu.get("options", []))
+            for p_item in p_items:
+                if isinstance(p_item, dict) and p_item.get("type") == "notebook":
+                    p_file = resolve_notebook_path(p_item.get("file"), self.menu_view.config)
+                    if os.path.abspath(os.path.expanduser(p_file)) == os.path.abspath(os.path.expanduser(filepath)):
+                        p_item["submenu"] = updated_sub
+        self.menu_view.refresh()
 
     def refresh_environment(self, clear_plugins: bool = True, reload_modules: bool = False) -> None:
         # 1. Hot-reload source modules if requested (skips pytest runner to avoid wiping active mocks)
