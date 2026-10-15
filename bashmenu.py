@@ -2065,11 +2065,6 @@ class MainMenuView(Widget):
         """
         w = max(40, self.size.width or 80)
         avail_w = max(20, w - 6)
-        cache_key = (total_content_rows, avail_w, len(_plugin_display_cache))
-        cached = getattr(self, "_cached_plugin_limits", None)
-        if cached and cached[0] == cache_key:
-            return cached[1], cached[2], cached[3]
-
         raw_plugin_lines = get_plugin_display_lines(self.config, width=avail_w)
         has_top_div, _ = get_plugin_divider_config(self.config)
         top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
@@ -2078,7 +2073,6 @@ class MainMenuView(Widget):
             raw_plugin_lines = raw_plugin_lines[:max_plugin_rows] if max_plugin_rows > 0 else []
         separator_rows = 1 if len(raw_plugin_lines) > 0 else 0
         visible_option_rows = max(1, total_content_rows - len(raw_plugin_lines) - separator_rows - top_div_rows)
-        self._cached_plugin_limits = (cache_key, raw_plugin_lines, separator_rows, visible_option_rows)
         return raw_plugin_lines, separator_rows, visible_option_rows
 
     def render(self) -> Text:
