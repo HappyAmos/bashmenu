@@ -16,10 +16,21 @@ description: Core developer guidelines for the multi-platform BashMenu
 
 ## 2. Core Development Workflow & Invariants
 - **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"` or `pytest`.
+- **GitHub Actions CI Workflow & Remote Test Verification:**
+  - Automated testing is offloaded to GitHub Actions (`.github/workflows/python-app.yml`) across Python 3.10, 3.11, and 3.12.
+  - When testing changes, commit and push to `origin/main`, then track remote CI using GitHub CLI:
+    - Query run ID: `gh run list --workflow=python-app.yml --limit 1 --json databaseId -q '.[0].databaseId'`
+    - Inspect failures: `gh run view <ID> --log-failed`
+    - Watch run: `gh run watch <ID>`
+    - Invariant: Never run `gh run view` or `gh run watch` without an explicit run ID as interactive prompts hang non-interactive agent shells.
+- **Style Cleanups & Dotfile Constraints:**
+  - Resolve PEP 8 warnings (`F841` unused variables, `E741` ambiguous variable names like `l`, trailing whitespace) directly in the source code.
+  - Do NOT introduce root `.flake8` configuration files unless explicitly requested by the user.
 - **Directory Invariants:**
   - Tests: All unit/integration tests must reside in `.tests/` (`test_*.py`) and dynamically resolve project root via `sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))`. Never place tests in root or `scripts/`.
   - Extension Scripts: Standalone games, plugins, and helper tools must reside in `scripts/`, never in root. Menu actions reference them via `{scripts_dir}/<name>`.
-- **Dependencies & Virtualenv Hygiene:** `requirements.txt` must declare `textual`, `rich`, `PyYAML`, and `ruff`. Never remove `ruff`. Keep system prerequisites to a minimum (`python3` + `curl`). Prefer Python standard library (`json`, `urllib.request`) over external CLI tools (`glow`, `jq`, `yq`) for out-of-the-box compatibility on Termux, Raspberry Pi, and Windows (Git Bash/WSL).
+  - Notebooks: User notebooks and notes must reside in `notebooks/` (`{notebooks_dir}` / `{notebooks}`). `resolve_notebook_path()` checks `notebooks/` first before falling back to root.
+- **Dependencies & Virtualenv Hygiene:** `requirements.txt` must declare all runtime and test dependencies (including `Pillow` for wallpaper compositing, `textual`, `rich`, `PyYAML`, `ruff`, `flake8`, and `pytest`). Keep system prerequisites to a minimum (`python3` + `curl`). CI runners install freshly from `requirements.txt`; ensure no test relies on unlisted packages. Prefer Python standard library (`json`, `urllib.request`) over external CLI tools (`glow`, `jq`, `yq`) for out-of-the-box compatibility on Termux, Raspberry Pi, and Windows (Git Bash/WSL).
 - **Sub-Agent Delegation Policy:** Use local `opencode` CLI sparingly and strictly for small, low-risk draft tasks (test case drafts, isolated prototypes). Treat all output as untrusted draft code requiring strict review, linting, and automated test validation.
 - **Branching Discipline:** For structural overhauls (cross-platform compatibility, editor re-architecture, dependency reduction), always branch from git (e.g. `feat/<topic>`) and verify all tests and linters pass before merging.
 
@@ -157,6 +168,9 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Configured with `milliseconds` and optional `command`. No default command in `bashmenu.yml` (dormant unless configured).
   - Intercept `events.Key` and `events.MouseEvent` in `BashMenuApp.on_event` to reset timer via `timer.reset()`.
   - Run screensavers in alternate screen buffer (`\x1b[?1049h\x1b[H\x1b[2J`) inside `with self.suspend():`. Restore primary buffer (`\x1b[?1049l`) in `finally`, repaint UI via `self.refresh(layout=True)`, and re-arm timer. Verify `can_suspend` before suspending for headless test safety.
+- **CI Virtualization & Performance Test Resilience:**
+  - Timing assertions in performance tests must account for shared virtualized runners and CPU scheduling jitter under parallel test workers (`pytest -n auto`).
+  - Use `os.getenv("CI")` to scale single-frame spike limits (e.g. `100ms` in CI vs `35ms` local) while keeping average latency targets strict (`< 15ms`).
 
 ---
 
@@ -180,6 +194,7 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Pipe Rich output via `FORCE_COLOR=1` and `less -R`. Standardize markdown viewing on `{scripts_dir}/rich.sh <file> | {scripts_dir}/pager.sh`. Pass `-y` (`--hyperlinks`) to `rich.markdown`.
   - Spools: Must reside strictly in `${CACHE_DIR:-${HOME}/.cache/bashmenu}/spool` with an immediate `trap 'cleanup' EXIT INT TERM HUP`.
   - Balanced 3-segment status bar: Left line range (`TOP 1-23/100`), center badge `[ filename.ext ]` or `[ <stdin> ]`, right key hints.
+  - Awk Collation Portability: In scripts utilizing byte-oriented regex patterns with high-bit octal escapes (`/[\300-\377]/`), GNU Awk (`gawk`) in UTF-8 locales produces `Invalid collation character` errors. Always force `LC_ALL=C` on the Awk execution pipeline (e.g. `LC_ALL=C BAR_LINE="${BAR_LINE}" awk ...`) to guarantee byte-oriented collation across `gawk` and `mawk`.
 - **Cheatsheet CLI (`scripts/cheat.sh`, `scripts/cheat.py`, `.cheat.yml`):**
   - Root directory defined in `scripts/.cheat.yml` (`dir: ~/cheat`).
   - Search hierarchy: 1a. Exact relative path -> 1b. Filename stem -> 2. YAML frontmatter tags -> 3. Full-text body.
