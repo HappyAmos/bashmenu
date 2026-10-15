@@ -333,7 +333,6 @@ MARKDOWN_REFERENCE_TEXT = """# Markdown Syntax Reference
 """
 
 
-
 def is_pua_glyph(c: str) -> bool:
     """
     Check if a character falls within Unicode Private Use Area ranges
@@ -1938,7 +1937,6 @@ class PrebakedWallpaperCanvas:
                 out.append("\n")
 
         return out
-
 
 
 def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
@@ -3949,7 +3947,6 @@ class RichHelpModalScreen(MessageModalScreen):
         )
 
 
-
 class NotebookDumper(yaml.SafeDumper):
     """YAML safe dumper that indents sequences under mapping keys."""
 
@@ -4319,7 +4316,7 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
                             if md_text.strip():
                                 yield Static(Markdown(md_text, hyperlinks=True), classes="markdown_block")
                         elif b[0] == "checkbox":
-                            line_idx, indent, _marker, is_checked, text = b[1], b[2], b[3], b[4], b[5]
+                            line_idx, indent, _, is_checked, text = b[1], b[2], b[3], b[4], b[5]
                             cb = Checkbox(text, value=is_checked, classes="markdown_checkbox", id=f"cb_{line_idx}")
                             cb._line_idx = line_idx
                             if indent:

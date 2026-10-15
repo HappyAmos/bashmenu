@@ -437,8 +437,8 @@ class TestPluginSystem(unittest.TestCase):
             self.assertIn("Weather", plain)
             self.assertIn("Up 2 hours", plain)
             self.assertIn("72F Sunny", plain)
-            lines = [l for l in plain.split("\n") if l.strip()]
-            self.assertTrue(all(cell_len(l) == pb.size.width for l in lines))
+            lines = [line for line in plain.split("\n") if line.strip()]
+            self.assertTrue(all(cell_len(line) == pb.size.width for line in lines))
 
     def test_plugin_table_layout_entries_and_standalone(self):
         """Test entries: 2 chunking and standalone plugin line stretching."""
@@ -552,7 +552,7 @@ class TestPluginSystem(unittest.TestCase):
             rendered = mv.render().plain
             rendered_lines = rendered.split("\n")
             # Should have horizontal divider line within window borders
-            div_lines = [l for l in rendered_lines if "──" in l and ("│" in l or "├" in l)]
+            div_lines = [line for line in rendered_lines if "──" in line and ("│" in line or "├" in line)]
             self.assertGreater(len(div_lines), 0)
 
     def test_table_layout_screen_width_divider_and_tee_alignment(self):
@@ -645,5 +645,3 @@ class TestPluginSystem(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

@@ -79,7 +79,6 @@ def get_cp437_glyph(code: int) -> str:
         return "?"
 
 
-
 def get_rgb_from_color_idx(idx: int | str) -> tuple[int, int, int]:
     """Calculate RGB triplet from 256-color index or color constant."""
     if isinstance(idx, str):

@@ -50,7 +50,7 @@ class TestAnsiParsing(unittest.TestCase):
         line = "\x1b[1;31mBoldRed\x1b[0;32mGreen\x1b[4;34mUnderlineBlue"
         segments = bashmenu.parse_ansi_line(line, 0)
         self.assertEqual(len(segments), 3)
-        
+
         self.assertEqual(segments[0][0], "BoldRed")
         self.assertEqual(segments[1][0], "Green")
         self.assertEqual(segments[2][0], "UnderlineBlue")
@@ -219,7 +219,7 @@ class TestAnsiParsing(unittest.TestCase):
         # Force a fresh fetch by clearing the cache time
         bashmenu._last_battery_time = 0.0
         first_call = bashmenu.get_battery_info()
-        
+
         # Modify the cached value to verify cache-hits return the modified value within the 5s window
         bashmenu._cached_battery = "42%"
         second_call = bashmenu.get_battery_info()
@@ -623,8 +623,8 @@ class TestMenuEditTreeSelection(unittest.TestCase):
         item_std = {"title": "Test Item", "interactive": True, "quiet": False}
         modal_std = menuedit.ItemEditModal(item_std)
         # Check initial index
-        self.assertEqual(modal_std.selected_mode_idx, 0) # default init before compose
-        
+        self.assertEqual(modal_std.selected_mode_idx, 0)  # default init before compose
+
         # Test saved values directly via mock/test logic
         # Standard Terminal Mode
         item1 = {"title": "Test Item"}
@@ -737,7 +737,7 @@ class TestMenuEditTreeSelection(unittest.TestCase):
 
         def mock_build_branch(parent_node, opts):
             for item in opts:
-                child = type("ChildNode", (), {"data": item, "parent": parent_node, "children": [], "expand": lambda *a, **kw: None, "add": lambda l, data: None})()
+                child = type("ChildNode", (), {"data": item, "parent": parent_node, "children": [], "expand": lambda *a, **kw: None, "add": lambda label, data: None})()
                 parent_node.children.append(child)
 
         screen.query_one = lambda selector, type_or_id=None: dummy_tree
@@ -1397,10 +1397,3 @@ class TestEmojiAndGlyphDisplayWidth(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-
-
-
-
-

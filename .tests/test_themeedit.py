@@ -377,7 +377,7 @@ class TestThemeEditor(unittest.TestCase):
                     inner_ph = max(1, panel.size.height - 4)
                     panel_area = inner_pw * inner_ph
 
-                    prev_w = max(len(l) for l in rendered)
+                    prev_w = max(len(line) for line in rendered)
                     prev_h = len(rendered)
                     prev_area = prev_w * prev_h
 
@@ -1174,4 +1174,3 @@ class TestThemeEditor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -1603,7 +1603,7 @@ class BashEditScreen(Screen):
 
     def update_legend_layout(self, width: int | None = None) -> None:
         """Distribute footer keyboard shortcut labels equally across both footer rows.
-        
+
         Calculates available screen width and dynamically sets right margins on items
         and separators so that keyboard shortcuts span the full width without breaking.
         """

@@ -115,6 +115,7 @@ def resolve_notebook_path(raw_path: str | None = None, config: dict | None = Non
         return root_candidate
     return nb_candidate
 
+
 def resolve_existing_path(primary: Path, fallback: Path | None = None) -> str:
     """Return primary path if it exists, or fallback if primary does not exist and fallback does."""
     if primary.exists():
@@ -182,10 +183,14 @@ show_confirm_box = bashmenu_ui.show_confirm_box
 show_toggle_box = bashmenu_ui.show_toggle_box
 show_input_box = bashmenu_ui.show_input_box
 show_file_picker = bashmenu_ui.show_file_picker
+
+
 def run_curses_editor(*args, **kwargs):
     import bashedit
 
     return bashedit.run_curses_editor(*args, **kwargs)
+
+
 get_visible_len = bashmenu_ui.get_visible_len
 get_char_width = bashmenu_ui.get_char_width
 get_display_width = bashmenu_ui.get_display_width
@@ -1438,7 +1443,7 @@ def _fetch_plugin_worker(name, script_cmd, now):
                 timeout=5,
             )
         raw_out = res.stdout.strip() if res and res.stdout else ""
-        plugin_lines = [l for l in raw_out.splitlines() if l.strip()]
+        plugin_lines = [line for line in raw_out.splitlines() if line.strip()]
     except Exception:  # noqa: BLE001
         plugin_lines = []
 
@@ -1691,8 +1696,8 @@ def get_plugin_display_items(
                         cache_entry = _plugin_output_cache.get(p_name)
                     raw_lines = cache_entry["lines"] if cache_entry else []
                     lines = [
-                        l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
-                        for l in raw_lines
+                        line.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
+                        for line in raw_lines
                     ]
                     pre = p_cfg.get("pretext")
                     post = p_cfg.get("posttext")
@@ -1722,8 +1727,8 @@ def get_plugin_display_items(
                     cache_entry = _plugin_output_cache.get(p_name)
                 raw_lines = cache_entry["lines"] if cache_entry else []
                 lines = [
-                    l.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
-                    for l in raw_lines
+                    line.replace("\x00", "").replace("\t", "    ").replace("\ufe0f", "").replace("\ufe0e", "").rstrip("\r\n")
+                    for line in raw_lines
                 ]
                 p_cfg = plugins_dict.get(p_name, {}) if isinstance(plugins_dict, dict) else {}
                 pre = p_cfg.get("pretext")

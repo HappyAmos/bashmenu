@@ -2262,15 +2262,15 @@ class TestImprovements(unittest.TestCase):
                 import re
 
                 h1_lines = [
-                    re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", l)
-                    for l in res.stdout.splitlines()
-                    if "Test Heading One" in l
+                    re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", line)
+                    for line in res.stdout.splitlines()
+                    if "Test Heading One" in line
                 ]
                 self.assertTrue(h1_lines, "Test Heading One not found in rich.sh output")
-                for l in h1_lines:
+                for line in h1_lines:
                     self.assertTrue(
-                        l.startswith("Test Heading One"),
-                        f"rich.sh h1 should be left-aligned, got: '{l}'",
+                        line.startswith("Test Heading One"),
+                        f"rich.sh h1 should be left-aligned, got: '{line}'",
                     )
             finally:
                 with contextlib.suppress(OSError):
@@ -2311,9 +2311,9 @@ class TestImprovements(unittest.TestCase):
         all_items = [f"Item{i}" for i in range(8)]
         lines = bashmenu.wrap_gutter_items(all_items, max_w=40, max_lines=2, spread=True)
         self.assertEqual(len(lines), 2)
-        for l in lines:
-            self.assertEqual(bashmenu_ui.get_visible_len(l), 40)
-            self.assertIn("|", l)
+        for line in lines:
+            self.assertEqual(bashmenu_ui.get_visible_len(line), 40)
+            self.assertIn("|", line)
 
     def test_menuedit_footer_dynamic_spreading(self):
         """Verify menuedit.MenuEditScreen spreads footer items and pipe separators across available width."""
@@ -3155,6 +3155,3 @@ G
 
 if __name__ == "__main__":
     unittest.main()
-
-
-
