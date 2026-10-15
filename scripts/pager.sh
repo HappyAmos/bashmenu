@@ -350,7 +350,7 @@ render() {
 
     build_bar
 
-    BAR_LINE="${BAR_LINE}" awk \
+    LC_ALL=C BAR_LINE="${BAR_LINE}" awk \
         -v top="${TOP_LINE}" \
         -v last="${LAST_SHOWN}" \
         -v page_rows="${PAGE_ROWS}" \
