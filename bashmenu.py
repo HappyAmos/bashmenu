@@ -2202,11 +2202,11 @@ class MainMenuView(Widget):
             help_lines, status_lines = cached_gutters[1], cached_gutters[2]
         else:
             if is_nb:
-                full_help_str = "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [F1]: Help | [F2]: Themes | [F7]: Gutter | [ESC]: Back"
+                full_help_str = "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
             elif self.show_shortcuts:
-                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
+                full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
             else:
-                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [ESC]: Back"
+                full_help_str = "[UP/DN]: Nav | [ENTER]: Select | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
             raw_help_items = [item.strip() for item in full_help_str.split("|") if item.strip()]
             help_lines = wrap_gutter_items(raw_help_items, left_gutter_w, max_lines=2, config=self.config, spread=True)
 
@@ -2447,15 +2447,27 @@ class MainMenuView(Widget):
 
         curr_y = 3 + target_blank_rows
         if top_div_rows > 0:
+            plugin_style = theme_styles.get("plugin", Style(color="cyan"))
+            plugin_bg_color = plugin_style.bgcolor if plugin_style else None
+            plugin_bg_style = Style(bgcolor=plugin_bg_color) if plugin_bg_color else None
+
+            top_div_theme = theme_styles
+            if plugin_bg_color and theme_styles and "divider" in theme_styles:
+                orig_div = theme_styles["divider"]
+                top_div_theme = dict(theme_styles)
+                top_div_theme["divider"] = Style(color=orig_div.color, bgcolor=plugin_bg_color)
+
             if top_div_is_screen:
                 div_str = resolve_divider_string(self.config, target_w=screen_div_w, extra_vars=extra_vars)
-                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                div_rich = bashmenu_ui.formatting_to_rich_text(
+                    div_str, default_style=plugin_bg_style, theme=top_div_theme, avail_width=screen_div_w
+                )
                 line_rich = Text(f"{b_tee_l}", style=border_style)
                 line_rich.append_text(div_rich)
                 used_w = get_visible_len(div_str, self.config)
                 fill_w = max(0, screen_div_w - used_w)
                 if fill_w > 0:
-                    line_rich.append(" " * fill_w)
+                    line_rich.append(" " * fill_w, style=plugin_bg_style or Style())
                 line_rich.append(f"{b_tee_r}", style=border_style)
                 canvas.set_static_line(curr_y, line_rich)
             else:
@@ -2463,13 +2475,15 @@ class MainMenuView(Widget):
                 if str(length_val).isdigit():
                     target_div_w = min(avail_w, int(length_val))
                 div_str = resolve_divider_string(self.config, target_w=target_div_w, extra_vars=extra_vars)
-                div_rich = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles)
+                div_rich = bashmenu_ui.formatting_to_rich_text(
+                    div_str, default_style=plugin_bg_style, theme=top_div_theme, avail_width=target_div_w
+                )
                 line_rich = Text(f"{b_v_left}  ", style=border_style)
                 line_rich.append_text(div_rich)
                 used_w = get_visible_len(div_str, self.config)
                 fill_w = max(0, avail_w - used_w)
                 if fill_w > 0:
-                    line_rich.append(" " * fill_w)
+                    line_rich.append(" " * fill_w, style=plugin_bg_style or Style())
                 line_rich.append(f"  {b_v_right}", style=border_style)
                 canvas.set_static_line(curr_y, line_rich)
             curr_y += 1
@@ -2940,20 +2954,31 @@ class MainMenuView(Widget):
                 item_lower = item.lower()
                 if ("help" in item_lower or "f1" in item_lower) and hasattr(scr, "action_help"):
                     scr.action_help()
+                elif (("theme" in item_lower and "edit" in item_lower) or "f8" in item_lower or "themeedit" in item_lower) and hasattr(scr, "action_theme_editor"):
+                    scr.action_theme_editor()
                 elif ("theme" in item_lower or "f2" in item_lower) and hasattr(scr, "action_themes"):
                     scr.action_themes()
-                elif ("editor" in item_lower or "f3" in item_lower) and hasattr(scr, "action_editor"):
-                    scr.action_editor()
+                elif ("editor" in item_lower or "f3" in item_lower) and (hasattr(scr, "action_launch_editor") or hasattr(scr, "action_editor")):
+                    if hasattr(scr, "action_launch_editor"):
+                        scr.action_launch_editor()
+                    else:
+                        scr.action_editor()
                 elif ("edit" in item_lower or "f4" in item_lower) and hasattr(scr, "action_edit_menu"):
                     scr.action_edit_menu()
-                elif ("refresh" in item_lower or "f5" in item_lower) and hasattr(scr, "action_refresh"):
-                    scr.action_refresh()
+                elif ("refresh" in item_lower or "f5" in item_lower) and (hasattr(scr, "action_refresh_menu") or hasattr(scr, "action_refresh")):
+                    if hasattr(scr, "action_refresh_menu"):
+                        scr.action_refresh_menu()
+                    else:
+                        scr.action_refresh()
                 elif ("keys" in item_lower or "f6" in item_lower) and hasattr(scr, "action_toggle_shortcuts"):
                     scr.action_toggle_shortcuts()
                 elif ("gutter" in item_lower or "f7" in item_lower) and hasattr(scr, "action_edit_status_gutter"):
                     scr.action_edit_status_gutter()
-                elif ("back" in item_lower or "esc" in item_lower) and hasattr(scr, "action_quit"):
-                    scr.action_quit()
+                elif ("back" in item_lower or "esc" in item_lower) and (hasattr(scr, "action_go_back") or hasattr(scr, "action_quit")):
+                    if hasattr(scr, "action_go_back"):
+                        scr.action_go_back()
+                    else:
+                        scr.action_quit()
                 elif ("new note" in item_lower or item_lower.startswith("[n]") or item_lower == "n") and hasattr(scr, "action_new_note"):
                     scr.action_new_note()
                 elif ("select" in item_lower or "read" in item_lower or "enter" in item_lower) and hasattr(scr, "action_select_option"):
@@ -3524,6 +3549,7 @@ class BashMenuScreen(Screen):
         Binding("f5", "refresh_menu", "Refresh"),
         Binding("f6", "toggle_shortcuts", "Keys"),
         Binding("f7", "edit_status_gutter", "Gutter"),
+        Binding("f8", "theme_editor", "Theme Editor"),
         Binding("escape", "go_back", "Back/Exit"),
     ]
 
@@ -3794,13 +3820,18 @@ class BashMenuScreen(Screen):
 
     def action_theme_editor(self) -> None:
         """Launch the interactive Visual Theme Editor."""
-        active_theme = getattr(self.app, "theme_name", "dracula")
+        app_obj = getattr(self, "_app", None)
+        if not app_obj:
+            with contextlib.suppress(Exception):
+                app_obj = self.app
+        active_theme = getattr(app_obj, "theme_name", "dracula")
         import themeedit
 
-        self.app.push_screen(
-            themeedit.ThemeEditScreen(initial_theme=active_theme),
-            lambda res: self.refresh_environment(),
-        )
+        if app_obj:
+            app_obj.push_screen(
+                themeedit.ThemeEditScreen(initial_theme=active_theme),
+                lambda res: self.refresh_environment(),
+            )
 
     def action_help(self) -> None:
         help_path = os.path.join(BASHMENU_DIR, "bashmenu.md")

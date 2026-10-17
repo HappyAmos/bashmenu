@@ -3334,6 +3334,31 @@ G
                 self.assertEqual(cfg["settings"]["status_gutter"], "New Format | {user}")
                 mock_mv.refresh.assert_called_once()
 
+    def test_bashmenu_f8_theme_editor(self):
+        """Verify F8 key binding launches ThemeEditScreen with active theme and gutter click works."""
+        bindings = {b.key: b.action for b in bashmenu.BashMenuScreen.BINDINGS}
+        self.assertIn("f8", bindings)
+        self.assertEqual(bindings["f8"], "theme_editor")
+
+        cfg = {"theme": "mountain"}
+        screen = bashmenu.BashMenuScreen(config=cfg)
+        mock_app = MagicMock()
+        mock_app.theme_name = "mountain"
+        screen._app = mock_app
+
+        import themeedit
+        with patch.object(themeedit, "ThemeEditScreen") as mock_editor_cls:
+            screen.action_theme_editor()
+            mock_editor_cls.assert_called_once_with(initial_theme="mountain")
+            mock_app.push_screen.assert_called_once()
+
+        # Also verify gutter click handler routes F8 to action_theme_editor
+        mv = bashmenu.MainMenuView(config=cfg)
+        mock_scr = MagicMock()
+        mv._screen = mock_scr
+        mv._handle_gutter_click(2, "[F8]: ThemeEdit")
+        mock_scr.action_theme_editor.assert_called_once()
+
 
     def test_marquee_spacer_and_theme_config(self):
         """Test format_marquee_spacer and get_theme_marquee_config fallbacks."""

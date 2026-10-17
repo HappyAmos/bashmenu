@@ -128,6 +128,8 @@ Used as dynamic templates for code generation, settings, or block injections:
 | `F4` | Launch visual menu editor (`menuedit.py`). |
 | `F5` | Refresh menu, reload configuration, menu files, and plugin outputs. |
 | `F6` | Toggle option shortcut key badges display. |
+| `F7` | Configure status gutter format modal. |
+| `F8` | Launch interactive Visual Theme Editor (`themeedit.py`). |
 | `ESC` | Return to parent submenu or exit application. |
 
 *Note on Intelligent State Retention:* When returning from editors, or scripts with `refresh: true`, the engine traces and preserves your submenu coordinate depth to return you to your exact location, skipping the root menu.
@@ -222,6 +224,7 @@ The visual theme editor provides a split-screen interface featuring a live, quar
 
 *Launching Theme Editor:*
 - Directly via command line: `./themeedit.py [theme_name]`
+- Directly inside HA Bash Menu via `F8` shortcut.
 - Inside HA Bash Menu via `F2` (Theme Picker) by pressing `e` on any highlighted theme.
 - Via the main menu under `Bashmenu Settings -> Theme Editor`.
 - Standalone CLI generator: `python3 scripts/theme_from_image.py <image.png> --name <theme_name> --save`

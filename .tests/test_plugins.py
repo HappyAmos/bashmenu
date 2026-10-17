@@ -648,11 +648,12 @@ class TestPluginSystem(unittest.TestCase):
             "theme": "mountain",
             "settings": {
                 "plugins": {
+                    "divider": True,
                     "standalone_p": {
                         "script": "echo test",
                         "standalone": True,
                         "pretext": "{divider}",
-                    }
+                    },
                 }
             },
         }
@@ -680,6 +681,45 @@ class TestPluginSystem(unittest.TestCase):
         # Trailing padding spaces must take expected_bg
         pad_spans = [s for s in content_row.spans if s.style and s.style.bgcolor == expected_bg and s.end == 74]
         self.assertTrue(len(pad_spans) > 0)
+
+        # MainMenuView top plugin divider line should also take expected_bg
+        mv = bashmenu.MainMenuView()
+        mv.config = config
+        canvas = bashmenu.bashmenu_ui.PrebakedWallpaperCanvas()
+        mv._canvas = canvas
+        total_content_rows = 18
+        raw_plugin_lines, separator_rows, visible_option_rows = mv.get_plugin_lines_and_limits(total_content_rows)
+        has_top_div, _ = bashmenu.get_plugin_divider_config(config)
+        top_div_rows = 1 if (has_top_div and len(raw_plugin_lines) > 0) else 0
+        target_blank_rows = total_content_rows - len(raw_plugin_lines) - separator_rows - top_div_rows
+        top_div_y = 3 + target_blank_rows
+
+        mv._build_canvas(
+            canvas=canvas,
+            canvas_key=("test",),
+            w=80,
+            h=24,
+            curr_menu={"items": [{"label": "Opt 1"}]},
+            options=[{"label": "Opt 1"}],
+            theme_name="mountain",
+            theme_styles=theme_styles,
+            has_bg=False,
+            img_path="",
+            opacity=1.0,
+            scaling="cover",
+            clustering=0,
+            avail_w=74,
+            screen_div_w=78,
+            visible_option_rows=visible_option_rows,
+            total_content_rows=total_content_rows,
+            raw_plugin_lines=raw_plugin_lines,
+            separator_rows=separator_rows,
+        )
+
+        top_div_line = canvas._static_lines.get(top_div_y)
+        self.assertIsNotNone(top_div_line)
+        top_spans_with_bg = [s for s in top_div_line.spans if s.style and s.style.bgcolor == expected_bg]
+        self.assertTrue(len(top_spans_with_bg) > 0)
 
 
 if __name__ == "__main__":
