@@ -37,5 +37,5 @@ notebook:
         type: note
         format: markdown
         content: |-
-          - [ ] Add {marquee]
+          - [ ] Add {marquee:}
           - [ ] Add an existing pallete reference to theme color picker.

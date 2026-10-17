@@ -124,6 +124,7 @@ def generate_theme_from_image(
     theme_name: str | None = None,
     mode: str = "dark",
     set_wallpaper: bool = True,
+    background_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Generate a full HA Bash Menu theme dictionary derived from an image.
@@ -284,7 +285,7 @@ def generate_theme_from_image(
             rel = os.path.relpath(image_path, bashmenu.BASHMENU_DIR)
             if not rel.startswith(".."):
                 rel_path = rel
-        full_theme["background"] = {
+        bg_dict: dict[str, Any] = {
             "image": rel_path,
             "opacity": 0.85,
             "scaling": "cover",
@@ -292,6 +293,13 @@ def generate_theme_from_image(
             "clustering": 0,
             "quantization": 1,
         }
+        if background_config and isinstance(background_config, dict):
+            for k, v in background_config.items():
+                if k != "image":
+                    bg_dict[k] = copy.deepcopy(v)
+        full_theme["background"] = bg_dict
+    elif background_config and isinstance(background_config, dict):
+        full_theme["background"] = copy.deepcopy(background_config)
 
     return full_theme
 
@@ -365,6 +373,21 @@ def main() -> int:
         "-a", "--set-active", action="store_true", help="Activate theme in bashmenu.yml (implies --save)"
     )
     parser.add_argument("-o", "--output", help="Write YAML output to specific file")
+    parser.add_argument(
+        "--opacity", type=float, help="Wallpaper opacity (0.0 - 1.0, default: 0.85)"
+    )
+    parser.add_argument(
+        "--scaling", choices=["cover", "stretch", "fit", "center", "tile"], help="Wallpaper scaling mode (default: cover)"
+    )
+    parser.add_argument(
+        "--bg-mode", choices=["halfblock", "quarterblock"], help="Wallpaper rendering mode (default: halfblock)"
+    )
+    parser.add_argument(
+        "--clustering", type=int, help="Color clustering distance (0=none, 16-128)"
+    )
+    parser.add_argument(
+        "--quantization", type=int, help="Palette quantization levels (1=off, 16-256)"
+    )
 
     args = parser.parse_args()
 
@@ -375,12 +398,25 @@ def main() -> int:
     stem = os.path.splitext(os.path.basename(args.image))[0]
     name = sanitize_theme_name(args.name or stem)
 
+    cli_bg: dict[str, Any] = {}
+    if args.opacity is not None:
+        cli_bg["opacity"] = args.opacity
+    if args.scaling is not None:
+        cli_bg["scaling"] = args.scaling
+    if args.bg_mode is not None:
+        cli_bg["mode"] = args.bg_mode
+    if args.clustering is not None:
+        cli_bg["clustering"] = args.clustering
+    if args.quantization is not None:
+        cli_bg["quantization"] = args.quantization
+
     try:
         theme = generate_theme_from_image(
             args.image,
             theme_name=name,
             mode=args.mode,
             set_wallpaper=not args.no_wallpaper,
+            background_config=cli_bg or None,
         )
     except (ValueError, OSError, RuntimeError) as exc:
         print(f"Error extracting theme from image: {exc}", file=sys.stderr)

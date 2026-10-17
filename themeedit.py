@@ -2056,11 +2056,13 @@ class ThemeFromImageModal(ModalScreen[dict[str, Any] | None]):
         self,
         initial_image: str = "",
         theme_styles: dict | None = None,
+        existing_background: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self.initial_image = initial_image
         self.theme_styles = theme_styles or {}
+        self.existing_background = existing_background or {}
 
     def compose(self) -> ComposeResult:
         with bashmenu_ui.ModalFrame(id="modal_frame"):
@@ -2235,6 +2237,7 @@ class ThemeFromImageModal(ModalScreen[dict[str, Any] | None]):
                 theme_name=name_val,
                 mode=mode_val,
                 set_wallpaper=set_wp,
+                background_config=self.existing_background,
             )
             self.dismiss({"theme": theme_dict, "name": name_val})
         except (ValueError, OSError, RuntimeError) as exc:
@@ -4111,15 +4114,25 @@ class ThemeEditScreen(Screen):
         """Open modal dialog to auto-generate theme palette from an image (F9)."""
         curr_bg = self.current_theme.get("background")
         curr_img = ""
+        existing_bg = None
         if isinstance(curr_bg, dict):
             curr_img = str(curr_bg.get("image", ""))
+            existing_bg = dict(curr_bg)
         elif isinstance(curr_bg, str):
             curr_img = curr_bg
+            existing_bg = {"image": curr_bg}
 
         def _on_theme_generated(result: dict[str, Any] | None) -> None:
             if result and "theme" in result:
                 new_theme = result["theme"]
                 new_name = result.get("name", "image_theme")
+
+                # Ensure existing background properties are preserved if wallpaper is configured
+                if existing_bg and isinstance(existing_bg, dict) and "background" in new_theme and isinstance(new_theme["background"], dict):
+                    for k, v in existing_bg.items():
+                        if k != "image" and k not in new_theme["background"]:
+                            new_theme["background"][k] = v
+
                 self.current_theme = new_theme
                 self.theme_name = new_name
                 self.is_new = new_name not in self.raw_themes_data
@@ -4136,7 +4149,11 @@ class ThemeEditScreen(Screen):
                 )
 
         self.app.push_screen(
-            ThemeFromImageModal(initial_image=curr_img, theme_styles=self.configured_theme_styles),
+            ThemeFromImageModal(
+                initial_image=curr_img,
+                theme_styles=self.configured_theme_styles,
+                existing_background=existing_bg,
+            ),
             _on_theme_generated,
         )
 

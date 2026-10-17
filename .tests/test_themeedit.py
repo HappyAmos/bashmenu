@@ -1281,8 +1281,31 @@ class TestThemeEditor(unittest.TestCase):
             errs = ymlcheck.validate_depth_section(str(depth), theme[depth], "twilight_auto")
             self.assertEqual(errs, [], f"Validation errors in depth {depth}: {errs}")
 
+        # Verify background_config preservation
+        custom_bg = {
+            "image": "assets/wallpapers/mountain.png",
+            "opacity": 0.55,
+            "scaling": "stretch",
+            "mode": "quarterblock",
+            "clustering": 32,
+            "quantization": 16,
+        }
+        theme_custom_bg = generate_theme_from_image(
+            twilight_img,
+            theme_name="twilight_custom",
+            mode="dark",
+            set_wallpaper=True,
+            background_config=custom_bg,
+        )
+        self.assertEqual(theme_custom_bg["background"]["image"], "assets/wallpapers/twilight.png")
+        self.assertEqual(theme_custom_bg["background"]["opacity"], 0.55)
+        self.assertEqual(theme_custom_bg["background"]["scaling"], "stretch")
+        self.assertEqual(theme_custom_bg["background"]["mode"], "quarterblock")
+        self.assertEqual(theme_custom_bg["background"]["clustering"], 32)
+        self.assertEqual(theme_custom_bg["background"]["quantization"], 16)
+
     def test_theme_from_image_modal_and_f9_shortcut(self):
-        """Verify pressing F9 in ThemeEditScreen opens ThemeFromImageModal and generates a theme."""
+        """Verify pressing F9 in ThemeEditScreen opens ThemeFromImageModal, generates theme, and preserves background settings."""
         twilight_img = os.path.join(bashmenu.BASHMENU_DIR, "assets", "wallpapers", "twilight.png")
         if not os.path.isfile(twilight_img):
             self.skipTest("twilight.png wallpaper not found")
@@ -1293,6 +1316,16 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.pause()
                 screen = app.screen
                 self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                # Configure custom background settings on screen before pressing F9
+                screen.current_theme["background"] = {
+                    "image": "assets/wallpapers/mountain.png",
+                    "opacity": 0.45,
+                    "scaling": "stretch",
+                    "mode": "halfblock",
+                    "clustering": 64,
+                    "quantization": 8,
+                }
 
                 # Press F9 to open ThemeFromImageModal
                 await pilot.press("f9")
@@ -1315,10 +1348,16 @@ class TestThemeEditor(unittest.TestCase):
                 app.screen.dismiss()
                 await pilot.pause()
 
-                # Verify ThemeEditScreen state updated
+                # Verify ThemeEditScreen state updated and background settings preserved
                 self.assertEqual(screen.theme_name, "twilight_gen")
                 self.assertTrue(screen.is_dirty)
-                self.assertEqual(screen.current_theme.get("background", {}).get("image"), "assets/wallpapers/twilight.png")
+                bg_res = screen.current_theme.get("background", {})
+                self.assertEqual(bg_res.get("image"), "assets/wallpapers/twilight.png")
+                self.assertEqual(bg_res.get("opacity"), 0.45)
+                self.assertEqual(bg_res.get("scaling"), "stretch")
+                self.assertEqual(bg_res.get("mode"), "halfblock")
+                self.assertEqual(bg_res.get("clustering"), 64)
+                self.assertEqual(bg_res.get("quantization"), 8)
 
         asyncio.run(_run())
 
