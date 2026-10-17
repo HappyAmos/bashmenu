@@ -64,13 +64,18 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Detect Python interpreter
-PYTHON_BIN=""
-if [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/python3" ]; then
+if [ -n "$PYTHON_BIN" ] && [ -x "$PYTHON_BIN" ]; then
+    :
+elif [ -n "$PYTHON" ] && [ -x "$PYTHON" ]; then
+    PYTHON_BIN="$PYTHON"
+elif [ -n "$VIRTUAL_ENV" ] && [ -x "$VIRTUAL_ENV/bin/python3" ]; then
     PYTHON_BIN="$VIRTUAL_ENV/bin/python3"
 elif [ -x "${PROJECT_ROOT}/.venv/bin/python3" ]; then
     PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="$(command -v python3)"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python)"
 else
     echo "Error: Python 3 executable was not found." >&2
     exit 1

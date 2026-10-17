@@ -7,6 +7,7 @@ in-house YAML parsing, architecture mapping, and dependency elimination.
 import contextlib
 import os
 import subprocess
+import sys
 import unittest
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -400,14 +401,23 @@ class TestPlatformDetection(unittest.TestCase):
                 f.write("# Hello World\nTesting **markdown** rendering.")
 
             # Test non-interactive render
+            env = os.environ.copy()
+            env["HOME"] = tmp_dir
+            env["PYTHON_BIN"] = sys.executable
+            env["PATH"] = f"{os.path.dirname(sys.executable)}:{env.get('PATH', '')}"
             run_res = subprocess.run(
                 [rich_bin, sample_md],
                 capture_output=True,
                 text=True,
                 check=False,
+                env=env,
                 timeout=5,
             )
-            self.assertEqual(run_res.returncode, 0)
+            self.assertEqual(
+                run_res.returncode,
+                0,
+                f"rich.sh failed (code {run_res.returncode}):\nSTDOUT: {run_res.stdout}\nSTDERR: {run_res.stderr}",
+            )
             self.assertIn("Hello World", run_res.stdout)
 
 
