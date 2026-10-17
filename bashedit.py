@@ -21,7 +21,7 @@ if hasattr(Heading, "LEVEL_ALIGN"):
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.events import Key
+from textual.events import Click, Key
 from textual.reactive import reactive
 from textual.screen import Screen
 from textual.widget import Widget
@@ -595,6 +595,103 @@ class EditorWidget(Widget):
             self.screen.update_status()
         event.prevent_default()
         event.stop()
+
+    def _display_col_to_char_idx(self, line: str, target_col: int) -> int:
+        """Map visual/display column index to character index in line, respecting tabstop expansion."""
+        if "\t" not in line:
+            return max(0, min(target_col, len(line)))
+        col = 0
+        for idx, ch in enumerate(line):
+            w = self.tabstop - (col % self.tabstop) if ch == "\t" else 1
+            if col + w > target_col:
+                return idx
+            col += w
+        return len(line)
+
+    def on_click(self, event: Click) -> None:
+        """Handle mouse clicks to position cursor or select text in editor viewport."""
+        if getattr(event, "button", 1) != 1:
+            return
+        if self.show_markdown:
+            return
+
+        lineno_width = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
+        target_y = max(0, min(self.top_line + int(event.y), len(self.lines) - 1))
+        content_x = int(event.x) - lineno_width
+        line = self.lines[target_y]
+        line_len = len(line)
+
+        if content_x < 0:
+            target_x = 0
+        else:
+            raw_target_col = self.left_col + content_x
+            target_x = self._display_col_to_char_idx(line, raw_target_col)
+
+        self.focus()
+
+        chain = getattr(event, "chain", 1) or getattr(event, "count", 1) or 1
+        if chain == 2:
+            # Double-click: select word under cursor
+            if not line:
+                self.mark_active = False
+                self.cursor_y = target_y
+                self.cursor_x = 0
+            else:
+                idx = min(target_x, line_len - 1) if target_x >= line_len > 0 else target_x
+                if line[idx].isalnum() or line[idx] == "_":
+                    sx = idx
+                    while sx > 0 and (line[sx - 1].isalnum() or line[sx - 1] == "_"):
+                        sx -= 1
+                    ex = idx
+                    while ex < line_len and (line[ex].isalnum() or line[ex] == "_"):
+                        ex += 1
+                elif line[idx].isspace():
+                    sx = idx
+                    while sx > 0 and line[sx - 1].isspace():
+                        sx -= 1
+                    ex = idx
+                    while ex < line_len and line[ex].isspace():
+                        ex += 1
+                else:
+                    sx = idx
+                    while sx > 0 and not (line[sx - 1].isalnum() or line[sx - 1] == "_" or line[sx - 1].isspace()):
+                        sx -= 1
+                    ex = idx
+                    while ex < line_len and not (line[ex].isalnum() or line[ex] == "_" or line[ex].isspace()):
+                        ex += 1
+                self.mark_active = True
+                self.mark_y = target_y
+                self.mark_x = sx
+                self.cursor_y = target_y
+                self.cursor_x = ex
+        elif chain >= 3:
+            # Triple-click: select entire line
+            self.mark_active = True
+            self.mark_y = target_y
+            self.mark_x = 0
+            self.cursor_y = target_y
+            self.cursor_x = line_len
+        elif getattr(event, "shift", False):
+            # Shift+click: extend or start selection
+            if not self.mark_active:
+                self.mark_active = True
+                self.mark_y = self.cursor_y
+                self.mark_x = self.cursor_x
+            self.cursor_y = target_y
+            self.cursor_x = target_x
+        else:
+            # Single click: move cursor and reset selection
+            self.mark_active = False
+            self.cursor_y = target_y
+            self.cursor_x = target_x
+
+        self.clamp_cursor()
+        self.refresh()
+        if hasattr(self.screen, "update_status"):
+            self.screen.update_status()
+        with contextlib.suppress(Exception):
+            event.prevent_default()
+            event.stop()
 
     def delete_selection(self) -> bool:
         """Delete active selection range if present. Return True if deleted."""
@@ -1279,6 +1376,11 @@ class BashEditScreen(Screen):
             node = getattr(node, "parent", None)
 
         if not target_action:
+            if not getattr(event, "_stop_propagation", False):
+                with contextlib.suppress(Exception):
+                    ed = self.query_one("#editor_widget", EditorWidget)
+                    if ed and (node is ed or getattr(node, "id", None) == "editor_widget"):
+                        ed.on_click(event)
             return
 
         with contextlib.suppress(Exception):

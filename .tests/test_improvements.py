@@ -331,6 +331,187 @@ class TestImprovements(unittest.TestCase):
 
         asyncio.run(run_scroll_checks())
 
+    def test_bashedit_mouse_click_cursor_positioning(self):
+        import asyncio
+
+        from textual.app import App
+        from textual.events import Click
+
+        from bashedit import BashEditScreen, EditorWidget
+
+        class ClickTestApp(App):
+            def on_mount(self):
+                self.push_screen(BashEditScreen())
+
+        async def run_click_checks():
+            app = ClickTestApp()
+            async with app.run_test():
+                screen = app.screen
+                ed = screen.query_one("#editor_widget", EditorWidget)
+                ed.lines = [
+                    "hello world",
+                    "def test_func():",
+                    "short",
+                ]
+                ed.top_line = 0
+                ed.cursor_y = 0
+                ed.cursor_x = 0
+                ed.show_line_numbers = True
+                # len(str(3)) + 2 = 3 (lineno gutter width = 3: "  1 ", "  2 ", "  3 ")
+                lineno_w = len(str(len(ed.lines))) + 2
+
+                # 1. Single click on text: row 0, character 'w' in "hello world" (index 6 -> x = lineno_w + 6)
+                click_event = Click(
+                    ed,
+                    x=lineno_w + 6,
+                    y=0,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                )
+                ed.on_click(click_event)
+                self.assertEqual(ed.cursor_y, 0)
+                self.assertEqual(ed.cursor_x, 6)
+                self.assertFalse(ed.mark_active)
+
+                # 2. Click on line numbers gutter (x < lineno_w) positions at column 0
+                gutter_click = Click(
+                    ed,
+                    x=1,
+                    y=1,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                )
+                ed.on_click(gutter_click)
+                self.assertEqual(ed.cursor_y, 1)
+                self.assertEqual(ed.cursor_x, 0)
+
+                # 3. Click on whitespace past end of line clamps to line length
+                # Line 2 is "short" (length 5). Click at x = lineno_w + 30
+                past_end_click = Click(
+                    ed,
+                    x=lineno_w + 30,
+                    y=2,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                )
+                ed.on_click(past_end_click)
+                self.assertEqual(ed.cursor_y, 2)
+                self.assertEqual(ed.cursor_x, 5)
+
+                # 4. Click below document lines clamps to last line
+                below_doc_click = Click(
+                    ed,
+                    x=lineno_w + 2,
+                    y=10,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                )
+                ed.on_click(below_doc_click)
+                self.assertEqual(ed.cursor_y, 2)
+
+                # 5. Shift+Click extends selection
+                # Place cursor at row 0, col 0
+                ed.cursor_y = 0
+                ed.cursor_x = 0
+                ed.mark_active = False
+                shift_click = Click(
+                    ed,
+                    x=lineno_w + 5,
+                    y=0,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=True,
+                    meta=False,
+                    ctrl=False,
+                )
+                ed.on_click(shift_click)
+                self.assertTrue(ed.mark_active)
+                self.assertEqual(ed.mark_y, 0)
+                self.assertEqual(ed.mark_x, 0)
+                self.assertEqual(ed.cursor_y, 0)
+                self.assertEqual(ed.cursor_x, 5)
+
+                # 6. Double-click selects word under cursor (chain=2)
+                dbl_click = Click(
+                    ed,
+                    x=lineno_w + 7,
+                    y=1,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                    chain=2,
+                )
+                ed.on_click(dbl_click)
+                self.assertTrue(ed.mark_active)
+                self.assertEqual(ed.mark_y, 1)
+                self.assertEqual(ed.mark_x, 4)  # "test_func" starts at col 4
+                self.assertEqual(ed.cursor_y, 1)
+                self.assertEqual(ed.cursor_x, 13)  # "test_func" ends at col 13
+
+                # 7. Triple-click selects entire line (chain=3)
+                triple_click = Click(
+                    ed,
+                    x=lineno_w + 2,
+                    y=1,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                    chain=3,
+                )
+                ed.on_click(triple_click)
+                self.assertTrue(ed.mark_active)
+                self.assertEqual(ed.mark_y, 1)
+                self.assertEqual(ed.mark_x, 0)
+                self.assertEqual(ed.cursor_y, 1)
+                self.assertEqual(ed.cursor_x, len(ed.lines[1]))
+
+                # 8. Status bar updates to clicked position
+                status_lbl = screen.query_one("#editor_status")
+                self.assertIn("Line 2/3", str(status_lbl.render()))
+
+                # 9. Markdown mode ignores click cursor movement
+                ed.show_markdown = True
+                ed.cursor_y = 1
+                ed.cursor_x = 0
+                md_click = Click(
+                    ed,
+                    x=lineno_w + 2,
+                    y=0,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                )
+                ed.on_click(md_click)
+                self.assertEqual(ed.cursor_y, 1)
+
+        asyncio.run(run_click_checks())
+
     def test_theme_submenu_divider(self):
         sub = bashmenu.build_dynamic_theme_submenu()
         self.assertIn("options", sub)

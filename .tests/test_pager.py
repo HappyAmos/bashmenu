@@ -883,6 +883,82 @@ class TestPagerScript(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_interactive_help_modal(self):
+        """Verify opening help modal via 'h' or '?', scrolling, closing via 'q', and resuming pager."""
+        master, slave = pty.openpty()
+        winsize = struct.pack("HHHH", 24, 80, 0, 0)
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            for i in range(1, 100):
+                tf.write(f"Document content line {i}\n")
+            temp_path = tf.name
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            # Let initial frame render
+            time.sleep(0.15)
+
+            # 1. Open help modal via '?'
+            os.write(master, b"?")
+            time.sleep(0.1)
+
+            # 2. Scroll down in modal (j, then space for pgdn)
+            os.write(master, b"j")
+            time.sleep(0.05)
+            os.write(master, b" ")
+            time.sleep(0.05)
+
+            # 3. Scroll back up (k, then b for pgup)
+            os.write(master, b"k")
+            time.sleep(0.05)
+            os.write(master, b"b")
+            time.sleep(0.05)
+
+            # 4. Close modal via 'q'
+            os.write(master, b"q")
+            time.sleep(0.1)
+
+            # 5. Now exit the pager cleanly via 'q'
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            out = b""
+            while True:
+                try:
+                    chunk = os.read(master, 2048)
+                    if not chunk:
+                        break
+                    out += chunk
+                except OSError:
+                    break
+
+            # Verify help modal rendered title, shortcuts, and usage
+            self.assertIn(b"Pager Help & Manual", out)
+            self.assertIn(b"KEYBOARD SHORTCUTS", out)
+            self.assertIn(b"Navigation & Scrolling", out)
+            self.assertIn(b"Document content line", out)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
 
 if __name__ == "__main__":
     unittest.main()

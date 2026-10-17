@@ -1354,7 +1354,9 @@ twilight:
   background:
     image: "assets/wallpapers/twilight.png"
     opacity: 0.85
-    scaling: "cover"
+    scaling: "stretch"
+    clustering: 16
+    quantization: 16
     mode: "halfblock"
   divider:
     char: "─"

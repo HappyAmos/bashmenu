@@ -105,7 +105,7 @@ Keys:
   g Home            Jump to TOP          G End           Jump to BOT
   /                 Search forward       n / N           Next / prev match
   l o               Follow / open link   e               Open in editor
-  h                 Toggle hint segment  q Q Ctrl-C Esc  Quit
+  h ? F1            Help manual modal    q Q Ctrl-C Esc  Quit
 EOF
 }
 
@@ -512,6 +512,7 @@ read_key() {
                 'D') KEY="LEFT" ;;
                 'H') KEY="HOME" ;;
                 'F') KEY="END" ;;
+                'P') KEY="F1" ;;
                 '') KEY="ESCAPE" ;;
                 [0-9])
                     body="${c3}"
@@ -528,6 +529,7 @@ read_key() {
                         4~|8~) KEY="END" ;;
                         5~) KEY="PGUP" ;;
                         6~) KEY="PGDN" ;;
+                        11~) KEY="F1" ;;
                         *) KEY="CSI${body}" ;;
                     esac
                     ;;
@@ -962,6 +964,209 @@ if best_line:
     fi
 }
 
+show_help_modal() {
+    # Render an interactive scrolling popup modal displaying pager usage and shortcuts.
+    local help_lines=(
+        "BASHMENU PAGER - HELP & MANUAL"
+        ""
+        "USAGE:"
+        "  command | pager.sh [options]"
+        "  pager.sh [options] <file> [file...]"
+        ""
+        "DESCRIPTION:"
+        "  Interactive full-screen text pager for terminal output and files."
+        "  Supports ANSI color preservation, line truncation, piped streams,"
+        "  interactive hyperlinks, and seamless external editor integration."
+        ""
+        "KEYBOARD SHORTCUTS:"
+        ""
+        "  Navigation & Scrolling"
+        "    j, DOWN, ENTER   Scroll down one line"
+        "    k, UP            Scroll up one line"
+        "    SPACE, f, PGDN   Scroll down one full page (window)"
+        "    b, PGUP          Scroll up one full page (window)"
+        "    Ctrl-D           Scroll down half a page"
+        "    Ctrl-U           Scroll up half a page"
+        "    g, HOME          Jump to top of document (line 1)"
+        "    G, END           Jump to bottom of document"
+        ""
+        "  Searching"
+        "    /                Search forward (pattern or regular expression)"
+        "    n                Repeat search forward for next match"
+        "    N                Repeat search backward for previous match"
+        ""
+        "  Hyperlinks & Anchors"
+        "    l, o             Open interactive link selector menu:"
+        "                     - OSC 8 terminal hyperlinks"
+        "                     - Markdown [label](url) links"
+        "                     - Plain web URLs (http:// or https://)"
+        "                     - Internal section anchors (#anchor)"
+        ""
+        "  Editor Integration"
+        "    e, E             Open file in \$EDITOR or \$VISUAL (nano, vim, vi)"
+        "                     positioned at current line; reloads automatically"
+        ""
+        "  Help & Exit"
+        "    h, ?, F1         Open / close this scrolling help modal"
+        "    q, Q, ESC        Close help modal / exit pager"
+        ""
+        "COMMAND LINE OPTIONS:"
+        "  -h, --help         Print CLI help screen and exit"
+        "  -V, --version      Display pager version"
+        "  +N                 Start viewing at line number N"
+        "  +/PATTERN          Start viewing at first line matching PATTERN"
+        "  -c, --no-color     Strip all ANSI escape codes from display"
+        "  --no-help          Omit shortcut hints from the command bar"
+        "  --no-file          Disable editor launch and filename badge"
+        "  --max-lines=N      Maximum lines to buffer (default: 1,000,000)"
+        "  --file=PATH        Target file to associate with piped input"
+        "  --reload-cmd=CMD   Command to refresh spool after editing"
+    )
+
+    local total_lines="${#help_lines[@]}"
+    local scroll_top=0
+    local box_w=0 box_h=0 start_r=0 start_c=0 inner_w=0 inner_h=0 max_scroll=0
+    local b_style="" t_style="" s_style="" r_style=""
+    local title="" t_len=0 r_len=0 top_bar="" i=0
+    local r_idx=0 line_idx=0 line_content="" l_style="" padded="" cur_r=0
+    local pct_str="" pct=0 hint="" h_len=0 b_len=0 bot_bar="" bot_r=0
+
+    while :; do
+        query_size
+
+        box_w=$(( COLS - 6 ))
+        [ "${box_w}" -gt 74 ] && box_w=74
+        [ "${box_w}" -lt 40 ] && box_w=$(( COLS > 40 ? 40 : COLS ))
+        box_h=$(( ROWS - 4 ))
+        [ "${box_h}" -gt 22 ] && box_h=22
+        [ "${box_h}" -lt 8 ] && box_h=$(( ROWS > 8 ? 8 : ROWS ))
+
+        start_r=$(( (ROWS - box_h) / 2 + 1 ))
+        start_c=$(( (COLS - box_w) / 2 + 1 ))
+        inner_w=$(( box_w - 6 ))
+        inner_h=$(( box_h - 2 ))
+        [ "${inner_w}" -lt 10 ] && inner_w=10
+        [ "${inner_h}" -lt 2 ] && inner_h=2
+
+        max_scroll=$(( total_lines - inner_h ))
+        [ "${max_scroll}" -lt 0 ] && max_scroll=0
+
+        if [ "${scroll_top}" -gt "${max_scroll}" ]; then
+            scroll_top="${max_scroll}"
+        fi
+        if [ "${scroll_top}" -lt 0 ]; then
+            scroll_top=0
+        fi
+
+        b_style="${ESC}[1;36m"
+        t_style="${ESC}[1;37;44m"
+        s_style="${ESC}[1;33m"
+        r_style="${ESC}[0m"
+        if [ "${STRIP_COLORS}" = "1" ]; then
+            b_style=""
+            t_style=""
+            s_style=""
+            r_style=""
+        fi
+
+        # Top border
+        title=" Pager Help & Manual "
+        t_len=${#title}
+        r_len=$(( box_w - t_len - 3 ))
+        [ "${r_len}" -lt 0 ] && r_len=0
+        top_bar=""
+        for (( i=0; i<r_len; i++ )); do top_bar="${top_bar}─"; done
+        printf '%s[%d;%dH%s┌─%s%s%s%s%s┐%s' \
+            "${ESC}" "${start_r}" "${start_c}" \
+            "${b_style}" "${t_style}" "${title}" "${r_style}${b_style}" "${top_bar}" "${b_style}" "${r_style}"
+
+        # Content rows
+        for (( r_idx=0; r_idx<inner_h; r_idx++ )); do
+            line_idx=$(( scroll_top + r_idx ))
+            line_content=""
+            if [ "${line_idx}" -lt "${total_lines}" ]; then
+                line_content="${help_lines[line_idx]}"
+            fi
+
+            l_style="${r_style}"
+            if [[ "${line_content}" =~ ^[A-Z\ ]+:$ ]] || [ "${line_idx}" -eq 0 ]; then
+                l_style="${s_style}"
+            fi
+
+            padded=""
+            printf -v padded '%-*.*s' "${inner_w}" "${inner_w}" "${line_content}"
+            cur_r=$(( start_r + 1 + r_idx ))
+            printf '%s[%d;%dH%s│  %s%s%s  │%s' \
+                "${ESC}" "${cur_r}" "${start_c}" \
+                "${b_style}" "${l_style}" "${padded}" "${b_style}" "${r_style}"
+        done
+
+        # Bottom border with scroll percentage indicator
+        if [ "${max_scroll}" -eq 0 ]; then
+            pct_str="All"
+        elif [ "${scroll_top}" -eq 0 ]; then
+            pct_str="Top"
+        elif [ "${scroll_top}" -ge "${max_scroll}" ]; then
+            pct_str="Bot"
+        else
+            pct=$(( ((scroll_top + inner_h) * 100) / total_lines ))
+            pct_str="${pct}%"
+        fi
+
+        hint=" [▲▼/PgUp/PgDn: scroll • q/ESC: close] (${pct_str}) "
+        h_len=${#hint}
+        b_len=$(( box_w - h_len - 3 ))
+        [ "${b_len}" -lt 0 ] && b_len=0
+        bot_bar=""
+        for (( i=0; i<b_len; i++ )); do bot_bar="${bot_bar}─"; done
+        bot_r=$(( start_r + box_h - 1 ))
+        printf '%s[%d;%dH%s└─%s%s%s%s%s┘%s' \
+            "${ESC}" "${bot_r}" "${start_c}" \
+            "${b_style}" "${r_style}${b_style}" "${hint}" "${b_style}" "${bot_bar}" "${b_style}" "${r_style}"
+
+        read_key
+        case "${KEY}" in
+            j|DOWN|ENTER)
+                [ "${scroll_top}" -lt "${max_scroll}" ] && scroll_top=$(( scroll_top + 1 ))
+                ;;
+            k|UP)
+                [ "${scroll_top}" -gt 0 ] && scroll_top=$(( scroll_top - 1 ))
+                ;;
+            ' '|f|PGDN)
+                scroll_top=$(( scroll_top + inner_h ))
+                [ "${scroll_top}" -gt "${max_scroll}" ] && scroll_top="${max_scroll}"
+                ;;
+            b|PGUP)
+                scroll_top=$(( scroll_top - inner_h ))
+                [ "${scroll_top}" -lt 0 ] && scroll_top=0
+                ;;
+            CTRL_D)
+                scroll_top=$(( scroll_top + inner_h / 2 ))
+                [ "${scroll_top}" -gt "${max_scroll}" ] && scroll_top="${max_scroll}"
+                ;;
+            CTRL_U)
+                scroll_top=$(( scroll_top - inner_h / 2 ))
+                [ "${scroll_top}" -lt 0 ] && scroll_top=0
+                ;;
+            g|HOME)
+                scroll_top=0
+                ;;
+            G|END)
+                scroll_top="${max_scroll}"
+                ;;
+            RESIZE)
+                query_size
+                render
+                ;;
+            q|Q|ESCAPE|CTRL_C|h|'?'|F1)
+                break
+                ;;
+        esac
+    done
+
+    render
+}
+
 handle_key() {
     # Apply the decoded key to the window position, or request termination.
     # This case statement is the single extension point for new bindings.
@@ -982,7 +1187,7 @@ handle_key() {
         N) search_next -1 ;;
         l|o) choose_link ;;
         e|E) open_in_editor ;;
-        h) SHOW_HELP=$(( 1 - SHOW_HELP )) ;;
+        h|'?'|F1) show_help_modal ;;
         q|Q|CTRL_C|ESCAPE|EOF) DONE=1 ;;
         LEFT|RIGHT|ALT*) : ;;
         *) MESSAGE="unbound key: ${KEY}" ;;
@@ -1070,9 +1275,9 @@ main() {
     fi
 
     if [ "${ALLOW_FILE}" = "1" ]; then
-        HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  e edit  q quit"
+        HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  e edit  h/? help  q quit"
     else
-        HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  q quit"
+        HINTS="j/k line  SPACE pgDn  b pgUp  / search  l link  h/? help  q quit"
     fi
 
     NEED_RESIZE=0
