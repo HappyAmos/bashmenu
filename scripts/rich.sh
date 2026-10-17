@@ -106,6 +106,8 @@ render_markdown() {
 import sys
 from rich.console import Console
 from rich.markdown import Heading, Markdown
+from rich.containers import Lines
+from rich.cells import cell_len
 
 if hasattr(Heading, "LEVEL_ALIGN"):
     Heading.LEVEL_ALIGN["h1"] = "left"
@@ -124,6 +126,27 @@ else:
             yield text
     Heading.__rich_console__ = _custom_h1_console
 
+_orig_lines_justify = Lines.justify
+def _custom_lines_justify(self, console, width, justify="left", overflow="fold"):
+    if justify == "center":
+        for line in self._lines:
+            has_protected_end = any(span.end >= len(line.plain) for span in line.spans) or (bool(line.plain) and line.plain[-1] in ("\xa0", "\u202f"))
+            if not has_protected_end:
+                line.rstrip()
+            line.truncate(width, overflow=overflow)
+            line.pad_left((width - cell_len(line.plain)) // 2)
+            line.pad_right(width - cell_len(line.plain))
+    elif justify == "right":
+        for line in self._lines:
+            has_protected_end = any(span.end >= len(line.plain) for span in line.spans) or (bool(line.plain) and line.plain[-1] in ("\xa0", "\u202f"))
+            if not has_protected_end:
+                line.rstrip()
+            line.truncate(width, overflow=overflow)
+            line.pad_left(width - cell_len(line.plain))
+    else:
+        _orig_lines_justify(self, console, width, justify=justify, overflow=overflow)
+Lines.justify = _custom_lines_justify
+
 width = None
 if "-w" in sys.argv:
     w_idx = sys.argv.index("-w") + 1
@@ -134,6 +157,7 @@ if "-w" in sys.argv:
             pass
 
 Console(force_terminal=True, width=width).print(Markdown(sys.stdin.read(), hyperlinks=True))
+
 ' "${WIDTH_ARGS[@]}"
 }
 

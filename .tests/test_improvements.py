@@ -3549,7 +3549,54 @@ G
         self.assertEqual(ed.cursor_x, 4)
 
 
+    def test_rich_sh_table_centering_trailing_space_preservation(self):
+        """Verify scripts/rich.sh preserves styled trailing space in markdown table cells without shifting."""
+        import contextlib
+        import re
+        import subprocess
+
+        rich_sh = os.path.join(os.path.dirname(__file__), "..", "scripts", "rich.sh")
+        if not os.path.isfile(rich_sh):
+            self.skipTest("rich.sh not found")
+
+        table_md = """
+| Dec \\| Hex \\| Ch |
+|:---:|
+| 32 \\| 20 \\| ` ` |
+| 33 \\| 21 \\| `!` |
+"""
+        with tempfile.NamedTemporaryFile("w+", suffix=".md", delete=False) as tf:
+            tf.write(table_md)
+            tf_path = tf.name
+
+        try:
+            res = subprocess.run(
+                [rich_sh, tf_path],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(res.returncode, 0)
+            cleaned_lines = [
+                re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", line)
+                for line in res.stdout.splitlines()
+            ]
+            row_32 = next((l for l in cleaned_lines if "32 | 20" in l), None)
+            row_33 = next((l for l in cleaned_lines if "33 | 21" in l), None)
+            self.assertIsNotNone(row_32)
+            self.assertIsNotNone(row_33)
+
+            # Leading spaces before 32 and 33 should match (no extra space shifting 32 right)
+            indent_32 = len(row_32) - len(row_32.lstrip())
+            indent_33 = len(row_33) - len(row_33.lstrip())
+            self.assertEqual(indent_32, indent_33)
+        finally:
+            with contextlib.suppress(OSError):
+                os.remove(tf_path)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
