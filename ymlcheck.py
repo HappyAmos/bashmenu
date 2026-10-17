@@ -402,6 +402,10 @@ def validate_config_file(filepath: str) -> bool:
         settings = data["settings"]
         if "plugins" in settings and not isinstance(settings["plugins"], dict):
             errors.append(f"'settings.plugins' must be a mapping, got {type(settings['plugins']).__name__}.")
+        if "refresh_interval" in settings and not isinstance(settings["refresh_interval"], (int, float)):
+            errors.append(
+                f"'settings.refresh_interval' must be a number, got {type(settings['refresh_interval']).__name__}."
+            )
         if "inactivity_timeout" in settings:
             it = settings["inactivity_timeout"]
             if not isinstance(it, dict):

@@ -100,6 +100,7 @@ These scripts are stored in the `/scripts` directory and can be used directly or
 | `scripts/rich.sh` | Markdown file rendering wrapper utilizing Python Rich piped into pager.sh. |
 | `scripts/serverup.sh` | Cross-platform server ping and uptime availability check script. |
 | `scripts/system_update.sh` | Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew. |
+| `scripts/theme_from_image.py` | Auto-generates HA Bash Menu theme palettes derived from an image file using Pillow color quantization. |
 | `scripts/unicode.sh` | Interactive Unicode Block Explorer script. |
 | `scripts/webopen.sh` | Cross-platform web browser launcher wrapper script that opens a specified URL, file, or default browser (supporting Linux, macOS, WSL, and Termux). Supports `--gui` / `-g` for graphical browsers and `--tty` / `tty` for terminal browsers (lynx, links, brow6el). |
 
@@ -200,18 +201,30 @@ The visual theme editor provides a split-screen interface featuring a live, quar
 
 | Keybinding | Action |
 | :--- | :--- |
-| `c` / `ENTER` | Open 256-color picker modal (`ColorPickerModal`) for the focused color field. |
-| `a` | Open box-drawing & glyph picker modal (`AsciiPickerModal`) for the focused character field. |
-| `t` | Clone existing theme as a base (`ThemeCloneModal`). |
-| `d` | Auto-derive 16-color and 8-color fallback palettes from current 256-color palette. |
-| `s` | Save theme to `bashmenu.themes` and optionally activate in `bashmenu.yml` (`SaveThemeModal`). |
 | `F1` / `?` | Display theme editor help modal. |
+| `F2` | Configure background wallpaper image, opacity, and scaling (`BackgroundConfigModal`). |
+| `F3` / `c` / `ENTER` | Open 256-color picker modal (`ColorPickerModal`) for the focused color field. |
+| `F4` / `a` | Open box-drawing & glyph picker modal (`AsciiPickerModal`) for the focused character field. |
+| `F5` | Reset theme to initial state or loaded base. |
+| `F6` / `t` | Clone existing theme as a base (`ThemePickerModalScreen`). |
+| `F7` / `d` | Auto-derive 16-color and 8-color fallback palettes from current 256-color palette. |
+| `F8` | Toggle expand/collapse all property inspector sections. |
+| `F9` | Auto-generate theme palette from an image file (`ThemeFromImageModal`). |
+| `Ctrl+R` | Rename current theme (`RenameThemeModal`). |
+| `Ctrl+D` | Delete current theme from `bashmenu.themes` (with confirmation modal). |
+| `Ctrl+S` / `s` | Save theme to `bashmenu.themes`. |
+| `Ctrl+A` | Save As under a new theme name and optionally activate in `bashmenu.yml`. |
 | `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |
+
+*Theme Renaming & Deletion:*
+- **Renaming:** Themes can be renamed directly by editing the **Theme Name:** text input field in the inspector panel under **General & Identity**, or by clicking the adjacent **[Rename]** button (or pressing `Ctrl+R`), which opens the interactive `RenameThemeModal` with automatic slug sanitization.
+- **Deleting:** Themes can be deleted from `bashmenu.themes` either by clicking the **[Delete]** button in the inspector panel under **General & Identity** (or pressing `Ctrl+D`), or directly from the Theme Picker modal (`F2`) using `[d]` / `Delete`. Both options present a confirmation dialog. If the theme is currently active in `bashmenu.yml`, the user is notified and the active theme is automatically switched to a fallback theme (e.g. `dracula`).
 
 *Launching Theme Editor:*
 - Directly via command line: `./themeedit.py [theme_name]`
 - Inside HA Bash Menu via `F2` (Theme Picker) by pressing `e` on any highlighted theme.
 - Via the main menu under `Bashmenu Settings -> Theme Editor`.
+- Standalone CLI generator: `python3 scripts/theme_from_image.py <image.png> --name <theme_name> --save`
 
 ---
 
@@ -333,6 +346,17 @@ Available status gutter placeholders (badges) include:
 | `{time_12_short}` / `{time_24_short}` | Short time (excludes seconds; optimal for snappier performance). |
 | `{date}` | Current date (YYYY-MM-DD). |
 | `{utc_seconds}` | Current epoch seconds. |
+
+#### Status Refresh Rate & Granularity:
+The main menu dynamically calculates its status refresh interval to balance real-time feedback with CPU and battery efficiency:
+- **Automatic Second Precision (1.0s):** If `settings.status_gutter` contains second tokens (`{date_time_24}`, `{date_time_12}`, `{time_24}`, `{time_12}`, `{seconds}`, or `%S`), the status line refreshes every **1.0 second**.
+- **Automatic Minute Precision (5.0s):** If only minute/date tokens (`{date_time_24_short}`, `{time_24_short}`, `{date}`) or static badges are used, the engine automatically throttles to **5.0 seconds**.
+- **Explicit Override (`settings.refresh_interval`):** You can explicitly configure the refresh interval in `bashmenu.yml` under `settings.refresh_interval` (or `settings.status_refresh_rate`). The setting accepts seconds (e.g. `1.0`, `2.5`) or milliseconds (e.g. `1000`, `2000`):
+  ```yaml
+  settings:
+    refresh_interval: 1.0   # Explicitly refresh status line every 1 second
+  ```
+  *(Note: Background plugins configured under `settings.plugins.<name>` control their own individual polling frequencies via their `sleep:` setting in milliseconds, e.g. `sleep: 10000`.)*
 
 ### 4.2 Menu Structure (`bashmenu.mnu`)
 The menu structure is defined as a hierarchical list of dictionaries under

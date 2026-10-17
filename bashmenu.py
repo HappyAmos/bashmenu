@@ -3529,12 +3529,33 @@ class BashMenuScreen(Screen):
         return self.query_one("#plugin_buffer", PluginBuffer)
 
     def _determine_refresh_interval(self) -> float:
-        """Return optimal periodic refresh interval based on status gutter clock granularity."""
+        """Return optimal periodic refresh interval based on user settings or status gutter clock granularity."""
         cfg = None
         with contextlib.suppress(Exception):
             cfg = getattr(self.menu_view, "config", None)
         if not cfg:
             cfg = self.initial_config or {}
+
+        # 1. Explicit user override in settings.refresh_interval / settings.status_refresh_rate
+        for key in (
+            "settings.refresh_interval",
+            "settings.status_refresh_rate",
+            "settings.status_refresh_interval",
+            "settings.status_refresh",
+        ):
+            custom_interval = get_config_value(cfg, key, None)
+            if custom_interval is not None:
+                try:
+                    val = float(custom_interval)
+                    # Support both milliseconds (e.g. >= 50 like plugin intervals) and seconds (e.g. 1.0 or 2)
+                    if val >= 50:
+                        val = val / 1000.0
+                    if val > 0:
+                        return val
+                except (ValueError, TypeError):
+                    pass
+
+        # 2. Dynamic clock granularity based on status_gutter placeholders
         gutter = str(get_config_value(cfg, "settings.status_gutter", ""))
         second_tokens = (
             "{date_time_24}",

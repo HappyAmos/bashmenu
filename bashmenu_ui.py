@@ -3821,7 +3821,7 @@ class ThemePickerModalScreen(ModalScreen[str]):
         background: rgba(0, 0, 0, 0.6);
     }
     #dialog {
-        width: 62;
+        width: 74;
         height: 20;
         border: thick $accent;
         background: $surface;
@@ -3874,6 +3874,8 @@ class ThemePickerModalScreen(ModalScreen[str]):
         Binding("escape", "cancel", "Cancel"),
         Binding("e", "edit_theme", "Edit"),
         Binding("c", "create_theme", "Create"),
+        Binding("d", "delete_theme", "Delete"),
+        Binding("delete", "delete_theme", "Delete", show=False),
     ]
 
     def __init__(self, current_theme: str = "dracula", theme: dict | None = None):
@@ -3896,6 +3898,8 @@ class ThemePickerModalScreen(ModalScreen[str]):
                         yield Label("[e] Edit", id="lbl_ft_edit", classes="footer_item", markup=False)
                         yield Label(" | ", classes="footer_sep", markup=False)
                         yield Label("[c] Create", id="lbl_ft_create", classes="footer_item", markup=False)
+                        yield Label(" | ", classes="footer_sep", markup=False)
+                        yield Label("[d] Delete", id="lbl_ft_delete", classes="footer_item", markup=False)
                         yield Label(" | ", classes="footer_sep", markup=False)
                         yield Label("[ESC] Cancel", id="lbl_ft_cancel", classes="footer_item", markup=False)
                 yield ShadowWidget(id="shadow_right")
@@ -3932,6 +3936,8 @@ class ThemePickerModalScreen(ModalScreen[str]):
             self.action_edit_theme()
         elif w_id == "lbl_ft_create":
             self.action_create_theme()
+        elif w_id == "lbl_ft_delete":
+            self.action_delete_theme()
         elif w_id == "lbl_ft_cancel":
             self.dismiss(None)
 
@@ -3997,6 +4003,66 @@ class ThemePickerModalScreen(ModalScreen[str]):
         self.app.push_screen(
             CreateThemePromptModal(sel_theme, theme=self.theme),
             _on_create_choice,
+        )
+
+    def action_delete_theme(self) -> None:
+        opt_list = self.query_one("#options_list", OptionList)
+        idx = opt_list.highlighted
+        if idx is None or idx < 0 or idx >= len(self.theme_keys):
+            return
+        target_theme = self.theme_keys[idx]
+
+        if len(self.theme_keys) <= 1:
+            self.app.push_screen(
+                MessageModalScreen("Cannot Delete Theme", "Cannot delete the only remaining theme.", theme=self.theme)
+            )
+            return
+
+        if target_theme == self.current_theme:
+            self.app.push_screen(
+                MessageModalScreen(
+                    "Cannot Delete Active Theme",
+                    f"Theme '{target_theme}' is currently the active theme.\nPlease switch to another theme first before deleting it.",
+                    theme=self.theme,
+                )
+            )
+            return
+
+        def _on_confirm(choice: str | None) -> None:
+            if choice == "yes":
+                try:
+                    import bashmenu
+                    themes_filepath = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.themes")
+                    raw_data = load_themes_file()
+                    if target_theme in raw_data:
+                        del raw_data[target_theme]
+                        with open(themes_filepath, "w", encoding="utf-8") as f:
+                            yaml.dump(raw_data, f, sort_keys=False, default_flow_style=False)
+                        self.theme_keys.remove(target_theme)
+                        opt_list.clear_options()
+                        new_idx = 0
+                        for i, key in enumerate(self.theme_keys):
+                            formatted_name = key.replace("_", " ").title()
+                            if key == self.current_theme:
+                                new_idx = i
+                                opt_list.add_option(Option(f"✔  {formatted_name} (Active)"))
+                            else:
+                                opt_list.add_option(Option(f"   {formatted_name}"))
+                        opt_list.highlighted = min(new_idx, len(self.theme_keys) - 1)
+                        with contextlib.suppress(Exception):
+                            self.notify(f"Theme '{target_theme}' deleted.", title="Theme Deleted")
+                except Exception as e:  # noqa: BLE001
+                    self.app.push_screen(
+                        MessageModalScreen("Delete Failed", f"Error deleting theme '{target_theme}':\n{e}", theme=self.theme)
+                    )
+
+        self.app.push_screen(
+            ConfirmModalScreen(
+                "Delete Theme",
+                f"Are you sure you want to permanently delete theme '{target_theme}' from bashmenu.themes?",
+                theme=self.theme,
+            ),
+            _on_confirm,
         )
 
     def action_cancel(self) -> None:

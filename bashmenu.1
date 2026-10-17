@@ -137,6 +137,9 @@ Cross-platform server ping and uptime availability check script.
 .I scripts/system_update.sh
 Cross-platform system update wrapper supporting apt, dnf, pacman, pkg, and brew.
 .TP
+.I scripts/theme_from_image.py
+Auto-generates HA Bash Menu theme palettes derived from an image file using Pillow color quantization.
+.TP
 .I scripts/unicode.sh
 Interactive Unicode Block Explorer script.
 .TP
@@ -330,6 +333,18 @@ Auto-derive 16-color and 8-color fallback palettes from the active 256-color pal
 .B s
 Save theme to bashmenu.themes and optionally activate it in bashmenu.yml (SaveThemeModal).
 .TP
+.B F8
+Toggle expand/collapse all property inspector sections.
+.TP
+.B F9
+Auto-generate theme palette from an image file (ThemeFromImageModal).
+.TP
+.B Ctrl+R
+Rename theme (RenameThemeModal). Themes can also be renamed in the inspector panel under General & Identity.
+.TP
+.B Ctrl+D
+Delete theme from bashmenu.themes (prompts confirmation). Themes can also be deleted in the Theme Picker modal via [d].
+.TP
 .B F1, ?
 Display theme editor keyboard shortcuts and help modal.
 .TP
@@ -367,6 +382,9 @@ Available badges include:
 (YYYY-MM-DD), and
 .I {utc_seconds}
 (epoch seconds).
+Status refresh frequency is automatically set to 1.0s if second-precision tokens are present, or 5.0s if minute-precision or static badges are used. Users can explicitly configure
+.I settings.refresh_interval
+in seconds (e.g. 1.0) or milliseconds (e.g. 1000) to override this default.
 .SS Menu Structure (bashmenu.mnu)
 The menu is defined as a hierarchical YAML options list. Options can utilize the
 following configuration keys:

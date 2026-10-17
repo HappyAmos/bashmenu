@@ -32,6 +32,15 @@ import bashmenu
 import bashmenu_ui
 import ymlcheck
 
+try:
+    from scripts.theme_from_image import generate_theme_from_image, sanitize_theme_name
+except ImportError:
+    try:
+        from theme_from_image import generate_theme_from_image, sanitize_theme_name
+    except ImportError:
+        generate_theme_from_image = None
+        sanitize_theme_name = None
+
 # Standard ANSI Color RGB definitions for distance calculation
 ANSI_16_RGB = {
     0: ("COLOR_BLACK", (0, 0, 0)),
@@ -1335,6 +1344,7 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "confirm", "Save", show=False),
     ]
 
     def __init__(self, current_name: str, theme_styles: dict | None = None):
@@ -1390,15 +1400,23 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
                 if css_e_fg:
                     b.styles.color = css_e_fg
 
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "input_theme_name":
+            self.action_confirm()
+
+    def action_confirm(self) -> None:
+        inp = self.query_one("#input_theme_name", Input)
+        chk = self.query_one("#chk_active", Checkbox)
+        name = inp.value.strip().lower().replace(" ", "_")
+        slug = sanitize_theme_name(name) if sanitize_theme_name else name
+        if slug:
+            self.dismiss((slug, chk.value))
+        else:
+            inp.focus()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_save":
-            inp = self.query_one("#input_theme_name", Input)
-            chk = self.query_one("#chk_active", Checkbox)
-            name = inp.value.strip().lower().replace(" ", "_")
-            if name:
-                self.dismiss((name, chk.value))
-            else:
-                self.dismiss(None)
+            self.action_confirm()
         elif event.button.id == "btn_cancel":
             self.dismiss(None)
 
@@ -1409,6 +1427,137 @@ class SaveThemeModal(ModalScreen[tuple[str, bool] | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+
+class RenameThemeModal(ModalScreen[str | None]):
+    """Modal for renaming the theme within the editor."""
+
+    DEFAULT_CSS = """
+    RenameThemeModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.65);
+    }
+    RenameThemeModal #dialog {
+        width: 60;
+        height: 18;
+        border: thick #555;
+        background: #181818;
+        padding: 1 2;
+    }
+    RenameThemeModal #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    RenameThemeModal #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: #eee;
+    }
+    RenameThemeModal .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    RenameThemeModal .btn_close_x:hover {
+        background: #333;
+        color: #fff;
+    }
+    RenameThemeModal #input_rename {
+        margin: 1 0;
+    }
+    RenameThemeModal #btn_row {
+        height: 3;
+        align: center middle;
+        margin-top: 1;
+    }
+    RenameThemeModal #btn_row Button {
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "confirm", "Confirm"),
+    ]
+
+    def __init__(self, current_name: str, theme_styles: dict | None = None) -> None:
+        super().__init__()
+        self.current_name = "" if current_name == "untitled" else current_name
+        self.theme_styles = theme_styles or {}
+
+    def compose(self) -> ComposeResult:
+        with bashmenu_ui.ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label("Rename Theme", id="title")
+                        yield Label(
+                            bashmenu_ui.format_close_button_label(self.theme_styles),
+                            id="btn_close_x",
+                            classes="btn_close_x",
+                        )
+                    yield Label("New Theme Identifier (lowercase slug):")
+                    yield Input(value=self.current_name, id="input_rename", placeholder="e.g. my_theme_name")
+                    with Horizontal(id="btn_row"):
+                        yield Button("Rename", variant="primary", id="btn_confirm_rename")
+                        yield Button("Cancel", variant="error", id="btn_cancel_rename")
+                yield bashmenu_ui.ShadowWidget(id="shadow_right")
+            yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        ts = self.theme_styles or getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors()
+        self.theme_styles = ts
+        bashmenu_ui.apply_modal_theme(self, ts)
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(ts))
+        border_style = ts.get("border") or ts.get("accent")
+        if border_style and border_style.color and border_style.color.name:
+            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+            if css_border:
+                with contextlib.suppress(Exception):
+                    self.query_one("#dialog").styles.border = ("thick", css_border)
+
+        btn_prim = ts.get("button_primary") or ts.get("selection")
+        if btn_prim:
+            css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
+            css_p_fg = bashmenu_ui.parse_css_color(btn_prim.color.name) if btn_prim.color else None
+            with contextlib.suppress(Exception):
+                b = self.query_one("#btn_confirm_rename")
+                if css_p_bg:
+                    b.styles.background = css_p_bg
+                if css_p_fg:
+                    b.styles.color = css_p_fg
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_confirm_rename":
+            self.action_confirm()
+        elif event.button.id == "btn_cancel_rename":
+            self.dismiss(None)
+
+    def on_click(self, event: Any) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_confirm(self) -> None:
+        inp = self.query_one("#input_rename", Input)
+        val = inp.value.strip()
+        slug = sanitize_theme_name(val) if sanitize_theme_name else re.sub(r"[^\w\-]+", "_", val.lower()).strip("_")
+        if not slug:
+            inp.focus()
+            return
+        self.dismiss(slug)
 
 
 # ==============================================================================
@@ -1772,6 +1921,324 @@ class BackgroundConfigModal(ModalScreen[dict | None]):
             cfg_dict["quantization"] = quantization_val
 
         self.dismiss(cfg_dict)
+
+
+# ==============================================================================
+# THEME AUTO-GENERATION FROM IMAGE MODAL SCREEN
+# ==============================================================================
+
+
+class ThemeFromImageModal(ModalScreen[dict[str, Any] | None]):
+    """Interactive modal dialog for auto-generating a theme palette from an image."""
+
+    DEFAULT_CSS = """
+    ThemeFromImageModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.65);
+    }
+    ThemeFromImageModal #dialog {
+        width: 76;
+        height: 25;
+        border: thick #555;
+        background: #181818;
+        padding: 0 1;
+    }
+    ThemeFromImageModal #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 0;
+    }
+    ThemeFromImageModal #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: #eee;
+    }
+    ThemeFromImageModal .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    ThemeFromImageModal .btn_close_x:hover {
+        background: #333;
+        color: #fff;
+    }
+    ThemeFromImageModal .field_label {
+        color: #aaa;
+        height: 1;
+        margin-top: 1;
+    }
+    ThemeFromImageModal .field_row {
+        height: 1;
+        width: 100%;
+        margin-bottom: 0;
+    }
+    ThemeFromImageModal .field_row Input {
+        width: 1fr;
+        height: 1;
+        padding: 0 1;
+        border: none;
+        background: #252525;
+        color: #fff;
+    }
+    ThemeFromImageModal #btn_browse_img {
+        height: 1;
+        min-width: 12;
+        margin-left: 1;
+        padding: 0 1;
+        border: none !important;
+        background: #0178d4;
+        color: #ffffff;
+    }
+    ThemeFromImageModal #btn_browse_img:hover {
+        background: #0288d1;
+    }
+    ThemeFromImageModal .split_row {
+        height: 3;
+        width: 100%;
+        margin-top: 0;
+    }
+    ThemeFromImageModal .split_col {
+        width: 1fr;
+        height: 100%;
+    }
+    ThemeFromImageModal .split_col_left {
+        margin-right: 1;
+    }
+    ThemeFromImageModal .split_col_right {
+        margin-left: 1;
+    }
+    ThemeFromImageModal .split_col Select {
+        height: 1;
+        border: none;
+        background: #252525;
+        color: #fff;
+    }
+    ThemeFromImageModal .split_col Select > SelectCurrent {
+        height: 1;
+        border: none !important;
+        padding: 0 1;
+        background: #252525;
+        color: #fff;
+    }
+    ThemeFromImageModal #chk_wallpaper {
+        margin-top: 1;
+    }
+    ThemeFromImageModal #lbl_err_msg {
+        height: 1;
+        color: #ff5555;
+        text-align: center;
+        margin-top: 1;
+    }
+    ThemeFromImageModal #btn_row {
+        height: 3;
+        margin-top: 1;
+        align: center middle;
+    }
+    ThemeFromImageModal #btn_row Button {
+        height: 3;
+        min-width: 16;
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "generate", "Generate"),
+    ]
+
+    def __init__(
+        self,
+        initial_image: str = "",
+        theme_styles: dict | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.initial_image = initial_image
+        self.theme_styles = theme_styles or {}
+
+    def compose(self) -> ComposeResult:
+        with bashmenu_ui.ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label("Auto-Generate Theme From Image", id="title")
+                        yield Label(
+                            bashmenu_ui.format_close_button_label(self.theme_styles),
+                            id="btn_close_x",
+                            classes="btn_close_x",
+                        )
+
+                    stem = ""
+                    if self.initial_image:
+                        stem = os.path.splitext(os.path.basename(self.initial_image))[0]
+
+                    yield Label("Source Image File (PNG/JPG):", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(
+                            value=self.initial_image,
+                            placeholder="e.g. assets/wallpapers/twilight.png",
+                            id="input_image_path",
+                        )
+                        yield Button("Browse...", id="btn_browse_img", variant="default")
+
+                    yield Label("Theme Identifier / Name:", classes="field_label")
+                    with Horizontal(classes="field_row"):
+                        yield Input(
+                            value=stem,
+                            placeholder="e.g. twilight_auto",
+                            id="input_theme_name",
+                        )
+
+                    with Horizontal(classes="split_row"):
+                        with Vertical(classes="split_col split_col_left"):
+                            yield Label("Palette Mode:", classes="field_label")
+                            yield Select(
+                                [
+                                    ("Dark Theme (recommended)", "dark"),
+                                    ("Light Theme", "light"),
+                                ],
+                                value="dark",
+                                id="select_mode",
+                                allow_blank=False,
+                            )
+                        with Vertical(classes="split_col split_col_right"):
+                            yield Label("Options:", classes="field_label")
+                            yield Checkbox(
+                                "Set image as wallpaper",
+                                value=True,
+                                id="chk_wallpaper",
+                            )
+
+                    yield Label("", id="lbl_err_msg")
+
+                    with Horizontal(id="btn_row"):
+                        yield Button("Generate", variant="primary", id="btn_generate")
+                        yield Button("Cancel", variant="error", id="btn_cancel")
+                yield bashmenu_ui.ShadowWidget(id="shadow_right")
+            yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        ts = self.theme_styles or getattr(self.app, "theme_styles", None) or bashmenu_ui.init_theme_colors()
+        self.theme_styles = ts
+        bashmenu_ui.apply_modal_theme(self, ts)
+        with contextlib.suppress(Exception):
+            btn_close = self.query_one("#btn_close_x", Label)
+            btn_close.update(bashmenu_ui.format_close_button_label(ts))
+        border_style = ts.get("border") or ts.get("accent")
+        if border_style and border_style.color and border_style.color.name:
+            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
+            if css_border:
+                with contextlib.suppress(Exception):
+                    self.query_one("#dialog").styles.border = ("thick", css_border)
+
+        btn_prim = ts.get("button_primary") or ts.get("selection")
+        if btn_prim:
+            css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
+            css_p_fg = bashmenu_ui.parse_css_color(btn_prim.color.name) if btn_prim.color else None
+            with contextlib.suppress(Exception):
+                for b_id in ["#btn_browse_img", "#btn_generate"]:
+                    b = self.query_one(b_id)
+                    if css_p_bg:
+                        b.styles.background = css_p_bg
+                    if css_p_fg:
+                        b.styles.color = css_p_fg
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        btn_id = event.button.id
+        if btn_id == "btn_browse_img":
+            start_dir = os.path.join(bashmenu.BASHMENU_DIR, "assets", "wallpapers")
+            if not os.path.isdir(start_dir):
+                start_dir = os.path.join(os.getcwd(), "assets", "wallpapers")
+            if not os.path.isdir(start_dir):
+                start_dir = os.getcwd()
+
+            def _on_file_picked(picked_file: str | None) -> None:
+                if picked_file:
+                    with contextlib.suppress(Exception):
+                        rel = os.path.relpath(picked_file, bashmenu.BASHMENU_DIR)
+                        if not rel.startswith(".."):
+                            picked_file = rel
+                    with contextlib.suppress(Exception):
+                        inp_img = self.query_one("#input_image_path", Input)
+                        inp_img.value = picked_file
+                        inp_name = self.query_one("#input_theme_name", Input)
+                        if not inp_name.value.strip():
+                            stem = os.path.splitext(os.path.basename(picked_file))[0]
+                            inp_name.value = sanitize_theme_name(stem) if sanitize_theme_name else stem.lower()
+                        inp_img.focus()
+
+            self.app.push_screen(
+                bashmenu_ui.FilePickerModalScreen(
+                    "Choose Image File",
+                    start_dir=start_dir,
+                    mode="file",
+                    theme=self.theme_styles,
+                ),
+                _on_file_picked,
+            )
+        elif btn_id == "btn_generate":
+            self.action_generate()
+        elif btn_id == "btn_cancel":
+            self.dismiss(None)
+
+    def on_click(self, event: Any) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_generate(self) -> None:
+        img_val = self.query_one("#input_image_path", Input).value.strip()
+        if not img_val:
+            self.query_one("#lbl_err_msg", Label).update("Please select or enter an image path.")
+            self.query_one("#input_image_path", Input).focus()
+            return
+
+        resolved_img = img_val
+        if not os.path.isabs(resolved_img):
+            cand1 = os.path.join(bashmenu.BASHMENU_DIR, resolved_img)
+            cand2 = os.path.abspath(resolved_img)
+            if os.path.isfile(cand1):
+                resolved_img = cand1
+            elif os.path.isfile(cand2):
+                resolved_img = cand2
+
+        if not os.path.isfile(resolved_img):
+            self.query_one("#lbl_err_msg", Label).update(f"File not found: {img_val}")
+            return
+
+        name_val = self.query_one("#input_theme_name", Input).value.strip()
+        if not name_val:
+            stem = os.path.splitext(os.path.basename(resolved_img))[0]
+            name_val = sanitize_theme_name(stem) if sanitize_theme_name else stem.lower()
+
+        mode_sel = self.query_one("#select_mode", Select)
+        mode_val = str(mode_sel.value) if mode_sel.value and mode_sel.value != Select.BLANK else "dark"
+
+        set_wp = self.query_one("#chk_wallpaper", Checkbox).value
+
+        if not generate_theme_from_image:
+            self.query_one("#lbl_err_msg", Label).update("Theme generator module is unavailable.")
+            return
+
+        try:
+            theme_dict = generate_theme_from_image(
+                resolved_img,
+                theme_name=name_val,
+                mode=mode_val,
+                set_wallpaper=set_wp,
+            )
+            self.dismiss({"theme": theme_dict, "name": name_val})
+        except (ValueError, OSError, RuntimeError) as exc:
+            self.query_one("#lbl_err_msg", Label).update(f"Error: {exc}")
 
 
 # ==============================================================================
@@ -2439,8 +2906,11 @@ class ThemeEditScreen(Screen):
         Binding("f6", "clone_theme", "Clone Base"),
         Binding("f7", "derive_palettes", "Derive 16/8"),
         Binding("f8", "toggle_expand_all", "Expand/Collapse All"),
+        Binding("f9", "theme_from_image", "From Image"),
         Binding("ctrl+s", "save_theme", "Save"),
         Binding("ctrl+a", "save_as_theme", "Save As"),
+        Binding("ctrl+r", "rename_theme", "Rename", show=False),
+        Binding("ctrl+d", "delete_theme", "Delete", show=False),
         Binding("escape", "exit_editor", "Exit"),
         Binding("q", "exit_editor", "Exit", show=False),
     ]
@@ -2766,7 +3236,7 @@ class ThemeEditScreen(Screen):
 
     def compose(self) -> ComposeResult:
         file_name = os.path.basename(self.themes_filepath) if self.themes_filepath else "bashmenu.themes"
-        theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
+        theme_disp = self.theme_name if (self.theme_name and self.theme_name != "untitled") else "Untitled"
         dirty_flag = " *" if self.is_dirty else ""
         with Horizontal(id="header"):
             yield Label(
@@ -2789,6 +3259,16 @@ class ThemeEditScreen(Screen):
             with VerticalScroll(id="inspector_panel"):
                 yield Label("▶ General & Identity", classes="section_header", id="hdr_general")
                 with Vertical(id="sec_general", classes="section_body collapsed"):
+                    with Horizontal(classes="prop_row"):
+                        yield Label("Theme Name:", classes="prop_label")
+                        yield Input(
+                            value=str(self.theme_name if (self.theme_name and self.theme_name != "untitled") else ""),
+                            id="prop_theme_name",
+                            classes="prop_input",
+                            placeholder="e.g. my_theme",
+                        )
+                        yield Button("Rename", classes="btn_prop_action", id="btn_rename_theme")
+                        yield Button("Delete", classes="btn_prop_action", id="btn_delete_theme")
                     with Horizontal(classes="prop_row"):
                         yield Label("Indicator:", classes="prop_label")
                         yield Input(
@@ -2894,6 +3374,8 @@ class ThemeEditScreen(Screen):
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F8] Expand All", classes="footer_item", id="lbl_expand_all", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[F9] From Image", classes="footer_item", id="lbl_from_image", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[Ctrl+S] Save", classes="footer_item", id="lbl_save", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[Ctrl+A] Save As", classes="footer_item", id="lbl_save_as", markup=False)
@@ -2910,7 +3392,7 @@ class ThemeEditScreen(Screen):
         l_cap = borders.get("title_left_cap", "[").strip() or "["
         r_cap = borders.get("title_right_cap", "]").strip() or "]"
         file_name = os.path.basename(self.themes_filepath) if self.themes_filepath else "bashmenu.themes"
-        theme_disp = self.theme_name if (self.theme_name and not getattr(self, "is_new", False) and self.theme_name != "untitled") else "Untitled"
+        theme_disp = self.theme_name if (self.theme_name and self.theme_name != "untitled") else "Untitled"
         h_title.update(f"{l_cap} BashMenu Theme Editor — {file_name} [{theme_disp}]{dirty_flag} {r_cap}")
 
     def update_footer_layout(self, width: int | None = None) -> None:
@@ -3069,6 +3551,15 @@ class ThemeEditScreen(Screen):
         if not inp_id:
             return
 
+        if inp_id == "prop_theme_name":
+            val_slug = sanitize_theme_name(val) if sanitize_theme_name else re.sub(r"[^\w\-]+", "_", val.lower()).strip("_")
+            if val_slug and self.theme_name != val_slug:
+                self.theme_name = val_slug
+                self.is_new = val_slug not in self.raw_themes_data
+                self.is_dirty = True
+                self._sync_preview()
+            return
+
         if inp_id == "prop_indicator":
             if str(self.current_theme.get("indicator", "")) == val:
                 return
@@ -3185,6 +3676,14 @@ class ThemeEditScreen(Screen):
         if not btn_id:
             return
 
+        if btn_id == "btn_rename_theme":
+            self.action_rename_theme()
+            return
+
+        if btn_id == "btn_delete_theme":
+            self.action_delete_theme()
+            return
+
         if btn_id.startswith("btn_ascii_"):
             prop_k = btn_id.replace("btn_ascii_", "")
             curr_val = ""
@@ -3254,6 +3753,8 @@ class ThemeEditScreen(Screen):
             self.action_derive_palettes()
         elif w_id == "lbl_expand_all":
             self.action_toggle_expand_all()
+        elif w_id == "lbl_from_image":
+            self.action_theme_from_image()
         elif w_id == "lbl_background":
             self.action_configure_background()
         elif w_id == "lbl_save":
@@ -3369,6 +3870,114 @@ class ThemeEditScreen(Screen):
                 _cb_a_def,
             )
 
+    def action_rename_theme(self) -> None:
+        """Prompt user with modal dialog to rename theme."""
+        def _on_rename_confirmed(new_slug: str | None) -> None:
+            if new_slug and new_slug != self.theme_name:
+                self.theme_name = new_slug
+                self.is_new = new_slug not in self.raw_themes_data
+                self.is_dirty = True
+                with contextlib.suppress(Exception):
+                    self.query_one("#prop_theme_name", Input).value = new_slug
+                self._sync_preview()
+                with contextlib.suppress(Exception):
+                    self.notify(f"Theme renamed to '{new_slug}'", title="Theme Renamed")
+
+        self.app.push_screen(
+            RenameThemeModal(current_name=self.theme_name, theme_styles=self.configured_theme_styles),
+            _on_rename_confirmed,
+        )
+
+    def action_delete_theme(self) -> None:
+        """Prompt user to confirm deletion of the current theme from bashmenu.themes."""
+        target_name = self.theme_name
+        if not target_name or target_name == "untitled" or target_name not in self.raw_themes_data:
+            self.app.push_screen(
+                bashmenu_ui.MessageModalScreen(
+                    "Delete Theme",
+                    f"Theme '{target_name}' is not saved in bashmenu.themes.",
+                    theme=self.configured_theme_styles,
+                )
+            )
+            return
+
+        remaining_keys = [k for k in self.raw_themes_data if k != target_name]
+        if not remaining_keys:
+            self.app.push_screen(
+                bashmenu_ui.MessageModalScreen(
+                    "Cannot Delete Theme",
+                    "Cannot delete the only remaining theme in bashmenu.themes.",
+                    theme=self.configured_theme_styles,
+                )
+            )
+            return
+
+        fallback_candidate = (
+            "dracula"
+            if ("dracula" in self.raw_themes_data and target_name != "dracula")
+            else remaining_keys[0]
+        )
+
+        def _on_confirm_delete(choice: str | None) -> None:
+            if choice != "yes":
+                return
+            try:
+                # Remove from in-memory dictionary
+                self.raw_themes_data.pop(target_name, None)
+
+                # Persist to bashmenu.themes
+                with open(self.themes_filepath, "w", encoding="utf-8") as f:
+                    yaml.dump(self.raw_themes_data, f, sort_keys=False, default_flow_style=False)
+
+                # If this was the active theme in bashmenu.yml, fallback to another theme
+                if self.configured_theme == target_name:
+                    cfg, _ = bashmenu.load_config()
+                    cfg["theme"] = fallback_candidate
+                    cfg_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.yml")
+                    with open(cfg_path, "w", encoding="utf-8") as f:
+                        yaml.dump(cfg, f, sort_keys=False, default_flow_style=False)
+                    self.configured_theme = fallback_candidate
+                    self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
+                    self.apply_theme()
+
+                # Switch current editor screen to the fallback theme
+                self.theme_name = fallback_candidate
+                self.current_theme = copy.deepcopy(self.raw_themes_data[fallback_candidate])
+                self._ensure_theme_structure()
+                self.is_new = False
+                self.is_dirty = False
+                self._populate_all_inputs()
+                self._sync_preview()
+                self.app.push_screen(
+                    bashmenu_ui.MessageModalScreen(
+                        "Theme Deleted",
+                        f"Successfully deleted theme '{target_name}' from bashmenu.themes.\nSwitched editor to '{fallback_candidate}'.",
+                        theme=self.configured_theme_styles,
+                    )
+                )
+            except Exception as e:  # noqa: BLE001
+                self.app.push_screen(
+                    bashmenu_ui.MessageModalScreen(
+                        "Delete Failed",
+                        f"Error deleting theme '{target_name}':\n{e}",
+                        theme=self.configured_theme_styles,
+                    )
+                )
+
+        warning_extra = (
+            f"\n\n[b]Warning:[/b] '{target_name}' is currently active in bashmenu.yml.\nDeleting it will switch your active theme to '{fallback_candidate}'."
+            if self.configured_theme == target_name
+            else ""
+        )
+        self.app.push_screen(
+            bashmenu_ui.ConfirmModalScreen(
+                "Delete Theme",
+                f"Are you sure you want to permanently delete theme '{target_name}' from bashmenu.themes?{warning_extra}",
+                theme=self.configured_theme_styles,
+            ),
+            _on_confirm_delete,
+        )
+
     def action_clone_theme(self) -> None:
         """Open theme picker to clone an existing theme as a base."""
         def _on_theme_chosen(theme_key: str | None) -> None:
@@ -3389,6 +3998,9 @@ class ThemeEditScreen(Screen):
     def _populate_all_inputs(self) -> None:
         """Reflect current_theme values across all inspector input fields."""
         with contextlib.suppress(Exception):
+            self.query_one("#prop_theme_name", Input).value = str(
+                self.theme_name if (self.theme_name and self.theme_name != "untitled") else ""
+            )
             self.query_one("#prop_indicator", Input).value = str(self.current_theme.get("indicator", ">"))
             self.query_one("#prop_shadow_char", Input).value = str(
                 self.current_theme.get("window", {}).get("shadow_char", "░")
@@ -3497,14 +4109,42 @@ class ThemeEditScreen(Screen):
             self._populate_all_inputs()
             self._sync_preview()
 
+    def action_theme_from_image(self) -> None:
+        """Open modal dialog to auto-generate theme palette from an image (F9)."""
+        curr_bg = self.current_theme.get("background")
+        curr_img = ""
+        if isinstance(curr_bg, dict):
+            curr_img = str(curr_bg.get("image", ""))
+        elif isinstance(curr_bg, str):
+            curr_img = curr_bg
+
+        def _on_theme_generated(result: dict[str, Any] | None) -> None:
+            if result and "theme" in result:
+                new_theme = result["theme"]
+                new_name = result.get("name", "image_theme")
+                self.current_theme = new_theme
+                self.theme_name = new_name
+                self.is_new = new_name not in self.raw_themes_data
+                self.is_dirty = True
+                self._populate_all_inputs()
+                self._sync_preview()
+                self.app.push_screen(
+                    bashmenu_ui.MessageModalScreen(
+                        "Theme Generated",
+                        f"Successfully generated theme '{new_name}' from image!\n"
+                        "Derived 256, 16, and 8 color tiers.",
+                        theme=self.configured_theme_styles,
+                    )
+                )
+
+        self.app.push_screen(
+            ThemeFromImageModal(initial_image=curr_img, theme_styles=self.configured_theme_styles),
+            _on_theme_generated,
+        )
+
     def action_save_theme(self) -> None:
-        """Save theme. If untitled or new, prompt for name (Save As); otherwise save directly to disk."""
-        if (
-            getattr(self, "is_new", False)
-            or not self.theme_name
-            or self.theme_name == "untitled"
-            or self.theme_name not in self.raw_themes_data
-        ):
+        """Save theme. If untitled, prompt for name (Save As); otherwise save directly to disk."""
+        if not self.theme_name or self.theme_name == "untitled":
             self.action_save_as_theme()
             return
 
@@ -3518,7 +4158,7 @@ class ThemeEditScreen(Screen):
             new_name, set_active = result
             self._save_theme_to_disk(new_name, set_active=set_active)
 
-        suggested_name = "" if (getattr(self, "is_new", False) or self.theme_name == "untitled") else self.theme_name
+        suggested_name = "" if (not self.theme_name or self.theme_name == "untitled") else self.theme_name
         self.app.push_screen(
             SaveThemeModal(suggested_name, theme_styles=self.configured_theme_styles),
             _on_save_confirmed,
@@ -3580,6 +4220,8 @@ class ThemeEditScreen(Screen):
             self.theme_name = target_name
             self.is_new = False
             self.is_dirty = False
+            with contextlib.suppress(Exception):
+                self.query_one("#prop_theme_name", Input).value = target_name
             self._sync_preview()
             self.app.push_screen(
                 bashmenu_ui.MessageModalScreen(

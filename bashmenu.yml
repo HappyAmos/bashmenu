@@ -1,5 +1,5 @@
 version: 0.0.1
-theme: dayscape
+theme: mountain
 user:
   example_boolean: true
   example_filepath: '{bashmenu_dir}'
@@ -18,15 +18,15 @@ settings:
     divider: true
     weather:
       script: "curl -s 'wttr.in/{user.postal_code}?format=4'"
-      sleep: 5000
-    alienware:
       sleep: 10000
+    alienware:
+      sleep: 15000
       script: '{scripts_dir}/serverup.sh 192.168.4.46 [b]Alienware[/b]'
     pi3b:
-      sleep: 15000
+      sleep: 20000
       script: '{scripts_dir}/serverup.sh 192.168.4.47 [b]Pi3b[/b]'
     halftop:
-      sleep: 20000
+      sleep: 25000
       script: '{scripts_dir}/serverup.sh 192.168.4.96 [b]Halftop[/b]'
     otd:
       script: otd.sh
@@ -46,6 +46,5 @@ settings:
     | {user.localip} | [b]{date_time_24_short}[/b]'
   inactivity_timeout:
     milliseconds: 300000
-  background:
-    enabled: true
-    clustering: 0
+    command: cmatrix -s
+  refresh_interval: 5000

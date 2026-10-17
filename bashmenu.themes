@@ -3424,12 +3424,12 @@ train_ride:
     gap: 4
   indicator: '{nf:*:#f0f0f:}'
   background:
-    image: assets/wallpapers/mountain-train.png
+    image: assets/wallpapers/mountain.png
     opacity: 0.85
     scaling: stretch
-    clustering: 16
-    quantization: 16
     mode: halfblock
+    clustering: 32
+    quantization: 8
   divider:
     char: "\u2500"
     length: '{window_width}'
@@ -3452,6 +3452,12 @@ train_ride:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: 233
     title:
@@ -3639,6 +3645,223 @@ train_ride:
     - COLOR_BLACK
     - -1
 dayscape:
+  marquee:
+    char: "\u2022"
+    gap: 5
+  indicator: "{nf:@:\uEE90:}"
+  window:
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
+  256:
+    background: 189
+    title:
+    - 235
+    - -1
+    border:
+    - 64
+    - -1
+    text:
+    - 16
+    - -1
+    highlight:
+    - 255
+    - 235
+    accent:
+    - 58
+    - -1
+    footer:
+    - 64
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 101
+    - -1
+    selection:
+    - 255
+    - 235
+    shortcut_key:
+    - 58
+    - -1
+    divider:
+    - 64
+    - -1
+    button_primary:
+    - 255
+    - 235
+    button_error:
+    - 255
+    - 196
+    button_cancel:
+    - 16
+    - 101
+    button_success:
+    - 255
+    - 64
+    help_text:
+    - 58
+    - -1
+    plugin:
+    - 58
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 235
+    - 250
+    whitespace:
+    - 101
+    - -1
+  16:
+    background: COLOR_BRIGHT_WHITE
+    title:
+    - COLOR_BLACK
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_BLACK
+    - -1
+    highlight:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    accent:
+    - COLOR_BLACK
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+    gutter:
+    - COLOR_GREY
+    - -1
+    selection:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_BLACK
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_GREY
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_BLACK
+    - -1
+    plugin:
+    - COLOR_BLACK
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    whitespace:
+    - COLOR_GREY
+    - -1
+  8:
+    background: COLOR_WHITE
+    title:
+    - COLOR_BLACK
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_BLACK
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    accent:
+    - COLOR_BLACK
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    shortcut_key:
+    - COLOR_BLACK
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_BLACK
+    - -1
+    plugin:
+    - COLOR_BLACK
+    - -1
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    whitespace:
+    - COLOR_YELLOW
+    - -1
+  background:
+    image: assets/wallpapers/dayscape.png
+    opacity: 0.85
+    scaling: cover
+    mode: halfblock
+    clustering: 32
+    quantization: 8
+mountain:
   marquee:
     char: ''
     gap: 4
@@ -3858,9 +4081,8 @@ dayscape:
     - COLOR_WHITE
     - -1
   background:
-    image: assets/wallpapers/dayscape.png
+    image: assets/wallpapers/mountain.png
     opacity: 0.85
-    scaling: stretch
+    scaling: center
     mode: halfblock
-    clustering: 64
     quantization: 16

@@ -147,6 +147,14 @@ class TestPerformanceAndResponsiveness(unittest.TestCase):
         screen.initial_config = {"settings": {"status_gutter": "User: {user} | Static Info"}}
         self.assertEqual(screen._determine_refresh_interval(), 5.0)
 
+        # Explicit user configuration overrides dynamic detection
+        screen.initial_config = {"settings": {"refresh_interval": 2.5, "status_gutter": "{date_time_24}"}}
+        self.assertEqual(screen._determine_refresh_interval(), 2.5)
+
+        # Millisecond configuration support (>= 50ms)
+        screen.initial_config = {"settings": {"refresh_interval": 2000, "status_gutter": "{date_time_24}"}}
+        self.assertEqual(screen._determine_refresh_interval(), 2.0)
+
     def test_mouse_navigation_scroll_stability(self):
         """Verify mouse hover in a scrolled menu preserves scroll offset without collapsing to top."""
         many_options = [{"title": f"Option {i}", "type": "command"} for i in range(30)]

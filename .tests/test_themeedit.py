@@ -7,17 +7,20 @@ AsciiPickerModal, ColorPickerModal, SaveThemeModal, and live inspector synchroni
 """
 
 import asyncio
+import copy
 import os
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from rich.text import Text
-from textual.widgets import Input, Label
+from textual.widgets import Input, Label, OptionList
+from textual.widgets.option_list import Option
 
 import bashmenu
 import bashmenu_ui
@@ -440,6 +443,8 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertIn("[F5] Reset", footer_labels)
                 self.assertIn("[F6] Clone/Base", footer_labels)
                 self.assertIn("[F7] Derive 16/8", footer_labels)
+                self.assertIn("[F8] Expand All", footer_labels)
+                self.assertIn("[F9] From Image", footer_labels)
                 self.assertIn("[Ctrl+S] Save", footer_labels)
                 self.assertIn("[Ctrl+A] Save As", footer_labels)
                 self.assertIn("[ESC/q] Exit", footer_labels)
@@ -1253,6 +1258,228 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_generate_theme_from_image_functionality(self):
+        """Verify generate_theme_from_image creates valid 256, 16, and 8 color tiers and wallpaper config."""
+        import ymlcheck
+        from scripts.theme_from_image import generate_theme_from_image
+
+        twilight_img = os.path.join(bashmenu.BASHMENU_DIR, "assets", "wallpapers", "twilight.png")
+        if not os.path.isfile(twilight_img):
+            self.skipTest("twilight.png wallpaper not found")
+
+        theme = generate_theme_from_image(twilight_img, theme_name="twilight_auto", mode="dark", set_wallpaper=True)
+        self.assertIn(256, theme)
+        self.assertIn(16, theme)
+        self.assertIn(8, theme)
+        self.assertIn("marquee", theme)
+        self.assertIn("window", theme)
+        self.assertIn("background", theme)
+        self.assertEqual(theme["background"]["image"], "assets/wallpapers/twilight.png")
+
+        # Validate with ymlcheck validators
+        for depth in (256, 16, 8):
+            errs = ymlcheck.validate_depth_section(str(depth), theme[depth], "twilight_auto")
+            self.assertEqual(errs, [], f"Validation errors in depth {depth}: {errs}")
+
+    def test_theme_from_image_modal_and_f9_shortcut(self):
+        """Verify pressing F9 in ThemeEditScreen opens ThemeFromImageModal and generates a theme."""
+        twilight_img = os.path.join(bashmenu.BASHMENU_DIR, "assets", "wallpapers", "twilight.png")
+        if not os.path.isfile(twilight_img):
+            self.skipTest("twilight.png wallpaper not found")
+
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                # Press F9 to open ThemeFromImageModal
+                await pilot.press("f9")
+                await pilot.pause()
+                self.assertIsInstance(app.screen, themeedit.ThemeFromImageModal)
+                modal = app.screen
+
+                # Set image path and theme name
+                modal.query_one("#input_image_path", Input).value = twilight_img
+                modal.query_one("#input_theme_name", Input).value = "twilight_gen"
+                await pilot.pause()
+
+                # Trigger generation
+                await pilot.click(modal.query_one("#btn_generate"))
+                await pilot.pause()
+
+                # Success modal appears
+                self.assertIsInstance(app.screen, bashmenu_ui.MessageModalScreen)
+                self.assertEqual(app.screen.modal_title, "Theme Generated")
+                app.screen.dismiss()
+                await pilot.pause()
+
+                # Verify ThemeEditScreen state updated
+                self.assertEqual(screen.theme_name, "twilight_gen")
+                self.assertTrue(screen.is_dirty)
+                self.assertEqual(screen.current_theme.get("background", {}).get("image"), "assets/wallpapers/twilight.png")
+
+        asyncio.run(_run())
+
+    def test_theme_rename_modal_and_inspector_input(self):
+        """Verify theme renaming updates ThemeEditScreen state via inspector input and RenameThemeModal."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+                self.assertEqual(screen.theme_name, "dracula")
+
+                # 1. Test inline input rename in General & Identity
+                inp = screen.query_one("#prop_theme_name", Input)
+                inp.value = "renamed_theme_inline"
+                await pilot.pause()
+
+                self.assertEqual(screen.theme_name, "renamed_theme_inline")
+                self.assertTrue(screen.is_dirty)
+
+                # 2. Test modal rename via action_rename_theme
+                screen.action_rename_theme()
+                await pilot.pause()
+                self.assertIsInstance(app.screen, themeedit.RenameThemeModal)
+                modal = app.screen
+                modal_inp = modal.query_one("#input_rename", Input)
+                self.assertEqual(modal_inp.value, "renamed_theme_inline")
+
+                modal_inp.value = "brand_new_name"
+                await pilot.click(modal.query_one("#btn_confirm_rename"))
+                await pilot.pause()
+
+                # State reflected on screen
+                self.assertEqual(screen.theme_name, "brand_new_name")
+                self.assertEqual(screen.query_one("#prop_theme_name", Input).value, "brand_new_name")
+                self.assertTrue(screen.is_dirty)
+
+        asyncio.run(_run())
+
+    def test_theme_deletion_in_editor(self):
+        """Verify deleting a theme prompts confirmation, removes from raw_themes_data, and switches to fallback."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                # Add a dummy disposable theme to raw_themes_data
+                screen.raw_themes_data["disposable_test_theme"] = copy.deepcopy(screen.current_theme)
+                screen.theme_name = "disposable_test_theme"
+
+                # Trigger deletion
+                screen.action_delete_theme()
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, bashmenu_ui.ConfirmModalScreen)
+                modal = app.screen
+                self.assertEqual(modal.modal_title, "Delete Theme")
+
+                # Mock open / write to avoid modifying local repo bashmenu.themes during unit test
+                with mock.patch("builtins.open", mock.mock_open()):
+                    await pilot.click(modal.query_one("#btn_yes"))
+                    await pilot.pause()
+
+                # Verify disposable theme was removed
+                self.assertNotIn("disposable_test_theme", screen.raw_themes_data)
+                self.assertEqual(screen.theme_name, "dracula")
+                self.assertEqual(screen.query_one("#prop_theme_name", Input).value, "dracula")
+
+        asyncio.run(_run())
+
+    def test_theme_picker_delete_theme(self):
+        """Verify ThemePickerModalScreen supports deleting a non-active theme with confirmation."""
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                picker = bashmenu_ui.ThemePickerModalScreen(current_theme="dracula")
+                app.push_screen(picker)
+                await pilot.pause()
+
+                self.assertIn("delete_theme", [b.action for b in picker.BINDINGS])
+                # Add dummy theme to picker
+                picker.theme_keys.append("temp_to_delete")
+                opt_list = picker.query_one("#options_list", OptionList)
+                opt_list.add_option(Option("   Temp To Delete"))
+                opt_list.highlighted = len(picker.theme_keys) - 1
+
+                picker.action_delete_theme()
+                await pilot.pause()
+
+                self.assertIsInstance(app.screen, bashmenu_ui.ConfirmModalScreen)
+                confirm_modal = app.screen
+
+                with mock.patch("builtins.open", mock.mock_open()), \
+                     mock.patch("bashmenu_ui.load_themes_file", return_value={"dracula": {}, "temp_to_delete": {}}):
+                    await pilot.click(confirm_modal.query_one("#btn_yes"))
+                    await pilot.pause()
+
+                self.assertNotIn("temp_to_delete", picker.theme_keys)
+
+        asyncio.run(_run())
+
+    def test_generate_from_image_and_save_workflow(self):
+        """Verify generating palette from image for an existing theme can be saved directly via Ctrl+S and exits cleanly."""
+        async def _run():
+            app = themeedit.ThemeEditApp("mountain")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+                self.assertEqual(screen.theme_name, "mountain")
+                self.assertFalse(screen.is_new)
+                self.assertFalse(screen.is_dirty)
+
+                # Simulate theme generation result for 'mountain'
+                dummy_theme = copy.deepcopy(screen.current_theme)
+                dummy_theme[256]["title"] = [214, -1]
+                res = {"theme": dummy_theme, "name": "mountain"}
+
+                # Trigger generation callback logic
+                screen.current_theme = res["theme"]
+                screen.theme_name = res["name"]
+                screen.is_new = res["name"] not in screen.raw_themes_data
+                screen.is_dirty = True
+                screen._populate_all_inputs()
+                screen._sync_preview()
+                await pilot.pause()
+
+                self.assertFalse(screen.is_new)
+                self.assertTrue(screen.is_dirty)
+                self.assertIn("mountain", str(screen.query_one("#header_title", Label).render()))
+
+                # Save directly via action_save_theme (Ctrl+S)
+                with mock.patch("builtins.open", mock.mock_open()):
+                    screen.action_save_theme()
+                    await pilot.pause()
+
+                # Verify MessageModalScreen 'Theme Saved' appears, NOT SaveThemeModal
+                self.assertIsInstance(app.screen, bashmenu_ui.MessageModalScreen)
+                self.assertEqual(app.screen.modal_title, "Theme Saved")
+                app.screen.dismiss()
+                await pilot.pause()
+
+                # State should now be clean (not dirty, not new)
+                self.assertFalse(screen.is_dirty)
+                self.assertFalse(screen.is_new)
+
+                # Exiting should not prompt for unsaved changes
+                screen.action_exit_editor()
+                await pilot.pause()
+                self.assertNotIsInstance(app.screen, bashmenu_ui.ConfirmModalScreen)
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+
