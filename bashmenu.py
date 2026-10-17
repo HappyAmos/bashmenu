@@ -1592,6 +1592,9 @@ def get_plugin_display_items(
     if extra_vars is None:
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": 10}
 
+    plugin_bg_color = plugin_style.bgcolor if plugin_style else None
+    plugin_bg_style = Style(bgcolor=plugin_bg_color) if plugin_bg_color else bg_style
+
     with _plugin_lock:
         has_cached_data = any(
             isinstance(p_name, str) and p_name in _plugin_output_cache
@@ -1608,20 +1611,33 @@ def get_plugin_display_items(
                 div_str = interpolate_placeholders(str(content), config, extra_vars=div_vars)
             else:
                 div_str = resolve_divider_string(config, target_w=target_w, extra_vars=div_vars)
-            div_rt = bashmenu_ui.formatting_to_rich_text(div_str, theme=theme_styles, avail_width=target_w)
+            div_theme = theme_styles
+            if plugin_bg_color and theme_styles and "divider" in theme_styles:
+                orig_div = theme_styles["divider"]
+                div_theme = dict(theme_styles)
+                div_theme["divider"] = Style(color=orig_div.color, bgcolor=plugin_bg_color)
+            div_rt = bashmenu_ui.formatting_to_rich_text(
+                div_str, default_style=plugin_bg_style, theme=div_theme, avail_width=target_w
+            )
             if div_rt.cell_len > target_w:
                 div_rt.truncate(target_w)
             pad_w = max(0, target_w - div_rt.cell_len)
             if pad_w > 0:
-                div_rt.append(" " * pad_w, style=bg_style)
+                div_rt.append(" " * pad_w, style=plugin_bg_style)
             return (raw_str, True, div_rt)
 
         if isinstance(content, Text):
             c_rt = content.copy()
+            c_style = Style.parse(c_rt.style) if isinstance(c_rt.style, str) else c_rt.style
+            if plugin_bg_color and (not c_style or not c_style.bgcolor):
+                c_rt.style = plugin_bg_style + (c_style or Style())
         else:
             c_interp = interpolate_placeholders(str(content), config, extra_vars=extra_vars)
             if "\x1b[" in c_interp:
                 c_rt = Text.from_ansi(c_interp)
+                c_style = Style.parse(c_rt.style) if isinstance(c_rt.style, str) else c_rt.style
+                if plugin_bg_color and (not c_style or not c_style.bgcolor):
+                    c_rt.style = plugin_bg_style + (c_style or Style())
             else:
                 c_rt = bashmenu_ui.formatting_to_rich_text(
                     c_interp, default_style=plugin_style, theme=theme_styles, avail_width=avail_w
@@ -1630,11 +1646,11 @@ def get_plugin_display_items(
         if has_screen_divider:
             if c_rt.cell_len > avail_w:
                 c_rt.truncate(avail_w)
-            row_rt = Text("  ", style=bg_style)
+            row_rt = Text("  ", style=plugin_bg_style)
             row_rt.append_text(c_rt)
             pad_w = max(0, screen_div_w - row_rt.cell_len)
             if pad_w > 0:
-                row_rt.append(" " * pad_w, style=bg_style)
+                row_rt.append(" " * pad_w, style=plugin_bg_style)
             return (raw_str, False, row_rt)
         else:
             buffer_w = avail_w
@@ -1642,7 +1658,7 @@ def get_plugin_display_items(
                 c_rt.truncate(buffer_w)
             pad_w = max(0, buffer_w - c_rt.cell_len)
             if pad_w > 0:
-                c_rt.append(" " * pad_w, style=bg_style)
+                c_rt.append(" " * pad_w, style=plugin_bg_style)
             return (raw_str, False, c_rt)
 
     items: list[tuple[str, bool, Text]] = []
@@ -3603,9 +3619,11 @@ class BashMenuScreen(Screen):
             pb.config = self.menu_view.config
 
             theme_styles = bashmenu_ui.init_theme_colors(self.menu_view.config.get("theme", "dracula"))
+            plugin_style = theme_styles.get("plugin", Style(color="cyan"))
             bg_style = theme_styles.get("background")
             bg_hex = get_hex_from_style(bg_style, "#000000")
-            pb.styles.background = bg_hex
+            plugin_bg_hex = get_hex_from_style(plugin_style, bg_hex) if (plugin_style and plugin_style.bgcolor) else bg_hex
+            pb.styles.background = plugin_bg_hex
             self.menu_view.styles.background = bg_hex
 
             if plugin_count == 0:
@@ -4049,7 +4067,9 @@ class BashMenuScreen(Screen):
                 self.styles.background = bg_hex
         if hasattr(self, "plugin_buffer") and hasattr(self.plugin_buffer, "styles"):
             with contextlib.suppress(Exception):
-                self.plugin_buffer.styles.background = bg_hex
+                p_style = new_styles.get("plugin")
+                p_hex = get_hex_from_style(p_style, bg_hex) if (p_style and p_style.bgcolor) else bg_hex
+                self.plugin_buffer.styles.background = p_hex
         if hasattr(mv, "styles"):
             with contextlib.suppress(Exception):
                 mv.styles.background = bg_hex

@@ -642,6 +642,45 @@ class TestPluginSystem(unittest.TestCase):
                 self.assertTrue(mv_lines[plugin_start + 4].startswith(b_v_l), f"Row 4 must have vertical border in {theme_name}")
                 self.assertTrue(mv_lines[plugin_start + 5].startswith(b_tee_l), f"Row 5 must have Tee border in {theme_name}")
 
+    def test_plugin_background_palette_uniform_padding(self):
+        """Verify plugin padding, dividers, and ANSI text inherit plugin background color."""
+        config = {
+            "theme": "mountain",
+            "settings": {
+                "plugins": {
+                    "standalone_p": {
+                        "script": "echo test",
+                        "standalone": True,
+                        "pretext": "{divider}",
+                    }
+                }
+            },
+        }
+        with bashmenu._plugin_lock:
+            bashmenu._plugin_output_cache["standalone_p"] = {
+                "lines": ["\x1b[38;5;226mAnsiText\x1b[0m and more"],
+                "time": time.time(),
+            }
+
+        theme_styles = bashmenu.bashmenu_ui.init_theme_colors("mountain")
+        expected_bg = theme_styles["plugin"].bgcolor
+
+        items = bashmenu.get_plugin_display_items(config, avail_w=74, screen_div_w=78, has_screen_divider=False)
+        self.assertGreaterEqual(len(items), 2)
+
+        # Row 0: In-plugin divider should have expected plugin background
+        div_row = items[0][2]
+        self.assertEqual(div_row.cell_len, 74)
+        div_spans_with_bg = [s for s in div_row.spans if s.style and s.style.bgcolor == expected_bg]
+        self.assertTrue(len(div_spans_with_bg) > 0)
+
+        # Row 1: Content row with ANSI text and padding
+        content_row = items[1][2]
+        self.assertEqual(content_row.cell_len, 74)
+        # Trailing padding spaces must take expected_bg
+        pad_spans = [s for s in content_row.spans if s.style and s.style.bgcolor == expected_bg and s.end == 74]
+        self.assertTrue(len(pad_spans) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()
