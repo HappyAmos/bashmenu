@@ -3334,5 +3334,222 @@ G
                 mock_mv.refresh.assert_called_once()
 
 
+    def test_marquee_spacer_and_theme_config(self):
+        """Test format_marquee_spacer and get_theme_marquee_config fallbacks."""
+        import bashmenu_ui
+
+        # format_marquee_spacer
+        self.assertEqual(bashmenu_ui.format_marquee_spacer(" ", 4), "    ")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("", 4), "    ")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("•", 4), "  •  ")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("-", 2), " - ")
+
+        # get_theme_marquee_config
+        drac_cfg = bashmenu_ui.get_theme_marquee_config("dracula")
+        self.assertEqual(drac_cfg["char"], "•")
+        self.assertEqual(drac_cfg["gap"], 4)
+
+        # Fallback when theme does not exist or omits marquee
+        dummy_theme = {"256": {}}
+        fallback_cfg = bashmenu_ui.get_theme_marquee_config(dummy_theme)
+        self.assertEqual(fallback_cfg["char"], " ")
+        self.assertEqual(fallback_cfg["gap"], 4)
+
+    def test_marquee_slice_and_tracker(self):
+        """Test get_marquee_slice calculation and MarqueeTracker timing."""
+        import bashmenu_ui
+
+        # Text fits -> returns intact
+        self.assertEqual(bashmenu_ui.get_marquee_slice("Short", 10, 0), "Short")
+
+        # Text overflows -> slices with spacer
+        text = "Hello World"  # len 11
+        # avail_w = 6, spacer = 4 spaces, loop_unit = "Hello World    " (len 15)
+        s0 = bashmenu_ui.get_marquee_slice(text, 6, 0, char=" ", gap=4)
+        self.assertEqual(s0, "Hello ")
+        s1 = bashmenu_ui.get_marquee_slice(text, 6, 1, char=" ", gap=4)
+        self.assertEqual(s1, "ello W")
+
+        # Offset near wrap
+        s10 = bashmenu_ui.get_marquee_slice(text, 6, 10, char=" ", gap=4)
+        self.assertEqual(s10, "d    H")
+
+        # MarqueeTracker
+        tracker = bashmenu_ui.MarqueeTracker(pause_ticks=4)
+        self.assertEqual(tracker.offset, 0)
+        # First 4 ticks should return False (pause phase)
+        for _ in range(4):
+            self.assertFalse(tracker.tick())
+            self.assertEqual(tracker.offset, 0)
+        # Next tick should advance offset and return True
+        self.assertTrue(tracker.tick())
+        self.assertEqual(tracker.offset, 1)
+        self.assertTrue(tracker.tick())
+        self.assertEqual(tracker.offset, 2)
+
+        # Reset returns to pause phase
+        tracker.reset()
+        self.assertEqual(tracker.offset, 0)
+        self.assertFalse(tracker.tick())
+
+    def test_ymlcheck_marquee_validation(self):
+        """Test that ymlcheck correctly validates the marquee section."""
+        import ymlcheck
+
+        # Valid marquee section
+        valid_mq = {"char": "•", "gap": 4}
+        errs = ymlcheck.validate_marquee_section(valid_mq, "test_theme.marquee")
+        self.assertEqual(errs, [])
+
+        # Invalid gap (negative)
+        inv_mq1 = {"char": "•", "gap": -1}
+        errs1 = ymlcheck.validate_marquee_section(inv_mq1, "test_theme.marquee")
+        self.assertTrue(any("gap" in e for e in errs1))
+
+        # Unknown property
+        inv_mq2 = {"char": "•", "gap": 4, "speed": 100}
+        errs2 = ymlcheck.validate_marquee_section(inv_mq2, "test_theme.marquee")
+        self.assertTrue(any("speed" in e for e in errs2))
+
+    def test_bashmenu_50_50_dual_marquee_contract(self):
+        """Test the 50/50 dual marquee contract on options with and without right bracket directives."""
+        import bashmenu
+        import bashmenu_ui
+
+        mv = bashmenu.MainMenuView()
+        theme_styles = bashmenu_ui.init_theme_colors("dracula")
+        borders = bashmenu_ui.get_theme_window_borders("dracula")
+        div_cfg = {}
+        extra_vars = {}
+
+        # 1. Option with right bracket: 50/50 partition
+        # avail_w = 60 -> center = 30 -> left partition = [0..28], right partition = [32..60]
+        avail_w = 60
+        opt_with_bracket = {
+            "title": "A Very Long Application Name That Will Overflow Left [Scripts / Deep / Subdirectory / Path]",
+        }
+
+        # Unselected: should truncate with ellipsis on both sides
+        line_unsel = mv._render_raw_option_line(
+            0, opt_with_bracket, False, "1", avail_w, 64, extra_vars, theme_styles, borders, div_cfg, False, ">", marquee_offset=0
+        )
+        plain_unsel = line_unsel.plain
+        # Line format: │  <content>  │
+        self.assertIn("…", plain_unsel)
+
+        # Selected at offset 0 vs offset 3: text shifts for marquee
+        line_sel_0 = mv._render_raw_option_line(
+            0, opt_with_bracket, True, "1", avail_w, 64, extra_vars, theme_styles, borders, div_cfg, False, ">", marquee_offset=0
+        )
+        line_sel_3 = mv._render_raw_option_line(
+            0, opt_with_bracket, True, "1", avail_w, 64, extra_vars, theme_styles, borders, div_cfg, False, ">", marquee_offset=3
+        )
+        self.assertNotEqual(line_sel_0.plain, line_sel_3.plain)
+
+        # 2. Option without right bracket: full width usage
+        opt_no_bracket = {
+            "title": "A Moderately Long Option Name That Fits Full Width",
+        }
+        line_full = mv._render_raw_option_line(
+            1, opt_no_bracket, False, "2", avail_w, 64, extra_vars, theme_styles, borders, div_cfg, False, ">", marquee_offset=0
+        )
+        self.assertIn("A Moderately Long Option Name That Fits Full Width", line_full.plain)
+
+    def test_themeedit_marquee_inputs(self):
+        """Test that themeedit allows editing and inspecting marquee settings."""
+        import themeedit
+
+        raw_theme = {
+            "indicator": ">",
+            "window": {},
+            "marquee": {"char": "•", "gap": 4},
+            256: {},
+        }
+        screen = themeedit.ThemeEditScreen(current_theme=raw_theme, theme_name="test_theme")
+        self.assertEqual(screen.current_theme["marquee"]["char"], "•")
+        self.assertEqual(screen.current_theme["marquee"]["gap"], 4)
+
+    def test_bashedit_whitespace_tab_backspace_and_delete(self):
+        """Verify backspace and delete behavior with show_whitespace enabled on lines with tabs."""
+        import bashedit
+
+        # 1. Test _char_idx_to_display_col mapping with tabstop=8
+        ed = bashedit.EditorWidget()
+        ed.tabstop = 8
+        line = "2\t02\tSTX (Start of Text)\t18\t12\tDC2 (Device Control 2)"
+        # '2' at idx 0 (col 0)
+        # '\t' at idx 1 (advances col 1 -> 8)
+        # '0' at idx 2 (col 8)
+        # '2' at idx 3 (col 9)
+        # '\t' at idx 4 (advances col 10 -> 16)
+        # 'S' at idx 5 (col 16, i.e. Col 17 in 1-indexed status bar)
+        self.assertEqual(ed._char_idx_to_display_col(line, 0), 0)
+        self.assertEqual(ed._char_idx_to_display_col(line, 1), 1)
+        self.assertEqual(ed._char_idx_to_display_col(line, 2), 8)
+        self.assertEqual(ed._char_idx_to_display_col(line, 4), 10)
+        self.assertEqual(ed._char_idx_to_display_col(line, 5), 16)
+        # Roundtrip mapping check with _display_col_to_char_idx
+        self.assertEqual(ed._display_col_to_char_idx(line, 16), 5)
+
+        # 2. Test backspace at 'S' deletes the tab immediately preceding 'S'
+        ed.lines = [line]
+        ed.cursor_y = 0
+        ed.cursor_x = 5  # At 'S' (Col 17 visually)
+        ed.backspace()
+        self.assertEqual(ed.lines[0], "2\t02STX (Start of Text)\t18\t12\tDC2 (Device Control 2)")
+        self.assertEqual(ed.cursor_x, 4)
+
+        # 3. Test delete at tab character deletes the tab without touching text further right
+        ed.lines = [line]
+        ed.cursor_y = 0
+        ed.cursor_x = 4  # At the tab character before 'S'
+        ed.delete_char()
+        self.assertEqual(ed.lines[0], "2\t02STX (Start of Text)\t18\t12\tDC2 (Device Control 2)")
+        self.assertEqual(ed.cursor_x, 4)
+
+        # 4. Test Textual Key event dispatch in BashEditScreen.on_key for Delete and Backspace
+        # Textual sends key="delete" with character="\x7f". Must invoke delete_char, not backspace.
+        screen = bashedit.BashEditScreen(file_path=None)
+        screen.query_one = lambda selector, *args, **kwargs: ed
+        screen.update_status = lambda: None
+        ed.lines = ["Hello\tWorld"]
+        ed.cursor_y = 0
+        ed.cursor_x = 5  # At '\t'
+
+        class MockDeleteKey:
+            key = "delete"
+            character = "\x7f"
+            name = "delete"
+
+            def prevent_default(self):
+                pass
+
+            def stop(self):
+                pass
+
+        screen.on_key(MockDeleteKey())
+        # Should have deleted '\t' forward, not 'o' backward
+        self.assertEqual(ed.lines[0], "HelloWorld")
+        self.assertEqual(ed.cursor_x, 5)
+
+        class MockBackspaceKey:
+            key = "backspace"
+            character = "\x7f"
+            name = "backspace"
+
+            def prevent_default(self):
+                pass
+
+            def stop(self):
+                pass
+
+        screen.on_key(MockBackspaceKey())
+        # Should delete 'o' backward
+        self.assertEqual(ed.lines[0], "HellWorld")
+        self.assertEqual(ed.cursor_x, 4)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+

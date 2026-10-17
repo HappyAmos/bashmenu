@@ -391,10 +391,9 @@ class ColorPickerModal(ModalScreen[Any]):
         border: none;
     }
     #preview_bar {
-        height: 2;
+        height: 1;
         width: 100%;
         margin-top: 0;
-        border: solid #555;
         text-align: center;
     }
     .swatch_row, #swatch_row {
@@ -406,11 +405,12 @@ class ColorPickerModal(ModalScreen[Any]):
     .swatch_lbl {
         color: #888;
         margin-right: 1;
+        width: 10;
     }
     .swatch_row Button, #swatch_row Button, .btn_swatch {
         height: 1;
         min-width: 4;
-        padding: 0 1;
+        padding: 0;
         margin: 0;
         border: none !important;
         background: #252525;
@@ -575,7 +575,6 @@ class ColorPickerModal(ModalScreen[Any]):
 
                     with Horizontal(id="swatch_row", classes="swatch_row"):
                         yield Label("Standard: ", classes="swatch_lbl")
-                        yield Button("Inherit", id="swatch_inherit", classes="btn_swatch")
                         yield Button("Black", id="swatch_COLOR_BLACK", classes="btn_swatch")
                         yield Button("Red", id="swatch_COLOR_RED", classes="btn_swatch")
                         yield Button("Green", id="swatch_COLOR_GREEN", classes="btn_swatch")
@@ -584,21 +583,25 @@ class ColorPickerModal(ModalScreen[Any]):
                         yield Button("Magenta", id="swatch_COLOR_MAGENTA", classes="btn_swatch")
                         yield Button("Cyan", id="swatch_COLOR_CYAN", classes="btn_swatch")
                         yield Button("White", id="swatch_COLOR_WHITE", classes="btn_swatch")
-                        yield Button("Grey", id="swatch_COLOR_GREY", classes="btn_swatch")
 
-                    with Horizontal(id="swatch_row_bright", classes="swatch_row"):
+                    with Horizontal(id="swatch_row_bright1", classes="swatch_row"):
                         yield Label("Bright:   ", classes="swatch_lbl")
                         yield Button("Br-Black", id="swatch_COLOR_BRIGHT_BLACK", classes="btn_swatch")
                         yield Button("Br-Red", id="swatch_COLOR_BRIGHT_RED", classes="btn_swatch")
                         yield Button("Br-Green", id="swatch_COLOR_BRIGHT_GREEN", classes="btn_swatch")
                         yield Button("Br-Yellow", id="swatch_COLOR_BRIGHT_YELLOW", classes="btn_swatch")
+
+                    with Horizontal(id="swatch_row_bright2", classes="swatch_row"):
+                        yield Label("          ", classes="swatch_lbl")
                         yield Button("Br-Blue", id="swatch_COLOR_BRIGHT_BLUE", classes="btn_swatch")
-                        yield Button("Br-Mag", id="swatch_COLOR_BRIGHT_MAGENTA", classes="btn_swatch")
+                        yield Button("Br-Magenta", id="swatch_COLOR_BRIGHT_MAGENTA", classes="btn_swatch")
                         yield Button("Br-Cyan", id="swatch_COLOR_BRIGHT_CYAN", classes="btn_swatch")
                         yield Button("Br-White", id="swatch_COLOR_BRIGHT_WHITE", classes="btn_swatch")
 
                     with Horizontal(id="swatch_row_ext", classes="swatch_row"):
                         yield Label("Extended: ", classes="swatch_lbl")
+                        yield Button("Inherit", id="swatch_inherit", classes="btn_swatch")
+                        yield Button("Grey", id="swatch_COLOR_GREY", classes="btn_swatch")
                         yield Button("Orange", id="swatch_COLOR_ORANGE", classes="btn_swatch")
                         yield Button("Purple", id="swatch_COLOR_PURPLE", classes="btn_swatch")
                         yield Button("Pink", id="swatch_COLOR_PINK", classes="btn_swatch")
@@ -619,13 +622,6 @@ class ColorPickerModal(ModalScreen[Any]):
         with contextlib.suppress(Exception):
             btn_close = self.query_one("#btn_close_x", Label)
             btn_close.update(bashmenu_ui.format_close_button_label(ts))
-
-        border_style = ts.get("border") or ts.get("accent")
-        if border_style and border_style.color and border_style.color.name:
-            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
-            if css_border:
-                with contextlib.suppress(Exception):
-                    self.query_one("#preview_bar").styles.border = ("solid", css_border)
 
         btn_prim = ts.get("button_primary") or ts.get("selection")
         if btn_prim:
@@ -933,18 +929,76 @@ class AsciiGridWidget(Widget):
         self.post_message(self.GlyphSelected(self.cursor_code, get_cp437_glyph(self.cursor_code)))
 
 
-QUICK_BORDER_SWATCHES: list[tuple[str, int]] = [
+QUICK_BORDER_SINGLE: list[tuple[str, int]] = [
     ("─", 196),
     ("│", 179),
-    ("═", 205),
-    ("║", 186),
     ("┌", 218),
     ("┐", 191),
     ("└", 192),
     ("┘", 217),
-    ("█", 219),
-    ("░", 176),
+    ("├", 195),
+    ("┤", 180),
+    ("┬", 194),
+    ("┴", 193),
+    ("┼", 197),
 ]
+
+QUICK_BORDER_DOUBLE: list[tuple[str, int]] = [
+    ("═", 205),
+    ("║", 186),
+    ("╔", 201),
+    ("╗", 187),
+    ("╚", 200),
+    ("╝", 188),
+    ("╠", 204),
+    ("╣", 185),
+    ("╦", 203),
+    ("╩", 202),
+    ("╬", 206),
+]
+
+QUICK_BORDER_MIXED: list[tuple[str, int]] = [
+    ("╒", 213),
+    ("╕", 184),
+    ("╘", 212),
+    ("╛", 190),
+    ("╓", 214),
+    ("╖", 183),
+    ("╙", 211),
+    ("╜", 189),
+    ("╞", 198),
+    ("╡", 181),
+    ("╤", 209),
+    ("╧", 207),
+    ("╪", 216),
+    ("╟", 199),
+    ("╢", 182),
+    ("╥", 210),
+    ("╨", 208),
+    ("╫", 215),
+]
+
+QUICK_BORDER_SHADES: list[tuple[str, int]] = [
+    ("░", 176),
+    ("▒", 177),
+    ("▓", 178),
+]
+
+QUICK_BORDER_BLOCKS: list[tuple[str, int]] = [
+    ("█", 219),
+    ("▄", 220),
+    ("▌", 221),
+    ("▐", 222),
+    ("▀", 223),
+]
+
+QUICK_BORDER_SWATCHES: list[tuple[str, int]] = (
+    QUICK_BORDER_SINGLE
+    + QUICK_BORDER_DOUBLE
+    + QUICK_BORDER_MIXED
+    + QUICK_BORDER_SHADES
+    + QUICK_BORDER_BLOCKS
+)
 
 
 class AsciiPickerModal(ModalScreen[str]):
@@ -957,7 +1011,7 @@ class AsciiPickerModal(ModalScreen[str]):
     }
     #dialog {
         width: 78;
-        height: 31;
+        height: 27;
         border: thick #555;
         background: #181818;
         padding: 0 1;
@@ -987,19 +1041,6 @@ class AsciiPickerModal(ModalScreen[str]):
         background: #333;
         color: #fff;
     }
-    #tabs_row {
-        height: 2;
-        width: 100%;
-        align: center middle;
-        margin-bottom: 0;
-    }
-    #tabs_row Button, .tab_btn {
-        height: 1;
-        min-width: 20;
-        margin: 0 1;
-        padding: 0 1;
-        border: none !important;
-    }
     #grid_container {
         height: 16;
         width: 100%;
@@ -1013,26 +1054,33 @@ class AsciiPickerModal(ModalScreen[str]):
         border: none;
     }
     #preview_bar {
-        height: 2;
-        width: 100%;
-        margin-top: 0;
-        border: solid #555;
-        text-align: center;
-    }
-    #swatch_row {
         height: 1;
         width: 100%;
-        align: center middle;
         margin-top: 0;
+        text-align: center;
+    }
+    #swatches_container {
+        height: 3;
+        width: 100%;
+        margin-top: 0;
+        padding: 0 1;
+    }
+    .swatch_row {
+        height: 1;
+        width: 100%;
+        align: left middle;
     }
     .swatch_lbl {
         color: #888;
-        margin-right: 1;
+        width: 8;
     }
-    #swatch_row Button, .btn_swatch {
+    .swatch_lbl_sec {
+        margin-left: 0;
+    }
+    .btn_swatch {
         height: 1;
-        min-width: 4;
-        padding: 0 1;
+        min-width: 3;
+        padding: 0;
         margin: 0;
         border: none !important;
         background: #252525;
@@ -1045,12 +1093,9 @@ class AsciiPickerModal(ModalScreen[str]):
     .btn_swatch:focus {
         text-style: underline bold reverse;
     }
-    .tab_btn:focus {
-        text-style: underline bold reverse;
-    }
     #btn_row {
         height: 3;
-        margin-top: 1;
+        margin-top: 0;
         align: center middle;
     }
     #btn_row Button {
@@ -1067,9 +1112,6 @@ class AsciiPickerModal(ModalScreen[str]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
         Binding("enter", "confirm_selection", "Select"),
-        Binding("1", "select_extended_tab", "Extended", show=False),
-        Binding("2", "select_standard_tab", "Standard", show=False),
-        Binding("3", "select_all_tab", "All", show=False),
     ]
 
     def __init__(self, property_name: str, current_char: str, theme_styles: dict | None = None) -> None:
@@ -1077,7 +1119,6 @@ class AsciiPickerModal(ModalScreen[str]):
         self.property_name = property_name
         self.current_char = current_char
         self.theme_styles = theme_styles or {}
-        self.active_range = "extended" if self._parse_initial_code(current_char) >= 128 else "standard"
 
     def _parse_initial_code(self, val: str) -> int:
         if not val:
@@ -1108,25 +1149,6 @@ class AsciiPickerModal(ModalScreen[str]):
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
-                    with Horizontal(id="tabs_row"):
-                        yield Button(
-                            "[1] Extended (128-255)",
-                            id="btn_tab_ext",
-                            classes="tab_btn",
-                            variant="primary" if self.active_range == "extended" else "default",
-                        )
-                        yield Button(
-                            "[2] Standard (32-126)",
-                            id="btn_tab_std",
-                            classes="tab_btn",
-                            variant="primary" if self.active_range == "standard" else "default",
-                        )
-                        yield Button(
-                            "[3] All (0-255)",
-                            id="btn_tab_all",
-                            classes="tab_btn",
-                            variant="primary" if self.active_range == "all" else "default",
-                        )
 
                     with Horizontal(id="grid_container"):
                         init_code = self._parse_initial_code(self.current_char)
@@ -1134,10 +1156,27 @@ class AsciiPickerModal(ModalScreen[str]):
 
                     yield Static(id="preview_bar")
 
-                    with Horizontal(id="swatch_row"):
-                        yield Label("Quick Borders: ", classes="swatch_lbl")
-                        for g, c in QUICK_BORDER_SWATCHES:
-                            yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
+                    with Vertical(id="swatches_container"):
+                        with Horizontal(classes="swatch_row"):
+                            yield Label("Single: ", classes="swatch_lbl")
+                            for g, c in QUICK_BORDER_SINGLE:
+                                yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
+                            yield Label("Shades: ", classes="swatch_lbl swatch_lbl_sec")
+                            for g, c in QUICK_BORDER_SHADES:
+                                yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
+
+                        with Horizontal(classes="swatch_row"):
+                            yield Label("Double: ", classes="swatch_lbl")
+                            for g, c in QUICK_BORDER_DOUBLE:
+                                yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
+                            yield Label("Blocks: ", classes="swatch_lbl swatch_lbl_sec")
+                            for g, c in QUICK_BORDER_BLOCKS:
+                                yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
+
+                        with Horizontal(classes="swatch_row"):
+                            yield Label("Mixed:  ", classes="swatch_lbl")
+                            for g, c in QUICK_BORDER_MIXED:
+                                yield Button(g, id=f"swatch_ascii_{c}", classes="btn_swatch")
 
                     with Horizontal(id="btn_row"):
                         yield Button("Select (Enter)", variant="primary", id="btn_select")
@@ -1154,13 +1193,6 @@ class AsciiPickerModal(ModalScreen[str]):
         with contextlib.suppress(Exception):
             btn_close = self.query_one("#btn_close_x", Label)
             btn_close.update(bashmenu_ui.format_close_button_label(ts))
-
-        border_style = ts.get("border") or ts.get("accent")
-        if border_style and border_style.color and border_style.color.name:
-            css_border = bashmenu_ui.parse_css_color(border_style.color.name)
-            if css_border:
-                with contextlib.suppress(Exception):
-                    self.query_one("#preview_bar").styles.border = ("solid", css_border)
 
         btn_prim = ts.get("button_primary") or ts.get("selection")
         if btn_prim:
@@ -1184,19 +1216,9 @@ class AsciiPickerModal(ModalScreen[str]):
                 if css_e_fg:
                     b.styles.color = css_e_fg
 
-        self._sync_tabs_ui()
         self._update_preview()
         with contextlib.suppress(Exception):
             self.query_one("#ascii_grid", AsciiGridWidget).focus()
-
-    def _sync_tabs_ui(self) -> None:
-        with contextlib.suppress(Exception):
-            btn_ext = self.query_one("#btn_tab_ext", Button)
-            btn_std = self.query_one("#btn_tab_std", Button)
-            btn_all = self.query_one("#btn_tab_all", Button)
-            btn_ext.variant = "primary" if self.active_range == "extended" else "default"
-            btn_std.variant = "primary" if self.active_range == "standard" else "default"
-            btn_all.variant = "primary" if self.active_range == "all" else "default"
 
     def _update_preview(self) -> None:
         p_bar = self.query_one("#preview_bar", Static)
@@ -1220,13 +1242,7 @@ class AsciiPickerModal(ModalScreen[str]):
         if not btn_id:
             return
 
-        if btn_id == "btn_tab_ext":
-            self.action_select_extended_tab()
-        elif btn_id == "btn_tab_std":
-            self.action_select_standard_tab()
-        elif btn_id == "btn_tab_all":
-            self.action_select_all_tab()
-        elif btn_id == "btn_select":
+        if btn_id == "btn_select":
             self._confirm()
         elif btn_id == "btn_select_macro":
             self._confirm(as_macro=True)
@@ -1240,39 +1256,6 @@ class AsciiPickerModal(ModalScreen[str]):
                 grid.set_code(code)
                 grid.focus()
                 self._update_preview()
-
-    def action_select_extended_tab(self) -> None:
-        self.active_range = "extended"
-        grid = self.query_one("#ascii_grid", AsciiGridWidget)
-        if grid.cursor_code < 128:
-            grid.set_code(128)
-        grid.focus()
-        self._sync_tabs_ui()
-        self._update_preview()
-
-    def action_select_standard_tab(self) -> None:
-        self.active_range = "standard"
-        grid = self.query_one("#ascii_grid", AsciiGridWidget)
-        if grid.cursor_code < 32 or grid.cursor_code > 126:
-            grid.set_code(32)
-        grid.focus()
-        self._sync_tabs_ui()
-        self._update_preview()
-
-    def action_select_all_tab(self) -> None:
-        self.active_range = "all"
-        grid = self.query_one("#ascii_grid", AsciiGridWidget)
-        grid.focus()
-        self._sync_tabs_ui()
-        self._update_preview()
-
-    def action_cycle_range_tab(self) -> None:
-        if self.active_range == "extended":
-            self.action_select_standard_tab()
-        elif self.active_range == "standard":
-            self.action_select_all_tab()
-        else:
-            self.action_select_extended_tab()
 
     def action_confirm_selection(self) -> None:
         self._confirm()
@@ -1496,7 +1479,34 @@ class BackgroundConfigModal(ModalScreen[dict | None]):
         min-width: 12;
         margin-left: 1;
         padding: 0 1;
-        border: none;
+        border: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    BackgroundConfigModal #btn_browse_bg {
+        height: 1;
+        min-width: 12;
+        margin-left: 1;
+        padding: 0 1;
+        border: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        background: #0178d4;
+        color: #ffffff;
+    }
+    BackgroundConfigModal #btn_browse_bg:hover {
+        background: #0288d1;
+        color: #ffffff;
+        text-style: bold underline;
+    }
+    BackgroundConfigModal #btn_browse_bg:focus {
+        background: #0288d1;
+        color: #ffffff;
+        text-style: bold reverse;
     }
     BackgroundConfigModal .split_row {
         height: 3;
@@ -1610,7 +1620,7 @@ class BackgroundConfigModal(ModalScreen[dict | None]):
                             placeholder="e.g. assets/wallpapers/twilight.png",
                             id="input_bg_image",
                         )
-                        yield Button("Browse...", id="btn_browse_bg", variant="primary")
+                        yield Button("Browse...", id="btn_browse_bg", variant="default")
 
                     with Horizontal(classes="split_row"):
                         with Vertical(classes="split_col split_col_left"):
@@ -1663,6 +1673,18 @@ class BackgroundConfigModal(ModalScreen[dict | None]):
             if css_border:
                 with contextlib.suppress(Exception):
                     self.query_one("#dialog").styles.border = ("thick", css_border)
+
+        btn_prim = ts.get("button_primary") or ts.get("selection")
+        if btn_prim:
+            css_p_bg = bashmenu_ui.parse_css_color(btn_prim.bgcolor.name) if btn_prim.bgcolor else None
+            css_p_fg = bashmenu_ui.parse_css_color(btn_prim.color.name) if btn_prim.color else None
+            with contextlib.suppress(Exception):
+                for b_id in ["#btn_browse_bg", "#btn_apply_bg"]:
+                    b = self.query_one(b_id)
+                    if css_p_bg:
+                        b.styles.background = css_p_bg
+                    if css_p_fg:
+                        b.styles.color = css_p_fg
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id
@@ -1823,7 +1845,7 @@ class ThemePreviewWidget(Static):
         """Render complete simulated BashMenu frame with active borders and styles."""
         parent = getattr(self, "parent", None)
         if parent and getattr(parent, "size", None) and parent.size.width > 20 and parent.size.height > 10:
-            inner_pw = max(40, parent.size.width - 2)
+            inner_pw = max(40, parent.size.width - 3)
             inner_ph = max(12, parent.size.height - 2)
             w = max(38, inner_pw - 2)
             num_rows = inner_ph
@@ -2328,9 +2350,9 @@ class ThemeEditScreen(Screen):
         width: 1fr;
         height: 100%;
         border: solid #444;
-        padding: 0;
+        padding: 0 0 0 1;
         overflow: hidden;
-        align: center middle;
+        align: left middle;
     }
     #inspector_panel {
         width: 1fr;
@@ -2338,6 +2360,9 @@ class ThemeEditScreen(Screen):
         border: solid #444;
         padding: 0 1;
         overflow-y: auto;
+    }
+    #inspector_panel > * {
+        margin-right: 1;
     }
     .section_header {
         text-style: bold;
@@ -2393,15 +2418,14 @@ class ThemeEditScreen(Screen):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("f1", "show_help", "Help"),
         Binding("question_mark", "show_help", "Help", show=False),
-        Binding("c", "pick_color", "Color Picker"),
-        Binding("a", "pick_ascii", "ASCII Picker"),
-        Binding("t", "clone_theme", "Clone Base"),
-        Binding("d", "derive_palettes", "Derive 16/8"),
-        Binding("b", "configure_background", "Background"),
-        Binding("s", "save_theme", "Save"),
-        Binding("S", "save_as_theme", "Save As"),
-        Binding("w", "save_as_theme", "Save As", show=False),
-        Binding("r", "reset_theme", "Reset"),
+        Binding("f2", "configure_background", "Background"),
+        Binding("f3", "pick_color", "Color Picker"),
+        Binding("f4", "pick_ascii", "ASCII Picker"),
+        Binding("f5", "reset_theme", "Reset"),
+        Binding("f6", "clone_theme", "Clone Base"),
+        Binding("f7", "derive_palettes", "Derive 16/8"),
+        Binding("ctrl+s", "save_theme", "Save"),
+        Binding("ctrl+a", "save_as_theme", "Save As"),
         Binding("escape", "exit_editor", "Exit"),
         Binding("q", "exit_editor", "Exit", show=False),
     ]
@@ -2458,6 +2482,8 @@ class ThemeEditScreen(Screen):
         configured_theme: str | None = None,
         is_new: bool = False,
         base_theme: str | None = None,
+        current_theme: dict | None = None,
+        theme_name: str | None = None,
     ):
         super().__init__()
         self.themes_filepath = themes_filepath or os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.themes")
@@ -2468,7 +2494,10 @@ class ThemeEditScreen(Screen):
         self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
 
         self.is_new = is_new
-        if is_new:
+        if current_theme is not None:
+            self.theme_name = theme_name or initial_theme or "custom"
+            self.current_theme = copy.deepcopy(current_theme)
+        elif is_new:
             if base_theme and base_theme in self.raw_themes_data:
                 self.theme_name = "untitled"
                 self.current_theme = copy.deepcopy(self.raw_themes_data[base_theme])
@@ -2756,6 +2785,26 @@ class ThemeEditScreen(Screen):
                     )
                     yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_shadow_char")
 
+                yield Label("▼ Marquee Settings", classes="section_header")
+                m_cfg = self.current_theme.get("marquee", {})
+                m_char = str(m_cfg.get("char", " ")) if isinstance(m_cfg, dict) else " "
+                m_gap = str(m_cfg.get("gap", 4)) if isinstance(m_cfg, dict) else "4"
+                with Horizontal(classes="prop_row"):
+                    yield Label("Marquee Char:", classes="prop_label")
+                    yield Input(
+                        value=m_char,
+                        id="prop_marquee_char",
+                        classes="prop_input",
+                    )
+                    yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_marquee_char")
+                with Horizontal(classes="prop_row"):
+                    yield Label("Gap Spaces:", classes="prop_label")
+                    yield Input(
+                        value=m_gap,
+                        id="prop_marquee_gap",
+                        classes="prop_input",
+                    )
+
                 yield Label("▼ Window & Gutter Borders", classes="section_header")
                 for key, label_text in self.BORDER_PROPERTIES:
                     val = str(self.current_theme["window"].get(key, ""))
@@ -2806,23 +2855,23 @@ class ThemeEditScreen(Screen):
             with Horizontal(classes="footer_row"):
                 yield Label("[F1] Help", classes="footer_item", id="lbl_help", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[c] Pick Color", classes="footer_item", id="lbl_color", markup=False)
+                yield Label("[F2] Background", classes="footer_item", id="lbl_background", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[a] ASCII/Glyphs", classes="footer_item", id="lbl_ascii", markup=False)
+                yield Label("[F3] Pick Color", classes="footer_item", id="lbl_color", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[t] Clone/Base", classes="footer_item", id="lbl_clone", markup=False)
+                yield Label("[F4] ASCII/Glyphs", classes="footer_item", id="lbl_ascii", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[d] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
+                yield Label("[F5] Reset", classes="footer_item", id="lbl_reset", markup=False)
             with Horizontal(classes="footer_row"):
-                yield Label("[b] Background", classes="footer_item", id="lbl_background", markup=False)
+                yield Label("[F6] Clone/Base", classes="footer_item", id="lbl_clone", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[s] Save", classes="footer_item", id="lbl_save", markup=False)
+                yield Label("[F7] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[S] Save As", classes="footer_item", id="lbl_save_as", markup=False)
+                yield Label("[Ctrl+S] Save", classes="footer_item", id="lbl_save", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[r] Reset", classes="footer_item", id="lbl_reset", markup=False)
+                yield Label("[Ctrl+A] Save As", classes="footer_item", id="lbl_save_as", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[q/ESC] Exit", classes="footer_item", id="lbl_exit", markup=False)
+                yield Label("[ESC/q] Exit", classes="footer_item", id="lbl_exit", markup=False)
 
     def _sync_preview(self) -> None:
         """Propagate current theme changes to the preview canvas widget."""
@@ -2943,6 +2992,27 @@ class ThemeEditScreen(Screen):
             if str(div.get(sub_k, "")) == val:
                 return
             div[sub_k] = val
+        elif inp_id.startswith("prop_marquee_"):
+            sub_k = inp_id.replace("prop_marquee_", "")
+            mq = self.current_theme.setdefault("marquee", {})
+            if not isinstance(mq, dict):
+                mq = {}
+                self.current_theme["marquee"] = mq
+            if sub_k == "gap":
+                try:
+                    num_val = int(val)
+                except ValueError:
+                    num_val = 4
+                if mq.get("gap") == num_val:
+                    return
+                mq["gap"] = num_val
+            else:
+                if str(mq.get("char", " ")) == val:
+                    return
+                mq["char"] = val
+            self.is_dirty = True
+            self._sync_preview()
+            return
         elif inp_id == "prop_wallpaper_image":
             val_clean = val.strip()
             curr_bg = self.current_theme.get("background")
@@ -3030,6 +3100,8 @@ class ThemeEditScreen(Screen):
                 curr_val = self.current_theme.get("indicator", "")
             elif prop_k == "divider_char":
                 curr_val = self.current_theme.get("divider", {}).get("char", "")
+            elif prop_k == "marquee_char":
+                curr_val = str(self.current_theme.get("marquee", {}).get("char", " "))
             else:
                 curr_val = self.current_theme.get("window", {}).get(prop_k, "")
 
@@ -3212,6 +3284,12 @@ class ThemeEditScreen(Screen):
             self.query_one("#prop_divider_char", Input).value = div_char
             self.query_one("#prop_divider_length", Input).value = div_len
 
+            m_cfg = self.current_theme.get("marquee", {})
+            m_char = str(m_cfg.get("char", " ")) if isinstance(m_cfg, dict) else " "
+            m_gap = str(m_cfg.get("gap", 4)) if isinstance(m_cfg, dict) else "4"
+            self.query_one("#prop_marquee_char", Input).value = m_char
+            self.query_one("#prop_marquee_gap", Input).value = m_gap
+
             bg_data = self.current_theme.get("background")
             bg_img = ""
             if isinstance(bg_data, dict):
@@ -3331,6 +3409,10 @@ class ThemeEditScreen(Screen):
                     errs.extend(ymlcheck.validate_window_section(v_keys, f"{target_name}.window"))
                 elif depth_str == "divider":
                     errs.extend(ymlcheck.validate_divider_section(v_keys, f"{target_name}.divider"))
+                elif depth_str == "marquee":
+                    errs.extend(ymlcheck.validate_marquee_section(v_keys, f"{target_name}.marquee"))
+                elif depth_str == "background":
+                    errs.extend(ymlcheck.validate_theme_background_section(v_keys, f"{target_name}.background"))
                 elif depth_str in ("256", "16", "8"):
                     errs.extend(ymlcheck.validate_depth_section(depth_str, v_keys, target_name))
 

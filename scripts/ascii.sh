@@ -5,6 +5,30 @@
 #              character set safely to the terminal using iconv for conversion.
 # ==============================================================================
 
+# List non-printable characters
+printf "Non-printable characters (0 - 31)\n"
+cat << 'EOF' | column -t -s $'\t'
+Dec	Hex	Description	Dec	Hex	Description
+0	00	NUL (Null character)	16	10	DLE (Data Link Escape)
+1	01	SOH (Start of Header)	17	11	DC1 (Device Control 1 / XON)
+2	02	STX (Start of Text)	18	12	DC2 (Device Control 2)
+3	03	ETX (End of Text)	19	13	DC3 (Device Control 3 / XOFF)
+4	04	EOT (End of Transmission)	20	14	DC4 (Device Control 4)
+5	05	ENQ (Enquiry)	21	15	NAK (Negative Acknowledgment)
+6	06	ACK (Acknowledgment)	22	16	SYN (Synchronous Idle)
+7	07	BEL (Bell / Beep)	23	17	ETB (End of Trans. Block)
+8	08	BS (Backspace)	24	18	CAN (Cancel)
+9	09	HT (Horizontal Tab)	25	19	EM (End of Medium)
+10	0A	LF (Line Feed / New Line)	26	1A	SUB (Substitute)
+11	0B	VT (Vertical Tab)	27	1B	ESC (Escape)
+12	0C	FF (Form Feed / New Page)	28	1C	FS (File Separator)
+13	0D	CR (Carriage Return)	29	1D	GS (Group Separator)
+14	0E	SO (Shift Out)	30	1E	RS (Record Separator)
+15	0F	SI (Shift In)	31	1F	US (Unit Separator)
+EOF
+
+echo ""
+
 # Loop through the printable Standard ASCII range (32 to 126)
 printf "Standard ASCII Range (32 - 126)\n"
 c=0

@@ -344,7 +344,7 @@ class TestThemeEditor(unittest.TestCase):
 
                 # Tab through widgets and track focused IDs
                 focused_ids = []
-                for _ in range(16):
+                for _ in range(60):
                     await pilot.press("tab")
                     await pilot.pause()
                     w = app.focused
@@ -434,14 +434,15 @@ class TestThemeEditor(unittest.TestCase):
                 # Verify all bracketed keys appear intact
                 footer_labels = [lbl.render().plain for lbl in screen.query(".footer_item")]
                 self.assertIn("[F1] Help", footer_labels)
-                self.assertIn("[c] Pick Color", footer_labels)
-                self.assertIn("[a] ASCII/Glyphs", footer_labels)
-                self.assertIn("[t] Clone/Base", footer_labels)
-                self.assertIn("[d] Derive 16/8", footer_labels)
-                self.assertIn("[s] Save", footer_labels)
-                self.assertIn("[S] Save As", footer_labels)
-                self.assertIn("[r] Reset", footer_labels)
-                self.assertIn("[q/ESC] Exit", footer_labels)
+                self.assertIn("[F2] Background", footer_labels)
+                self.assertIn("[F3] Pick Color", footer_labels)
+                self.assertIn("[F4] ASCII/Glyphs", footer_labels)
+                self.assertIn("[F5] Reset", footer_labels)
+                self.assertIn("[F6] Clone/Base", footer_labels)
+                self.assertIn("[F7] Derive 16/8", footer_labels)
+                self.assertIn("[Ctrl+S] Save", footer_labels)
+                self.assertIn("[Ctrl+A] Save As", footer_labels)
+                self.assertIn("[ESC/q] Exit", footer_labels)
 
                 # Test F1 Help shortcut
                 await pilot.press("f1")
@@ -1127,8 +1128,8 @@ class TestThemeEditor(unittest.TestCase):
                 btn_cfg = screen.query_one("#btn_config_background")
                 self.assertIsNotNone(btn_cfg)
 
-                # Press 'b' to open modal
-                await pilot.press("b")
+                # Press 'f2' to open modal
+                await pilot.press("f2")
                 await pilot.pause()
                 self.assertIsInstance(app.screen, themeedit.BackgroundConfigModal)
 

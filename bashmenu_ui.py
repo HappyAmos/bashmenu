@@ -1228,6 +1228,202 @@ def apply_theme_to_textual_borders(
             tb.get_box.cache_clear()
 
 
+def get_theme_marquee_config(
+    theme_name: str | dict | None = "dracula",
+    raw_theme_data: dict | None = None,
+) -> dict[str, Any]:
+    """Retrieve marquee configuration (char and gap) for the specified theme.
+
+    Falls back to 4 plain spaces (char: ' ', gap: 4) if not defined.
+    """
+    import bashmenu
+
+    def _resolve_marquee_char(raw_val: Any) -> str:
+        s = str(raw_val) if raw_val is not None else " "
+        if "{" in s:
+            s = bashmenu.interpolate_placeholders(s, {})
+            s = bashmenu.resolve_glyph(s, {})
+        return s.replace("\ufe0f", "").replace("\ufe0e", "")
+
+    if isinstance(theme_name, dict):
+        if "marquee" in theme_name and isinstance(theme_name["marquee"], dict):
+            m_def = theme_name["marquee"]
+            return {
+                "char": _resolve_marquee_char(m_def.get("char", " ")),
+                "gap": int(m_def.get("gap", 4)),
+            }
+        if "theme_name" in theme_name and isinstance(theme_name["theme_name"], str):
+            theme_name = theme_name["theme_name"]
+        else:
+            return {"char": " ", "gap": 4}
+
+    if not raw_theme_data:
+        raw_theme_data = load_themes_file()
+
+    theme_def = raw_theme_data.get(theme_name, {}) if isinstance(theme_name, str) else {}
+    if not theme_def:
+        return {"char": " ", "gap": 4}
+
+    m_def = theme_def.get("marquee", {}) if isinstance(theme_def, dict) else {}
+    if isinstance(m_def, dict):
+        return {
+            "char": _resolve_marquee_char(m_def.get("char", " ")),
+            "gap": int(m_def.get("gap", 4)),
+        }
+    return {"char": " ", "gap": 4}
+
+
+def format_marquee_spacer(char: str = " ", gap: int = 4) -> str:
+    """Format the spacer between repeated cycles of marquee scrolling text.
+
+    If char is a space or empty, returns gap spaces (default 4).
+    If char is a symbol (bullet, dash, etc.), centers it flanked by gap spaces.
+    """
+    g = max(0, gap)
+    if not char or char == " ":
+        return " " * max(1, g)
+    left_spaces = " " * (g // 2)
+    right_spaces = " " * (g - (g // 2))
+    return f"{left_spaces}{char}{right_spaces}"
+
+
+def get_marquee_slice(
+    text: str,
+    avail_w: int,
+    offset: int,
+    char: str = " ",
+    gap: int = 4,
+) -> str:
+    """Calculate and return a scrolling slice of text for width avail_w at offset."""
+    if not text or avail_w <= 0:
+        return ""
+    if cell_len(text) <= avail_w:
+        return text
+
+    spacer = format_marquee_spacer(char=char, gap=gap)
+    loop_unit = text + spacer
+    unit_cells = cell_len(loop_unit)
+    if unit_cells == 0:
+        return ""
+
+    eff_offset = offset % unit_cells
+    stream = loop_unit * ((eff_offset + avail_w) // len(loop_unit) + 3)
+
+    curr_cells = 0
+    start_idx = 0
+    for i, c in enumerate(stream):
+        if curr_cells >= eff_offset:
+            start_idx = i
+            break
+        curr_cells += cell_len(c)
+
+    collected: list[str] = []
+    collected_cells = 0
+    for c in stream[start_idx:]:
+        c_w = cell_len(c)
+        if collected_cells + c_w > avail_w:
+            break
+        collected.append(c)
+        collected_cells += c_w
+
+    res = "".join(collected)
+    pad = avail_w - collected_cells
+    if pad > 0:
+        res += " " * pad
+    return res
+
+
+class MarqueeTracker:
+    """State tracker for pause delays and ticking offsets of marquee text elements."""
+
+    def __init__(self, pause_ticks: int = 4):
+        self.pause_ticks = pause_ticks
+        self.ticks_remaining = pause_ticks
+        self.offset = 0
+        self.active_id: Any = None
+
+    def reset(self, new_id: Any = None) -> None:
+        self.offset = 0
+        self.ticks_remaining = self.pause_ticks
+        self.active_id = new_id
+
+    def tick(self) -> bool:
+        """Advance marquee ticker. Returns True if offset advanced and redraw is needed."""
+        if self.ticks_remaining > 0:
+            self.ticks_remaining -= 1
+            return False
+        self.offset += 1
+        return True
+
+
+class MarqueeLabel(Label):
+    """Textual Label widget that automatically marquees its text if it overflows available width."""
+
+    def __init__(
+        self,
+        text: str = "",
+        theme_styles: dict | None = None,
+        pause_ticks: int = 4,
+        tick_interval: float = 0.25,
+        **kwargs,
+    ):
+        super().__init__(text, **kwargs)
+        self.raw_text = text
+        self.theme_styles = theme_styles or {}
+        self.tracker = MarqueeTracker(pause_ticks=pause_ticks)
+        self.tick_interval = tick_interval
+        self._timer = None
+
+    def on_mount(self) -> None:
+        self._check_timer()
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._check_timer()
+
+    def set_text(self, text: str) -> None:
+        if self.raw_text != text:
+            self.raw_text = text
+            self.tracker.reset()
+            self._check_timer()
+            self.refresh()
+
+    def update(self, text: str) -> None:
+        self.set_text(str(text))
+
+    def _check_timer(self) -> None:
+        w = max(0, self.size.width)
+        if w > 0 and cell_len(self.raw_text) > w:
+            if self._timer is None:
+                self._timer = self.set_interval(self.tick_interval, self._on_tick)
+        elif self._timer is not None:
+            with contextlib.suppress(Exception):
+                self._timer.stop()
+            self._timer = None
+            self.tracker.reset()
+            self.refresh()
+
+    def _on_tick(self) -> None:
+        if self.tracker.tick():
+            self.refresh()
+
+    def render(self) -> Text:
+        w = max(0, self.size.width)
+        if w <= 0:
+            return Text()
+        mq_cfg = get_theme_marquee_config(self.theme_styles)
+        if cell_len(self.raw_text) > w:
+            slice_str = get_marquee_slice(
+                self.raw_text,
+                w,
+                self.tracker.offset,
+                char=mq_cfg["char"],
+                gap=mq_cfg["gap"],
+            )
+        else:
+            slice_str = self.raw_text
+        return formatting_to_rich_text(slice_str, theme=self.theme_styles)
+
+
 def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None = None) -> dict:
     """
     Initialize theme data and construct Rich Style mapping for elements.
@@ -1243,6 +1439,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
         cached = _theme_styles_cache[cache_key]
         cached["theme_name"] = theme_name
         cached["window_borders"] = borders
+        cached["marquee"] = get_theme_marquee_config(theme_name, raw_theme_data=raw_theme_data)
         return cached
 
     theme_def = raw_theme_data.get(theme_name, {})
@@ -1250,7 +1447,13 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
         theme_def = next(iter(raw_theme_data.values()), {})
 
     palette = theme_def.get(256, theme_def.get(16, theme_def.get(8, {})))
-    indicator = theme_def.get("indicator", ">")
+    raw_ind = theme_def.get("indicator", ">")
+    if isinstance(raw_ind, str) and "{" in raw_ind:
+        import bashmenu
+        indicator = bashmenu.resolve_glyph(bashmenu.interpolate_placeholders(raw_ind, {}), {})
+        indicator = indicator.replace("\ufe0f", "").replace("\ufe0e", "")
+    else:
+        indicator = raw_ind
 
     bg_spec = palette.get("background")
     bg_color = None
@@ -1319,6 +1522,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
         styles["wallpaper"] = None
     styles["theme_name"] = theme_name
     styles["window_borders"] = borders
+    styles["marquee"] = get_theme_marquee_config(theme_name, raw_theme_data=raw_theme_data)
 
     _theme_styles_cache[cache_key] = styles
     return styles
@@ -1901,6 +2105,21 @@ class PrebakedWallpaperCanvas:
         self._cached_gutter_lines = composited_gutters
         return composited_gutters
 
+    def composite_dynamic_line(self, y: int, raw_line: Text) -> Text:
+        """Composite a dynamic/marqueeing raw option line at screen row y without caching."""
+        clean_line = raw_line.copy()
+        if clean_line.plain.endswith("\n"):
+            clean_line.rstrip()
+        row_cache = self.grid[y] if (self.grid and y < len(self.grid)) else None
+        if row_cache:
+            return composite_single_row(
+                clean_line,
+                row_cache,
+                console=self.console,
+                theme_default_bg=self.theme_default_bg,
+            )
+        return clean_line
+
     def assemble_frame(
         self,
         height: int,
@@ -1910,6 +2129,7 @@ class PrebakedWallpaperCanvas:
         num_options: int,
         gutter_y_start: int,
         gutter_lines: list[Text],
+        active_option_line: Text | None = None,
     ) -> Text:
         """Assemble full screen Text buffer from pre-baked lines."""
         out = Text()
@@ -1922,7 +2142,10 @@ class PrebakedWallpaperCanvas:
                 opt_offset = y - 3
                 opt_idx = scroll_start + opt_offset
                 if opt_idx < num_options:
-                    line = self.get_option_line(y, opt_idx, opt_idx == curr_row)
+                    if opt_idx == curr_row and active_option_line is not None:
+                        line = active_option_line
+                    else:
+                        line = self.get_option_line(y, opt_idx, opt_idx == curr_row)
                 else:
                     line = self._static_lines.get(y)
             elif gutter_y_start <= y < gutter_y_start + len(gutter_lines):
@@ -3215,7 +3438,7 @@ class FilePickerModalScreen(ModalScreen[str]):
                         title_str = self.modal_title or ("Save File As" if self.mode == "save" else "File Picker")
                         yield Label(title_str, id="title")
                         yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-                    yield Label(f"Path: {self.current_path}", id="path_label")
+                    yield MarqueeLabel(f"Path: {self.current_path}", id="path_label", theme_styles=self.theme)
                     yield OptionList(id="options_list")
                     if self.mode == "save":
                         with Vertical(id="save_filename_container"):
@@ -3333,7 +3556,7 @@ class FilePickerModalScreen(ModalScreen[str]):
 
     def load_directory(self) -> None:
         """Scan current directory path and populate OptionList with folders, files, and navigation options."""
-        self.query_one("#path_label", Label).update(f"Path: {self.current_path}")
+        self.query_one("#path_label", MarqueeLabel).update(f"Path: {self.current_path}")
         options_list = self.query_one("#options_list", OptionList)
         options_list.clear_options()
         self.entries = []

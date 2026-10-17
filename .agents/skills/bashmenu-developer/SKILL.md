@@ -15,7 +15,7 @@ description: Core developer guidelines for the multi-platform BashMenu
 ---
 
 ## 2. Core Development Workflow & Invariants
-- **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"` or `pytest`.
+- **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"`  and `pytest`.
 - **GitHub Actions CI Workflow & Remote Test Verification:**
   - Automated testing is offloaded to GitHub Actions (`.github/workflows/python-app.yml`) across Python 3.10, 3.11, and 3.12.
   - When testing changes, commit and push to `origin/main`, then track remote CI using GitHub CLI:
@@ -77,6 +77,22 @@ description: Core developer guidelines for the multi-platform BashMenu
   - `PluginBuffer` is an independent Textual buffer at least 1 line above the gutter, dynamic height up to 10 rows, with theme background matching.
   - Top divider (`divider: true` / `top_divider: true`): Deducts 1 row from `visible_option_rows` so scrolling never overlaps the divider.
   - With `{screen_width}` dividers, `PluginBuffer` expands to `max(20, w - 2)` at `x = 1`, and text lines indent 2 spaces (`"  "`) for menu column alignment.
+- **50/50 Dual Marquee Partition Contract (`bashmenu.py`):**
+  - **With Right-Aligned Bracket Directives (`[...]`):**
+    - Available line width (`avail_w`) is strictly split 50/50 around the center:
+      - Left partition: constrained from `0` to `center - 2` (`left_part_w = max(prefix_w + 1, center - 2)`).
+      - Center margin: exactly 4 spaces (`"    "`) between `center - 2` and `center + 2`.
+      - Right partition: constrained from `center + 2` to `avail_w` (`right_part_w = max(3, avail_w - (center + 2))`), right-aligned.
+    - *Unselected Items:* Overflowing text in either partition is truncated with a Unicode ellipsis (`…`).
+    - *Selected Items:* If the left label, right bracket, or both overflow their respective partitions, marquee scrolling activates simultaneously on both sides after a brief pause delay (4 ticks / 1.0 second).
+  - **Without Right-Aligned Bracket Directives:**
+    - The option text may utilize the entire available width up to `avail_w` (`label_avail_w = max(5, avail_w - prefix_w)`).
+    - *Unselected Items:* Overflowing text truncates with an ellipsis (`…`).
+    - *Selected Items:* Overflows marquee across the full available row width.
+- **Microsecond Dynamic Compositing Invariant:**
+  - Marquee animation ticks (250ms interval) must **NEVER** invalidate or recalculate the entire `PrebakedWallpaperCanvas` or background wallpaper grid.
+  - Only the single active row line region (`Region(0, active_y, w, 1)`) is refreshed via Textual.
+  - Dynamically composite the marqueeing raw line against the wallpaper grid for row `active_y` via `canvas.composite_dynamic_line(active_y, raw_active)`, leaving all static lines, borders, dividers, gutters, and unselected rows cached.
 
 ---
 
@@ -92,9 +108,28 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Width Modes:
     - `{window_width}`: Inset within borders and 2-space margins (`avail_w = max(20, w - 6)`), framed by standard vertical borders without tees.
     - `{screen_width}`: Full-width border-to-border (`w - 2`), connects directly to `left_tee`/`right_tee` without margin spaces. Foregrounds must match border color.
+- **Theme-Configurable Marquee (`marquee:` in `bashmenu.themes`):**
+  - Supported keys under `marquee:`:
+    - `char`: Separator string or character displayed between repeats of scrolling text (e.g. `"•"`, `"»"`, `"·"`, `"-"`, `" "` or Nerd Font glyphs).
+    - `gap`: Number of space characters flanking or defining the spacer between loop cycles (integer >= 0, default `4`).
+  - Fallback Standard: If a theme omits the `marquee:` section or if an unknown theme is queried, fall back strictly to 4 plain spaces (`char: " "`, `gap: 4`).
+  - Validation (`ymlcheck.py`): `validate_marquee_section()` enforces that `char` is a string and `gap` is a non-negative integer.
+  - Theme Editor (`themeedit.py`):
+    - Inspector exposes `prop_marquee_char` (with `btn_ascii_marquee_char` launching `AsciiPickerModal`) and `prop_marquee_gap`.
+    - Modifying inputs dynamically synchronizes the live preview and sets the dirty state.
+    - Saving persists the validated `marquee:` mapping to disk.
+- **CP437 ASCII Macro Interpolation Invariant (`{ascii:NNN}`):**
+  - Theme properties for borders, indicators, and marquee characters may specify CP437 byte codes using `{ascii:NNN}` macros (e.g. `{ascii:216}`, `{ascii:196}`).
+  - Any code reading theme glyphs (`init_theme_colors`, `get_theme_marquee_config`, `MainMenuView._render_option_row`) must pass the string through `bashmenu_ui.parse_ascii_val()` (or equivalent regex replacement `r"\{ascii:\s*(\d+)\s*\}"`) before displaying or formatting.
+  - Raw `{ascii:NNN}` strings must NEVER appear in the user-facing menu options, indicators, or status lines.
 - **Theme Editor & Contrast Invariants (`bashedit.py`):**
   - When `--display-theme-colors` is active, invert FG/BG if text matches theme background. Fall back to neutral primary 8 (`white` on dark, `black` on light) if both match.
   - Whitespace (`Alt+1`): Stylize non-visible whitespace (`'·'`, `'→'`, `'↵'`) with theme's `whitespace` token (fallback `dim white`). Apply before selection and cursor styles.
+- **Editor Mouse Navigation & Text Selection (`bashedit.py`):**
+  - Gutter & Viewport Geometry: Calculate content column as `content_x = int(event.x) - lineno_width`. If `content_x < 0` (clicked gutter), position at column 0. Clicks beyond text clamp to `len(line)` (whitespace past EOL). Clicks below document clamp to `len(lines) - 1`.
+  - Tabstop Mapping: When translating visual columns to buffer character indices, use `_display_col_to_char_idx()` to resolve expanded tabs against `tabstop`.
+  - Selection Chains & Modifiers: Single left-click resets `mark_active = False`. Shift+Click anchors or extends `mark_active`. Double-click (`event.chain == 2`) selects word bounds (`[a-zA-Z0-9_]`, whitespace, or punctuation). Triple-click (`event.chain >= 3`) selects the entire row (`mark_x = 0`, `cursor_x = len(line)`).
+  - Event Stopping: Consume click events in `EditorWidget.on_click()` with `event.stop()` so parent screen handlers do not trigger unintended actions, while preserving parent delegation for unhandled clicks.
 
 ---
 
@@ -133,14 +168,34 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Wrap `#dialog` in `ModalFrame(id="modal_frame")` and `Horizontal(id="dialog_hrow")` with right and bottom `ShadowWidget`. Direct child IDs remain queryable.
   - Expanded help modals (`is_help=True`): Sized to 95% width/height with `#dialog_hrow` at `1fr 1fr` and `#dialog` at `1fr 100%`.
 - **Selection Modals Standard:** When selecting from predefined lists, avoid freeform inputs (`InputModalScreen`). Always prefer `OptionList`-based modals (`ThemePickerModalScreen`) or 2D grid pickers.
+- **Theme Editor Keybinding Conventions (`themeedit.py`):**
+  - Standardized function key map for theme editor:
+    - `F1`: Help
+    - `F2`: Background configuration modal
+    - `F3`: Color Picker modal
+    - `F4`: ASCII / Glyphs modal
+    - `F5`: Reset current theme to disk
+    - `F6`: Clone / Base theme
+    - `F7`: Derive 16/8-color fallback palettes
+    - `Ctrl+S`: Save theme
+    - `Ctrl+A`: Save As new theme
+    - `Esc` / `q`: Exit theme editor
 - **Interactive 16×16 2D Pickers (`ColorGridWidget`, `AsciiGridWidget`):**
   - For 256-entry domains (colors and CP437 ASCII 0–255), use 16×16 grids with arrow navigation (±1, ±16), Home/End, PgUp/PgDn (±64), and Enter.
   - Active cells must display bold + underline (`underline=True, bold=True`). Mouse clicks resolve via `col = event.x // cell_width; row = event.y`.
-  - ASCII Modal Tabs & Swatches: Group characters into range tabs modeled after `scripts/ascii.sh`: `[1] Extended (128-255)`, `[2] Standard (32-126)`, `[3] All (0-255)`. Quick swatches for box borders (`─`, `│`, `═`, `║`, `┌`, `┐`, `└`, `┘`, `█`, `░`) and ANSI colors.
+  - Direct 2D Grid Access: Avoid unnecessary range tabs in picker modals; keep navigation centered directly on the 16×16 grid.
+  - Quick Swatches & Palettes: Provide visual quick-pick buttons for borders (`Single`, `Double`, `Mixed`, `Shades`, `Blocks`) and standard/bright/extended ANSI colors. Avoid `Select` dropdowns for visual tokens where 1-click visual recognition is essential.
   - Event Decoupling: Grid `set_code(code, notify=True)` must accept `notify=False`. Pass `notify=False` when clicking swatches to prevent highlight events from overwriting named constants (`"COLOR_RED"`).
+- **Modal Geometry & Button Box Model Standards (80-Column Safe):**
+  - Terminal Geometry Bounds: All modal dialogs must fit standard 80-column terminals:
+    - Width: `#dialog` width must not exceed `78` columns (`80` columns with right shadow).
+    - Height: `#dialog` height must not exceed `27` to `29` rows to prevent vertical clipping on standard 80×24 / 80×28 / 80×30 terminals.
+  - Textual Button Width Invariant: Textual's `Button.get_content_width` adds 2 cells to label text by default. For dense button rows (like swatch rows), set `.btn_swatch { padding: 0; margin: 0; min-width: 3; }` so that button width equals `len(label) + 2`.
+  - Row Length Limit: Keep all horizontal swatch rows $\le 66$ columns. Split long button groups (e.g. Bright colors) across two clean rows of 4 buttons so labels like `Br-Magenta` are fully spelled out rather than truncated.
+  - Preview Bar Sizing: Single-line status or preview bars inside modals must use `height: 1; border: none;` without dynamic borders, ensuring content is not squashed by border edges.
 - **Tab Key Navigation & Modal Button Sizing:**
   - Never bind `tab` at the screen level (`Binding("tab", ...)`). Let Textual's default focus traversal handle <kbd>Tab</kbd> and <kbd>Shift+Tab</kbd> across tabs, grid, swatches, and action buttons.
-  - Standard Button Sizing: Button variants apply 2-line borders. Never use `height: 1` or `border: none` on action buttons. Always use standard `#btn_row` styling: `#btn_row { height: 3; margin-top: 1; align: center middle; }` and `#btn_row Button { height: 3; min-width: 16; margin: 0 1; }`.
+  - Standard Action Button Sizing: Button variants apply 2-line borders. Never use `height: 1` or `border: none` on bottom dialog action buttons. Always use standard `#btn_row` styling: `#btn_row { height: 3; margin-top: 0; align: center middle; }` and `#btn_row Button { height: 3; min-width: 16; margin: 0 1; }`.
   - Provide distinct `:focus` styling for `.btn_swatch:focus`, `.tab_btn:focus`, and `#btn_row Button:focus`.
 - **Split-Screen Preview Maximization (`ThemePreviewWidget`):**
   - `#preview_panel` must use `padding: 0; overflow: hidden;`.
@@ -149,6 +204,14 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Avoid Textual's built-in `Markdown` widget for large docs (decomposes into hundreds of DOM widgets causing multi-second lag).
   - Use `Static` wrapping `rich.markdown.Markdown(text, hyperlinks=True)` for single-widget rendering (<0.1s load, 60 FPS). Intercept clicks via `event.style.link`.
   - If using Textual's `Markdown` widget, always pass `open_links=False` to prevent external browser launches on `#anchor` links.
+- **Reusable Marquee Engine & `MarqueeLabel` Widget (`bashmenu_ui.py`):**
+  - Centralized Primitives: `format_marquee_spacer()`, `get_theme_marquee_config()`, `get_marquee_slice()`, and `MarqueeTracker`.
+  - Polymorphic Widget: `MarqueeLabel` subclasses Textual's `Label` and automatically activates an interval timer (0.25s) with a 4-tick pause delay whenever its content exceeds the widget's visual width (`cell_len(text) > size.width`).
+  - Drop-in Compatibility: Because `MarqueeLabel` inherits from `Label`, queries such as `query_one(..., Label)` and methods like `.update(text)` work seamlessly across screens and modals without type mismatches.
+  - Applied across:
+    - `FilePickerModalScreen` (`#path_label`): smoothly scrolls deep file paths.
+    - `bashedit.py` (`#editor_header`): marquees long file paths in narrow Netbook terminal windows.
+    - `menuedit.py` (`render_menu_item_preview`): synchronizes preview rendering with 50/50 partition and theme marquee rules.
 
 ---
 
@@ -193,7 +256,10 @@ description: Core developer guidelines for the multi-platform BashMenu
 - **Terminal Pager Pipeline (`scripts/pager.sh`, `scripts/rich.sh`):**
   - Pipe Rich output via `FORCE_COLOR=1` and `less -R`. Standardize markdown viewing on `{scripts_dir}/rich.sh <file> | {scripts_dir}/pager.sh`. Pass `-y` (`--hyperlinks`) to `rich.markdown`.
   - Spools: Must reside strictly in `${CACHE_DIR:-${HOME}/.cache/bashmenu}/spool` with an immediate `trap 'cleanup' EXIT INT TERM HUP`.
-  - Balanced 3-segment status bar: Left line range (`TOP 1-23/100`), center badge `[ filename.ext ]` or `[ <stdin> ]`, right key hints.
+  - Balanced 3-segment status bar: Left line range (`TOP 1-23/100`), center badge `[ filename.ext ]` or `[ <stdin> ]`, right key hints (`h/? help`).
+  - **Multibyte Box Drawing Invariant:** Never use `tr " " "─"` to generate repeated box borders; `tr` operates on single bytes and corrupts multibyte UTF-8 characters (`\xe2\x94\x80`). Use pure bash string repetition loops (`for (( i=0; i<len; i++ )); do bar="${bar}─"; done`).
+  - **Function Key Decoding:** In raw terminal input parsing, decode `F1` from both `ESC O P` (`c2='O', c3='P'`) and `ESC [ 11 ~` (`body="11~"`).
+  - **Centered Popup Modals:** Centered floating overlays (`show_help_modal`) must compute `box_w = min(COLS - 6, 74)` and `box_h = min(ROWS - 4, 22)`, draw non-destructively over visible viewport rows, handle internal scrolling (`scroll_top`, `max_scroll`), respect `-c`/`--no-color` (`STRIP_COLORS`), and repaint the underlying document via `render` on dismissal.
   - Awk Collation Portability: In scripts utilizing byte-oriented regex patterns with high-bit octal escapes (`/[\300-\377]/`), GNU Awk (`gawk`) in UTF-8 locales produces `Invalid collation character` errors. Always force `LC_ALL=C` on the Awk execution pipeline (e.g. `LC_ALL=C BAR_LINE="${BAR_LINE}" awk ...`) to guarantee byte-oriented collation across `gawk` and `mawk`.
 - **Cheatsheet CLI (`scripts/cheat.sh`, `scripts/cheat.py`, `.cheat.yml`):**
   - Root directory defined in `scripts/.cheat.yml` (`dir: ~/cheat`).

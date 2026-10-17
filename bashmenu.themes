@@ -1,1545 +1,3640 @@
 dracula:
-  indicator: "{nf:@:\uee90:}"
+  marquee:
+    char: "\u2022"
+    gap: 4
+  indicator: "{nf:@:\uEE90:}"
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "┌"
-    border_top_right: "┐"
-    border_bottom_left: "└"
-    border_bottom_right: "┘"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: COLOR_BLACK
-    title: [201, -1]
-    border: [61, -1]
-    text: [255, -1]
-    highlight: [255, 201]
-    accent: [117, -1]
-    footer: [61, -1]
-    shadow: [236, COLOR_BLACK]
-    gutter: [239, -1]
-    selection: [255, 61]
-    shortcut_key: [201, -1]
-    divider: [61, -1]
-    button_primary: [255, 61]
-    button_error: [255, 60]
-    button_cancel: [255, 239]
-    button_success: [255, 84]
-    help_text: [117, -1]
-    plugin: [212, -1]
-    window_close_button: [203, -1]
-    scrollbar: [61, 236]
-    whitespace: [239, -1]
+    title:
+    - 201
+    - -1
+    border:
+    - 61
+    - -1
+    text:
+    - 255
+    - -1
+    highlight:
+    - 255
+    - 201
+    accent:
+    - 117
+    - -1
+    footer:
+    - 61
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 239
+    - -1
+    selection:
+    - 255
+    - 61
+    shortcut_key:
+    - 201
+    - -1
+    divider:
+    - 61
+    - -1
+    button_primary:
+    - 255
+    - 61
+    button_error:
+    - 255
+    - 60
+    button_cancel:
+    - 255
+    - 239
+    button_success:
+    - 255
+    - 84
+    help_text:
+    - 117
+    - -1
+    plugin:
+    - 212
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 61
+    - 236
+    whitespace:
+    - 239
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_MAGENTA, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_WHITE, COLOR_MAGENTA]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_MAGENTA, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_WHITE, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_BLUE, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_BLUE
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_MAGENTA, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_WHITE, COLOR_MAGENTA]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_BLUE, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_MAGENTA, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_WHITE, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_BLUE, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_BLUE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 nord:
-  indicator: "{nf:#:\uef66:}"
+  marquee:
+    char: "\xB7"
+    gap: 4
+  indicator: "{nf:#:\uEF66:}"
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "┌"
-    border_top_right: "┐"
-    border_bottom_left: "└"
-    border_bottom_right: "┘"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "«"
-    title_right_cap: "»"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: "\xAB"
+    title_right_cap: "\xBB"
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: COLOR_BLACK
-    title: [111, -1]
-    border: [60, -1]
-    text: [255, -1]
-    highlight: [COLOR_BLACK, 111]
-    accent: [60, -1]
-    footer: [255, -1]
-    shadow: [236, COLOR_BLACK]
-    gutter: [239, -1]
-    selection: [255, 60]
-    shortcut_key: [111, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [255, 60]
-    button_error: [255, 239]
-    button_cancel: [255, 111]
-    button_success: [255, 108]
-    help_text: [111, -1]
-    plugin: [146, -1]
-    window_close_button: [203, -1]
-    scrollbar: [60, 236]
-    whitespace: [239, -1]
+    title:
+    - 111
+    - -1
+    border:
+    - 60
+    - -1
+    text:
+    - 255
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 111
+    accent:
+    - 60
+    - -1
+    footer:
+    - 255
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 239
+    - -1
+    selection:
+    - 255
+    - 60
+    shortcut_key:
+    - 111
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - 255
+    - 60
+    button_error:
+    - 255
+    - 239
+    button_cancel:
+    - 255
+    - 111
+    button_success:
+    - 255
+    - 108
+    help_text:
+    - 111
+    - -1
+    plugin:
+    - 146
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 60
+    - 236
+    whitespace:
+    - 239
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_CYAN, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_CYAN]
-    accent: [COLOR_BLUE, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_CYAN, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_WHITE, COLOR_CYAN]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_CYAN, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_CYAN, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    accent:
+    - COLOR_BLUE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_CYAN
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_CYAN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_CYAN
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_CYAN, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_CYAN]
-    accent: [COLOR_BLUE, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_BLUE, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_CYAN, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_WHITE, COLOR_CYAN]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_CYAN, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_CYAN, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    accent:
+    - COLOR_BLUE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_CYAN
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_CYAN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_CYAN
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 cyberpunk:
-  indicator: "{nf:>:#f07c0:}"
+  marquee:
+    char: "\xBB"
+    gap: 4
+  indicator: '{nf:>:#f07c0:}'
   divider:
-    char: "━"
-    length: "{screen_width}"
+    char: "\u2501"
+    length: '{screen_width}'
   window:
-    border_horizontal: "━"
-    border_vertical: "┃"
-    border_top_left: "┏"
-    border_top_right: "┓"
-    border_bottom_left: "┗"
-    border_bottom_right: "┛"
-    left_tee: "┣"
-    right_tee: "┫"
-    top_tee: "┳"
-    bottom_tee: "┻"
-    title_left_cap: "【"
-    title_right_cap: "】"
-    gutter_border: "━"
-    gutter_separator: "┃"
-    gutter_left_tee: "┣"
-    gutter_right_tee: "┫"
-    gutter_top_tee: "┳"
-    gutter_bottom_tee: "┻"
+    border_horizontal: "\u2501"
+    border_vertical: "\u2503"
+    border_top_left: "\u250F"
+    border_top_right: "\u2513"
+    border_bottom_left: "\u2517"
+    border_bottom_right: "\u251B"
+    left_tee: "\u2523"
+    right_tee: "\u252B"
+    top_tee: "\u2533"
+    bottom_tee: "\u253B"
+    title_left_cap: "\u3010"
+    title_right_cap: "\u3011"
+    gutter_border: "\u2501"
+    gutter_separator: "\u2503"
+    gutter_left_tee: "\u2523"
+    gutter_right_tee: "\u252B"
+    gutter_top_tee: "\u2533"
+    gutter_bottom_tee: "\u253B"
   256:
     background: COLOR_BLACK
-    title: [226, -1]
-    border: [201, -1]
-    text: [51, -1]
-    highlight: [COLOR_BLACK, 226]
-    accent: [201, -1]
-    footer: [255, -1]
-    shadow: [236, COLOR_BLACK]
-    gutter: [201, -1]
-    selection: [COLOR_BLACK, 51]
-    shortcut_key: [226, -1]
-    divider: [201, -1]
-    button_primary: [COLOR_BLACK, 226]
-    button_error: [201, 234]
-    button_cancel: [COLOR_BLACK, 51]
-    button_success: [COLOR_BLACK, 255]
-    help_text: [51, -1]
-    plugin: [201, -1]
-    window_close_button: [208, -1]
-    scrollbar: [51, 236]
-    whitespace: [240, -1]
+    title:
+    - 226
+    - -1
+    border:
+    - 201
+    - -1
+    text:
+    - 51
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 226
+    accent:
+    - 201
+    - -1
+    footer:
+    - 255
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 201
+    - -1
+    selection:
+    - COLOR_BLACK
+    - 51
+    shortcut_key:
+    - 226
+    - -1
+    divider:
+    - 201
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 226
+    button_error:
+    - 201
+    - 234
+    button_cancel:
+    - COLOR_BLACK
+    - 51
+    button_success:
+    - COLOR_BLACK
+    - 255
+    help_text:
+    - 51
+    - -1
+    plugin:
+    - 201
+    - -1
+    window_close_button:
+    - 208
+    - -1
+    scrollbar:
+    - 51
+    - 236
+    whitespace:
+    - 240
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_MAGENTA, -1]
-    text: [COLOR_CYAN, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_MAGENTA, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [COLOR_MAGENTA, -1]
-    selection: [COLOR_BLACK, COLOR_CYAN]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_MAGENTA, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_MAGENTA, COLOR_BLACK]
-    button_cancel: [COLOR_BLACK, COLOR_CYAN]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_CYAN, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_MAGENTA
+    - -1
+    text:
+    - COLOR_CYAN
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_MAGENTA
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - COLOR_MAGENTA
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_MAGENTA
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_MAGENTA, -1]
-    text: [COLOR_CYAN, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_MAGENTA, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_MAGENTA, -1]
-    selection: [COLOR_BLACK, COLOR_CYAN]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_MAGENTA, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_MAGENTA, COLOR_BLACK]
-    button_cancel: [COLOR_BLACK, COLOR_CYAN]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_CYAN, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_MAGENTA
+    - -1
+    text:
+    - COLOR_CYAN
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_MAGENTA
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_MAGENTA
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_MAGENTA
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 gruvbox:
-  indicator: "{nf:&:#f0c6b:}"
+  marquee:
+    char: "\u2022"
+    gap: 4
+  indicator: '{nf:&:#f0c6b:}'
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "┌"
-    border_top_right: "┐"
-    border_bottom_left: "└"
-    border_bottom_right: "┘"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "〔"
-    title_right_cap: "〕"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: "\u3014"
+    title_right_cap: "\u3015"
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: -1
-    title: [214, -1]
-    border: [142, -1]
-    text: [223, -1]
-    highlight: [235, 214]
-    accent: [142, -1]
-    footer: [223, -1]
-    shadow: [236, COLOR_BLACK]
-    gutter: [243, -1]
-    selection: [235, 214]
-    shortcut_key: [214, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [235, 214]
-    button_error: [214, 237]
-    button_cancel: [255, 237]
-    button_success: [235, 142]
-    help_text: [214, -1]
-    plugin: [142, -1]
-    window_close_button: [208, -1]
-    scrollbar: [214, 237]
-    whitespace: [243, -1]
+    title:
+    - 214
+    - -1
+    border:
+    - 142
+    - -1
+    text:
+    - 223
+    - -1
+    highlight:
+    - 235
+    - 214
+    accent:
+    - 142
+    - -1
+    footer:
+    - 223
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 243
+    - -1
+    selection:
+    - 235
+    - 214
+    shortcut_key:
+    - 214
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - 235
+    - 214
+    button_error:
+    - 214
+    - 237
+    button_cancel:
+    - 255
+    - 237
+    button_success:
+    - 235
+    - 142
+    help_text:
+    - 214
+    - -1
+    plugin:
+    - 142
+    - -1
+    window_close_button:
+    - 208
+    - -1
+    scrollbar:
+    - 214
+    - 237
+    whitespace:
+    - 243
+    - -1
   16:
     background: -1
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_GREEN, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_YELLOW]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_YELLOW, -1]
-    plugin: [COLOR_GREEN, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_GREEN
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: -1
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_GREEN, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_GREEN, -1]
-    selection: [COLOR_WHITE, COLOR_YELLOW]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_YELLOW, -1]
-    plugin: [COLOR_GREEN, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [COLOR_GREEN, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_GREEN
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_GREEN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_GREEN
+    - -1
 qbasic:
-  indicator: "{nf:>:#e629:}"
+  marquee:
+    char: '{ascii:32}'
+    gap: 4
+  indicator: '{ascii:240}'
   divider:
-    char: "{ascii:196}"
-    length: "{screen_width}"
+    char: '{ascii:196}'
+    length: '{screen_width}'
   window:
-    border_horizontal: "{ascii:205}"
-    border_vertical: "{ascii:186}"
-    border_top_left: "{ascii:201}"
-    border_top_right: "{ascii:187}"
-    border_bottom_left: "{ascii:200}"
-    border_bottom_right: "{ascii:188}"
-    border_tee_left: "{ascii:199}"
-    border_tee_right: "{ascii:182}"
-    left_tee: "{ascii:199}"
-    right_tee: "{ascii:182}"
-    top_tee: "{ascii:209}"
-    bottom_tee: "{ascii:207}"
-    title_left_cap: "{ascii:181}"
-    title_right_cap: "{ascii:198}"
-    gutter_border: "{ascii:196}"
-    gutter_separator: "{ascii:179}"
-    gutter_left_tee: "{ascii:199}"
-    gutter_right_tee: "{ascii:182}"
-    gutter_top_tee: "{ascii:194}"
-    gutter_bottom_tee: "{ascii:207}"
+    border_horizontal: '{ascii:205}'
+    border_vertical: '{ascii:186}'
+    border_top_left: '{ascii:201}'
+    border_top_right: '{ascii:187}'
+    border_bottom_left: '{ascii:200}'
+    border_bottom_right: '{ascii:188}'
+    border_tee_left: '{ascii:199}'
+    border_tee_right: '{ascii:182}'
+    left_tee: '{ascii:199}'
+    right_tee: '{ascii:182}'
+    top_tee: '{ascii:209}'
+    bottom_tee: '{ascii:207}'
+    title_left_cap: '{ascii:181}'
+    title_right_cap: '{ascii:198}'
+    gutter_border: '{ascii:196}'
+    gutter_separator: '{ascii:179}'
+    gutter_left_tee: '{ascii:199}'
+    gutter_right_tee: '{ascii:182}'
+    gutter_top_tee: '{ascii:194}'
+    gutter_bottom_tee: '{ascii:207}'
+    border_tee_top: '{ascii:209}'
+    border_tee_bottom: '{ascii:207}'
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: 19
-    title: [226, 19]
-    border: [51, 19]
-    text: [255, 19]
-    highlight: [16, 51]
-    accent: [51, 19]
-    footer: [255, 19]
-    shadow: [16, 16]
-    gutter: [51, 19]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [226, 19]
-    divider: [51, 19]
-    button_primary: [COLOR_WHITE, 51]
-    button_error: [COLOR_WHITE, 51]
-    button_cancel: [COLOR_WHITE, 51]
-    button_success: [COLOR_WHITE, 51]
-    help_text: [51, 19]
-    plugin: [226, 19]
-    window_close_button: [203, 19]
-    scrollbar: [51, 19]
-    whitespace: [60, 19]
+    title:
+    - 226
+    - 19
+    border:
+    - 51
+    - 19
+    text:
+    - 255
+    - 19
+    highlight:
+    - 16
+    - 51
+    accent:
+    - 51
+    - 19
+    footer:
+    - 255
+    - 19
+    shadow:
+    - 22
+    - 17
+    gutter:
+    - 51
+    - 19
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - 226
+    - 19
+    divider:
+    - 51
+    - 19
+    button_primary:
+    - COLOR_WHITE
+    - 51
+    button_error:
+    - COLOR_WHITE
+    - 51
+    button_cancel:
+    - COLOR_WHITE
+    - 51
+    button_success:
+    - COLOR_WHITE
+    - 51
+    help_text:
+    - 51
+    - 19
+    plugin:
+    - 226
+    - 19
+    window_close_button:
+    - 203
+    - 19
+    scrollbar:
+    - 51
+    - 19
+    whitespace:
+    - 60
+    - 19
   16:
     background: COLOR_BLUE
-    title: [COLOR_YELLOW, COLOR_BLUE]
-    border: [COLOR_CYAN, COLOR_BLUE]
-    text: [COLOR_WHITE, COLOR_BLUE]
-    highlight: [COLOR_BLACK, COLOR_CYAN]
-    accent: [COLOR_CYAN, COLOR_BLUE]
-    footer: [COLOR_WHITE, COLOR_BLUE]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_CYAN, COLOR_BLUE]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [COLOR_YELLOW, COLOR_BLUE]
-    divider: [COLOR_CYAN, COLOR_BLUE]
-    button_primary: [COLOR_WHITE, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_BLACK, COLOR_WHITE]
-    button_success: [COLOR_WHITE, COLOR_YELLOW]
-    help_text: [COLOR_CYAN, COLOR_BLUE]
-    plugin: [COLOR_YELLOW, COLOR_BLUE]
-    window_close_button: [COLOR_BRIGHT_RED, COLOR_BLUE]
-    scrollbar: [COLOR_CYAN, COLOR_BLUE]
-    whitespace: [COLOR_CYAN, COLOR_BLUE]
+    title:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    border:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    text:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    accent:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    footer:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    divider:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_success:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    plugin:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - COLOR_BLUE
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    whitespace:
+    - COLOR_CYAN
+    - COLOR_BLUE
   8:
     background: COLOR_BLUE
-    title: [COLOR_YELLOW, COLOR_BLUE]
-    border: [COLOR_CYAN, COLOR_BLUE]
-    text: [COLOR_WHITE, COLOR_BLUE]
-    highlight: [COLOR_BLACK, COLOR_CYAN]
-    accent: [COLOR_CYAN, COLOR_BLUE]
-    footer: [COLOR_WHITE, COLOR_BLUE]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_CYAN, COLOR_BLUE]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [COLOR_YELLOW, COLOR_BLUE]
-    divider: [COLOR_CYAN, COLOR_BLUE]
-    button_primary: [COLOR_WHITE, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_BLACK, COLOR_WHITE]
-    button_success: [COLOR_WHITE, COLOR_YELLOW]
-    help_text: [COLOR_CYAN, COLOR_BLUE]
-    plugin: [COLOR_YELLOW, COLOR_BLUE]
-    window_close_button: [COLOR_RED, COLOR_BLUE]
-    scrollbar: [COLOR_CYAN, COLOR_BLUE]
-    whitespace: [COLOR_CYAN, COLOR_BLUE]
+    title:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    border:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    text:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    highlight:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    accent:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    footer:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    divider:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_success:
+    - COLOR_WHITE
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    plugin:
+    - COLOR_YELLOW
+    - COLOR_BLUE
+    window_close_button:
+    - COLOR_RED
+    - COLOR_BLUE
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLUE
+    whitespace:
+    - COLOR_CYAN
+    - COLOR_BLUE
 pacman:
-  indicator: "{nf:):#f0baf:}"
-  divider: 
-    char: "{ascii:205}"
-    length: "{window_width}"
+  marquee:
+    char: "\u2022"
+    gap: 3
+  indicator: '{nf:):#f0baf:}'
+  divider:
+    char: '{ascii:205}'
+    length: '{window_width}'
   window:
-    border_horizontal_top: "{ascii:223}"
-    border_horizontal_bottom: "{ascii:220}"
-    border_vertical_left: "{ascii:221}"
-    border_vertical_right: "{ascii:222}"
-    border_top_left: "{ascii:219}"
-    border_top_right: "{ascii:219}"
-    border_bottom_left: "{ascii:219}"
-    border_bottom_right: "{ascii:219}"
-    left_tee: "{ascii:219}"
-    right_tee: "{ascii:219}"
-    top_tee: "{ascii:219}"
-    bottom_tee: "{ascii:219}"
-    title_left_cap: "{ascii:219}"
-    title_right_cap: "{ascii:219}"
-    gutter_border: "{ascii:220}"
-    gutter_separator: "{ascii:221}"
-    gutter_left_tee: "{ascii:219}"
-    gutter_right_tee: "{ascii:219}"
-    gutter_top_tee: "{ascii:219}"
-    gutter_bottom_tee: "{ascii:219}"
+    border_horizontal_top: '{ascii:223}'
+    border_horizontal_bottom: '{ascii:220}'
+    border_vertical_left: '{ascii:221}'
+    border_vertical_right: '{ascii:222}'
+    border_top_left: '{ascii:219}'
+    border_top_right: '{ascii:219}'
+    border_bottom_left: '{ascii:219}'
+    border_bottom_right: '{ascii:219}'
+    left_tee: '{ascii:219}'
+    right_tee: '{ascii:219}'
+    top_tee: '{ascii:219}'
+    bottom_tee: '{ascii:219}'
+    title_left_cap: '{ascii:219}'
+    title_right_cap: '{ascii:219}'
+    gutter_border: '{ascii:220}'
+    gutter_separator: '{ascii:221}'
+    gutter_left_tee: '{ascii:219}'
+    gutter_right_tee: '{ascii:219}'
+    gutter_top_tee: '{ascii:219}'
+    gutter_bottom_tee: '{ascii:219}'
   256:
     background: COLOR_BLACK
-    title: [226, -1]
-    border: [21, -1]
-    text: [255, -1]
-    highlight: [COLOR_BLACK, 226]
-    accent: [51, -1]
-    footer: [COLOR_GREY, -1]
-    shadow: [236, COLOR_BLACK]
-    gutter: [196, -1]
-    selection: [255, 21]
-    shortcut_key: [205, -1]
-    divider: [207, -1]
-    button_primary: [COLOR_BLACK, 226]
-    button_error: [255, 21]
-    button_cancel: [255, 21]
-    button_success: [COLOR_BLACK, 51]
-    help_text: [51, -1]
-    plugin: [255, -1]
-    window_close_button: [196, -1]
-    scrollbar: [226, 235]
-    whitespace: [239, -1]
+    title:
+    - 226
+    - -1
+    border:
+    - 21
+    - -1
+    text:
+    - 255
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 226
+    accent:
+    - 51
+    - -1
+    footer:
+    - COLOR_GREY
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 196
+    - -1
+    selection:
+    - 255
+    - 21
+    shortcut_key:
+    - 205
+    - -1
+    divider:
+    - 207
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 226
+    button_error:
+    - 255
+    - 21
+    button_cancel:
+    - 255
+    - 21
+    button_success:
+    - COLOR_BLACK
+    - 51
+    help_text:
+    - 51
+    - -1
+    plugin:
+    - 255
+    - -1
+    window_close_button:
+    - 196
+    - -1
+    scrollbar:
+    - 226
+    - 235
+    whitespace:
+    - 239
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [COLOR_RED, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_MAGENTA, -1]
-    divider: [13, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLUE]
-    button_success: [COLOR_BLACK, COLOR_CYAN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_WHITE, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - COLOR_RED
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - 13
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_RED, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_MAGENTA, -1]
-    divider: [5, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLUE]
-    button_success: [COLOR_BLACK, COLOR_CYAN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_WHITE, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_RED
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - 5
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 industry:
-  indicator: "{nf:#:#f0b46:}"
+  marquee:
+    char: '|'
+    gap: 4
+  indicator: '{nf:#:#f0b46:}'
   divider:
-    char: "{ascii:205}"
-    length: "{screen_width}"
+    char: '{ascii:205}'
+    length: '{screen_width}'
   window:
-    border_horizontal: "{ascii:205}"
-    border_vertical: "{ascii:186}"
-    border_top_left: "{ascii:201}"
-    border_top_right: "{ascii:187}"
-    border_bottom_left: "{ascii:200}"
-    border_bottom_right: "{ascii:188}"
-    left_tee: "{ascii:204}"
-    right_tee: "{ascii:185}"
-    top_tee: "{ascii:203}"
-    bottom_tee: "{ascii:202}"
-    title_left_cap: "«"
-    title_right_cap: "»"
-    gutter_border: "{ascii:205}"
-    gutter_separator: "{ascii:186}"
-    gutter_left_tee: "{ascii:204}"
-    gutter_right_tee: "{ascii:185}"
-    gutter_top_tee: "{ascii:203}"
-    gutter_bottom_tee: "{ascii:202}"
+    border_horizontal: '{ascii:205}'
+    border_vertical: '{ascii:186}'
+    border_top_left: '{ascii:201}'
+    border_top_right: '{ascii:187}'
+    border_bottom_left: '{ascii:200}'
+    border_bottom_right: '{ascii:188}'
+    left_tee: '{ascii:204}'
+    right_tee: '{ascii:185}'
+    top_tee: '{ascii:203}'
+    bottom_tee: '{ascii:202}'
+    title_left_cap: "\xAB"
+    title_right_cap: "\xBB"
+    gutter_border: '{ascii:205}'
+    gutter_separator: '{ascii:186}'
+    gutter_left_tee: '{ascii:204}'
+    gutter_right_tee: '{ascii:185}'
+    gutter_top_tee: '{ascii:203}'
+    gutter_bottom_tee: '{ascii:202}'
   256:
     background: 234
-    title: [214, 234]
-    border: [242, 234]
-    text: [250, 234]
-    highlight: [232, 214]
-    accent: [220, 234]
-    footer: [242, 234]
-    shadow: [233, COLOR_BLACK]
-    gutter: [240, 234]
-    selection: [255, 238]
-    shortcut_key: [214, 234]
-    divider: [242, 234]
-    button_primary: [232, 214]
-    button_error: [214, 235]
-    button_cancel: [255, 238]
-    button_success: [255, 67]
-    help_text: [220, 234]
-    plugin: [67, 234]
-    window_close_button: [203, 234]
-    scrollbar: [220, 236]
-    whitespace: [240, 234]
+    title:
+    - 214
+    - 234
+    border:
+    - 242
+    - 234
+    text:
+    - 250
+    - 234
+    highlight:
+    - 232
+    - 214
+    accent:
+    - 220
+    - 234
+    footer:
+    - 242
+    - 234
+    shadow:
+    - 233
+    - COLOR_BLACK
+    gutter:
+    - 240
+    - 234
+    selection:
+    - 255
+    - 238
+    shortcut_key:
+    - 214
+    - 234
+    divider:
+    - 242
+    - 234
+    button_primary:
+    - 232
+    - 214
+    button_error:
+    - 214
+    - 235
+    button_cancel:
+    - 255
+    - 238
+    button_success:
+    - 255
+    - 67
+    help_text:
+    - 220
+    - 234
+    plugin:
+    - 67
+    - 234
+    window_close_button:
+    - 203
+    - 234
+    scrollbar:
+    - 220
+    - 236
+    whitespace:
+    - 240
+    - 234
   16:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_WHITE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_YELLOW, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_BLACK, COLOR_YELLOW]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, 8]
-    help_text: [COLOR_YELLOW, -1]
-    plugin: [COLOR_GREEN, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_YELLOW
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - 8
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_WHITE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_YELLOW, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_WHITE, -1]
-    selection: [COLOR_BLACK, COLOR_YELLOW]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, 8]
-    help_text: [COLOR_YELLOW, -1]
-    plugin: [COLOR_GREEN, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [COLOR_WHITE, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_YELLOW
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - 8
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_WHITE
+    - -1
 matrix:
-  indicator: "{nf:->:#f0628:}"
+  marquee:
+    char: ':'
+    gap: 4
+  indicator: '{nf:->:#f0628:}'
   divider:
-    char: "-"
-    length: "{window_width}"
+    char: '-'
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "┌"
-    border_top_right: "┐"
-    border_bottom_left: "└"
-    border_bottom_right: "┘"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: COLOR_BLACK
-    title: [46, -1]
-    border: [34, -1]
-    text: [46, -1]
-    highlight: [COLOR_BLACK, 46]
-    accent: [82, -1]
-    footer: [34, -1]
-    shadow: [236, COLOR_BLACK]
-    gutter: [22, -1]
-    selection: [255, 22]
-    shortcut_key: [82, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_BLACK, 46]
-    button_error: [46, 234]
-    button_cancel: [46, 234]
-    button_success: [COLOR_BLACK, 46]
-    help_text: [82, -1]
-    plugin: [22, -1]
-    window_close_button: [196, -1]
-    scrollbar: [46, 22]
-    whitespace: [22, -1]
+    title:
+    - 46
+    - -1
+    border:
+    - 34
+    - -1
+    text:
+    - 46
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 46
+    accent:
+    - 82
+    - -1
+    footer:
+    - 34
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 22
+    - -1
+    selection:
+    - 255
+    - 22
+    shortcut_key:
+    - 82
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 46
+    button_error:
+    - 46
+    - 234
+    button_cancel:
+    - 46
+    - 234
+    button_success:
+    - COLOR_BLACK
+    - 46
+    help_text:
+    - 82
+    - -1
+    plugin:
+    - 22
+    - -1
+    window_close_button:
+    - 196
+    - -1
+    scrollbar:
+    - 46
+    - 22
+    whitespace:
+    - 22
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_GREEN, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_GREEN, -1]
-    highlight: [COLOR_BLACK, COLOR_GREEN]
-    accent: [COLOR_GREEN, -1]
-    footer: [COLOR_GREEN, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_GREEN]
-    shortcut_key: [COLOR_GREEN, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_BLACK, COLOR_GREEN]
-    button_error: [COLOR_GREEN, COLOR_BLACK]
-    button_cancel: [COLOR_GREEN, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_GREEN, -1]
-    plugin: [COLOR_GREEN, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_GREEN, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_GREEN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_GREEN
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    accent:
+    - COLOR_GREEN
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_GREEN
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    button_error:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_GREEN
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_GREEN, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_GREEN, -1]
-    highlight: [COLOR_BLACK, COLOR_GREEN]
-    accent: [COLOR_GREEN, -1]
-    footer: [COLOR_GREEN, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_GREEN, -1]
-    selection: [COLOR_WHITE, COLOR_GREEN]
-    shortcut_key: [COLOR_GREEN, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_BLACK, COLOR_GREEN]
-    button_error: [COLOR_GREEN, COLOR_BLACK]
-    button_cancel: [COLOR_GREEN, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_GREEN, -1]
-    plugin: [COLOR_GREEN, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_GREEN, COLOR_BLACK]
-    whitespace: [COLOR_GREEN, -1]
+    title:
+    - COLOR_GREEN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_GREEN
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    accent:
+    - COLOR_GREEN
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_GREEN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_GREEN
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    button_error:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_GREEN
+    - -1
+    plugin:
+    - COLOR_GREEN
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_GREEN
+    - -1
 monochrome:
-  indicator: "{nf:>:#eee9:}"
+  marquee:
+    char: ' '
+    gap: 4
+  indicator: '{nf:>:#eee9:}'
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "┌"
-    border_top_right: "┐"
-    border_bottom_left: "└"
-    border_bottom_right: "┘"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: COLOR_BLACK
-    title: [255, -1]
-    border: [245, -1]
-    text: [252, -1]
-    highlight: [COLOR_BLACK, 255]
-    accent: [248, -1]
-    footer: [245, -1]
-    shadow: [235, COLOR_BLACK]
-    gutter: [239, -1]
-    selection: [232, 250]
-    shortcut_key: [255, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, 255]
-    button_error: [255, 240]
-    button_cancel: [255, 240]
-    button_success: [COLOR_BLACK, 255]
-    help_text: [250, -1]
-    plugin: [245, -1]
-    window_close_button: [255, -1]
-    scrollbar: [250, 238]
-    whitespace: [239, -1]
+    title:
+    - 255
+    - -1
+    border:
+    - 245
+    - -1
+    text:
+    - 252
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 255
+    accent:
+    - 248
+    - -1
+    footer:
+    - 245
+    - -1
+    shadow:
+    - 235
+    - COLOR_BLACK
+    gutter:
+    - 239
+    - -1
+    selection:
+    - 232
+    - 250
+    shortcut_key:
+    - 255
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 255
+    button_error:
+    - 255
+    - 240
+    button_cancel:
+    - 255
+    - 240
+    button_success:
+    - COLOR_BLACK
+    - 255
+    help_text:
+    - 250
+    - -1
+    plugin:
+    - 245
+    - -1
+    window_close_button:
+    - 255
+    - -1
+    scrollbar:
+    - 250
+    - 238
+    whitespace:
+    - 239
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_WHITE, -1]
-    border: [COLOR_WHITE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_WHITE]
-    accent: [COLOR_WHITE, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [COLOR_WHITE, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, COLOR_WHITE]
-    button_error: [COLOR_WHITE, COLOR_BLACK]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_WHITE]
-    help_text: [COLOR_WHITE, -1]
-    plugin: [COLOR_WHITE, -1]
-    window_close_button: [COLOR_WHITE, -1]
-    scrollbar: [COLOR_WHITE, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    help_text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_WHITE, -1]
-    border: [COLOR_WHITE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_WHITE]
-    accent: [COLOR_WHITE, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_WHITE, -1]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [COLOR_WHITE, -1]
-    divider: [COLOR_WHITE, -1]
-    button_primary: [COLOR_BLACK, COLOR_WHITE]
-    button_error: [COLOR_WHITE, COLOR_BLACK]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_WHITE]
-    help_text: [COLOR_WHITE, -1]
-    plugin: [COLOR_WHITE, -1]
-    window_close_button: [COLOR_WHITE, -1]
-    scrollbar: [COLOR_WHITE, COLOR_BLACK]
-    whitespace: [COLOR_WHITE, -1]
+    title:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    help_text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_WHITE
+    - -1
 synthwave:
-  indicator: "{nf:>:#f147d:}"
+  marquee:
+    char: "\u2605"
+    gap: 4
+  indicator: '{nf:>:#f147d:}'
   divider:
-    char: "~"
-    length: "{screen_width}"
+    char: '~'
+    length: '{screen_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "«"
-    title_right_cap: "»"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: "\xAB"
+    title_right_cap: "\xBB"
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: COLOR_BLACK
-    title: [207, -1]
-    border: [129, -1]
-    text: [255, -1]
-    highlight: [COLOR_BLACK, 201]
-    accent: [51, -1]
-    footer: [129, -1]
-    shadow: [234, COLOR_BLACK]
-    gutter: [238, -1]
-    selection: [255, 129]
-    shortcut_key: [214, -1]
-    divider: [129, -1]
-    button_primary: [255, 201]
-    button_error: [255, 93]
-    button_cancel: [255, 93]
-    button_success: [COLOR_BLACK, 51]
-    help_text: [51, -1]
-    plugin: [207, -1]
-    window_close_button: [207, -1]
-    scrollbar: [201, 236]
-    whitespace: [238, -1]
+    title:
+    - 207
+    - -1
+    border:
+    - 129
+    - -1
+    text:
+    - 255
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 201
+    accent:
+    - 51
+    - -1
+    footer:
+    - 129
+    - -1
+    shadow:
+    - 234
+    - COLOR_BLACK
+    gutter:
+    - 238
+    - -1
+    selection:
+    - 255
+    - 129
+    shortcut_key:
+    - 214
+    - -1
+    divider:
+    - 129
+    - -1
+    button_primary:
+    - 255
+    - 201
+    button_error:
+    - 255
+    - 93
+    button_cancel:
+    - 255
+    - 93
+    button_success:
+    - COLOR_BLACK
+    - 51
+    help_text:
+    - 51
+    - -1
+    plugin:
+    - 207
+    - -1
+    window_close_button:
+    - 207
+    - -1
+    scrollbar:
+    - 201
+    - 236
+    whitespace:
+    - 238
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_MAGENTA, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_MAGENTA]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_WHITE, COLOR_MAGENTA]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLUE]
-    button_success: [COLOR_BLACK, COLOR_CYAN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_MAGENTA, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_MAGENTA]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_BLUE, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_WHITE, COLOR_MAGENTA]
-    button_error: [COLOR_WHITE, COLOR_BLUE]
-    button_cancel: [COLOR_WHITE, COLOR_BLUE]
-    button_success: [COLOR_BLACK, COLOR_CYAN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_success:
+    - COLOR_BLACK
+    - COLOR_CYAN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 amber_crt:
-  indicator: "{nf:>:#f0379:}"
+  marquee:
+    char: '-'
+    gap: 4
+  indicator: '{nf:>:#f0379:}'
   divider:
-    char: "{ascii:196}"
-    length: "{window_width}"
+    char: '{ascii:196}'
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: COLOR_BLACK
-    title: [214, -1]
-    border: [172, -1]
-    text: [214, -1]
-    highlight: [COLOR_BLACK, 214]
-    accent: [220, -1]
-    footer: [172, -1]
-    shadow: [234, COLOR_BLACK]
-    gutter: [130, -1]
-    selection: [0, 214]
-    shortcut_key: [220, -1]
-    divider: [172, -1]
-    button_primary: [COLOR_BLACK, 214]
-    button_error: [214, 235]
-    button_cancel: [214, 235]
-    button_success: [COLOR_BLACK, 214]
-    help_text: [220, -1]
-    plugin: [172, -1]
-    window_close_button: [214, -1]
-    scrollbar: [214, 234]
-    whitespace: [130, -1]
+    title:
+    - 214
+    - -1
+    border:
+    - 172
+    - -1
+    text:
+    - 214
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 214
+    accent:
+    - 220
+    - -1
+    footer:
+    - 172
+    - -1
+    shadow:
+    - 234
+    - COLOR_BLACK
+    gutter:
+    - 130
+    - -1
+    selection:
+    - 0
+    - 214
+    shortcut_key:
+    - 220
+    - -1
+    divider:
+    - 172
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 214
+    button_error:
+    - 214
+    - 235
+    button_cancel:
+    - 214
+    - 235
+    button_success:
+    - COLOR_BLACK
+    - 214
+    help_text:
+    - 220
+    - -1
+    plugin:
+    - 172
+    - -1
+    window_close_button:
+    - 214
+    - -1
+    scrollbar:
+    - 214
+    - 234
+    whitespace:
+    - 130
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_YELLOW, -1]
-    text: [COLOR_YELLOW, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_WHITE, -1]
-    footer: [COLOR_YELLOW, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_BLACK, COLOR_YELLOW]
-    shortcut_key: [COLOR_WHITE, -1]
-    divider: [COLOR_YELLOW, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_YELLOW, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_YELLOW]
-    help_text: [COLOR_YELLOW, -1]
-    plugin: [COLOR_YELLOW, -1]
-    window_close_button: [COLOR_YELLOW, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_YELLOW
+    - -1
+    text:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_YELLOW, -1]
-    border: [COLOR_YELLOW, -1]
-    text: [COLOR_YELLOW, -1]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_WHITE, -1]
-    footer: [COLOR_YELLOW, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_YELLOW, -1]
-    selection: [COLOR_BLACK, COLOR_YELLOW]
-    shortcut_key: [COLOR_WHITE, -1]
-    divider: [COLOR_YELLOW, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_YELLOW, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_YELLOW]
-    help_text: [COLOR_YELLOW, -1]
-    plugin: [COLOR_YELLOW, -1]
-    window_close_button: [COLOR_YELLOW, -1]
-    scrollbar: [COLOR_YELLOW, COLOR_BLACK]
-    whitespace: [COLOR_YELLOW, -1]
+    title:
+    - COLOR_YELLOW
+    - -1
+    border:
+    - COLOR_YELLOW
+    - -1
+    text:
+    - COLOR_YELLOW
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_YELLOW
+    - -1
+    plugin:
+    - COLOR_YELLOW
+    - -1
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_YELLOW
+    - -1
 hotdog_stand:
-  indicator: "{nf:o.O:#e251:}"
+  marquee:
+    char: '!'
+    gap: 4
+  indicator: '{nf:o.O:#e251:}'
   divider:
-    char: "="
-    length: "{window_width}"
+    char: '='
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "┌"
-    border_top_right: "┐"
-    border_bottom_left: "└"
-    border_bottom_right: "┘"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: 196
-    title: [226, 196]
-    border: [226, 196]
-    text: [226, 196]
-    highlight: [16, 226]
-    accent: [255, 196]
-    footer: [226, 196]
-    shadow: [16, 16]
-    gutter: [220, 196]
-    selection: [16, 255]
-    shortcut_key: [255, 196]
-    divider: [COLOR_YELLOW, -1]
-    button_primary: [16, 226]
-    button_error: [226, 235]
-    button_cancel: [226, 196]
-    button_success: [16, 226]
-    help_text: [226, 196]
-    plugin: [255, 196]
-    window_close_button: [255, 196]
-    scrollbar: [226, 88]
-    whitespace: [130, 196]
+    title:
+    - 226
+    - 196
+    border:
+    - 226
+    - 196
+    text:
+    - 226
+    - 196
+    highlight:
+    - 16
+    - 226
+    accent:
+    - 255
+    - 196
+    footer:
+    - 226
+    - 196
+    shadow:
+    - 16
+    - 16
+    gutter:
+    - 220
+    - 196
+    selection:
+    - 16
+    - 255
+    shortcut_key:
+    - 255
+    - 196
+    divider:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - 16
+    - 226
+    button_error:
+    - 226
+    - 235
+    button_cancel:
+    - 226
+    - 196
+    button_success:
+    - 16
+    - 226
+    help_text:
+    - 226
+    - 196
+    plugin:
+    - 255
+    - 196
+    window_close_button:
+    - 255
+    - 196
+    scrollbar:
+    - 226
+    - 88
+    whitespace:
+    - 130
+    - 196
   16:
     background: COLOR_RED
-    title: [COLOR_YELLOW, COLOR_RED]
-    border: [COLOR_YELLOW, COLOR_RED]
-    text: [COLOR_YELLOW, COLOR_RED]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_WHITE, COLOR_RED]
-    footer: [COLOR_YELLOW, COLOR_RED]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_YELLOW, COLOR_RED]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [COLOR_WHITE, COLOR_RED]
-    divider: [COLOR_YELLOW, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_YELLOW, COLOR_RED]
-    button_success: [COLOR_BLACK, COLOR_YELLOW]
-    help_text: [COLOR_YELLOW, COLOR_RED]
-    plugin: [COLOR_WHITE, COLOR_RED]
-    window_close_button: [COLOR_WHITE, COLOR_RED]
-    scrollbar: [COLOR_YELLOW, COLOR_RED]
-    whitespace: [COLOR_YELLOW, COLOR_RED]
+    title:
+    - COLOR_YELLOW
+    - COLOR_RED
+    border:
+    - COLOR_YELLOW
+    - COLOR_RED
+    text:
+    - COLOR_YELLOW
+    - COLOR_RED
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_WHITE
+    - COLOR_RED
+    footer:
+    - COLOR_YELLOW
+    - COLOR_RED
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - COLOR_RED
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - COLOR_RED
+    divider:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_YELLOW
+    - COLOR_RED
+    button_success:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_YELLOW
+    - COLOR_RED
+    plugin:
+    - COLOR_WHITE
+    - COLOR_RED
+    window_close_button:
+    - COLOR_WHITE
+    - COLOR_RED
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_RED
+    whitespace:
+    - COLOR_YELLOW
+    - COLOR_RED
   8:
     background: COLOR_RED
-    title: [COLOR_YELLOW, COLOR_RED]
-    border: [COLOR_YELLOW, COLOR_RED]
-    text: [COLOR_YELLOW, COLOR_RED]
-    highlight: [COLOR_BLACK, COLOR_YELLOW]
-    accent: [COLOR_WHITE, COLOR_RED]
-    footer: [COLOR_YELLOW, COLOR_RED]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_YELLOW, COLOR_RED]
-    selection: [COLOR_BLACK, COLOR_WHITE]
-    shortcut_key: [COLOR_WHITE, COLOR_RED]
-    divider: [COLOR_YELLOW, -1]
-    button_primary: [COLOR_BLACK, COLOR_YELLOW]
-    button_error: [COLOR_YELLOW, COLOR_BLACK]
-    button_cancel: [COLOR_YELLOW, COLOR_RED]
-    button_success: [COLOR_BLACK, COLOR_YELLOW]
-    help_text: [COLOR_YELLOW, COLOR_RED]
-    plugin: [COLOR_WHITE, COLOR_RED]
-    window_close_button: [COLOR_WHITE, COLOR_RED]
-    scrollbar: [COLOR_YELLOW, COLOR_RED]
-    whitespace: [COLOR_YELLOW, COLOR_RED]
+    title:
+    - COLOR_YELLOW
+    - COLOR_RED
+    border:
+    - COLOR_YELLOW
+    - COLOR_RED
+    text:
+    - COLOR_YELLOW
+    - COLOR_RED
+    highlight:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    accent:
+    - COLOR_WHITE
+    - COLOR_RED
+    footer:
+    - COLOR_YELLOW
+    - COLOR_RED
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - COLOR_RED
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - COLOR_RED
+    divider:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    button_error:
+    - COLOR_YELLOW
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_YELLOW
+    - COLOR_RED
+    button_success:
+    - COLOR_BLACK
+    - COLOR_YELLOW
+    help_text:
+    - COLOR_YELLOW
+    - COLOR_RED
+    plugin:
+    - COLOR_WHITE
+    - COLOR_RED
+    window_close_button:
+    - COLOR_WHITE
+    - COLOR_RED
+    scrollbar:
+    - COLOR_YELLOW
+    - COLOR_RED
+    whitespace:
+    - COLOR_YELLOW
+    - COLOR_RED
 tokyo_night:
-  indicator: "{nf:*:#f0766:}"
+  marquee:
+    char: "\u25C6"
+    gap: 4
+  indicator: '{nf:*:#f0766:}'
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: 234
-    title: [111, -1]
-    border: [66, -1]
-    text: [250, -1]
-    highlight: [234, 111]
-    accent: [117, -1]
-    footer: [66, -1]
-    shadow: [233, 233]
-    gutter: [66, -1]
-    selection: [250, 60]
-    shortcut_key: [111, -1]
-    divider: [60, -1]
-    button_primary: [234, 111]
-    button_error: [234, 210]
-    button_cancel: [250, 60]
-    button_success: [234, 149]
-    help_text: [117, -1]
-    plugin: [183, -1]
-    window_close_button: [210, -1]
-    scrollbar: [117, 236]
-    whitespace: [66, -1]
+    title:
+    - 111
+    - -1
+    border:
+    - 66
+    - -1
+    text:
+    - 250
+    - -1
+    highlight:
+    - 234
+    - 111
+    accent:
+    - 117
+    - -1
+    footer:
+    - 66
+    - -1
+    shadow:
+    - 233
+    - 233
+    gutter:
+    - 66
+    - -1
+    selection:
+    - 250
+    - 60
+    shortcut_key:
+    - 111
+    - -1
+    divider:
+    - 60
+    - -1
+    button_primary:
+    - 234
+    - 111
+    button_error:
+    - 234
+    - 210
+    button_cancel:
+    - 250
+    - 60
+    button_success:
+    - 234
+    - 149
+    help_text:
+    - 117
+    - -1
+    plugin:
+    - 183
+    - -1
+    window_close_button:
+    - 210
+    - -1
+    scrollbar:
+    - 117
+    - 236
+    whitespace:
+    - 66
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_BLUE, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_BLUE]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_BLUE, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_BLACK, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_CYAN, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_BLUE
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_BLUE
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_BLUE
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_BLUE, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_BLUE]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_WHITE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_BLUE, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_BLUE, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_BLACK, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_CYAN, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_BLUE
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_BLUE
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_BLUE
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_CYAN
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 everforest:
-  indicator: "{nf:^:#f06aa:}"
+  marquee:
+    char: "\u2022"
+    gap: 4
+  indicator: '{nf:^:#f06aa:}'
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: 235
-    title: [142, -1]
-    border: [108, -1]
-    text: [223, -1]
-    highlight: [235, 142]
-    accent: [108, -1]
-    footer: [108, -1]
-    shadow: [234, 234]
-    gutter: [108, -1]
-    selection: [223, 65]
-    shortcut_key: [142, -1]
-    divider: [65, -1]
-    button_primary: [235, 108]
-    button_error: [235, 167]
-    button_cancel: [223, 238]
-    button_success: [235, 142]
-    help_text: [108, -1]
-    plugin: [175, -1]
-    window_close_button: [167, -1]
-    scrollbar: [142, 237]
-    whitespace: [108, -1]
+    title:
+    - 142
+    - -1
+    border:
+    - 108
+    - -1
+    text:
+    - 223
+    - -1
+    highlight:
+    - 235
+    - 142
+    accent:
+    - 108
+    - -1
+    footer:
+    - 108
+    - -1
+    shadow:
+    - 234
+    - 234
+    gutter:
+    - 108
+    - -1
+    selection:
+    - 223
+    - 65
+    shortcut_key:
+    - 142
+    - -1
+    divider:
+    - 65
+    - -1
+    button_primary:
+    - 235
+    - 108
+    button_error:
+    - 235
+    - 167
+    button_cancel:
+    - 223
+    - 238
+    button_success:
+    - 235
+    - 142
+    help_text:
+    - 108
+    - -1
+    plugin:
+    - 175
+    - -1
+    window_close_button:
+    - 167
+    - -1
+    scrollbar:
+    - 142
+    - 237
+    whitespace:
+    - 108
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_GREEN, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_GREEN]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_GREEN, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_GREEN]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_BLACK, COLOR_GREEN]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_GREEN, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_GREEN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_GREEN, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_GREEN]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_GREEN, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_GREEN, -1]
-    selection: [COLOR_WHITE, COLOR_GREEN]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_BLACK, COLOR_GREEN]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_GREEN, COLOR_BLACK]
-    whitespace: [COLOR_GREEN, -1]
+    title:
+    - COLOR_GREEN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_GREEN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_GREEN
+    - -1
 rose_pine:
-  indicator: "{nf:*:#f0851:}"
+  marquee:
+    char: "\u25C7"
+    gap: 4
+  indicator: '{nf:*:#f0851:}'
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: 234
-    title: [175, -1]
-    border: [109, -1]
-    text: [251, -1]
-    highlight: [234, 175]
-    accent: [116, -1]
-    footer: [109, -1]
-    shadow: [233, 233]
-    gutter: [109, -1]
-    selection: [251, 60]
-    shortcut_key: [221, -1]
-    divider: [60, -1]
-    button_primary: [234, 175]
-    button_error: [234, 203]
-    button_cancel: [251, 60]
-    button_success: [234, 109]
-    help_text: [116, -1]
-    plugin: [183, -1]
-    window_close_button: [203, -1]
-    scrollbar: [175, 236]
-    whitespace: [109, -1]
+    title:
+    - 175
+    - -1
+    border:
+    - 109
+    - -1
+    text:
+    - 251
+    - -1
+    highlight:
+    - 234
+    - 175
+    accent:
+    - 116
+    - -1
+    footer:
+    - 109
+    - -1
+    shadow:
+    - 233
+    - 233
+    gutter:
+    - 109
+    - -1
+    selection:
+    - 251
+    - 60
+    shortcut_key:
+    - 221
+    - -1
+    divider:
+    - 60
+    - -1
+    button_primary:
+    - 234
+    - 175
+    button_error:
+    - 234
+    - 203
+    button_cancel:
+    - 251
+    - 60
+    button_success:
+    - 234
+    - 109
+    help_text:
+    - 116
+    - -1
+    plugin:
+    - 183
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 175
+    - 236
+    whitespace:
+    - 109
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_MAGENTA, -1]
-    border: [COLOR_CYAN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_MAGENTA]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_CYAN, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_MAGENTA]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_BLACK, COLOR_MAGENTA]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_CYAN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_CYAN
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_MAGENTA, -1]
-    border: [COLOR_CYAN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_BLACK, COLOR_MAGENTA]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_CYAN, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_CYAN, -1]
-    selection: [COLOR_WHITE, COLOR_MAGENTA]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_BLACK, COLOR_MAGENTA]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_BLACK, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_MAGENTA, COLOR_BLACK]
-    whitespace: [COLOR_CYAN, -1]
+    title:
+    - COLOR_MAGENTA
+    - -1
+    border:
+    - COLOR_CYAN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_CYAN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_CYAN
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_MAGENTA
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_MAGENTA
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_MAGENTA
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_CYAN
+    - -1
 twilight:
-  indicator: "{nf:*:◆}"
+  marquee:
+    char: '~'
+    gap: 4
+  indicator: "{nf:*:\u25C6}"
   background:
-    image: "assets/wallpapers/twilight.png"
+    image: assets/wallpapers/twilight.png
     opacity: 0.85
-    scaling: "stretch"
+    scaling: stretch
     clustering: 16
     quantization: 16
-    mode: "halfblock"
+    mode: halfblock
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "⟦"
-    title_right_cap: "⟧"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: "\u27E6"
+    title_right_cap: "\u27E7"
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: 233
-    title: [153, -1]
-    border: [61, -1]
-    text: [253, -1]
-    highlight: [255, 61]
-    accent: [110, -1]
-    footer: [118, -1]
-    shadow: [234, COLOR_BLACK]
-    gutter: [103, -1]
-    selection: [255, 61]
-    shortcut_key: [183, -1]
-    divider: [61, -1]
-    button_primary: [255, 61]
-    button_error: [255, 131]
-    button_cancel: [253, 238]
-    button_success: [255, 65]
-    help_text: [110, -1]
-    plugin: [147, -1]
-    window_close_button: [203, -1]
-    scrollbar: [61, 235]
-    whitespace: [238, -1]
+    title:
+    - 153
+    - -1
+    border:
+    - 61
+    - -1
+    text:
+    - 253
+    - -1
+    highlight:
+    - 255
+    - 61
+    accent:
+    - 110
+    - -1
+    footer:
+    - 118
+    - -1
+    shadow:
+    - 234
+    - COLOR_BLACK
+    gutter:
+    - 103
+    - -1
+    selection:
+    - 255
+    - 61
+    shortcut_key:
+    - 183
+    - -1
+    divider:
+    - 61
+    - -1
+    button_primary:
+    - 255
+    - 61
+    button_error:
+    - 255
+    - 131
+    button_cancel:
+    - 253
+    - 238
+    button_success:
+    - 255
+    - 65
+    help_text:
+    - 110
+    - -1
+    plugin:
+    - 147
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 61
+    - 235
+    whitespace:
+    - 238
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_CYAN, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_WHITE, COLOR_BLUE]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [8, COLOR_BLACK]
-    gutter: [8, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_MAGENTA, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_WHITE, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_BLUE, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_BLUE
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_CYAN, -1]
-    border: [COLOR_BLUE, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_WHITE, COLOR_BLUE]
-    accent: [COLOR_CYAN, -1]
-    footer: [COLOR_BLUE, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_BLUE, -1]
-    selection: [COLOR_WHITE, COLOR_BLUE]
-    shortcut_key: [COLOR_MAGENTA, -1]
-    divider: [COLOR_BLUE, -1]
-    button_primary: [COLOR_WHITE, COLOR_BLUE]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_CYAN, -1]
-    plugin: [COLOR_MAGENTA, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_BLUE, COLOR_BLACK]
-    whitespace: [COLOR_BLUE, -1]
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_BLUE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    accent:
+    - COLOR_CYAN
+    - -1
+    footer:
+    - COLOR_BLUE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_BLUE
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    shortcut_key:
+    - COLOR_MAGENTA
+    - -1
+    divider:
+    - COLOR_BLUE
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_BLUE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_CYAN
+    - -1
+    plugin:
+    - COLOR_MAGENTA
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_BLUE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLUE
+    - -1
 train_ride:
-  indicator: "{nf:*:#f0f0f:}"
+  marquee:
+    char: '='
+    gap: 4
+  indicator: '{nf:*:#f0f0f:}'
   background:
-    image: "assets/wallpapers/mountain-train.png"
+    image: assets/wallpapers/mountain-train.png
     opacity: 0.85
-    scaling: "stretch"
+    scaling: stretch
     clustering: 16
     quantization: 16
-    mode: "halfblock"
+    mode: halfblock
   divider:
-    char: "─"
-    length: "{window_width}"
+    char: "\u2500"
+    length: '{window_width}'
   window:
-    border_horizontal: "─"
-    border_vertical: "│"
-    border_top_left: "╭"
-    border_top_right: "╮"
-    border_bottom_left: "╰"
-    border_bottom_right: "╯"
-    left_tee: "├"
-    right_tee: "┤"
-    top_tee: "┬"
-    bottom_tee: "┴"
-    title_left_cap: "["
-    title_right_cap: "]"
-    gutter_border: "─"
-    gutter_separator: "│"
-    gutter_left_tee: "├"
-    gutter_right_tee: "┤"
-    gutter_top_tee: "┬"
-    gutter_bottom_tee: "┴"
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u256D"
+    border_top_right: "\u256E"
+    border_bottom_left: "\u2570"
+    border_bottom_right: "\u256F"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
   256:
     background: 233
-    title: [110, -1]
-    border: [65, -1]
-    text: [254, -1]
-    highlight: [255, 28]
-    accent: [179, -1]
-    footer: [108, -1]
-    shadow: [233, 233]
-    gutter: [179, -1]
-    selection: [255, 28]
-    shortcut_key: [179, -1]
-    divider: [65, -1]
-    button_primary: [255, 28]
-    button_error: [255, 167]
-    button_cancel: [254, 236]
-    button_success: [233, 149]
-    help_text: [108, -1]
-    plugin: [110, -1]
-    window_close_button: [167, -1]
-    scrollbar: [65, 233]
-    whitespace: [238, -1]
+    title:
+    - 110
+    - -1
+    border:
+    - 65
+    - -1
+    text:
+    - 254
+    - -1
+    highlight:
+    - 255
+    - 28
+    accent:
+    - 179
+    - -1
+    footer:
+    - 108
+    - -1
+    shadow:
+    - 233
+    - 233
+    gutter:
+    - 179
+    - -1
+    selection:
+    - 255
+    - 28
+    shortcut_key:
+    - 179
+    - -1
+    divider:
+    - 65
+    - -1
+    button_primary:
+    - 255
+    - 28
+    button_error:
+    - 255
+    - 167
+    button_cancel:
+    - 254
+    - 236
+    button_success:
+    - 233
+    - 149
+    help_text:
+    - 108
+    - -1
+    plugin:
+    - 110
+    - -1
+    window_close_button:
+    - 167
+    - -1
+    scrollbar:
+    - 65
+    - 233
+    whitespace:
+    - 238
+    - -1
   16:
     background: COLOR_BLACK
-    title: [COLOR_CYAN, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_BRIGHT_WHITE, -1]
-    highlight: [COLOR_WHITE, COLOR_GREEN]
-    accent: [COLOR_YELLOW, -1]
-    footer: [COLOR_BRIGHT_GREEN, -1]
-    shadow: [COLOR_BRIGHT_BLACK, COLOR_BLACK]
-    gutter: [COLOR_YELLOW, -1]
-    selection: [COLOR_WHITE, COLOR_GREEN]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_WHITE, COLOR_GREEN]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_BRIGHT_GREEN, -1]
-    plugin: [COLOR_CYAN, -1]
-    window_close_button: [COLOR_BRIGHT_RED, -1]
-    scrollbar: [COLOR_GREEN, COLOR_BLACK]
-    whitespace: [8, -1]
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    accent:
+    - COLOR_YELLOW
+    - -1
+    footer:
+    - COLOR_BRIGHT_GREEN
+    - -1
+    shadow:
+    - COLOR_BRIGHT_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_BRIGHT_GREEN
+    - -1
+    plugin:
+    - COLOR_CYAN
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
   8:
     background: COLOR_BLACK
-    title: [COLOR_CYAN, -1]
-    border: [COLOR_GREEN, -1]
-    text: [COLOR_WHITE, -1]
-    highlight: [COLOR_WHITE, COLOR_GREEN]
-    accent: [COLOR_YELLOW, -1]
-    footer: [COLOR_GREEN, -1]
-    shadow: [COLOR_BLACK, COLOR_BLACK]
-    gutter: [COLOR_YELLOW, -1]
-    selection: [COLOR_WHITE, COLOR_GREEN]
-    shortcut_key: [COLOR_YELLOW, -1]
-    divider: [COLOR_GREEN, -1]
-    button_primary: [COLOR_WHITE, COLOR_GREEN]
-    button_error: [COLOR_WHITE, COLOR_RED]
-    button_cancel: [COLOR_WHITE, COLOR_BLACK]
-    button_success: [COLOR_WHITE, COLOR_GREEN]
-    help_text: [COLOR_GREEN, -1]
-    plugin: [COLOR_CYAN, -1]
-    window_close_button: [COLOR_RED, -1]
-    scrollbar: [COLOR_GREEN, COLOR_BLACK]
-    whitespace: [COLOR_BLACK, -1]
+    title:
+    - COLOR_CYAN
+    - -1
+    border:
+    - COLOR_GREEN
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    accent:
+    - COLOR_YELLOW
+    - -1
+    footer:
+    - COLOR_GREEN
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_YELLOW
+    - -1
+    selection:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    shortcut_key:
+    - COLOR_YELLOW
+    - -1
+    divider:
+    - COLOR_GREEN
+    - -1
+    button_primary:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_GREEN
+    - -1
+    plugin:
+    - COLOR_CYAN
+    - -1
+    window_close_button:
+    - COLOR_RED
+    - -1
+    scrollbar:
+    - COLOR_GREEN
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLACK
+    - -1

@@ -234,9 +234,23 @@ def validate_theme_background_section(bg_data: Any, path: str) -> list[str]:
         if "enabled" in bg_data and not isinstance(bg_data["enabled"], bool):
             errors.append(f"'{path}.enabled' must be a boolean, got {type(bg_data['enabled']).__name__}.")
         return errors
-    return [
-        f"'{path}': Background specification must be a string or mapping, got {type(bg_data).__name__}."
-    ]
+def validate_marquee_section(marquee_data: Any, path: str) -> list[str]:
+    """Validate marquee scrolling configuration in a theme."""
+    if not isinstance(marquee_data, dict):
+        return [f"'{path}': Section must contain key-value pairs (char, gap)."]
+
+    errors = []
+    for key, val in marquee_data.items():
+        subpath = f"{path}.{key}"
+        if key == "char":
+            if not isinstance(val, (str, int)):
+                errors.append(f"'{subpath}': Marquee character must be a string, got {type(val).__name__}.")
+        elif key == "gap":
+            if not isinstance(val, int) or val < 0:
+                errors.append(f"'{subpath}': Marquee gap must be a non-negative integer, got {val!r}.")
+        else:
+            errors.append(f"'{subpath}': Unknown marquee property '{key}'. Expected 'char' or 'gap'.")
+    return errors
 
 
 def validate_color_value(val: Any, depth_mode: str, path: str) -> list[str]:
@@ -334,6 +348,8 @@ def validate_theme_file(filepath: str) -> bool:
                     errors.extend(
                         validate_theme_background_section(keys, f"{theme_name}.background")
                     )
+                elif depth_str == "marquee":
+                    errors.extend(validate_marquee_section(keys, f"{theme_name}.marquee"))
                 elif depth_str in VALID_NON_COLOR_KEYS:
                     errors.extend(validate_indicator_value(keys, f"{theme_name}.{depth_str}"))
                 else:
@@ -347,6 +363,8 @@ def validate_theme_file(filepath: str) -> bool:
                 errors.extend(validate_divider_section(keys, "root.divider"))
             elif depth_str == "background":
                 errors.extend(validate_theme_background_section(keys, "root.background"))
+            elif depth_str == "marquee":
+                errors.extend(validate_marquee_section(keys, "root.marquee"))
             elif depth_str in VALID_NON_COLOR_KEYS:
                 errors.extend(validate_indicator_value(keys, f"root.{depth_str}"))
             else:

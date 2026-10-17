@@ -458,26 +458,42 @@ class EditorWidget(Widget):
                         sm_x, em_x = min(self.mark_x, self.cursor_x), max(self.mark_x, self.cursor_x)
                     elif line_num == sy:
                         sm_x = self.mark_x if self.mark_y == sy else self.cursor_x
-                        em_x = len(disp_text)
+                        em_x = len(line_text)
                     elif line_num == ey:
                         sm_x = 0
                         em_x = self.mark_x if self.mark_y == ey else self.cursor_x
                     else:
                         sm_x = 0
-                        em_x = len(disp_text)
+                        em_x = len(line_text)
 
-                    rel_s = max(0, sm_x - sx)
-                    rel_e = min(len(visible_segment), em_x - sx)
+                    if self.show_whitespace:
+                        disp_sm_x = self._char_idx_to_display_col(line_text, sm_x)
+                        disp_em_x = (
+                            len(disp_text)
+                            if (line_num < ey or em_x >= len(line_text))
+                            else self._char_idx_to_display_col(line_text, em_x)
+                        )
+                    else:
+                        disp_sm_x = sm_x
+                        disp_em_x = em_x
+
+                    rel_s = max(0, disp_sm_x - sx)
+                    rel_e = min(len(visible_segment), disp_em_x - sx)
                     if rel_s < rel_e:
                         line_rich.stylize(sel_style, rel_s, rel_e)
 
             # Highlight current line cursor position
             if line_num == self.cursor_y:
-                rel_cursor_x = self.cursor_x - sx
-                if 0 <= rel_cursor_x <= len(line_rich):
+                disp_cursor_x = (
+                    self._char_idx_to_display_col(line_text, self.cursor_x)
+                    if self.show_whitespace
+                    else self.cursor_x
+                )
+                rel_cursor_x = disp_cursor_x - sx
+                if rel_cursor_x >= 0:
                     if rel_cursor_x < len(line_rich):
                         line_rich.stylize("reverse bold", rel_cursor_x, rel_cursor_x + 1)
-                    else:
+                    elif rel_cursor_x == len(line_rich):
                         line_rich.append(" ", style="reverse bold")
 
             out.append_text(line_rich)
@@ -538,10 +554,12 @@ class EditorWidget(Widget):
         lineno_w = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
         visible_w = max(10, width - lineno_w)
 
-        if self.cursor_x < self.left_col:
-            self.left_col = self.cursor_x
-        elif self.cursor_x >= self.left_col + visible_w:
-            self.left_col = self.cursor_x - visible_w + 1
+        curr_line = self.lines[self.cursor_y] if self.cursor_y < len(self.lines) else ""
+        disp_x = self._char_idx_to_display_col(curr_line, self.cursor_x) if self.show_whitespace else self.cursor_x
+        if disp_x < self.left_col:
+            self.left_col = disp_x
+        elif disp_x >= self.left_col + visible_w:
+            self.left_col = disp_x - visible_w + 1
 
     def _get_rendered_md_lines(self) -> list:
         if self._rendered_md_lines is not None:
@@ -595,6 +613,18 @@ class EditorWidget(Widget):
             self.screen.update_status()
         event.prevent_default()
         event.stop()
+
+    def _char_idx_to_display_col(self, line: str, char_idx: int) -> int:
+        """Map character index in line to visual/display column index, respecting tabstop expansion."""
+        if "\t" not in line:
+            return char_idx
+        col = 0
+        for idx, ch in enumerate(line):
+            if idx >= char_idx:
+                break
+            w = self.tabstop - (col % self.tabstop) if ch == "\t" else 1
+            col += w
+        return col
 
     def _display_col_to_char_idx(self, line: str, target_col: int) -> int:
         """Map visual/display column index to character index in line, respecting tabstop expansion."""
@@ -1258,7 +1288,7 @@ class BashEditScreen(Screen):
         file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
         with Vertical(id="editor_header_area"):
             with Horizontal(id="editor_header_bar"):
-                yield Label(f"  BashEdit - {file_name}  ", id="editor_header")
+                yield bashmenu_ui.MarqueeLabel(f"  BashEdit - {file_name}  ", id="editor_header")
                 yield Label(bashmenu_ui.format_close_button_label(), id="btn_close_x", classes="btn_close_x")
             with Horizontal(id="editor_tab_bar"):
                 for idx, tab in enumerate(self.tabs):
@@ -1772,7 +1802,9 @@ class BashEditScreen(Screen):
             cur_line = min(total_lines, ed.top_line + 1)
             pos_info = f"[MD View] Line {cur_line}/{total_lines}"
         else:
-            pos_info = f"Line {ed.cursor_y + 1}/{len(ed.lines)}, Col {ed.cursor_x + 1}"
+            curr_line = ed.lines[ed.cursor_y] if ed.cursor_y < len(ed.lines) else ""
+            disp_col = ed._char_idx_to_display_col(curr_line, ed.cursor_x)
+            pos_info = f"Line {ed.cursor_y + 1}/{len(ed.lines)}, Col {disp_col + 1}"
         sel_info = ""
         if ed.mark_active and not ed.show_markdown:
             sel = ed.get_selection_range()
@@ -2115,13 +2147,13 @@ class BashEditScreen(Screen):
             self.update_status()
             return
 
-        if key_lower in ["backspace", "ctrl+h"] or char_lower in ["\x08", "\x7f"]:
-            ed.backspace()
+        if key_lower in ["delete", "del"]:
+            ed.delete_char()
             self.update_status()
             return
 
-        if key_lower == "delete":
-            ed.delete_char()
+        if key_lower in ["backspace", "ctrl+h"] or char_lower in ["\x08", "\x7f"]:
+            ed.backspace()
             self.update_status()
             return
 

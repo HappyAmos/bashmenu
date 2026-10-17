@@ -563,7 +563,7 @@ def resolve_glyph_preview(glyph_def: str, config: dict | None = None) -> str:
     return char_part
 
 
-def render_menu_item_preview(item: dict, config: dict | None = None, width: int = 38) -> str:
+def render_menu_item_preview(item: dict, config: dict | None = None, width: int = 38, offset: int = 0) -> str:
     """Render a visual preview string for a menu item (command, divider, submenu, script, etc.)."""
     if not isinstance(item, dict):
         return ""
@@ -618,11 +618,39 @@ def render_menu_item_preview(item: dict, config: dict | None = None, width: int 
         left_len = len(left_label)
         right_len = len(right_bracket) if right_bracket else 0
 
+    mq_cfg = bashmenu_ui.get_theme_marquee_config(cfg.get("theme", "dracula"))
+    mq_char = mq_cfg.get("char", " ")
+    mq_gap = mq_cfg.get("gap", 4)
+
     if right_bracket:
-        spacer_len = max(1, width - prefix_len - left_len - right_len)
-        return f"{prefix}{left_label}{' ' * spacer_len}{right_bracket}"
+        center = width // 2
+        left_part_w = max(prefix_len + 1, center - 2)
+        left_label_avail_w = max(1, left_part_w - prefix_len)
+        right_part_w = max(3, width - (center + 2))
+
+        if left_len > left_label_avail_w:
+            lbl_disp = bashmenu_ui.get_marquee_slice(left_label, left_label_avail_w, offset, char=mq_char, gap=mq_gap)
+        else:
+            lbl_disp = left_label
+
+        if right_len > right_part_w:
+            rb_disp = bashmenu_ui.get_marquee_slice(right_bracket, right_part_w, offset, char=mq_char, gap=mq_gap)
+        else:
+            rb_disp = right_bracket
+
+        left_side = f"{prefix}{lbl_disp}"
+        pad_left = max(0, left_part_w - len(left_side))
+        gap_w = max(0, (center + 2) - (len(left_side) + pad_left))
+        pad_right = max(0, right_part_w - len(rb_disp))
+        res = f"{left_side}{' ' * pad_left}{' ' * gap_w}{' ' * pad_right}{rb_disp}"
+        return res[:width]
     else:
-        return f"{prefix}{left_label}"
+        label_avail_w = max(5, width - prefix_len)
+        if left_len > label_avail_w:
+            lbl_disp = bashmenu_ui.get_marquee_slice(left_label, label_avail_w, offset, char=mq_char, gap=mq_gap)
+        else:
+            lbl_disp = left_label
+        return f"{prefix}{lbl_disp}"
 
 
 class ItemEditModal(ModalScreen[dict]):

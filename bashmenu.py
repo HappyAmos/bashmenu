@@ -1904,6 +1904,28 @@ class MainMenuView(Widget):
         self.show_shortcuts = True
         self.can_focus = True
         self._canvas = bashmenu_ui.PrebakedWallpaperCanvas()
+        self._marquee_tracker = bashmenu_ui.MarqueeTracker(pause_ticks=4)
+        self._shortcut_map: dict[int, str] = {}
+        self._marquee_timer = None
+
+    def on_mount(self) -> None:
+        self._marquee_timer = self.set_interval(0.25, self._tick_marquee)
+
+    def _tick_marquee(self) -> None:
+        opts = self.current_menu().get("items", self.current_menu().get("options", []))
+        if not opts:
+            return
+        curr_row = self.current_row()
+        if curr_row < 0 or curr_row >= len(opts):
+            return
+        if self._marquee_tracker.tick():
+            w = max(40, self.size.width or 80)
+            visible_rows = getattr(self, "visible_option_rows", None)
+            scroll_start = self.current_scroll_offset()
+            if visible_rows and visible_rows > 0:
+                y = 3 + (curr_row - scroll_start)
+                if 3 <= y < 3 + visible_rows:
+                    self.refresh(Region(0, y, w, 1))
 
     def current_menu(self) -> dict:
         return self.menu_stack[-1]
@@ -1948,6 +1970,7 @@ class MainMenuView(Widget):
         if old_row == new_row and old_scroll == new_scroll:
             return
 
+        self._marquee_tracker.reset(new_id=new_row)
         self.selected_rows[-1] = new_row
 
         if visible_rows and visible_rows > 0 and old_scroll == new_scroll:
@@ -1990,12 +2013,14 @@ class MainMenuView(Widget):
                 while target < len(opts) and is_divider(opts[target]):
                     target += 1
                 if target < len(opts):
+                    self._marquee_tracker.reset(new_id=target)
                     self.selected_rows[-1] = target
             elif curr_row >= new_scroll + visible_rows:
                 target = new_scroll + visible_rows - 1
                 while target >= new_scroll and is_divider(opts[target]):
                     target -= 1
                 if target >= 0:
+                    self._marquee_tracker.reset(new_id=target)
                     self.selected_rows[-1] = target
             self.refresh()
         else:
@@ -2033,12 +2058,14 @@ class MainMenuView(Widget):
                 while target >= new_scroll and is_divider(opts[target]):
                     target -= 1
                 if target >= 0:
+                    self._marquee_tracker.reset(new_id=target)
                     self.selected_rows[-1] = target
             elif curr_row < new_scroll:
                 target = new_scroll
                 while target < len(opts) and is_divider(opts[target]):
                     target += 1
                 if target < len(opts):
+                    self._marquee_tracker.reset(new_id=target)
                     self.selected_rows[-1] = target
             self.refresh()
         else:
@@ -2256,6 +2283,34 @@ class MainMenuView(Widget):
             raw_hg_lines,
         )
 
+        active_opt_line = None
+        if 0 <= curr_row < len(options) and not is_divider(options[curr_row]):
+            sc_char = getattr(self, "_shortcut_map", {}).get(curr_row, "")
+            borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
+            div_cfg = get_effective_divider_config(self.config)
+            length_val = div_cfg.get("length", "{window_width}")
+            is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
+            indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config), self.config)
+            extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
+
+            raw_active = self._render_raw_option_line(
+                curr_row,
+                options[curr_row],
+                True,
+                sc_char,
+                avail_w,
+                screen_div_w,
+                extra_vars,
+                theme_styles,
+                borders,
+                div_cfg,
+                is_screen,
+                indicator_symbol,
+                marquee_offset=self._marquee_tracker.offset,
+            )
+            active_y = 3 + (curr_row - scroll_start)
+            active_opt_line = canvas.composite_dynamic_line(active_y, raw_active)
+
         return canvas.assemble_frame(
             h,
             scroll_start,
@@ -2264,6 +2319,7 @@ class MainMenuView(Widget):
             len(options),
             gutter_y_start,
             gutter_lines,
+            active_option_line=active_opt_line,
         )
 
     def _build_canvas(
@@ -2449,8 +2505,9 @@ class MainMenuView(Widget):
             if not is_divider(opt) and sc_idx < len(shortcut_chars):
                 shortcut_map[idx] = shortcut_chars[sc_idx]
                 sc_idx += 1
+        self._shortcut_map = shortcut_map
 
-        indicator_symbol = resolve_glyph(theme_styles.get("indicator", ">"), self.config)
+        indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config), self.config)
         for idx, opt in enumerate(options):
             sc_char = shortcut_map.get(idx, "")
             line_unsel = self._render_raw_option_line(
@@ -2548,6 +2605,7 @@ class MainMenuView(Widget):
         div_cfg: dict,
         is_screen: bool,
         indicator_symbol: str,
+        marquee_offset: int = 0,
     ) -> Text:
         border_style = theme_styles.get("border", Style(color="blue"))
         highlight_style = theme_styles.get("highlight", Style(color="white", bgcolor="magenta", bold=True))
@@ -2625,46 +2683,99 @@ class MainMenuView(Widget):
                 opt["_parsed_cache"] = (theme_key, icon_str, icon_w, left_label, right_bracket)
 
         prefix_w = ind_w + sc_w + icon_w
-        right_w = get_visible_len(right_bracket, self.config) if right_bracket else 0
-        label_avail_w = max(5, avail_w - prefix_w - (right_w + 1 if right_w else 0))
+
+        mq_cfg = bashmenu_ui.get_theme_marquee_config(theme_styles)
+        mq_char = mq_cfg.get("char", " ")
+        mq_gap = mq_cfg.get("gap", 4)
+
+        def _truncate_ellipsis(s: str, max_w: int) -> str:
+            if not s or max_w <= 0:
+                return ""
+            if get_visible_len(s, self.config) <= max_w:
+                return s
+            if max_w <= 1:
+                return "…"[:max_w]
+            target_w = max_w - 1
+            low, high = 1, len(s)
+            best = 0
+            while low <= high:
+                mid = (low + high) // 2
+                if get_visible_len(s[:mid], self.config) <= target_w:
+                    best = mid
+                    low = mid + 1
+                else:
+                    high = mid - 1
+            return f"{s[:best]}…"
 
         row_content = Text(ind_str, style=item_style)
         if self.show_shortcuts and sc_char:
             row_content.append(f"[{sc_char}] ", style=shortcut_key_style if not is_selected else item_style)
         else:
             row_content.append("    ", style=item_style)
-
         row_content.append(icon_str, style=item_style)
 
-        lbl_truncated = left_label
-        if get_visible_len(left_label, self.config) > label_avail_w:
-            low, high = 1, len(left_label)
-            best = 1
-            while low <= high:
-                mid = (low + high) // 2
-                if get_visible_len(left_label[:mid], self.config) <= label_avail_w:
-                    best = mid
-                    low = mid + 1
-                else:
-                    high = mid - 1
-            lbl_truncated = left_label[:best]
-
-        lbl_rich = bashmenu_ui.formatting_to_rich_text(lbl_truncated, default_style=item_style, theme=theme_styles)
-        row_content.append_text(lbl_rich)
-
-        rendered_lbl_w = get_visible_len(lbl_truncated, self.config)
-        spaces_w = max(0, avail_w - prefix_w - rendered_lbl_w - right_w)
-        row_content.append(" " * spaces_w, style=item_style)
-
         if right_bracket:
-            rb_rich = bashmenu_ui.formatting_to_rich_text(right_bracket, default_style=item_style, theme=theme_styles)
+            center = avail_w // 2
+            left_part_w = max(prefix_w + 1, center - 2)
+            left_label_avail_w = max(1, left_part_w - prefix_w)
+            right_part_w = max(3, avail_w - (center + 2))
+
+            if is_selected:
+                if get_visible_len(left_label, self.config) > left_label_avail_w:
+                    lbl_text = bashmenu_ui.get_marquee_slice(
+                        left_label, left_label_avail_w, marquee_offset, char=mq_char, gap=mq_gap
+                    )
+                else:
+                    lbl_text = left_label
+
+                if get_visible_len(right_bracket, self.config) > right_part_w:
+                    rb_text = bashmenu_ui.get_marquee_slice(
+                        right_bracket, right_part_w, marquee_offset, char=mq_char, gap=mq_gap
+                    )
+                else:
+                    rb_text = right_bracket
+            else:
+                lbl_text = _truncate_ellipsis(left_label, left_label_avail_w)
+                rb_text = _truncate_ellipsis(right_bracket, right_part_w)
+
+            lbl_rich = bashmenu_ui.formatting_to_rich_text(lbl_text, default_style=item_style, theme=theme_styles)
+            row_content.append_text(lbl_rich)
+
+            used_left = row_content.cell_len
+            pad_left = max(0, left_part_w - used_left)
+            if pad_left > 0:
+                row_content.append(" " * pad_left, style=item_style)
+
+            gap_w = max(0, (center + 2) - row_content.cell_len)
+            if gap_w > 0:
+                row_content.append(" " * gap_w, style=item_style)
+
+            rb_rich = bashmenu_ui.formatting_to_rich_text(rb_text, default_style=item_style, theme=theme_styles)
+            rb_w = rb_rich.cell_len
+            pad_right = max(0, right_part_w - rb_w)
+            if pad_right > 0:
+                row_content.append(" " * pad_right, style=item_style)
             row_content.append_text(rb_rich)
+        else:
+            label_avail_w = max(5, avail_w - prefix_w)
+            if is_selected:
+                if get_visible_len(left_label, self.config) > label_avail_w:
+                    lbl_text = bashmenu_ui.get_marquee_slice(
+                        left_label, label_avail_w, marquee_offset, char=mq_char, gap=mq_gap
+                    )
+                else:
+                    lbl_text = left_label
+            else:
+                lbl_text = _truncate_ellipsis(left_label, label_avail_w)
+
+            lbl_rich = bashmenu_ui.formatting_to_rich_text(lbl_text, default_style=item_style, theme=theme_styles)
+            row_content.append_text(lbl_rich)
 
         if row_content.cell_len > avail_w:
             row_content.truncate(avail_w)
-        pad_w = max(0, avail_w - row_content.cell_len)
-        if pad_w > 0:
-            row_content.append(" " * pad_w, style=item_style)
+        pad_end = max(0, avail_w - row_content.cell_len)
+        if pad_end > 0:
+            row_content.append(" " * pad_end, style=item_style)
 
         line_rich.append_text(row_content)
         line_rich.append(f"  {b_v_right}", style=border_style)
