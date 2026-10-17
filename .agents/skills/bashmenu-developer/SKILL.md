@@ -15,6 +15,10 @@ description: Core developer guidelines for the multi-platform BashMenu
 ---
 
 ## 2. Core Development Workflow & Invariants
+- **Mandatory Git Commit & Push on All Changes:**
+  - Every completed task, bug fix, feature addition, or refactoring step must conclude by creating a concise, descriptive git commit (`git commit -m "..."`) and pushing directly to GitHub (`git push`).
+  - Never leave changes uncommitted or unpushed in the local repository.
+  - After pushing to `origin/main`, inspect or verify GitHub Actions CI when appropriate using GitHub CLI (`gh run list`).
 - **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"`  and `pytest`.
 - **GitHub Actions CI Workflow & Remote Test Verification:**
   - Automated testing is offloaded to GitHub Actions (`.github/workflows/python-app.yml`) across Python 3.10, 3.11, and 3.12.
@@ -122,6 +126,11 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Theme properties for borders, indicators, and marquee characters may specify CP437 byte codes using `{ascii:NNN}` macros (e.g. `{ascii:216}`, `{ascii:196}`).
   - Any code reading theme glyphs (`init_theme_colors`, `get_theme_marquee_config`, `MainMenuView._render_option_row`) must pass the string through `bashmenu_ui.parse_ascii_val()` (or equivalent regex replacement `r"\{ascii:\s*(\d+)\s*\}"`) before displaying or formatting.
   - Raw `{ascii:NNN}` strings must NEVER appear in the user-facing menu options, indicators, or status lines.
+- **Theme Renaming, Deletion & Direct Save Invariants (`themeedit.py`):**
+  - **Renaming:** Themes can be renamed in-place via `#prop_theme_name`, the adjacent `[Rename]` button, or <kbd>Ctrl+R</kbd> (`RenameThemeModal`). Updating the theme slug synchronizes the header title, live preview, and sets `is_dirty = True`.
+  - **Direct Save Invariant (<kbd>Ctrl+S</kbd>):** If `self.theme_name` is set to any valid name (existing or newly named via F9/Rename), <kbd>Ctrl+S</kbd> must immediately serialize and save to disk via `_save_theme_to_disk()`. It must NEVER divert to "Save As" unless the theme is truly untitled (`not self.theme_name or self.theme_name == "untitled"`). Only <kbd>Ctrl+A</kbd> opens "Save As". `SaveThemeModal` must pre-fill `self.theme_name` as suggested name and submit on <kbd>Enter</kbd> (`on_input_submitted`).
+  - **Deletion:** Themes can be deleted from `bashmenu.themes` via `#btn_delete_theme` / <kbd>Ctrl+D</kbd> in `themeedit.py`, or via <kbd>d</kbd> / <kbd>Delete</kbd> in `ThemePickerModalScreen` (`bashmenu_ui.py`). Prompts confirmation via `ConfirmModalScreen`. Invariants: Never allow deleting the only remaining theme; if deleting the currently active theme, safely fall back to another theme (e.g. `dracula`) and update `bashmenu.yml`.
+  - **Image Palette Generation (`scripts/theme_from_image.py`, <kbd>F9</kbd>):** Generates 256, 16, and 8 color tiers from wallpaper images using Pillow adaptive palette extraction and perceptual luminance sorting. In `action_theme_from_image`, `self.is_new` must be set based on `new_name not in self.raw_themes_data` so existing themes aren't falsely flagged as unnamable/unsaved new themes.
 - **Theme Editor & Contrast Invariants (`bashedit.py`):**
   - When `--display-theme-colors` is active, invert FG/BG if text matches theme background. Fall back to neutral primary 8 (`white` on dark, `black` on light) if both match.
   - Whitespace (`Alt+1`): Stylize non-visible whitespace (`'·'`, `'→'`, `'↵'`) with theme's `whitespace` token (fallback `dim white`). Apply before selection and cursor styles.
@@ -168,18 +177,23 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Wrap `#dialog` in `ModalFrame(id="modal_frame")` and `Horizontal(id="dialog_hrow")` with right and bottom `ShadowWidget`. Direct child IDs remain queryable.
   - Expanded help modals (`is_help=True`): Sized to 95% width/height with `#dialog_hrow` at `1fr 1fr` and `#dialog` at `1fr 100%`.
 - **Selection Modals Standard:** When selecting from predefined lists, avoid freeform inputs (`InputModalScreen`). Always prefer `OptionList`-based modals (`ThemePickerModalScreen`) or 2D grid pickers.
-- **Theme Editor Keybinding Conventions (`themeedit.py`):**
+- **Theme Editor Keybinding & Inspector Standards (`themeedit.py`):**
   - Standardized function key map for theme editor:
     - `F1`: Help
-    - `F2`: Background configuration modal
+    - `F2`: Background wallpaper configuration modal
     - `F3`: Color Picker modal
     - `F4`: ASCII / Glyphs modal
     - `F5`: Reset current theme to disk
     - `F6`: Clone / Base theme
     - `F7`: Derive 16/8-color fallback palettes
-    - `Ctrl+S`: Save theme
+    - `F8`: Toggle expand/collapse all property inspector sections
+    - `F9`: Auto-generate theme palette from image (`ThemeFromImageModal`)
+    - `Ctrl+R`: Rename theme (`RenameThemeModal`)
+    - `Ctrl+D`: Delete theme (confirmation prompt)
+    - `Ctrl+S`: Save theme directly to disk
     - `Ctrl+A`: Save As new theme
     - `Esc` / `q`: Exit theme editor
+  - **Inspector Section Collapsing:** Section headers (`.section_header`) toggle the `.collapsed` class on their corresponding `.section_body`. Inspector sections default to collapsed (`classes="section_body collapsed"`). Pressing `F8` toggles expand/collapse all.
 - **Interactive 16×16 2D Pickers (`ColorGridWidget`, `AsciiGridWidget`):**
   - For 256-entry domains (colors and CP437 ASCII 0–255), use 16×16 grids with arrow navigation (±1, ±16), Home/End, PgUp/PgDn (±64), and Enter.
   - Active cells must display bold + underline (`underline=True, bold=True`). Mouse clicks resolve via `col = event.x // cell_width; row = event.y`.
@@ -231,6 +245,10 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Configured with `milliseconds` and optional `command`. No default command in `bashmenu.yml` (dormant unless configured).
   - Intercept `events.Key` and `events.MouseEvent` in `BashMenuApp.on_event` to reset timer via `timer.reset()`.
   - Run screensavers in alternate screen buffer (`\x1b[?1049h\x1b[H\x1b[2J`) inside `with self.suspend():`. Restore primary buffer (`\x1b[?1049l`) in `finally`, repaint UI via `self.refresh(layout=True)`, and re-arm timer. Verify `can_suspend` before suspending for headless test safety.
+- **Status Gutter Clock & Refresh Granularity (`_determine_refresh_interval`):**
+  - Second-precision tokens (`{date_time_24}`, `{date_time_12}`, `{time_24}`, `{time_12}`, `{seconds}`, `%S`): automatically sets periodic refresh to `1.0` second.
+  - Minute-precision tokens (`{date_time_24_short}`, `{time_24_short}`, `{date}`) or static badges: automatically throttles periodic refresh to `5.0` seconds to conserve CPU and battery.
+  - User Override: Users can explicitly configure `settings.refresh_interval` (or `settings.status_refresh_rate`) in `bashmenu.yml` (in seconds, e.g. `1.0`, or milliseconds, e.g. `1000`). Validated in `ymlcheck.py`.
 - **CI Virtualization & Performance Test Resilience:**
   - Timing assertions in performance tests must account for shared virtualized runners and CPU scheduling jitter under parallel test workers (`pytest -n auto`).
   - Use `os.getenv("CI")` to scale single-frame spike limits (e.g. `100ms` in CI vs `35ms` local) while keeping average latency targets strict (`< 15ms`).
@@ -265,6 +283,13 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Root directory defined in `scripts/.cheat.yml` (`dir: ~/cheat`).
   - Search hierarchy: 1a. Exact relative path -> 1b. Filename stem -> 2. YAML frontmatter tags -> 3. Full-text body.
   - List/Search flags: `cheat -l` (lists files and tags in 2 columns), `cheat -s <query>` (filtered search). Dispatches to `rich.sh` and `pager.sh`.
+- **CLI Executable Symlinks (`install.sh` / `uninstall.sh`):**
+  - The installer exposes first-class CLI commands via symlinks created in `${BIN_DIR}` (default `~/.local/bin` or `/usr/local/bin`):
+    - `bm`: Main TUI launcher (`bashmenu.sh`).
+    - `cheat`: Cheatsheet search and reader (`scripts/cheat.sh`).
+    - `rich`: ANSI-rendered markdown / syntax viewer (`scripts/rich.sh`).
+    - `bmpager`: Built-in terminal pager with balanced status bar and popup help modal (`scripts/pager.sh`).
+  - `uninstall.sh` removes all four symlinks during uninstallation.
 - **BBCode Rich Formatting (`bashmenu_ui.py`):**
   - Bracketed tags: `[b]`, `[u]`, `[dim]`, `[reverse]`, `[color=...]`.
   - Tables: `[table]`, `[tr]`, `[th]`, `[td]` with Unicode borders. `width=100%` distributes columns equally with word-boundary cell wrapping.
