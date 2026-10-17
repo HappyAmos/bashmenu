@@ -97,7 +97,7 @@ echo "==> Removing installed symlinks and shortcuts..."
 CANDIDATE_BIN_DIRS="$HOME/.local/bin /usr/local/bin ${PREFIX:-}/bin"
 for dir in $CANDIDATE_BIN_DIRS; do
     [ -d "$dir" ] || continue
-    for link_name in "bm" "bashmenu" "cheat"; do
+    for link_name in "bm" "bashmenu" "cheat" "rich" "bmpager"; do
         target_path="$dir/$link_name"
         if [ -L "$target_path" ] || [ -f "$target_path" ]; then
             # Verify if it points to bashmenu or remove it

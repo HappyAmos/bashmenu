@@ -96,7 +96,7 @@ items:
               quiet: true
           - View ASCII Symbols [Standard and Extended]:
               type: script
-              action: '{scripts_dir}/ascii.sh'
+              action: '{scripts_dir}/rich.sh {bashmenu_dir}/assets/ascii.md'
               icon: '{nf::#f07ef:}'
               stream: true
               quiet: true

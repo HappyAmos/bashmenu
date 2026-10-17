@@ -1234,12 +1234,12 @@ def get_theme_marquee_config(
 ) -> dict[str, Any]:
     """Retrieve marquee configuration (char and gap) for the specified theme.
 
-    Falls back to 4 plain spaces (char: ' ', gap: 4) if not defined.
+    Falls back to 5 bullets (char: '•', gap: 5) if not defined.
     """
     import bashmenu
 
     def _resolve_marquee_char(raw_val: Any) -> str:
-        s = str(raw_val) if raw_val is not None else " "
+        s = str(raw_val) if raw_val is not None else "•"
         if "{" in s:
             s = bashmenu.interpolate_placeholders(s, {})
             s = bashmenu.resolve_glyph(s, {})
@@ -1249,50 +1249,47 @@ def get_theme_marquee_config(
         if "marquee" in theme_name and isinstance(theme_name["marquee"], dict):
             m_def = theme_name["marquee"]
             return {
-                "char": _resolve_marquee_char(m_def.get("char", " ")),
-                "gap": int(m_def.get("gap", 4)),
+                "char": _resolve_marquee_char(m_def.get("char", "•")),
+                "gap": int(m_def.get("gap", 5)),
             }
         if "theme_name" in theme_name and isinstance(theme_name["theme_name"], str):
             theme_name = theme_name["theme_name"]
         else:
-            return {"char": " ", "gap": 4}
+            return {"char": "•", "gap": 5}
 
     if not raw_theme_data:
         raw_theme_data = load_themes_file()
 
     theme_def = raw_theme_data.get(theme_name, {}) if isinstance(theme_name, str) else {}
     if not theme_def:
-        return {"char": " ", "gap": 4}
+        return {"char": "•", "gap": 5}
 
     m_def = theme_def.get("marquee", {}) if isinstance(theme_def, dict) else {}
     if isinstance(m_def, dict):
         return {
-            "char": _resolve_marquee_char(m_def.get("char", " ")),
-            "gap": int(m_def.get("gap", 4)),
+            "char": _resolve_marquee_char(m_def.get("char", "•")),
+            "gap": int(m_def.get("gap", 5)),
         }
-    return {"char": " ", "gap": 4}
+    return {"char": "•", "gap": 5}
 
 
-def format_marquee_spacer(char: str = " ", gap: int = 4) -> str:
+def format_marquee_spacer(char: str = "•", gap: int = 5) -> str:
     """Format the spacer between repeated cycles of marquee scrolling text.
 
-    If char is a space or empty, returns gap spaces (default 4).
-    If char is a symbol (bullet, dash, etc.), centers it flanked by gap spaces.
+    Repeats the marquee character `gap` times (e.g. char '~' with gap 6 becomes '~~~~~~').
+    If char is empty or None, defaults to bullet ('•') repeated `gap` times.
     """
     g = max(0, gap)
-    if not char or char == " ":
-        return " " * max(1, g)
-    left_spaces = " " * (g // 2)
-    right_spaces = " " * (g - (g // 2))
-    return f"{left_spaces}{char}{right_spaces}"
+    fill_char = char if (char is not None and len(char) > 0) else "•"
+    return fill_char * g
 
 
 def get_marquee_slice(
     text: str,
     avail_w: int,
     offset: int,
-    char: str = " ",
-    gap: int = 4,
+    char: str = "•",
+    gap: int = 5,
 ) -> str:
     """Calculate and return a scrolling slice of text for width avail_w at offset."""
     if not text or avail_w <= 0:

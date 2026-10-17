@@ -2412,7 +2412,7 @@ class BashEditScreen(Screen):
             "| :--- | :--- |",
             "| `F1` | Help Manual |",
             "| `F2` | Toggle Whitespace Display (spaces & tabs) |",
-            "| `F3` | View ASCII Character Table (`ascii.sh`) |",
+            "| `F3` | View ASCII Character Table (`assets/ascii.md` via `rich.sh`) |",
             "| `F4` | View Terminal Colors (`ncurses_colors.py`) |",
             "| `F5` | Show Available Placeholders & Macros |",
             "| `F6` | View Markdown via Rich Pager (`rich.sh`) |",
@@ -2598,16 +2598,20 @@ class BashEditScreen(Screen):
 
     def action_show_ascii_table(self) -> None:
         """Stream ASCII character table modal."""
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "ascii.sh")
-        if not os.path.exists(script_path):
-            try:
-                import bashmenu
-                app_obj = getattr(self, "app", None)
-                cfg = getattr(app_obj, "config", {}) if app_obj else {}
-                script_path = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
-            except Exception:  # noqa: BLE001, S110
-                pass
-        script_cmd = f'bash "{script_path}"'
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        rich_script = os.path.join(base_dir, "scripts", "rich.sh")
+        ascii_md = os.path.join(base_dir, "assets", "ascii.md")
+        try:
+            import bashmenu
+            app_obj = getattr(self, "app", None)
+            cfg = getattr(app_obj, "config", {}) if app_obj else {}
+            if not os.path.exists(rich_script):
+                rich_script = bashmenu.interpolate_placeholders("{scripts_dir}/rich.sh", cfg)
+            if not os.path.exists(ascii_md):
+                ascii_md = bashmenu.interpolate_placeholders("{bashmenu_dir}/assets/ascii.md", cfg)
+        except Exception:  # noqa: BLE001, S110
+            pass
+        script_cmd = f'bash "{rich_script}" "{ascii_md}"'
         self.app.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", script_cmd, theme=self.theme_styles))
 
     def action_show_placeholders(self) -> None:

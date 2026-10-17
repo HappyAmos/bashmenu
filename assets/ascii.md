@@ -1,4 +1,4 @@
-# ASCII Character Tables (Code Page 437)
+# ASCII Character Table
 
 ## Non-Printable Characters (Control Codes)
 

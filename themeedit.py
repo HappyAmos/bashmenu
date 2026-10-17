@@ -2371,6 +2371,20 @@ class ThemeEditScreen(Screen):
         margin-bottom: 0;
         background: #252525;
         padding: 0 1;
+        width: 100%;
+    }
+    .section_header:hover {
+        background: #333333;
+    }
+    .section_header:focus {
+        text-style: bold underline;
+    }
+    .section_body {
+        width: 100%;
+        height: auto;
+    }
+    .section_body.collapsed {
+        display: none;
     }
     .prop_row {
         height: 3;
@@ -2424,6 +2438,7 @@ class ThemeEditScreen(Screen):
         Binding("f5", "reset_theme", "Reset"),
         Binding("f6", "clone_theme", "Clone Base"),
         Binding("f7", "derive_palettes", "Derive 16/8"),
+        Binding("f8", "toggle_expand_all", "Expand/Collapse All"),
         Binding("ctrl+s", "save_theme", "Save"),
         Binding("ctrl+a", "save_as_theme", "Save As"),
         Binding("escape", "exit_editor", "Exit"),
@@ -2560,6 +2575,7 @@ class ThemeEditScreen(Screen):
         self.current_theme.setdefault("indicator", ">")
         win = self.current_theme.setdefault("window", {})
         self.current_theme.setdefault("divider", {"char": "─", "length": "{window_width}"})
+        self.current_theme.setdefault("marquee", {"char": "•", "gap": 5})
         if "256" in self.current_theme and 256 not in self.current_theme:
             self.current_theme[256] = self.current_theme.pop("256")
         if "16" in self.current_theme and 16 not in self.current_theme:
@@ -2742,6 +2758,10 @@ class ThemeEditScreen(Screen):
                         if css_sb_bg:
                             w.styles.scrollbar_background = css_sb_bg
 
+            with contextlib.suppress(Exception):
+                for sh in self.query(".section_header"):
+                    sh.can_focus = True
+
             self.update_footer_layout()
 
     def compose(self) -> ComposeResult:
@@ -2767,71 +2787,75 @@ class ThemeEditScreen(Screen):
                 )
 
             with VerticalScroll(id="inspector_panel"):
-                yield Label("▼ General & Identity", classes="section_header")
-                with Horizontal(classes="prop_row"):
-                    yield Label("Indicator:", classes="prop_label")
-                    yield Input(
-                        value=str(self.current_theme.get("indicator", ">")),
-                        id="prop_indicator",
-                        classes="prop_input",
-                    )
-                    yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_indicator")
-                with Horizontal(classes="prop_row"):
-                    yield Label("Shadow Char:", classes="prop_label")
-                    yield Input(
-                        value=str(self.current_theme["window"].get("shadow_char", "░")),
-                        id="prop_shadow_char",
-                        classes="prop_input",
-                    )
-                    yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_shadow_char")
-
-                yield Label("▼ Marquee Settings", classes="section_header")
-                m_cfg = self.current_theme.get("marquee", {})
-                m_char = str(m_cfg.get("char", " ")) if isinstance(m_cfg, dict) else " "
-                m_gap = str(m_cfg.get("gap", 4)) if isinstance(m_cfg, dict) else "4"
-                with Horizontal(classes="prop_row"):
-                    yield Label("Marquee Char:", classes="prop_label")
-                    yield Input(
-                        value=m_char,
-                        id="prop_marquee_char",
-                        classes="prop_input",
-                    )
-                    yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_marquee_char")
-                with Horizontal(classes="prop_row"):
-                    yield Label("Gap Spaces:", classes="prop_label")
-                    yield Input(
-                        value=m_gap,
-                        id="prop_marquee_gap",
-                        classes="prop_input",
-                    )
-
-                yield Label("▼ Window & Gutter Borders", classes="section_header")
-                for key, label_text in self.BORDER_PROPERTIES:
-                    val = str(self.current_theme["window"].get(key, ""))
+                yield Label("▶ General & Identity", classes="section_header", id="hdr_general")
+                with Vertical(id="sec_general", classes="section_body collapsed"):
                     with Horizontal(classes="prop_row"):
-                        yield Label(f"{label_text}:", classes="prop_label")
-                        yield Input(value=val, id=f"prop_{key}", classes="prop_input")
-                        yield Button("ASCII", classes="btn_prop_action", id=f"btn_ascii_{key}")
+                        yield Label("Indicator:", classes="prop_label")
+                        yield Input(
+                            value=str(self.current_theme.get("indicator", ">")),
+                            id="prop_indicator",
+                            classes="prop_input",
+                        )
+                        yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_indicator")
+                    with Horizontal(classes="prop_row"):
+                        yield Label("Shadow Char:", classes="prop_label")
+                        yield Input(
+                            value=str(self.current_theme["window"].get("shadow_char", "░")),
+                            id="prop_shadow_char",
+                            classes="prop_input",
+                        )
+                        yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_shadow_char")
 
-                yield Label("▼ Divider Settings", classes="section_header")
+                yield Label("▶ Marquee Settings", classes="section_header", id="hdr_marquee")
+                m_cfg = self.current_theme.get("marquee", {})
+                m_char = str(m_cfg.get("char", "•")) if isinstance(m_cfg, dict) else "•"
+                m_gap = str(m_cfg.get("gap", 5)) if isinstance(m_cfg, dict) else "5"
+                with Vertical(id="sec_marquee", classes="section_body collapsed"):
+                    with Horizontal(classes="prop_row"):
+                        yield Label("Marquee Char:", classes="prop_label")
+                        yield Input(
+                            value=m_char,
+                            id="prop_marquee_char",
+                            classes="prop_input",
+                        )
+                        yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_marquee_char")
+                    with Horizontal(classes="prop_row"):
+                        yield Label("Gap Spaces:", classes="prop_label")
+                        yield Input(
+                            value=m_gap,
+                            id="prop_marquee_gap",
+                            classes="prop_input",
+                        )
+
+                yield Label("▶ Window & Gutter Borders", classes="section_header", id="hdr_borders")
+                with Vertical(id="sec_borders", classes="section_body collapsed"):
+                    for key, label_text in self.BORDER_PROPERTIES:
+                        val = str(self.current_theme["window"].get(key, ""))
+                        with Horizontal(classes="prop_row"):
+                            yield Label(f"{label_text}:", classes="prop_label")
+                            yield Input(value=val, id=f"prop_{key}", classes="prop_input")
+                            yield Button("ASCII", classes="btn_prop_action", id=f"btn_ascii_{key}")
+
+                yield Label("▶ Divider Settings", classes="section_header", id="hdr_divider")
                 div_char = str(self.current_theme.get("divider", {}).get("char", "─"))
                 div_len = str(self.current_theme.get("divider", {}).get("length", "{window_width}"))
-                with Horizontal(classes="prop_row"):
-                    yield Label("Divider Char:", classes="prop_label")
-                    yield Input(value=div_char, id="prop_divider_char", classes="prop_input")
-                    yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_divider_char")
-                with Horizontal(classes="prop_row"):
-                    yield Label("Length Mode:", classes="prop_label")
-                    yield Input(value=div_len, id="prop_divider_length", classes="prop_input")
+                with Vertical(id="sec_divider", classes="section_body collapsed"):
+                    with Horizontal(classes="prop_row"):
+                        yield Label("Divider Char:", classes="prop_label")
+                        yield Input(value=div_char, id="prop_divider_char", classes="prop_input")
+                        yield Button("ASCII", classes="btn_prop_action", id="btn_ascii_divider_char")
+                    with Horizontal(classes="prop_row"):
+                        yield Label("Length Mode:", classes="prop_label")
+                        yield Input(value=div_len, id="prop_divider_length", classes="prop_input")
 
-                yield Label("▼ Wallpaper & Background", classes="section_header")
+                yield Label("▶ Wallpaper & Background", classes="section_header", id="hdr_wallpaper")
                 bg_data = self.current_theme.get("background")
                 bg_img = ""
                 if isinstance(bg_data, dict):
                     bg_img = str(bg_data.get("image", ""))
                 elif isinstance(bg_data, str):
                     bg_img = bg_data
-                with Horizontal(classes="prop_row"):
+                with Vertical(id="sec_wallpaper", classes="section_body collapsed"), Horizontal(classes="prop_row"):
                     yield Label("Wallpaper:", classes="prop_label")
                     yield Input(
                         value=bg_img,
@@ -2841,15 +2865,16 @@ class ThemeEditScreen(Screen):
                     )
                     yield Button("Config", classes="btn_prop_action", id="btn_config_background")
 
-                yield Label("▼ 256-Color Palette Tokens", classes="section_header")
+                yield Label("▶ 256-Color Palette Tokens", classes="section_header", id="hdr_colors")
                 pal_256 = self.current_theme.get(256) or self.current_theme.get("256") or {}
-                for tok in self.COLOR_TOKENS:
-                    tok_val = pal_256.get(tok, -1)
-                    val_str = str(tok_val)
-                    with Horizontal(classes="prop_row"):
-                        yield Label(f"{tok}:", classes="prop_label")
-                        yield Input(value=val_str, id=f"color_{tok}", classes="prop_input")
-                        yield Button("Color", classes="btn_prop_action", id=f"btn_color_{tok}")
+                with Vertical(id="sec_colors", classes="section_body collapsed"):
+                    for tok in self.COLOR_TOKENS:
+                        tok_val = pal_256.get(tok, -1)
+                        val_str = str(tok_val)
+                        with Horizontal(classes="prop_row"):
+                            yield Label(f"{tok}:", classes="prop_label")
+                            yield Input(value=val_str, id=f"color_{tok}", classes="prop_input")
+                            yield Button("Color", classes="btn_prop_action", id=f"btn_color_{tok}")
 
         with Vertical(id="footer"):
             with Horizontal(classes="footer_row"):
@@ -2866,6 +2891,8 @@ class ThemeEditScreen(Screen):
                 yield Label("[F6] Clone/Base", classes="footer_item", id="lbl_clone", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F7] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[F8] Expand All", classes="footer_item", id="lbl_expand_all", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[Ctrl+S] Save", classes="footer_item", id="lbl_save", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
@@ -2951,8 +2978,73 @@ class ThemeEditScreen(Screen):
         if event.widget and getattr(event.widget, "id", None) == "preview_panel":
             self.focus_inspector_target("color_background")
 
+    def toggle_inspector_section(self, header: Label | str, expand: bool | None = None) -> bool:
+        """Toggle or set the collapsed state of an inspector section.
+
+        Args:
+            header: The section header Label widget or its ID (e.g. 'hdr_general').
+            expand: True to expand, False to collapse, or None to toggle.
+
+        Returns:
+            True if section is now expanded, False if collapsed.
+        """
+        if isinstance(header, str):
+            hdr_id = header if header.startswith("hdr_") else f"hdr_{header}"
+            try:
+                hdr_widget = self.query_one(f"#{hdr_id}", Label)
+            except Exception:  # noqa: BLE001
+                return False
+        else:
+            hdr_widget = header
+            hdr_id = getattr(hdr_widget, "id", "") or ""
+
+        sec_id = hdr_id.replace("hdr_", "sec_")
+        try:
+            body = self.query_one(f"#{sec_id}")
+        except Exception:  # noqa: BLE001
+            return False
+
+        is_collapsed = body.has_class("collapsed")
+        should_expand = is_collapsed if expand is None else expand
+        if should_expand == (not is_collapsed):
+            return not is_collapsed
+
+        curr_text = str(hdr_widget.render()) if hasattr(hdr_widget, "render") else str(getattr(hdr_widget, "text", ""))
+        ret = False
+        if should_expand:
+            body.remove_class("collapsed")
+            new_text = curr_text.replace("▶", "▼")
+            hdr_widget.update(new_text)
+            ret = True
+        else:
+            body.add_class("collapsed")
+            new_text = curr_text.replace("▼", "▶")
+            hdr_widget.update(new_text)
+            ret = False
+
+        with contextlib.suppress(Exception):
+            lbl = self.query_one("#lbl_expand_all", Label)
+            all_expanded = not any(b.has_class("collapsed") for b in self.query(".section_body"))
+            lbl.update("[F8] Collapse All" if all_expanded else "[F8] Expand All")
+
+        return ret
+
     def focus_inspector_target(self, target_id: str) -> None:
-        """Scroll to and focus an inspector input widget by element ID."""
+        """Scroll to and focus an inspector input widget by element ID, expanding its section if collapsed."""
+        with contextlib.suppress(Exception):
+            target_widget = self.query_one(f"#{target_id}")
+            parent = getattr(target_widget, "parent", None)
+            while parent and parent != self:
+                if "section_body" in getattr(parent, "classes", []):
+                    sec_id = getattr(parent, "id", "") or ""
+                    if sec_id.startswith("sec_"):
+                        hdr_id = sec_id.replace("sec_", "hdr_")
+                        with contextlib.suppress(Exception):
+                            hdr = self.query_one(f"#{hdr_id}", Label)
+                            self.toggle_inspector_section(hdr, expand=True)
+                    break
+                parent = getattr(parent, "parent", None)
+
         try:
             inp = self.query_one(f"#{target_id}", Input)
             inp.scroll_visible()
@@ -3101,7 +3193,7 @@ class ThemeEditScreen(Screen):
             elif prop_k == "divider_char":
                 curr_val = self.current_theme.get("divider", {}).get("char", "")
             elif prop_k == "marquee_char":
-                curr_val = str(self.current_theme.get("marquee", {}).get("char", " "))
+                curr_val = str(self.current_theme.get("marquee", {}).get("char", "•"))
             else:
                 curr_val = self.current_theme.get("window", {}).get(prop_k, "")
 
@@ -3139,9 +3231,12 @@ class ThemeEditScreen(Screen):
             )
 
     def on_click(self, event: Any) -> None:
-        """Handle mouse clicks on interactive footer shortcut items and header close button."""
+        """Handle mouse clicks on interactive footer shortcut items, header close button, and section headers."""
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
         if not widget:
+            return
+        if "section_header" in getattr(widget, "classes", []):
+            self.toggle_inspector_section(widget)
             return
         w_id = getattr(widget, "id", None)
         if w_id == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", []):
@@ -3157,6 +3252,8 @@ class ThemeEditScreen(Screen):
             self.action_clone_theme()
         elif w_id == "lbl_derive":
             self.action_derive_palettes()
+        elif w_id == "lbl_expand_all":
+            self.action_toggle_expand_all()
         elif w_id == "lbl_background":
             self.action_configure_background()
         elif w_id == "lbl_save":
@@ -3167,6 +3264,23 @@ class ThemeEditScreen(Screen):
             self.action_reset_theme()
         elif w_id == "lbl_exit":
             self.action_exit_editor()
+
+    def on_key(self, event: events.Key) -> None:
+        """Handle keyboard interactions for collapsible section headers."""
+        focused = self.focused
+        if focused and isinstance(focused, Label) and "section_header" in getattr(focused, "classes", []):
+            if event.key in ("enter", "space"):
+                event.prevent_default()
+                event.stop()
+                self.toggle_inspector_section(focused)
+            elif event.key == "left":
+                event.prevent_default()
+                event.stop()
+                self.toggle_inspector_section(focused, expand=False)
+            elif event.key == "right":
+                event.prevent_default()
+                event.stop()
+                self.toggle_inspector_section(focused, expand=True)
 
     def action_show_help(self) -> None:
         """Display the HA Bash Menu manual modal (F1 / ? shortcut)."""
@@ -3285,8 +3399,8 @@ class ThemeEditScreen(Screen):
             self.query_one("#prop_divider_length", Input).value = div_len
 
             m_cfg = self.current_theme.get("marquee", {})
-            m_char = str(m_cfg.get("char", " ")) if isinstance(m_cfg, dict) else " "
-            m_gap = str(m_cfg.get("gap", 4)) if isinstance(m_cfg, dict) else "4"
+            m_char = str(m_cfg.get("char", "•")) if isinstance(m_cfg, dict) else "•"
+            m_gap = str(m_cfg.get("gap", 5)) if isinstance(m_cfg, dict) else "5"
             self.query_one("#prop_marquee_char", Input).value = m_char
             self.query_one("#prop_marquee_gap", Input).value = m_gap
 
@@ -3346,6 +3460,27 @@ class ThemeEditScreen(Screen):
                 theme=self.configured_theme_styles,
             )
         )
+
+    def action_toggle_expand_all(self) -> None:
+        """Toggle all inspector property sections between collapsed and expanded states."""
+        bodies = list(self.query(".section_body"))
+        if not bodies:
+            return
+        # If any section is currently collapsed, expand all; otherwise collapse all
+        target_expand = any(b.has_class("collapsed") for b in bodies)
+
+        for hdr in self.query(".section_header"):
+            if isinstance(hdr, Label):
+                self.toggle_inspector_section(hdr, expand=target_expand)
+
+        with contextlib.suppress(Exception):
+            lbl = self.query_one("#lbl_expand_all", Label)
+            lbl.update("[F8] Collapse All" if target_expand else "[F8] Expand All")
+            self.update_footer_layout()
+
+        status_msg = "Expanded all inspector sections" if target_expand else "Collapsed all inspector sections"
+        with contextlib.suppress(Exception):
+            self.notify(status_msg, title="Theme Inspector", timeout=1.5)
 
     def action_reset_theme(self) -> None:
         """Revert working copy to loaded state."""

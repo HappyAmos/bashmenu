@@ -110,9 +110,9 @@ description: Core developer guidelines for the multi-platform BashMenu
     - `{screen_width}`: Full-width border-to-border (`w - 2`), connects directly to `left_tee`/`right_tee` without margin spaces. Foregrounds must match border color.
 - **Theme-Configurable Marquee (`marquee:` in `bashmenu.themes`):**
   - Supported keys under `marquee:`:
-    - `char`: Separator string or character displayed between repeats of scrolling text (e.g. `"•"`, `"»"`, `"·"`, `"-"`, `" "` or Nerd Font glyphs).
-    - `gap`: Number of space characters flanking or defining the spacer between loop cycles (integer >= 0, default `4`).
-  - Fallback Standard: If a theme omits the `marquee:` section or if an unknown theme is queried, fall back strictly to 4 plain spaces (`char: " "`, `gap: 4`).
+    - `char`: Separator string or character repeated between cycles of scrolling text (e.g. `"~"`, `"•"`, `"»"`, `"·"`, `"-"`, `" "` or Nerd Font glyphs).
+    - `gap`: Number of times `char` is repeated to form the spacer between loop cycles (integer >= 0, default `5`).
+  - Fallback Standard: If a theme omits the `marquee:` section or if an unknown theme is queried, fall back strictly to 5 bullets (`char: "•"`, `gap: 5`).
   - Validation (`ymlcheck.py`): `validate_marquee_section()` enforces that `char` is a string and `gap` is a non-negative integer.
   - Theme Editor (`themeedit.py`):
     - Inspector exposes `prop_marquee_char` (with `btn_ascii_marquee_char` launching `AsciiPickerModal`) and `prop_marquee_gap`.

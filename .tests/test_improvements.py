@@ -1580,14 +1580,15 @@ class TestImprovements(unittest.TestCase):
             self.assertTrue(help_modal.is_markdown)
             self.assertTrue(help_modal.is_help)
             self.assertIn("| Keybinding / Shortcut | Description / Action |", help_modal.message)
-            self.assertIn("| `F3` | View ASCII Character Table (`ascii.sh`) |", help_modal.message)
+            self.assertIn("| `F3` | View ASCII Character Table (`assets/ascii.md` via `rich.sh`) |", help_modal.message)
 
             # 2. Test action_show_ascii_table pushes StreamOutputModalScreen
             screen.action_show_ascii_table()
             self.assertEqual(len(pushed_screens), 2)
             stream_modal = pushed_screens[1]
             self.assertEqual(stream_modal.modal_title, "ASCII Character Table")
-            self.assertIn("ascii.sh", stream_modal.command)
+            self.assertIn("rich.sh", stream_modal.command)
+            self.assertIn("ascii.md", stream_modal.command)
 
         # 3. Test bindings in BashEditScreen
         binding_dict = {b.key: b.action for b in bashedit.BashEditScreen.BINDINGS}
@@ -2204,7 +2205,7 @@ class TestImprovements(unittest.TestCase):
         for fname in os.listdir(scripts_dir):
             if (
                 fname.startswith(".")
-                or fname.endswith((".yml", ".pyc", ".md"))
+                or fname.endswith((".yml", ".pyc", ".md", ".old", ".bak"))
                 or fname == "__pycache__"
                 or os.path.getsize(os.path.join(scripts_dir, fname)) == 0
             ):
@@ -3339,21 +3340,28 @@ G
         import bashmenu_ui
 
         # format_marquee_spacer
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("~", 6), "~~~~~~")
         self.assertEqual(bashmenu_ui.format_marquee_spacer(" ", 4), "    ")
-        self.assertEqual(bashmenu_ui.format_marquee_spacer("", 4), "    ")
-        self.assertEqual(bashmenu_ui.format_marquee_spacer("•", 4), "  •  ")
-        self.assertEqual(bashmenu_ui.format_marquee_spacer("-", 2), " - ")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("", 4), "••••")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer(), "•••••")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("•", 4), "••••")
+        self.assertEqual(bashmenu_ui.format_marquee_spacer("-", 2), "--")
 
         # get_theme_marquee_config
         drac_cfg = bashmenu_ui.get_theme_marquee_config("dracula")
         self.assertEqual(drac_cfg["char"], "•")
         self.assertEqual(drac_cfg["gap"], 4)
 
+        # matrix theme updated from colon to default bullet and gap 5
+        matrix_cfg = bashmenu_ui.get_theme_marquee_config("matrix")
+        self.assertEqual(matrix_cfg["char"], "•")
+        self.assertEqual(matrix_cfg["gap"], 5)
+
         # Fallback when theme does not exist or omits marquee
         dummy_theme = {"256": {}}
         fallback_cfg = bashmenu_ui.get_theme_marquee_config(dummy_theme)
-        self.assertEqual(fallback_cfg["char"], " ")
-        self.assertEqual(fallback_cfg["gap"], 4)
+        self.assertEqual(fallback_cfg["char"], "•")
+        self.assertEqual(fallback_cfg["gap"], 5)
 
     def test_marquee_slice_and_tracker(self):
         """Test get_marquee_slice calculation and MarqueeTracker timing."""
@@ -3373,6 +3381,10 @@ G
         # Offset near wrap
         s10 = bashmenu_ui.get_marquee_slice(text, 6, 10, char=" ", gap=4)
         self.assertEqual(s10, "d    H")
+
+        # Offset near wrap with repeated char spacer
+        s10_tilde = bashmenu_ui.get_marquee_slice(text, 6, 10, char="~", gap=6)
+        self.assertEqual(s10_tilde, "d~~~~~")
 
         # MarqueeTracker
         tracker = bashmenu_ui.MarqueeTracker(pause_ticks=4)
@@ -3595,8 +3607,53 @@ G
                 os.remove(tf_path)
 
 
+    def test_ascii_modal_rich_sh_rendering(self):
+        """Verify bashedit and menuedit invoke rich.sh with assets/ascii.md for ASCII modals."""
+        import bashedit
+        import menuedit
+
+        # 1. Test bashedit action_show_ascii_table
+        pushed = []
+
+        class DummyApp:
+            def __init__(self):
+                self.config = {}
+
+            def push_screen(self, scr):
+                pushed.append(scr)
+
+        screen = bashedit.BashEditScreen(file_path=None)
+        with patch.object(bashedit.BashEditScreen, "app", property(lambda s: DummyApp())):
+            screen.action_show_ascii_table()
+        self.assertEqual(len(pushed), 1)
+        self.assertEqual(pushed[0].modal_title, "ASCII Character Table")
+        self.assertIn("rich.sh", pushed[0].command)
+        self.assertIn("ascii.md", pushed[0].command)
+
+        # 2. Test menuedit ItemEditModal action_lookup_ascii
+        pushed.clear()
+        item_modal = menuedit.ItemEditModal(item={})
+        item_modal._app = DummyApp()
+        item_modal.action_lookup_ascii()
+        self.assertEqual(len(pushed), 1)
+        self.assertEqual(pushed[0].modal_title, "ASCII Character Table")
+        self.assertIn("rich.sh", pushed[0].command)
+        self.assertIn("ascii.md", pushed[0].command)
+
+        # 3. Test menuedit MenuEditScreen action_lookup_ascii
+        pushed.clear()
+        menu_screen = menuedit.MenuEditScreen()
+        menu_screen._app = DummyApp()
+        menu_screen.action_lookup_ascii()
+        self.assertEqual(len(pushed), 1)
+        self.assertEqual(pushed[0].modal_title, "ASCII Character Table")
+        self.assertIn("rich.sh", pushed[0].command)
+        self.assertIn("ascii.md", pushed[0].command)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
 

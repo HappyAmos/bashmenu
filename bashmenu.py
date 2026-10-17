@@ -2685,8 +2685,8 @@ class MainMenuView(Widget):
         prefix_w = ind_w + sc_w + icon_w
 
         mq_cfg = bashmenu_ui.get_theme_marquee_config(theme_styles)
-        mq_char = mq_cfg.get("char", " ")
-        mq_gap = mq_cfg.get("gap", 4)
+        mq_char = mq_cfg.get("char", "•")
+        mq_gap = mq_cfg.get("gap", 5)
 
         def _truncate_ellipsis(s: str, max_w: int) -> str:
             if not s or max_w <= 0:

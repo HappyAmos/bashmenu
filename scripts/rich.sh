@@ -53,8 +53,14 @@ else
     TARGET_FILE="$(cd "$(dirname "$TARGET_FILE")" && pwd)/$(basename "$TARGET_FILE")"
 fi
 
-# Resolve script directory and project root dynamically
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Canonical symlink resolution to determine true script directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Detect Python interpreter
@@ -174,6 +180,17 @@ if [ -t 1 ]; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
             render_markdown | \
             "${SCRIPT_DIR}/pager.sh" "${PAGER_ARGS[@]}"
+    elif command -v bmpager >/dev/null 2>&1; then
+        PAGER_ARGS=()
+        if [ "$ALLOW_FILE" = "1" ]; then
+            RELOAD_CMD="\"${SCRIPT_DIR}/rich.sh\" \"$TARGET_FILE\""
+            PAGER_ARGS+=(--file="$TARGET_FILE" --reload-cmd="$RELOAD_CMD")
+        else
+            PAGER_ARGS+=(--no-file)
+        fi
+        sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
+            render_markdown | \
+            bmpager "${PAGER_ARGS[@]}"
     elif command -v less >/dev/null 2>&1; then
         sed 's/^```[[:space:]]\+/```/' "$TARGET_FILE" | \
             render_markdown | less -R

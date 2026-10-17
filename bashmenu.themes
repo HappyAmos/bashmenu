@@ -1496,8 +1496,8 @@ industry:
     - -1
 matrix:
   marquee:
-    char: ':'
-    gap: 4
+    char: "\u2022"
+    gap: 5
   indicator: '{nf:->:#f0628:}'
   divider:
     char: '-'

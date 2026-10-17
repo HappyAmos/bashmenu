@@ -619,10 +619,15 @@ def render_menu_item_preview(item: dict, config: dict | None = None, width: int 
         right_len = len(right_bracket) if right_bracket else 0
 
     mq_cfg = bashmenu_ui.get_theme_marquee_config(cfg.get("theme", "dracula"))
-    mq_char = mq_cfg.get("char", " ")
-    mq_gap = mq_cfg.get("gap", 4)
+    mq_char = mq_cfg.get("char", "•")
+    mq_gap = mq_cfg.get("gap", 5)
 
     if right_bracket:
+        avail_for_labels = max(2, width - prefix_len)
+        if left_len + right_len + 1 <= avail_for_labels:
+            spacer_len = max(1, width - prefix_len - left_len - right_len)
+            return f"{prefix}{left_label}{' ' * spacer_len}{right_bracket}"
+
         center = width // 2
         left_part_w = max(prefix_len + 1, center - 2)
         left_label_avail_w = max(1, left_part_w - prefix_len)
@@ -1321,7 +1326,15 @@ class ItemEditModal(ModalScreen[dict]):
         except Exception:  # noqa: BLE001
             app_obj = getattr(self, "_app", None)
             cfg = getattr(app_obj, "config", {}) if app_obj else {}
-        cmd = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
+        rich_script = bashmenu.interpolate_placeholders("{scripts_dir}/rich.sh", cfg)
+        ascii_md = bashmenu.interpolate_placeholders("{bashmenu_dir}/assets/ascii.md", cfg)
+        if not os.path.exists(rich_script) or not os.path.exists(ascii_md):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            if not os.path.exists(rich_script):
+                rich_script = os.path.join(base_dir, "scripts", "rich.sh")
+            if not os.path.exists(ascii_md):
+                ascii_md = os.path.join(base_dir, "assets", "ascii.md")
+        cmd = f'bash "{rich_script}" "{ascii_md}"'
         if app_obj:
             app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme))
 
@@ -1779,7 +1792,15 @@ class MenuEditScreen(Screen):
         except Exception:  # noqa: BLE001
             app_obj = getattr(self, "_app", None)
             cfg = getattr(app_obj, "config", {}) if app_obj else {}
-        cmd = bashmenu.interpolate_placeholders("{scripts_dir}/ascii.sh", cfg)
+        rich_script = bashmenu.interpolate_placeholders("{scripts_dir}/rich.sh", cfg)
+        ascii_md = bashmenu.interpolate_placeholders("{bashmenu_dir}/assets/ascii.md", cfg)
+        if not os.path.exists(rich_script) or not os.path.exists(ascii_md):
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            if not os.path.exists(rich_script):
+                rich_script = os.path.join(base_dir, "scripts", "rich.sh")
+            if not os.path.exists(ascii_md):
+                ascii_md = os.path.join(base_dir, "assets", "ascii.md")
+        cmd = f'bash "{rich_script}" "{ascii_md}"'
         if app_obj:
             app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme_styles))
 

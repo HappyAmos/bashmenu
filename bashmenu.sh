@@ -386,6 +386,91 @@ install_cheat() {
     fi
 }
 
+# Install 'rich' command symlink pointing to rich.sh
+install_rich() {
+    local shortcut_name="rich"
+    local target_dir=""
+
+    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+        target_dir="$PREFIX/bin"
+    elif [ "$(id -u)" = 0 ]; then
+        target_dir="/usr/local/bin"
+    elif [ -w "/usr/local/bin" ]; then
+        target_dir="/usr/local/bin"
+    else
+        target_dir="$HOME/.local/bin"
+    fi
+
+    mkdir -p "$target_dir" 2>/dev/null || true
+    local target_file="${target_dir}/${shortcut_name}"
+    local real_script_path="${ADDITIONAL_SCRIPTS_DIR}/rich.sh"
+
+    echo "Installing symlink '$shortcut_name' shortcut pointing to: $real_script_path"
+
+    ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
+
+    if [ -L "$target_file" ] || [ -f "$target_file" ]; then
+        echo "  [✓] Successfully installed '$shortcut_name' shortcut at $target_file"
+
+        if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+            echo "  [!] Notice: $target_dir is not currently in your PATH environment variable."
+            for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+                if [ -f "$rc" ] && ! grep -q "$target_dir" "$rc"; then
+                    echo "export PATH=\"$target_dir:\$PATH\"" >> "$rc"
+                    echo "  [+] Added $target_dir to $rc"
+                fi
+            done
+        fi
+        return 0
+    else
+        echo "  [✗] Failed to create shortcut (symlink) at $target_file" >&2
+        return 1
+    fi
+}
+
+# Install 'bmpager' command symlink pointing to pager.sh
+install_bmpager() {
+    local shortcut_name="bmpager"
+    local target_dir=""
+
+    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+        target_dir="$PREFIX/bin"
+    elif [ "$(id -u)" = 0 ]; then
+        target_dir="/usr/local/bin"
+    elif [ -w "/usr/local/bin" ]; then
+        target_dir="/usr/local/bin"
+    else
+        target_dir="$HOME/.local/bin"
+    fi
+
+    mkdir -p "$target_dir" 2>/dev/null || true
+    local target_file="${target_dir}/${shortcut_name}"
+    local real_script_path="${ADDITIONAL_SCRIPTS_DIR}/pager.sh"
+
+    echo "Installing symlink '$shortcut_name' shortcut pointing to: $real_script_path"
+
+    ln -sf "$real_script_path" "$target_file" 2>/dev/null || run_as_root ln -sf "$real_script_path" "$target_file"
+
+    if [ -L "$target_file" ] || [ -f "$target_file" ]; then
+        echo "  [✓] Successfully installed '$shortcut_name' shortcut at $target_file"
+
+        if [[ ":$PATH:" != *":$target_dir:"* ]]; then
+            echo "  [!] Notice: $target_dir is not currently in your PATH environment variable."
+            for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+                if [ -f "$rc" ] && ! grep -q "$target_dir" "$rc"; then
+                    echo "export PATH=\"$target_dir:\$PATH\"" >> "$rc"
+                    echo "  [+] Added $target_dir to $rc"
+                fi
+            done
+        fi
+        return 0
+    else
+        echo "  [✗] Failed to create shortcut (symlink) at $target_file" >&2
+        return 1
+    fi
+}
+
+
 
 # Map binary names to their respective installation package names based on the package manager
 get_package_name() {
@@ -546,6 +631,8 @@ Options:
   --check-env              Inspect platform detection, paths, and dependencies
   --install-bm             Install 'bm' command shortcut [/.local/bin/bm]
   --install-cheat          Install 'cheat' command shortcut [/.local/bin/cheat]
+  --install-rich           Install 'rich' command shortcut [/.local/bin/rich]
+  --install-bmpager        Install 'bmpager' command shortcut [/.local/bin/bmpager]
   --install-man            Install bashmenu.1 man page [/.local/share/man/man1/bashmenu.1]
   --setup                  Run non-interactive setup (venv, deps, shortcuts) and exit
   -y, --yes                Automatically answer yes to dependency installation prompts
@@ -581,6 +668,14 @@ for arg in "$@"; do
             ;;
         --install-cheat)
             install_cheat
+            exit $?
+            ;;
+        --install-rich)
+            install_rich
+            exit $?
+            ;;
+        --install-bmpager)
+            install_bmpager
             exit $?
             ;;
         --install-man|--install-manpage)
@@ -718,6 +813,8 @@ fi
 if [ "$SETUP_ONLY" = true ]; then
     install_bm
     install_cheat
+    install_rich
+    install_bmpager
     install_man_page
 else
     # Check if 'bm' shortcut is missing and prompt user if interactive session

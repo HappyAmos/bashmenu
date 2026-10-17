@@ -339,6 +339,78 @@ class TestPlatformDetection(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertTrue("statistics" in res.stdout or "Reply from" in res.stdout)
 
+    def test_install_rich_symlink(self):
+        """Verify bashmenu.sh --install-rich installs symlink pointing to rich.sh in target directory."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Point HOME to tmp_dir so it installs to $tmp_dir/.local/bin/rich without root
+            res = self.run_bash_snippet(
+                {"HOME": tmp_dir, "PREFIX": ""},
+                f'bash "{BASHMENU_SH}" --install-rich',
+            )
+            self.assertEqual(res.returncode, 0)
+            rich_bin = os.path.join(tmp_dir, ".local", "bin", "rich")
+            self.assertTrue(os.path.islink(rich_bin))
+            resolved = os.path.realpath(rich_bin)
+            expected = os.path.realpath(os.path.join(SCRIPTS_DIR, "rich.sh"))
+            self.assertEqual(resolved, expected)
+
+    def test_install_bmpager_symlink(self):
+        """Verify bashmenu.sh --install-bmpager installs symlink pointing to pager.sh and runs via symlink."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            res = self.run_bash_snippet(
+                {"HOME": tmp_dir, "PREFIX": ""},
+                f'bash "{BASHMENU_SH}" --install-bmpager',
+            )
+            self.assertEqual(res.returncode, 0)
+            bmpager_bin = os.path.join(tmp_dir, ".local", "bin", "bmpager")
+            self.assertTrue(os.path.islink(bmpager_bin))
+            resolved = os.path.realpath(bmpager_bin)
+            expected = os.path.realpath(os.path.join(SCRIPTS_DIR, "pager.sh"))
+            self.assertEqual(resolved, expected)
+
+            # Test execution through the symlink
+            ver_res = subprocess.run(
+                [bmpager_bin, "--version"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            self.assertEqual(ver_res.returncode, 0)
+            self.assertIn("1.0.0", ver_res.stdout)
+
+    def test_rich_symlink_resolves_pager(self):
+        """Verify rich symlink can resolve pager.sh and render markdown."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Install both rich and bmpager
+            self.run_bash_snippet(
+                {"HOME": tmp_dir, "PREFIX": ""},
+                f'bash "{BASHMENU_SH}" --install-rich',
+            )
+            self.run_bash_snippet(
+                {"HOME": tmp_dir, "PREFIX": ""},
+                f'bash "{BASHMENU_SH}" --install-bmpager',
+            )
+            rich_bin = os.path.join(tmp_dir, ".local", "bin", "rich")
+            sample_md = os.path.join(tmp_dir, "test.md")
+            with open(sample_md, "w") as f:
+                f.write("# Hello World\nTesting **markdown** rendering.")
+
+            # Test non-interactive render
+            run_res = subprocess.run(
+                [rich_bin, sample_md],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            self.assertEqual(run_res.returncode, 0)
+            self.assertIn("Hello World", run_res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
+

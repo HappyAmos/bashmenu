@@ -17,7 +17,7 @@ import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from rich.text import Text
-from textual.widgets import Input
+from textual.widgets import Input, Label
 
 import bashmenu
 import bashmenu_ui
@@ -1171,6 +1171,87 @@ class TestThemeEditor(unittest.TestCase):
         rendered = widget.render()
         self.assertIsInstance(rendered, Text)
         self.assertIn("Bash Menu", rendered.plain)
+
+    def test_theme_editor_collapsible_sections(self):
+        """Verify ThemeEditScreen collapsible section headers, default collapsed state, F8 shortcut, and auto-expansion."""
+        app = themeedit.ThemeEditApp()
+
+        async def _run():
+            async with app.run_test() as pilot:
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+
+                # 1. Initial default state: all 6 sections are collapsed with '▶'
+                hdr_general = screen.query_one("#hdr_general")
+                sec_general = screen.query_one("#sec_general")
+                self.assertIn("▶", str(hdr_general.render()))
+                self.assertTrue(sec_general.has_class("collapsed"))
+
+                lbl_expand_all = screen.query_one("#lbl_expand_all", Label)
+                self.assertIn("Expand All", str(lbl_expand_all.render()))
+
+                # 2. Press F8 to expand all sections
+                await pilot.press("f8")
+                await pilot.pause()
+                self.assertFalse(sec_general.has_class("collapsed"))
+                self.assertIn("▼", str(hdr_general.render()))
+                self.assertIn("Collapse All", str(lbl_expand_all.render()))
+
+                # Verify other sections also expanded
+                sec_marquee = screen.query_one("#sec_marquee")
+                hdr_marquee = screen.query_one("#hdr_marquee")
+                self.assertFalse(sec_marquee.has_class("collapsed"))
+                self.assertIn("▼", str(hdr_marquee.render()))
+
+                # 3. Press F8 again to collapse all sections
+                await pilot.press("f8")
+                await pilot.pause()
+                self.assertTrue(sec_general.has_class("collapsed"))
+                self.assertIn("▶", str(hdr_general.render()))
+                self.assertTrue(sec_marquee.has_class("collapsed"))
+                self.assertIn("▶", str(hdr_marquee.render()))
+                self.assertIn("Expand All", str(lbl_expand_all.render()))
+
+                # 4. Click single section header to expand
+                await pilot.click(hdr_general)
+                await pilot.pause()
+                self.assertFalse(sec_general.has_class("collapsed"))
+                self.assertIn("▼", str(hdr_general.render()))
+
+                # Click again to collapse
+                await pilot.click(hdr_general)
+                await pilot.pause()
+                self.assertTrue(sec_general.has_class("collapsed"))
+                self.assertIn("▶", str(hdr_general.render()))
+
+                # 5. Keyboard interaction on focused header: Enter/Space/Left/Right
+                hdr_marquee.focus()
+                await pilot.press("enter")
+                await pilot.pause()
+                self.assertFalse(sec_marquee.has_class("collapsed"))
+                self.assertIn("▼", str(hdr_marquee.render()))
+
+                await pilot.press("space")
+                await pilot.pause()
+                self.assertTrue(sec_marquee.has_class("collapsed"))
+                self.assertIn("▶", str(hdr_marquee.render()))
+
+                await pilot.press("right")
+                await pilot.pause()
+                self.assertFalse(sec_marquee.has_class("collapsed"))
+
+                await pilot.press("left")
+                await pilot.pause()
+                self.assertTrue(sec_marquee.has_class("collapsed"))
+
+                # 6. Auto-expand on focus_inspector_target from collapsed state
+                self.assertTrue(sec_general.has_class("collapsed"))
+                screen.focus_inspector_target("prop_indicator")
+                await pilot.pause()
+                self.assertFalse(sec_general.has_class("collapsed"))
+                self.assertIn("▼", str(hdr_general.render()))
+
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":
