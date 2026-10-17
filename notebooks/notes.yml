@@ -33,3 +33,9 @@ notebook:
         type: note
         format: markdown
         content: This is a note about wifi.
+    - TODO:
+        type: note
+        format: markdown
+        content: |-
+          - [ ] Add {marquee]
+          - [ ] Add an existing pallete reference to theme color picker.
