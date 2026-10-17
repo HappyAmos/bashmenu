@@ -1,3 +1,9 @@
+# ==============================================================================
+# BashMenu Configuration (bashmenu.yml)
+# All keys defined in this file can be referenced via placeholders using the
+# '{app.<key>}' namespace (e.g. {app.theme}, {app.settings.tabstop}, {app.user.postal_code}),
+# or shorthand shortcuts ({theme}, {user.<key>}, {settings.<key>}).
+# ==============================================================================
 version: 0.0.1
 theme: mountain
 user:

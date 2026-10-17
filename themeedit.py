@@ -3933,9 +3933,7 @@ class ThemeEditScreen(Screen):
                 if self.configured_theme == target_name:
                     cfg, _ = bashmenu.load_config()
                     cfg["theme"] = fallback_candidate
-                    cfg_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.yml")
-                    with open(cfg_path, "w", encoding="utf-8") as f:
-                        yaml.dump(cfg, f, sort_keys=False, default_flow_style=False)
+                    bashmenu.save_config(cfg)
                     self.configured_theme = fallback_candidate
                     self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
                     self.apply_theme()
@@ -4210,9 +4208,7 @@ class ThemeEditScreen(Screen):
             if set_active:
                 cfg, _ = bashmenu.load_config()
                 cfg["theme"] = target_name
-                cfg_path = os.path.join(bashmenu.BASHMENU_DIR, "bashmenu.yml")
-                with open(cfg_path, "w", encoding="utf-8") as f:
-                    yaml.dump(cfg, f, sort_keys=False, default_flow_style=False)
+                bashmenu.save_config(cfg)
                 self.configured_theme = target_name
                 self.configured_theme_styles = bashmenu_ui.init_theme_colors(self.configured_theme)
                 self.apply_theme()

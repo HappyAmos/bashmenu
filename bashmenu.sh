@@ -297,19 +297,26 @@ install_man_page() {
     fi
 }
 
+# Resolve bin directory for command symlinks
+get_install_bin_dir() {
+    if [ -n "${BASHMENU_BIN_DIR:-}" ]; then
+        echo "$BASHMENU_BIN_DIR"
+    elif [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
+        echo "$PREFIX/bin"
+    elif [ "$(id -u)" = 0 ]; then
+        echo "/usr/local/bin"
+    elif [ -n "$HOME" ]; then
+        echo "$HOME/.local/bin"
+    elif [ -w "/usr/local/bin" ]; then
+        echo "/usr/local/bin"
+    else
+        echo "$HOME/.local/bin"
+    fi
+}
+
 # Install 'bm' and 'bashmenu' command symlinks pointing to bashmenu.sh
 install_bm() {
-    local target_dir=""
-
-    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
-        target_dir="$PREFIX/bin"
-    elif [ "$(id -u)" = 0 ]; then
-        target_dir="/usr/local/bin"
-    elif [ -w "/usr/local/bin" ]; then
-        target_dir="/usr/local/bin"
-    else
-        target_dir="$HOME/.local/bin"
-    fi
+    local target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local real_script_path="${SCRIPT_DIR}/bashmenu.sh"
@@ -347,17 +354,7 @@ install_bm() {
 # Install 'cheat' command symlink pointing to bashmenu.sh
 install_cheat() {
     local shortcut_name="cheat"
-    local target_dir=""
-
-    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
-        target_dir="$PREFIX/bin"
-    elif [ "$(id -u)" = 0 ]; then
-        target_dir="/usr/local/bin"
-    elif [ -w "/usr/local/bin" ]; then
-        target_dir="/usr/local/bin"
-    else
-        target_dir="$HOME/.local/bin"
-    fi
+    local target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local target_file="${target_dir}/${shortcut_name}"
@@ -389,17 +386,7 @@ install_cheat() {
 # Install 'rich' command symlink pointing to rich.sh
 install_rich() {
     local shortcut_name="rich"
-    local target_dir=""
-
-    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
-        target_dir="$PREFIX/bin"
-    elif [ "$(id -u)" = 0 ]; then
-        target_dir="/usr/local/bin"
-    elif [ -w "/usr/local/bin" ]; then
-        target_dir="/usr/local/bin"
-    else
-        target_dir="$HOME/.local/bin"
-    fi
+    local target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local target_file="${target_dir}/${shortcut_name}"
@@ -431,17 +418,7 @@ install_rich() {
 # Install 'bmpager' command symlink pointing to pager.sh
 install_bmpager() {
     local shortcut_name="bmpager"
-    local target_dir=""
-
-    if [ "$IS_TERMUX" = true ] && [ -n "$PREFIX" ] && [ -d "$PREFIX/bin" ]; then
-        target_dir="$PREFIX/bin"
-    elif [ "$(id -u)" = 0 ]; then
-        target_dir="/usr/local/bin"
-    elif [ -w "/usr/local/bin" ]; then
-        target_dir="/usr/local/bin"
-    else
-        target_dir="$HOME/.local/bin"
-    fi
+    local target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local target_file="${target_dir}/${shortcut_name}"
