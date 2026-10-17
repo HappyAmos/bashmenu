@@ -3946,7 +3946,7 @@ mountain:
     - -1
     plugin:
     - 245
-    - -1
+    - 22
     window_close_button:
     - 255
     - -1
@@ -4082,7 +4082,8 @@ mountain:
     - -1
   background:
     image: assets/wallpapers/mountain.png
-    opacity: 0.85
-    scaling: center
+    opacity: 0.5
+    scaling: stretch
     mode: halfblock
+    clustering: 64
     quantization: 16

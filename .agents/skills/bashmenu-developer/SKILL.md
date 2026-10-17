@@ -19,6 +19,9 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Every completed task, bug fix, feature addition, or refactoring step must conclude by creating a concise, descriptive git commit (`git commit -m "..."`) and pushing directly to GitHub (`git push`).
   - Never leave changes uncommitted or unpushed in the local repository.
   - After pushing to `origin/main`, inspect or verify GitHub Actions CI when appropriate using GitHub CLI (`gh run list`).
+- **Configuration Header Preservation Invariant (`bashmenu.yml`):**
+  - Never use raw `open(CONFIG_FILE, "w")` with `yaml.dump()` to persist settings to `bashmenu.yml`.
+  - Always call `bashmenu.save_config(config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.
 - **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"`  and `pytest`.
 - **GitHub Actions CI Workflow & Remote Test Verification:**
   - Automated testing is offloaded to GitHub Actions (`.github/workflows/python-app.yml`) across Python 3.10, 3.11, and 3.12.
@@ -283,12 +286,14 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Root directory defined in `scripts/.cheat.yml` (`dir: ~/cheat`).
   - Search hierarchy: 1a. Exact relative path -> 1b. Filename stem -> 2. YAML frontmatter tags -> 3. Full-text body.
   - List/Search flags: `cheat -l` (lists files and tags in 2 columns), `cheat -s <query>` (filtered search). Dispatches to `rich.sh` and `pager.sh`.
-- **CLI Executable Symlinks (`install.sh` / `uninstall.sh`):**
-  - The installer exposes first-class CLI commands via symlinks created in `${BIN_DIR}` (default `~/.local/bin` or `/usr/local/bin`):
-    - `bm`: Main TUI launcher (`bashmenu.sh`).
-    - `cheat`: Cheatsheet search and reader (`scripts/cheat.sh`).
-    - `rich`: ANSI-rendered markdown / syntax viewer (`scripts/rich.sh`).
-    - `bmpager`: Built-in terminal pager with balanced status bar and popup help modal (`scripts/pager.sh`).
+- **CLI Executable Symlinks & Target Directory Resolution (`install.sh` / `bashmenu.sh`):**
+  - The installer and launcher expose first-class CLI commands: `bm`, `cheat`, `rich`, and `bmpager`.
+  - Resolution Hierarchy (`get_install_bin_dir`):
+    1. `$BASHMENU_BIN_DIR` (custom environment override).
+    2. `$PREFIX/bin` (Termux environments).
+    3. `/usr/local/bin` (when running as `root`, `id -u == 0`).
+    4. `$HOME/.local/bin` (standard user binary directory).
+    5. `/usr/local/bin` (fallback if no `$HOME` is defined and directory is writable).
   - `uninstall.sh` removes all four symlinks during uninstallation.
 - **BBCode Rich Formatting (`bashmenu_ui.py`):**
   - Bracketed tags: `[b]`, `[u]`, `[dim]`, `[reverse]`, `[color=...]`.
