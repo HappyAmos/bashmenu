@@ -3205,11 +3205,11 @@ twilight:
   indicator: "{nf:*:\u25C6}"
   background:
     image: assets/wallpapers/twilight.png
-    opacity: 0.85
+    opacity: 0.4
     scaling: stretch
-    clustering: 16
-    quantization: 16
     mode: halfblock
+    clustering: 64
+    quantization: 16
   divider:
     char: "\u2500"
     length: '{window_width}'
@@ -3232,6 +3232,12 @@ twilight:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: 233
     title:
@@ -3885,6 +3891,12 @@ nightscape:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: 53
     title:
@@ -4073,8 +4085,11 @@ nightscape:
     - -1
   background:
     image: assets/wallpapers/nightscape.png
-    opacity: 0.5
+    opacity: 0.25
     scaling: stretch
     mode: halfblock
     clustering: 32
     quantization: 16
+  divider:
+    char: "\u2500"
+    length: '{window_width}'

@@ -38,6 +38,8 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Extension Scripts: Standalone games, plugins, and helper tools must reside in `scripts/`, never in root. Menu actions reference them via `{scripts_dir}/<name>`.
   - Notebooks: User notebooks and notes must reside in `notebooks/` (`{notebooks_dir}` / `{notebooks}`). `resolve_notebook_path()` checks `notebooks/` first before falling back to root.
 - **Dependencies & Virtualenv Hygiene:** `requirements.txt` must declare all runtime and test dependencies (including `Pillow` for wallpaper compositing, `textual`, `rich`, `PyYAML`, `ruff`, `flake8`, and `pytest`). Keep system prerequisites to a minimum (`python3` + `curl`). CI runners install freshly from `requirements.txt`; ensure no test relies on unlisted packages. Prefer Python standard library (`json`, `urllib.request`) over external CLI tools (`glow`, `jq`, `yq`) for out-of-the-box compatibility on Termux, Raspberry Pi, and Windows (Git Bash/WSL).
+- **Subprocess Test Environment Isolation:**
+  - Tests executing shell scripts or wrapper binaries (`scripts/rich.sh`, `bashmenu.sh`) via `subprocess.run` must explicitly pass `PYTHON_BIN=sys.executable` and prepend `os.path.dirname(sys.executable)` to `PATH` in `env` to ensure multi-version CI runners (e.g. Python 3.10/3.11/3.12 under `pytest-xdist`) invoke the active virtual environment rather than system Python.
 - **Sub-Agent Delegation Policy:** Use local `opencode` CLI sparingly and strictly for small, low-risk draft tasks (test case drafts, isolated prototypes). Treat all output as untrusted draft code requiring strict review, linting, and automated test validation.
 - **Branching Discipline:** For structural overhauls (cross-platform compatibility, editor re-architecture, dependency reduction), always branch from git (e.g. `feat/<topic>`) and verify all tests and linters pass before merging.
 
@@ -84,6 +86,9 @@ description: Core developer guidelines for the multi-platform BashMenu
   - `PluginBuffer` is an independent Textual buffer at least 1 line above the gutter, dynamic height up to 10 rows, with theme background matching.
   - Top divider (`divider: true` / `top_divider: true`): Deducts 1 row from `visible_option_rows` so scrolling never overlaps the divider.
   - With `{screen_width}` dividers, `PluginBuffer` expands to `max(20, w - 2)` at `x = 1`, and text lines indent 2 spaces (`"  "`) for menu column alignment.
+- **Plugin Background & Divider Uniformity:**
+  - In-plugin rows, in-plugin dividers, padding spaces, and top plugin dividers pre-baked on `PrebakedWallpaperCanvas` must explicitly apply `plugin_bg_color` / `plugin_bg_style` when a theme defines a plugin background (e.g. `mountain`).
+  - Cells within the plugin domain must never leave `style.bgcolor is None`, as `composite_single_row` will otherwise treat them as transparent and composite them directly over wallpaper half-blocks.
 - **50/50 Dual Marquee Partition Contract (`bashmenu.py`):**
   - **With Right-Aligned Bracket Directives (`[...]`):**
     - Available line width (`avail_w`) is strictly split 50/50 around the center:
@@ -133,7 +138,9 @@ description: Core developer guidelines for the multi-platform BashMenu
   - **Renaming:** Themes can be renamed in-place via `#prop_theme_name`, the adjacent `[Rename]` button, or <kbd>Ctrl+R</kbd> (`RenameThemeModal`). Updating the theme slug synchronizes the header title, live preview, and sets `is_dirty = True`.
   - **Direct Save Invariant (<kbd>Ctrl+S</kbd>):** If `self.theme_name` is set to any valid name (existing or newly named via F9/Rename), <kbd>Ctrl+S</kbd> must immediately serialize and save to disk via `_save_theme_to_disk()`. It must NEVER divert to "Save As" unless the theme is truly untitled (`not self.theme_name or self.theme_name == "untitled"`). Only <kbd>Ctrl+A</kbd> opens "Save As". `SaveThemeModal` must pre-fill `self.theme_name` as suggested name and submit on <kbd>Enter</kbd> (`on_input_submitted`).
   - **Deletion:** Themes can be deleted from `bashmenu.themes` via `#btn_delete_theme` / <kbd>Ctrl+D</kbd> in `themeedit.py`, or via <kbd>d</kbd> / <kbd>Delete</kbd> in `ThemePickerModalScreen` (`bashmenu_ui.py`). Prompts confirmation via `ConfirmModalScreen`. Invariants: Never allow deleting the only remaining theme; if deleting the currently active theme, safely fall back to another theme (e.g. `dracula`) and update `bashmenu.yml`.
-  - **Image Palette Generation (`scripts/theme_from_image.py`, <kbd>F9</kbd>):** Generates 256, 16, and 8 color tiers from wallpaper images using Pillow adaptive palette extraction and perceptual luminance sorting. In `action_theme_from_image`, `self.is_new` must be set based on `new_name not in self.raw_themes_data` so existing themes aren't falsely flagged as unnamable/unsaved new themes.
+  - **Image Palette Generation (`scripts/theme_from_image.py`, <kbd>F9</kbd>):**
+    - Generates 256, 16, and 8 color tiers from wallpaper images using Pillow adaptive palette extraction and perceptual luminance sorting. In `action_theme_from_image`, `self.is_new` must be set based on `new_name not in self.raw_themes_data` so existing themes aren't falsely flagged as unnamable/unsaved new themes.
+    - **Background Settings Preservation Invariant:** When deriving colors from an image in `themeedit.py` or via `generate_theme_from_image(..., background_config=...)`, all existing wallpaper background parameters (`opacity`, `scaling`, `mode`, `clustering`, `quantization`, `enabled`) from the active theme must be preserved, updating only `image` to the newly resolved path.
 - **Theme Editor & Contrast Invariants (`bashedit.py`):**
   - When `--display-theme-colors` is active, invert FG/BG if text matches theme background. Fall back to neutral primary 8 (`white` on dark, `black` on light) if both match.
   - Whitespace (`Alt+1`): Stylize non-visible whitespace (`'·'`, `'→'`, `'↵'`) with theme's `whitespace` token (fallback `dim white`). Apply before selection and cursor styles.
@@ -197,6 +204,17 @@ description: Core developer guidelines for the multi-platform BashMenu
     - `Ctrl+A`: Save As new theme
     - `Esc` / `q`: Exit theme editor
   - **Inspector Section Collapsing:** Section headers (`.section_header`) toggle the `.collapsed` class on their corresponding `.section_body`. Inspector sections default to collapsed (`classes="section_body collapsed"`). Pressing `F8` toggles expand/collapse all.
+- **Main Menu Global Keybindings (`BashMenuScreen`):**
+  - `F1`: Help manual modal
+  - `F2`: Theme selector modal
+  - `F3`: Text editor (`bashedit.py`)
+  - `F4`: Menu editor (`menuedit.py`)
+  - `F5`: Hot reload (menu, configs, plugins)
+  - `F6`: Direct shortcut badges toggle
+  - `F7`: Status gutter configuration modal
+  - `F8`: Visual Theme Editor (`themeedit.py`)
+  - `Esc`: Back / Exit
+  - Gutter click handler (`_handle_gutter_click`) must support mouse clicks for all function key actions and prioritize compound phrases (e.g. `f8`/`themeedit`) before generic matches (`theme`).
 - **Interactive 16×16 2D Pickers (`ColorGridWidget`, `AsciiGridWidget`):**
   - For 256-entry domains (colors and CP437 ASCII 0–255), use 16×16 grids with arrow navigation (±1, ±16), Home/End, PgUp/PgDn (±64), and Enter.
   - Active cells must display bold + underline (`underline=True, bold=True`). Mouse clicks resolve via `col = event.x // cell_width; row = event.y`.
