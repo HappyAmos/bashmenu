@@ -25,7 +25,7 @@ Contains a few personal scripts as examples.
 - **Adaptive Icons**: Icons mapped via `{nf:[char]:[hex]:[emoji]}`.
   Toggles gracefully between Unicode Emojis, Nerd Font Glyphs, or defined
   characters. Icon slots standardize to 4 columns, ensuring all menu text
-  strictly aligns at column 11.
+  strictly aligns.
 - **Dynamic Settings Injection (`type: inject_block`)**: Interactively inject
   modular configuration snippets from templates into shell profiles (e.g.
   `~/.bashrc`), with automatic install, update, and uninstall prompts.
@@ -34,6 +34,12 @@ Contains a few personal scripts as examples.
 - **Multi-Platform Support**: Features smart environment detection and package
   manager abstraction (pkg, apt, dnf, pacman, brew) ensuring seamless execution
   across standard Linux, Termux, WSL, and macOS.
+- **Complete Theme Editor**: Visual theme editor for `bashmenu.themes` (run with
+  `F3`).
+- **Built-in Text Editor (`bashedit.py`)**: Built-in terminal text editor, run with
+  `F2`.
+- **Built-in Notebook**: Simple Markdown/bbcode notebook. Each notebook is 
+  saved as a separate yaml file in bashmenu/notebooks/ (e.g. `bashmenu/notebooks/todo.yml`).
 
 ---
 
@@ -54,12 +60,13 @@ Contains a few personal scripts as examples.
 | `ymlcheck.py`     | Command line utility to validate YAML syntax and schemas.     |
 | `scripts/`        | Useful scripts collection (DNS setup, web browser launcher, glyph search, etc.). |
 | `templates/`      | Sample settings block templates (aliases, autoexec).          |
+| `themeedit.py`    | Visual theme editor for `bashmenu.themes` (run with `F3`).    |
 
 ### local Manual Pages (Man Pages)
 
 | File | Description |
 | :--- | :--- |
-| `bashmenu.1` | Man page for HA Bash Menu. |
+| `bashmenu.1` | Man page for HA Bash Menu. If bashmenu is installed, run with `man bashmenu`. |
 
 ---
 

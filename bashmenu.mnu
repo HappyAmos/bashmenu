@@ -1,7 +1,6 @@
 version: 0.0.1
 title: Bash Menu
 items:
-  - '{divider}':
   - Notes:
       type: notebook
       file: '{notebooks_dir}/notes.yml'
@@ -9,6 +8,7 @@ items:
       quiet: false
       alt_buffer: true
       icon: '{nf:/:#f1a7c}'
+  - '{divider}':
   - '{divider}':
   - Applications:
       icon: '{nf::#f003b:}'
@@ -523,6 +523,14 @@ items:
                         {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12},
                         {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
                       icon: '{nf::#ebf3}'
+                  - Status Gutter Refresh Rate:
+                      type: config
+                      icon: '{nf:@:#f1452}'
+                      key: app.settings.refresh_interval
+                      prompt: 'Seconds until next status gutter refresh:'
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Visual Menu Editor [menuedit.py]:
                       type: script
                       action: menuedit.py
