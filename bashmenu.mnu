@@ -1,6 +1,7 @@
 version: 0.0.1
 title: Bash Menu
 items:
+  - '{divider}':
   - Notes:
       type: notebook
       file: '{notebooks_dir}/notes.yml'
@@ -8,7 +9,6 @@ items:
       quiet: false
       alt_buffer: true
       icon: '{nf:/:#f1a7c}'
-  - '{divider}':
   - '{divider}':
   - Applications:
       icon: '{nf::#f003b:}'
