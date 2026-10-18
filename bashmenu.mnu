@@ -566,7 +566,7 @@ items:
                         {battery}, {date}, {date_time_24}, {date_time_24_short}, {date_time_12},
                         {date_time_12_short}, {host}, {user-mode}, {version}, {utc_seconds}'
                       icon: '{nf::#ebf3}'
-                  - Status Gutter Refresh Rate:
+                  - Status Gutter Refresh Rate [{{app.settings.refresh_interval}} milli-seconds]:
                       type: config
                       icon: '{nf:@:#f1452}'
                       key: app.settings.refresh_interval

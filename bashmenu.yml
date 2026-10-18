@@ -53,4 +53,4 @@ settings:
   inactivity_timeout:
     milliseconds: 300000
     command: cmatrix -s
-  refresh_interval: 5000
+  refresh_interval: 5

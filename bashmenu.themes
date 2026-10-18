@@ -3684,7 +3684,7 @@ mountain:
     border_cross: "\u253C"
     shadow_char: "\u2591"
   256:
-    background: -1
+    background: COLOR_BLACK
     title:
     - 255
     - -1
@@ -3735,7 +3735,7 @@ mountain:
     - -1
     plugin:
     - 245
-    - -1
+    - 22
     window_close_button:
     - 255
     - -1
