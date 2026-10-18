@@ -3589,15 +3589,15 @@ class ThemeEditScreen(Screen):
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F5] Reset", classes="footer_item", id="lbl_reset", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
-                yield Label("[Ctrl+O] Open", classes="footer_item", id="lbl_open", markup=False)
-            with Horizontal(classes="footer_row"):
                 yield Label("[F6] Clone/Base", classes="footer_item", id="lbl_clone", markup=False)
-                yield Label("|", classes="footer_sep", markup=False)
+            with Horizontal(classes="footer_row"):
                 yield Label("[F7] Derive 16/8", classes="footer_item", id="lbl_derive", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F8] Expand All", classes="footer_item", id="lbl_expand_all", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F9] From Image", classes="footer_item", id="lbl_from_image", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[Ctrl+O] Open", classes="footer_item", id="lbl_open", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[Ctrl+S] Save", classes="footer_item", id="lbl_save", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)

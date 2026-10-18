@@ -1684,6 +1684,45 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_themeedit_footer_shortcuts_sequential(self):
+        """Verify theme editor footer presents function keys sequentially followed by non-function keys."""
+        import asyncio
+
+        app = themeedit.ThemeEditApp("dracula")
+
+        async def _run():
+            async with app.run_test(size=(120, 40)):
+                screen = app.screen
+                footer = screen.query_one("#footer")
+                rows = list(footer.query(".footer_row"))
+                self.assertEqual(len(rows), 2)
+
+                row1_labels = [str(lbl.render()) for lbl in rows[0].query(".footer_item")]
+                row2_labels = [str(lbl.render()) for lbl in rows[1].query(".footer_item")]
+
+                # Row 1 must have F1 through F6 in sequential order
+                self.assertEqual(row1_labels, [
+                    "[F1] Help",
+                    "[F2] Background",
+                    "[F3] Pick Color",
+                    "[F4] ASCII/Glyphs",
+                    "[F5] Reset",
+                    "[F6] Clone/Base",
+                ])
+
+                # Row 2 must have F7 through F9, followed by non-function keys
+                self.assertEqual(row2_labels, [
+                    "[F7] Derive 16/8",
+                    "[F8] Expand All",
+                    "[F9] From Image",
+                    "[Ctrl+O] Open",
+                    "[Ctrl+S] Save",
+                    "[Ctrl+A] Save As",
+                    "[ESC/q] Exit",
+                ])
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()

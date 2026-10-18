@@ -105,6 +105,8 @@ def is_formatting_tag(content: str) -> bool:
     if content_clean.startswith(("color=", "list=", "table")) and "]" not in content_clean:
         return True
     content_clean = content_clean.removeprefix("/")
+    if len(content_clean) <= 1:
+        return False
     with contextlib.suppress(Exception):
         Style.parse(content_clean)
         return True

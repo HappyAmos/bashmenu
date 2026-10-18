@@ -585,6 +585,42 @@ Detailed section content here.
         bashmenu_ui.apply_button_theme(btn, theme=theme, button_type="button_default")
         self.assertEqual(str(btn.styles.background), "Color(135, 135, 95)")
 
+    def test_notebook_delete_shortcut_gutter_display(self):
+        """Verify [D]: Delete keyboard shortcut is preserved and displayed in notebook help gutter."""
+        from rich.style import Style
+
+        # 1. is_formatting_tag must reject single-character shortcut codes
+        self.assertFalse(bashmenu_ui.is_formatting_tag("d"))
+        self.assertFalse(bashmenu_ui.is_formatting_tag("D"))
+        self.assertFalse(bashmenu_ui.is_formatting_tag("n"))
+        self.assertFalse(bashmenu_ui.is_formatting_tag("s"))
+
+        # Valid formatting tags must still be accepted
+        self.assertTrue(bashmenu_ui.is_formatting_tag("b"))
+        self.assertTrue(bashmenu_ui.is_formatting_tag("u"))
+        self.assertTrue(bashmenu_ui.is_formatting_tag("dim"))
+        self.assertTrue(bashmenu_ui.is_formatting_tag("reverse"))
+
+        # 2. formatting_to_rich_text must preserve [D]: Delete intact
+        gutter_str = (
+            "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [D]: Delete | "
+            "[F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+        )
+        rt = bashmenu_ui.formatting_to_rich_text(gutter_str)
+        self.assertIn("[D]: Delete", rt.plain)
+        self.assertNotIn(": Delete", rt.plain.replace("[D]: Delete", ""))
+
+        # 3. MainMenuView gutter rendering in notebook mode retains [D]: Delete
+        bm = bashmenu.MainMenuView()
+        styles = {
+            "help_text": Style(color="cyan"),
+            "gutter": Style(color="blue"),
+            "border": Style(color="white"),
+        }
+        rendered = bm._render_raw_gutter_lines([gutter_str], ["dracula | 12:00"], 1, 140, styles, w=151)
+        self.assertTrue(len(rendered) > 0)
+        self.assertIn("[D]: Delete", rendered[0].plain)
+
 
 if __name__ == "__main__":
     unittest.main()
