@@ -60,6 +60,7 @@ items:
       quiet: false
       alt_buffer: true
       icon: '{nf:/:#f14d3}'
+      action: BM Developer Shortcuts
   - Notes [{notebooks_dir}/notes.yml]:
       type: notebook
       file: '{notebooks_dir}/notes.yml'

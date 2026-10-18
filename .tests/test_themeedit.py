@@ -19,6 +19,7 @@ from unittest import mock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from rich.cells import cell_len
+from rich.style import Style
 from rich.text import Text
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
@@ -1229,6 +1230,20 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertIsNone(app.modal_result)
 
         asyncio.run(_run_cancel())
+
+    def test_wallpaper_compositor_all_scaling_modes(self):
+        """Verify WallpaperCompositor implements cover, stretch, fit, center, and tile scaling modes."""
+        img_path = "assets/wallpapers/happysun.png"
+        for sc in ("cover", "stretch", "fit", "center", "tile"):
+            comp = bashmenu_ui.WallpaperCompositor(img_path, opacity=0.6, scaling=sc)
+            grid = comp.get_grid(width=40, height=20, theme_bg_rgb=(12, 16, 24))
+            self.assertIsNotNone(grid, f"Grid must not be None for scaling='{sc}'")
+            self.assertEqual(len(grid), 20, f"Expected 20 rows for scaling='{sc}'")
+            self.assertEqual(len(grid[0]), 40, f"Expected 40 cols for scaling='{sc}'")
+            for row in grid:
+                for style, bg_str in row:
+                    self.assertIsInstance(style, Style)
+                    self.assertIsInstance(bg_str, str)
 
     def test_theme_editor_background_shortcut_and_inspector(self):
         """Verify ThemeEditScreen background shortcut [b] and inspector wallpaper controls."""

@@ -68,4 +68,4 @@
 - [x] Add a directive to SKILL.md to append .agents/skills/bashmenu-developer/DONE.md with completed TODO.md items, and include a description and summary of what you did.
 - [x] BUG: Vertical borders in the preview pane of the theme editor are no longer clickable (outside/window borders).
 - [x] REQUEST: Start referencing {bashmenu_dir}/notebook/notes.yml -> notebook -> notes -> TODO update SKILL.md to add this to your workflow after completing tasks. Mark done items in this list as done, and continue writing completion summaries to DONE.md . You will still reference this file (TODO.md) after completing tasks as well.
-- [ ] BUG: Theme editor -> `<f2>` to Configure Background Wallpaper: "Scaling Mode" has several  options to choose from, but I think only two options are actually implemented (cover, stretch). Please finish implementing the other methods.
+- [x] BUG: Theme editor -> `<f2>` to Configure Background Wallpaper: "Scaling Mode" has several  options to choose from, but I think only two options are actually implemented (cover, stretch). Please finish implementing the other methods.

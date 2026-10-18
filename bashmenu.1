@@ -711,7 +711,7 @@ Path to wallpaper image (PNG or JPG format). Supports system placeholders like {
 Float factor between 0.0 (transparent) and 1.0 (opaque), default 0.35. Lower values blend more theme background tint.
 .TP
 .B scaling
-Image scaling mode: "cover" (maintains aspect ratio, auto-cropping) or "stretch".
+Image scaling mode: "cover" (maintains aspect ratio, auto-cropping), "stretch" (exact fit), "fit" (proportional inside window), "center" (1:1 original size), or "tile" (pattern repeat).
 .TP
 .B clustering
 Integer delta threshold between 0 and 128 (default: 0). Default 0 preserves full photographic fidelity and gradients without horizontal run-length streaking. Values above 0 merge neighboring spans for high-latency connections.

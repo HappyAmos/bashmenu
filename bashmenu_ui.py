@@ -1754,7 +1754,39 @@ class WallpaperCompositor:
                 top = (img.height - new_h) // 2
                 cropped = img.crop((0, top, img.width, top + new_h))
             resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
-        else:
+        elif self.scaling == "fit":
+            img_ratio = img.width / max(1, img.height)
+            target_ratio = pixel_w / max(1, pixel_h)
+            if img_ratio > target_ratio:
+                fitted_w = pixel_w
+                fitted_h = max(1, int(pixel_w / img_ratio))
+            else:
+                fitted_h = pixel_h
+                fitted_w = max(1, int(pixel_h * img_ratio))
+            scaled = img.resize((fitted_w, fitted_h), Image.Resampling.LANCZOS)
+            canvas = Image.new("RGB", (pixel_w, pixel_h), color=theme_bg_rgb)
+            canvas.paste(scaled, ((pixel_w - fitted_w) // 2, (pixel_h - fitted_h) // 2))
+            resized = canvas
+        elif self.scaling == "center":
+            canvas = Image.new("RGB", (pixel_w, pixel_h), color=theme_bg_rgb)
+            crop_l = max(0, (img.width - pixel_w) // 2)
+            crop_t = max(0, (img.height - pixel_h) // 2)
+            crop_r = crop_l + min(img.width, pixel_w)
+            crop_b = crop_t + min(img.height, pixel_h)
+            cropped_c = img.crop((crop_l, crop_t, crop_r, crop_b))
+            paste_x = max(0, (pixel_w - cropped_c.width) // 2)
+            paste_y = max(0, (pixel_h - cropped_c.height) // 2)
+            canvas.paste(cropped_c, (paste_x, paste_y))
+            resized = canvas
+        elif self.scaling == "tile":
+            canvas = Image.new("RGB", (pixel_w, pixel_h), color=theme_bg_rgb)
+            w_step = max(1, img.width)
+            h_step = max(1, img.height)
+            for x in range(0, pixel_w, w_step):
+                for y in range(0, pixel_h, h_step):
+                    canvas.paste(img, (x, y))
+            resized = canvas
+        else:  # "stretch" (default / fallback)
             resized = img.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
 
         pixels = resized.load()

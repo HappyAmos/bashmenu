@@ -142,3 +142,17 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   4. Added `overflow-x: hidden;` to `#scroll_container` in `NoteViewerModalScreen`.
 - **Tests:** Added `test_note_viewer_text_wrapping_for_checkboxes` in `.tests/test_notebook.py` verifying that long task items wrap across multiple lines without truncation while short items remain single-line.
 
+---
+
+### 18. Wallpaper Scaling Modes Implementation (Fit, Center, Tile)
+- **Item:** `- [x] BUG: Theme editor -> `<f2>` to Configure Background Wallpaper: "Scaling Mode" has several  options to choose from, but I think only two options are actually implemented (cover, stretch). Please finish implementing the other methods.` (from `TODO.md`)
+- **Root Cause:** In `bashmenu_ui.py`, `WallpaperCompositor.get_grid()` checked `if self.scaling == "cover": ... else: resized = img.resize((pixel_w, pixel_h))`. While `themeedit.py`'s `BackgroundConfigModal` offered all five scaling options (`cover`, `stretch`, `fit`, `center`, `tile`), only `cover` and `stretch` were implemented; `fit`, `center`, and `tile` fell back to `stretch`.
+- **Fix:** In `bashmenu_ui.py`:
+  1. Implemented `"fit"`: Scales the image proportionally to fit within `(pixel_w, pixel_h)` and centers it against a `theme_bg_rgb` canvas without cropping.
+  2. Implemented `"center"`: Centers the image at 1:1 original pixel scale, cropping excess if larger or padding with `theme_bg_rgb` if smaller.
+  3. Implemented `"tile"`: Repeats the image pattern across `(pixel_w, pixel_h)` along both axes (supporting seamless wallpaper pattern tiles).
+  4. Updated documentation in `bashmenu.md` and `bashmenu.1` to reflect all five supported scaling modes.
+- **Tests:** Added `test_wallpaper_compositor_all_scaling_modes` in `.tests/test_themeedit.py` verifying that `cover`, `stretch`, `fit`, `center`, and `tile` successfully construct 2D ANSI cell grids across valid dimensions.
+
+
+

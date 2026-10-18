@@ -505,7 +505,7 @@ settings:
     enabled: true
     image: "{bashmenu_dir}/assets/wallpapers/twilight.png"
     opacity: 0.35    # Float between 0.0 (transparent) and 1.0 (opaque)
-    scaling: "cover" # "cover" (crops to fill aspect ratio) or "stretch"
+    scaling: "cover" # "cover", "stretch", "fit", "center", or "tile"
     clustering: 0    # Integer 0 to 128 (default: 0). Default 0 preserves full photographic fidelity.
                      # Values > 0 merge subtle color differences for high-latency connections.
     quantization: 1  # Integer >= 1 (default: 1). 1 preserves full 24-bit TrueColor depth.
@@ -529,7 +529,7 @@ twilight:
 | `enabled` | Boolean | `true` | Master switch to enable or disable wallpaper background compositing. |
 | `image` | String | (theme) | Path to wallpaper image (PNG/JPG). Supports `{bashmenu_dir}` and placeholders. |
 | `opacity` | Float | `0.35` | Blending factor ($0.0$ to $1.0$). Lower values blend more theme background tint. |
-| `scaling` | String | `"cover"` | Scaling mode: `"cover"` (aspect ratio fill with auto-crop) or `"stretch"`. |
+| `scaling` | String | `"cover"` | Scaling mode: `"cover"` (proportional fill with auto-crop), `"stretch"` (exact fit), `"fit"` (proportional inside window), `"center"` (1:1 original size), or `"tile"` (repeat pattern). |
 | `clustering` | Integer | `0` | Horizontal delta threshold ($0$ to $128$). Default $0$ preserves true photographic detail without horizontal streaking. |
 | `quantization` | Integer | `1` | Color channel quantization ($1$ to $32$). Default $1$ retains full 24-bit TrueColor depth without color banding. |
 
