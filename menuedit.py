@@ -9,6 +9,7 @@ __author__ = "HappyAmos"
 
 import contextlib
 import os
+import re
 import shlex
 import sys
 import textwrap
@@ -17,6 +18,7 @@ from typing import ClassVar
 import yaml
 from rich.markup import escape
 from rich.style import Style
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -28,6 +30,13 @@ from textual.widgets.option_list import Option
 
 import bashmenu
 import bashmenu_ui
+
+
+def safe_escape(text: object) -> str:
+    """Escapes text for Textual and Rich markup, ensuring stray or unclosed brackets are escaped."""
+    escaped = escape(str(text))
+    return re.sub(r"(?<!\\)\[", r"\[", escaped)
+
 
 TYPE_BADGES = {
     "root_menu": "[MNU]",
@@ -1079,7 +1088,7 @@ class ItemEditModal(ModalScreen[dict]):
                 cfg = {}
 
             preview_str = render_menu_item_preview(temp_item, config=cfg, width=60)
-            preview_box.update(escape(preview_str))
+            preview_box.update(safe_escape(preview_str))
 
     def update_divider_preview(self) -> None:
         with contextlib.suppress(Exception):
@@ -1120,7 +1129,7 @@ class ItemEditModal(ModalScreen[dict]):
             char_len = max(1, len(expanded_char))
             repeated = (expanded_char * ((disp_len // char_len) + 1))[:disp_len]
 
-            preview_box.update(escape(repeated))
+            preview_box.update(safe_escape(repeated))
 
     def on_exec_mode_container_mode_changed(self, message: ExecModeContainer.ModeChanged) -> None:
         self.update_alt_buffer_visibility(message.mode_idx)
@@ -2221,60 +2230,60 @@ class MenuEditScreen(Screen):
             length_val = div_cfg.get("length", "{window_width}")
             lines = [
                 f"[bold magenta]{badge} DIVIDER[/bold magenta]",
-                f"[bold white]Repeating Char (Theme):[/bold white] {escape(str(char_val))}",
-                f"[bold white]Length Directive (Theme):[/bold white] {escape(str(length_val))}",
+                f"[bold white]Repeating Char (Theme):[/bold white] {safe_escape(str(char_val))}",
+                f"[bold white]Length Directive (Theme):[/bold white] {safe_escape(str(length_val))}",
             ]
         else:
             title = item.get("title", item.get("label", "(No Title)"))
 
             lines = [
                 f"[bold magenta]{badge} {item_type.upper()}[/bold magenta]",
-                f"[bold white]Title/Label:[/bold white] {escape(str(title))}",
+                f"[bold white]Title/Label:[/bold white] {safe_escape(str(title))}",
             ]
 
             icon = item.get("icon") or item.get("glyph")
             if icon:
-                lines.append(f"[bold cyan]Icon/Glyph:[/bold cyan] {escape(str(icon))}")
+                lines.append(f"[bold cyan]Icon/Glyph:[/bold cyan] {safe_escape(str(icon))}")
 
             action = item.get("action") or item.get("command") or item.get("script") or item.get("file") or item.get("python")
             if action:
-                lines.append(f"[bold yellow]Action/Target:[/bold yellow] {escape(str(action))}")
+                lines.append(f"[bold yellow]Action/Target:[/bold yellow] {safe_escape(str(action))}")
 
             key = item.get("key")
             if key:
-                lines.append(f"[bold green]Config Key:[/bold green] {escape(str(key))}")
+                lines.append(f"[bold green]Config Key:[/bold green] {safe_escape(str(key))}")
 
             msg = item.get("message") or item.get("prompt") or item.get("text")
             if msg:
-                lines.append(f"[bold blue]Message/Prompt:[/bold blue] {escape(str(msg))}")
+                lines.append(f"[bold blue]Message/Prompt:[/bold blue] {safe_escape(str(msg))}")
 
             template = item.get("template")
             if template:
-                lines.append(f"[bold cyan]Template:[/bold cyan] {escape(str(template))}")
+                lines.append(f"[bold cyan]Template:[/bold cyan] {safe_escape(str(template))}")
 
             target = item.get("target")
             if target:
-                lines.append(f"[bold cyan]Target File:[/bold cyan] {escape(str(target))}")
+                lines.append(f"[bold cyan]Target File:[/bold cyan] {safe_escape(str(target))}")
 
             block_id = item.get("block_id")
             if block_id:
-                lines.append(f"[bold cyan]Block ID:[/bold cyan] {escape(str(block_id))}")
+                lines.append(f"[bold cyan]Block ID:[/bold cyan] {safe_escape(str(block_id))}")
 
             start_dir = item.get("start_dir")
             if start_dir:
-                lines.append(f"[bold cyan]Start Directory:[/bold cyan] {escape(str(start_dir))}")
+                lines.append(f"[bold cyan]Start Directory:[/bold cyan] {safe_escape(str(start_dir))}")
 
             picker = item.get("picker")
             if picker:
-                lines.append(f"[bold cyan]Picker Type:[/bold cyan] {escape(str(picker))}")
+                lines.append(f"[bold cyan]Picker Type:[/bold cyan] {safe_escape(str(picker))}")
 
             on_yes = item.get("on_yes")
             if on_yes is not None:
-                lines.append(f"[bold green]On Yes Action:[/bold green] {escape(str(on_yes))}")
+                lines.append(f"[bold green]On Yes Action:[/bold green] {safe_escape(str(on_yes))}")
 
             on_no = item.get("on_no")
             if on_no is not None:
-                lines.append(f"[bold red]On No Action:[/bold red] {escape(str(on_no))}")
+                lines.append(f"[bold red]On No Action:[/bold red] {safe_escape(str(on_no))}")
 
             if "alt_buffer" in item:
                 lines.append(f"[bold cyan]Alt Buffer:[/bold cyan] {item['alt_buffer']}")
@@ -2346,13 +2355,21 @@ class MenuEditScreen(Screen):
             }
             extra_keys = [k for k in item if k not in known_keys]
             if extra_keys:
-                extras = ", ".join(f"{k}={escape(str(item[k]))}" for k in sorted(extra_keys))
+                extras = ", ".join(f"{k}={safe_escape(str(item[k]))}" for k in sorted(extra_keys))
                 lines.append(f"[bold yellow]Extra Properties:[/bold yellow] [dim]{extras}[/dim]")
 
         preview_str = render_menu_item_preview(item, config=cfg, width=38)
-        lines.append(f"[bold cyan]Preview:[/bold cyan]\n{escape(preview_str)}")
+        lines.append(f"[bold cyan]Preview:[/bold cyan]\n{safe_escape(preview_str)}")
 
-        inspector.update("\n\n".join(lines))
+        markup_text = "\n\n".join(lines)
+        try:
+            inspector.update(markup_text)
+        except Exception:  # noqa: BLE001
+            with contextlib.suppress(Exception):
+                try:
+                    inspector.update(Text.from_markup(markup_text))
+                except Exception:  # noqa: BLE001
+                    inspector.update(Text(markup_text))
 
     def action_edit_item(self) -> None:
         """Open the modal property editor for the currently selected menu item."""

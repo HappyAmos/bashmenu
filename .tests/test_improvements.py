@@ -3768,6 +3768,29 @@ G
             with contextlib.suppress(OSError):
                 os.unlink(temp_path)
 
+    def test_menuedit_inspector_unclosed_bracket_no_markup_error(self):
+        """Verify update_inspector safely handles items with truncated preview brackets without MarkupError."""
+        import menuedit
+
+        screen = menuedit.MenuEditScreen()
+        item = {
+            "type": "editor",
+            "action": "{home}/autoexec.sh",
+            "icon": "{nf::#f11e7}",
+            "label": "Edit autoexec.sh [{home}/autoexec.sh]",
+        }
+        updated_content = []
+
+        class DummyInspector:
+            def update(self, content):
+                updated_content.append(content)
+
+        screen.query_one = lambda *a, **kw: DummyInspector()
+        screen.update_inspector(item)
+        self.assertEqual(len(updated_content), 1)
+        self.assertIn("Preview:", str(updated_content[0]))
+        self.assertIn("Edit autoexec.sh", str(updated_content[0]))
+
 
 if __name__ == "__main__":
     unittest.main()
