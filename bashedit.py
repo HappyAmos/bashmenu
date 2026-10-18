@@ -1074,22 +1074,13 @@ def compute_file_sha256(path: str) -> str:
 
 def get_swap_path(file_path: str) -> str:
     """Determine the hidden swap file path for a given target file path.
-    Prefers colocated .<filename>.swp, falling back to ~/.cache/bashmenu/swap/<hash>.swp."""
+    Always creates .<filename>.swp in the exact directory where the file being edited is located."""
     if not file_path:
         return ""
     abs_path = os.path.abspath(file_path)
     dir_name = os.path.dirname(abs_path)
     base_name = os.path.basename(abs_path)
-    colocated_path = os.path.join(dir_name, f".{base_name}.swp")
-
-    if os.path.exists(dir_name) and os.access(dir_name, os.W_OK):
-        return colocated_path
-
-    cache_dir = os.path.expanduser("~/.cache/bashmenu/swap")
-    with contextlib.suppress(Exception):
-        os.makedirs(cache_dir, exist_ok=True)
-    path_hash = hashlib.sha256(abs_path.encode("utf-8")).hexdigest()[:16]
-    return os.path.join(cache_dir, f"{base_name}.{path_hash}.swp")
+    return os.path.join(dir_name, f".{base_name}.swp")
 
 
 def is_pid_running(pid: int) -> bool:
@@ -1178,13 +1169,23 @@ def read_swap_file(swap_path: str) -> tuple[dict | None, list[str] | None]:
 
 def remove_swap_file(swap_path: str | None) -> bool:
     """Remove swap file if it exists."""
-    if not swap_path or not os.path.exists(swap_path):
+    if not swap_path:
         return False
-    try:
-        os.remove(swap_path)
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+    removed = False
+    with contextlib.suppress(Exception):
+        if os.path.exists(swap_path):
+            os.remove(swap_path)
+            removed = True
+
+    with contextlib.suppress(Exception):
+        parent_dir = os.path.dirname(swap_path)
+        base = os.path.basename(swap_path)
+        if parent_dir and os.path.exists(parent_dir):
+            for fname in os.listdir(parent_dir):
+                if fname.startswith(f"{base}.") and fname.endswith(".tmp"):
+                    with contextlib.suppress(Exception):
+                        os.remove(os.path.join(parent_dir, fname))
+    return removed
 
 
 class SwapPromptModalScreen(ModalScreen[str]):

@@ -2084,11 +2084,15 @@ class MenuEditScreen(Screen):
                         it.styles.margin = (0, 0, 0, 0)
 
     def on_resize(self, event=None) -> None:
-        """Adjust footer keyboard shortcut spacing responsively on terminal resize."""
+        """Adjust footer keyboard shortcut spacing and property inspector preview responsively on terminal resize."""
         w = None
         if event is not None and hasattr(event, "size") and event.size:
             w = event.size.width
         self.update_footer_layout(width=w)
+        with contextlib.suppress(Exception):
+            tree = self.query_one("#tree", Tree)
+            if tree and tree.cursor_node and tree.cursor_node.data:
+                self.update_inspector(tree.cursor_node.data)
 
     def on_mount(self) -> None:
         """Initialize tree, apply themes, and set initial focus on mount."""
@@ -2396,8 +2400,15 @@ class MenuEditScreen(Screen):
             if extra_keys:
                 extras = ", ".join(f"{k}={safe_escape(str(item[k]))}" for k in sorted(extra_keys))
                 lines.append(f"[bold yellow]Extra Properties:[/bold yellow] [dim]{extras}[/dim]")
+        preview_w = 38
+        with contextlib.suppress(Exception):
+            panel = self.query_one("#inspector_panel")
+            if panel and getattr(panel, "size", None) and panel.size.width > 20:
+                preview_w = max(38, panel.size.width - 6)
+            elif getattr(self, "size", None) and self.size.width > 40:
+                preview_w = max(38, (self.size.width // 2) - 6)
 
-        preview_str = render_menu_item_preview(item, config=cfg, width=38)
+        preview_str = render_menu_item_preview(item, config=cfg, width=preview_w)
         lines.append(f"[bold cyan]Preview:[/bold cyan]\n{safe_escape(preview_str)}")
 
         markup_text = "\n\n".join(lines)

@@ -6,5 +6,24 @@ notebook:
         type: note
         format: markdown
         content: |-
-          - [ ] Add {marquee:}
-          - [ ] Add an existing pallete reference to theme color picker.
+          ## TODO List (Shared with agent).
+
+          - [ ] UI: Bashmenu editor property inspector panel is not utilizing as much space as it can for the preview pane:
+          ```
+          ┌──────────────────────────────────────────────────────────────────────────────────┐
+          │                                                                                  │
+          │  ── Property Inspector ──                                                        │
+          │                                                                                  │
+          │   SCRIPT                                                                         │
+          │                                                                                  │
+          │  Title/Label: Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]                 │
+          │                                                                                  │
+          │  Icon/Glyph: {nf::#f422}                                                         │
+          │                                                                                  │
+          │  Action/Target: {scripts_dir}/glyphs.sh {param}                                  │
+          │                                                                                  │
+          │  Flags: stream=True                                                              │
+          │                                                                                  │
+          │  Preview:                                                                        │
+          │    1.     Search     [/home/andrew/git[---This space could be used.----------]  │
+          ```

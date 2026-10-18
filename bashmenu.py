@@ -772,6 +772,10 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None, trigger_toa
             else (match.group(3) if match.group(3) is not None else match.group(4))
         )
         msg_clean = (msg or "").strip()
+        if "{" in msg_clean and depth < 3:
+            msg_clean = interpolate_placeholders(
+                msg_clean, config, depth=depth + 1, extra_vars=extra_vars, trigger_toasts=False
+            )
         if trigger_toasts:
             trigger_toast(msg_clean, timeout=timeout)
         return ""
@@ -1866,9 +1870,15 @@ class PluginBuffer(Static):
         of 10 rows, and normalizes tabs, null bytes, and Unicode variation selectors.
         """
         cfg = self.config
+        scr = None
         with contextlib.suppress(Exception):
-            if self.screen and self.screen.menu_view and self.screen.menu_view.config:
-                cfg = self.screen.menu_view.config
+            scr = getattr(self, "_screen", None)
+            if scr is None and hasattr(self, "screen"):
+                scr = self.screen
+
+        with contextlib.suppress(Exception):
+            if scr and scr.menu_view and scr.menu_view.config:
+                cfg = scr.menu_view.config
 
         theme_styles = bashmenu_ui.init_theme_colors(cfg.get("theme", "dracula"))
         plugin_style = theme_styles.get("plugin", Style(color="cyan"))
@@ -1923,10 +1933,55 @@ class PluginBuffer(Static):
         if not items:
             return Text()
 
+        grid = None
+        theme_default_bg = None
+        x_offset = 0
+        y_offset = 0
+
+        mv = None
+        with contextlib.suppress(Exception):
+            if scr and hasattr(scr, "menu_view"):
+                mv = scr.menu_view
+
+        if mv is not None:
+            canvas = getattr(mv, "_canvas", None)
+            if canvas is not None and getattr(canvas, "grid", None):
+                grid = canvas.grid
+                theme_default_bg = getattr(canvas, "theme_default_bg", None)
+
+            with contextlib.suppress(Exception):
+                off = getattr(self.styles, "offset", None)
+                if off:
+                    ox = getattr(off, "x", None)
+                    oy = getattr(off, "y", None)
+                    if ox is not None:
+                        x_offset = int(getattr(ox, "value", ox))
+                    if oy is not None:
+                        y_offset = int(getattr(oy, "value", oy))
+
+            if y_offset == 0 and grid:
+                with contextlib.suppress(Exception):
+                    h = max(10, mv.size.height or 24)
+                    t_rows = getattr(mv, "total_content_rows", None)
+                    total_content_rows = t_rows if isinstance(t_rows, int) else max(1, h - 5)
+                    raw_p_lines, sep_rows, _ = mv.get_plugin_lines_and_limits(total_content_rows)
+                    y_offset = 3 + total_content_rows - len(raw_p_lines) - sep_rows
+                    x_offset = 1 if has_screen_divider else 3
+
         out = Text()
-        for idx, it in enumerate(items[:10]):
-            out.append_text(it[2])
-            if idx < min(10, len(items)) - 1:
+        num_items = min(10, len(items))
+        for idx in range(num_items):
+            line_rt = items[idx][2].copy()
+            if grid:
+                row_y = y_offset + idx
+                if 0 <= row_y < len(grid):
+                    full_row = grid[row_y]
+                    row_cache = full_row[x_offset : x_offset + line_rt.cell_len]
+                    line_rt = bashmenu_ui.composite_single_row(
+                        line_rt, row_cache, theme_default_bg=theme_default_bg
+                    )
+            out.append_text(line_rt)
+            if idx < num_items - 1:
                 out.append("\n")
         return out
 

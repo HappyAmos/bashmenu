@@ -370,6 +370,7 @@ description: Core developer guidelines for the multi-platform BashMenu
   5. `bashmenu.md`: Reference documentation (Sections 1, 2.1, 6.1, 6.2).
   6. `bashmenu.1`: Linux system man page.
 - **Scripts Documentation:** Every executable script in `scripts/` must be registered in `bashmenu.md`, `bashmenu.1`, and `README.md`. Verified by automated assertions in `.tests/test_improvements.py`.
+- **Placeholders & Macros Popup Reference Modal Requirement:** Whenever a new placeholder, directive, or macro (such as `{toast:...}`) is introduced or modified, it is a strict requirement to document it in `bashmenu_ui.py` (`PLACEHOLDER_SECTIONS` and `PLACEHOLDER_HELP_TEXT`) so it is immediately available to users in the Placeholders and Macros popup reference modal (`^P`/`Alt+M` in editor).
 - **Directory Aliases & Macro Parity:** Document aliases (`{scripts}`, `{templates}`, `{cache}`, `{notebooks}`) alongside canonical forms (`{scripts_dir}`, `{templates_dir}`, `{cache_dir}`, `{notebooks_dir}`). Document config namespaces (`{app.<key>}` alongside `{theme}`, `{settings.<key>}`).
 
 ---

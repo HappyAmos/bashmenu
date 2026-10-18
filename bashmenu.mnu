@@ -43,7 +43,7 @@ items:
               file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
           - Toast Test:
               type: script
-              script: '{toast:2:"Hello, world."}'
+              script: '{toast:2:"Hello, world. {date_time_24_short}"}'
               interactive: true
               quiet: false
               alt_buffer: true
@@ -52,13 +52,14 @@ items:
       quiet: false
       alt_buffer: true
       icon: '{nf:/:#f14d3}'
-  - Notes:
+  - Notes [{notebooks_dir}/notes.yml]:
       type: notebook
       file: '{notebooks_dir}/notes.yml'
       interactive: true
       quiet: false
       alt_buffer: true
       icon: '{nf:/:#f1a7c}'
+      action: '{notebooks_dir}/notes.yml'
   - '{divider}':
   - Applications:
       icon: '{nf::#f003b:}'

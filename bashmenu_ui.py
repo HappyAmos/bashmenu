@@ -175,6 +175,7 @@ PLACEHOLDER_SECTIONS = [
         [
             ("{battery}", "Current battery capacity percentage"),
             ("{battery_stat}", "Current battery charging status (Charging, Discharging, Full)"),
+            ("{battery_status}", "Alias for {battery_stat}"),
             ("{localip}", "Primary outbound IPv4 address"),
             ("{user-mode}", "Privilege level (User or Root)"),
             ("{version}", "BashMenu application version"),
@@ -201,6 +202,7 @@ PLACEHOLDER_SECTIONS = [
         [
             ("{window_width}", "Inner terminal window column width"),
             ("{window_height}", "Inner terminal window line height"),
+            ("{screen_width}", "Full terminal screen column width"),
             ("{divider}", "Themed horizontal divider bar ({ascii:196})"),
         ],
     ),
@@ -209,6 +211,7 @@ PLACEHOLDER_SECTIONS = [
         [
             ("{ascii:<code_num>}", "CP437 ASCII character byte (e.g. {ascii:196} -> ─)"),
             ("{command:<cmd>}", "Executes shell command and inserts output"),
+            ('{toast:SECONDS:"MESSAGE"}', "Displays non-blocking popup toast message"),
             ("{nf:<char>:<hex>:<emoji>}", "Adaptive Nerd Font / Unicode / Emoji glyph"),
             ("{app.<key.path>}", "Configuration key in bashmenu.yml (e.g. {app.theme})"),
             ("{<key.path>}", "Refers to nested key in bashmenu.yml (e.g. {user.postal_code})"),

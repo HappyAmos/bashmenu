@@ -691,6 +691,42 @@ class TestImprovements(unittest.TestCase):
         self.assertIn("external=True", inspector_text)
         self.assertIn("Extra Properties:[/bold yellow] [dim]custom_prop=custom_val[/dim]", inspector_text)
 
+    def test_menuedit_inspector_preview_width_scaling(self):
+        """Verify that property inspector preview utilizes available panel width."""
+        import menuedit
+
+        screen = menuedit.MenuEditScreen()
+        updated_content = []
+
+        class DummyInspector:
+            def update(self, content):
+                updated_content.append(content)
+
+        class DummyPanel:
+            class DummySize:
+                width = 80
+            size = DummySize()
+
+        def mock_query(selector, *a, **kw):
+            if selector == "#inspector_panel":
+                return DummyPanel()
+            return DummyInspector()
+
+        screen.query_one = mock_query
+
+        test_item = {
+            "type": "script",
+            "title": "Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]",
+            "script": "{scripts_dir}/glyphs.sh {param}",
+        }
+
+        screen.update_inspector(test_item)
+        self.assertEqual(len(updated_content), 1)
+        inspector_text = updated_content[0]
+        self.assertIn("Search Nerd Font & Emoji", inspector_text)
+        self.assertIn("[{scripts_dir}/glyphs.sh]", inspector_text)
+
+
     def test_menuedit_modal_properties(self):
         import menuedit
 
@@ -1401,9 +1437,11 @@ class TestImprovements(unittest.TestCase):
             "{date_time_24_short}",
             "{window_width}",
             "{window_height}",
+            "{screen_width}",
             "{divider}",
             "{ascii:<code_num>}",
             "{command:<cmd>}",
+            '{toast:SECONDS:"MESSAGE"}',
             "{nf:<char>:<hex>:<emoji>}",
             "{<key.path>}",
             "{theme}",
@@ -3901,6 +3939,12 @@ G
             res3 = bashmenu.interpolate_placeholders(text3, config, trigger_toasts=False)
             self.assertEqual(res3, "Label ")
             mock_toast.assert_not_called()
+
+            # 4. Nested placeholders inside toast message
+            mock_toast.reset_mock()
+            text4 = '{toast: 3.0: "User is {user}"}'
+            bashmenu.interpolate_placeholders(text4, config, trigger_toasts=True)
+            mock_toast.assert_called_with(f"User is {bashmenu.USERNAME}", timeout=3.0)
 
     def test_toast_menu_item_action(self):
         """Verify process_item_action handles type: toast."""

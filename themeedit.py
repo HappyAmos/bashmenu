@@ -2582,13 +2582,14 @@ class ThemePreviewWidget(Static):
         title_str = f"{b_cap_l} Menu Editor {b_cap_r}"
         close_str = f"{b_cap_l}X{b_cap_r}"
 
-        avail_top = max(4, w - len(title_str) - len(close_str) - 4)
+        avail_top = max(1, w - len(title_str) - len(close_str) - 6)
         top_line = Text()
         top_line.append(b_tl + b_h_top * 2, style=b_style)
         top_line.append(title_str, style=t_style)
         top_line.append(b_h_top * avail_top, style=b_style)
         top_line.append(close_str, style=close_btn_style)
-        top_line.append(b_h_top * 2 + b_tr, style=b_style)
+        rem_top = max(1, w - 3 - len(title_str) - avail_top - len(close_str) - 1)
+        top_line.append(b_h_top * rem_top + b_tr, style=b_style)
         top_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(top_line)
 
@@ -2605,7 +2606,7 @@ class ThemePreviewWidget(Static):
 
         # Inner body
         split_x = max(18, min(24, w // 2 - 2))
-        right_w = max(10, w - split_x - 3)
+        right_w = max(8, w - split_x - 4)
 
         body_rows = max(5, num_rows - 3)
         editor_items = [
@@ -2647,9 +2648,9 @@ class ThemePreviewWidget(Static):
             else:
                 p_text.append(f" {prop_item}", style=text_style)
 
-            if p_text.cell_len > right_w - 2:
-                p_text.truncate(right_w - 2)
-            p_pad = max(0, right_w - 2 - p_text.cell_len)
+            if p_text.cell_len > right_w:
+                p_text.truncate(right_w)
+            p_pad = max(0, right_w - p_text.cell_len)
             p_text.append(" " * p_pad)
 
             row_line.append_text(p_text)
@@ -2751,14 +2752,15 @@ class ThemePreviewWidget(Static):
 
         title_str = f"{b_cap_l} Notice Modal {b_cap_r}"
         close_str = f"{b_cap_l}X{b_cap_r}"
-        avail_top = max(2, modal_w - len(title_str) - len(close_str) - 4)
+        avail_top = max(1, modal_w - len(title_str) - len(close_str) - 6)
 
         top_line = Text(" " * left_margin)
         top_line.append(b_tl + b_h_top * 2, style=b_style)
         top_line.append(title_str, style=t_style)
         top_line.append(b_h_top * avail_top, style=b_style)
         top_line.append(close_str, style=close_btn_style)
-        top_line.append(b_h_top * 2 + b_tr, style=b_style)
+        rem_top = max(1, modal_w - 3 - len(title_str) - avail_top - len(close_str) - 1)
+        top_line.append(b_h_top * rem_top + b_tr, style=b_style)
         top_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(top_line)
 

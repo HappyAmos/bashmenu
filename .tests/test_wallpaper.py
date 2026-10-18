@@ -321,6 +321,48 @@ class TestWallpaperCompositor(unittest.TestCase):
         # With capping at 4, the run length is constrained.
         self.assertLessEqual(max_run, 12)
 
+    def test_plugin_buffer_wallpaper_transparency(self):
+        """Verify PluginBuffer composites over active wallpaper grid so empty space shows wallpaper half-blocks."""
+        compositor = bashmenu_ui.WallpaperCompositor(
+            self.wallpaper_path, opacity=0.85, scaling="cover", base_dir=self.test_dir
+        )
+        grid = compositor.get_grid(80, 24, (15, 20, 32))
+        self.assertIsNotNone(grid)
+
+        cfg = {"theme": "dracula"}
+        pb = bashmenu.PluginBuffer(config=cfg)
+
+        # Mock screen and menu_view with prebaked canvas
+        mock_canvas = unittest.mock.MagicMock()
+        mock_canvas.grid = grid
+        mock_canvas.theme_default_bg = None
+
+        mock_mv = unittest.mock.MagicMock()
+        mock_mv.config = cfg
+        mock_mv._canvas = mock_canvas
+        mock_mv.size.height = 24
+        mock_mv.total_content_rows = 18
+        mock_mv.get_plugin_lines_and_limits.return_value = (["Sample Plugin Output Line"], 0, 15)
+
+        mock_screen = unittest.mock.MagicMock()
+        mock_screen.menu_view = mock_mv
+        pb._screen = mock_screen
+
+        with (
+            patch("bashmenu.get_plugin_outputs", return_value=["Sample Plugin Output Line"]),
+            patch.object(pb, "styles", create=True) as mock_styles,
+        ):
+            mock_offset = unittest.mock.MagicMock()
+            mock_offset.x = 3
+            mock_offset.y = 10
+            mock_styles.offset = mock_offset
+            res = pb.render()
+
+        plain = res.plain
+        self.assertIn("Sample Plugin Output Line", plain)
+        self.assertIn("▀", plain)  # Half-blocks appear in padding spaces for wallpaper transparency
+
 
 if __name__ == "__main__":
     unittest.main()
+

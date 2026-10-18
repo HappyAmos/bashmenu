@@ -18,6 +18,7 @@ from unittest import mock
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
@@ -104,6 +105,45 @@ class TestThemeEditor(unittest.TestCase):
         self.assertIn("[F1] Help", plain)
         self.assertIn("test_theme", plain)
         self.assertIn("░", plain)  # Drop shadow character present
+
+    def test_theme_preview_tabs_border_alignment(self):
+        """Verify that ThemePreviewWidget borders and shadows in editor and modals tabs are perfectly aligned."""
+        sample_theme = {
+            "borders": {
+                "border_top_left": "┌",
+                "border_top_right": "┐",
+                "border_bottom_left": "└",
+                "border_bottom_right": "┘",
+                "border_horizontal": "─",
+                "border_vertical": "│",
+                "shadow_char": "░",
+            },
+            "256": {
+                "border": [60, -1],
+                "title": [141, -1],
+                "text": [255, -1],
+                "shadow": [236, "COLOR_BLACK"],
+            },
+        }
+
+        # 1. Menu Editor preview tab
+        widget_ed = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="editor")
+        rendered_ed = widget_ed.render()
+        lines_ed = rendered_ed.plain.split("\n")
+        window_rows_ed = [l for l in lines_ed if "░" in l and not l.strip().startswith("░")]
+        widths_ed = [cell_len(l) for l in window_rows_ed]
+        self.assertTrue(len(widths_ed) > 3)
+        self.assertEqual(len(set(widths_ed)), 1, f"Menu editor rows width mismatch: {widths_ed}")
+
+        # 2. Modals & Popups preview tab
+        widget_modal = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="modals")
+        rendered_modal = widget_modal.render()
+        lines_modal = rendered_modal.plain.split("\n")
+        window_rows_modal = [l for l in lines_modal if "░" in l and not l.strip().startswith("░")]
+        widths_modal = [cell_len(l) for l in window_rows_modal]
+        self.assertTrue(len(widths_modal) > 3)
+        self.assertEqual(len(set(widths_modal)), 1, f"Modals rows width mismatch: {widths_modal}")
+
 
     def test_theme_editor_app_live_synchronization(self):
         """Verify ThemeEditApp launches, mounts, and updates preview on input change."""

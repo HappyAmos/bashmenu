@@ -1,5 +1,5 @@
 
-- [ ] BUG: border misalignment in theme editor 'menu editor' tab:
+- [x] BUG: border misalignment in theme editor 'menu editor' tab:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ Mock Menu  Menu Editor  Modals & Popups                                         │
@@ -10,7 +10,7 @@
 │ │▀▀▀▶ Applications▀▀▀▀▀▀▀│ Icon:▀▀[ 📁▀▀▀▀▀▀▀▀▀]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█│░░   │
 │ │▀▀▀▀▀• Terminal▀▀▀▀▀▀▀▀▀│ Type:▀▀[ submenu▀▀▀▀]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█│░░   │
 ```
-- [ ] BUG: Misalignment of borders in Modals & Popups tab of theme editor:
+- [x] BUG: Misalignment of borders in Modals & Popups tab of theme editor:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ Mock Menu  Menu Editor  Modals & Popups                                         │
@@ -26,7 +26,7 @@
 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀│▀▀▀▀▀▀▀▀ [ Confirm ]    [ Cancel ] ▀▀▀▀▀▀▀▀▀│░░                 │
 │ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀└────────────────────────────────────────────┘░░                 │
 ```
-- [ ] BUG: Background of plugins still does not appear 'transparent', meaning it does not show the wallpaper behind the text of the plugins:
+- [x] BUG: Background of plugins still does not appear 'transparent', meaning it does not show the wallpaper behind the text of the plugins:
 ```
 │▀▀─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────▀▀│
 │▀▀┌───────────────────────────────────────┬───────────────────────────────────────┬───────────────────────────────────────┬───────────────────────────────────────┐▀▀│
@@ -41,4 +41,27 @@
 │▀▀─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────▀▀│
 ```
 - [x] CRITICAL BUG: the time is displaying two hours ahead of the actual system time.
-- [ ] BUG: {toast:SECONDS:"MESSAGE"} popup toast message was not added to the Placeholders and Macros help popup modal. Are there any other missing Placeholders or Macros from this help screen? Make sure that creating new Placeholders and Macros documentation in the Placeholders & Macros popup reference modal is a requirement in SKILL.md .
+- [x] BUG: {toast:SECONDS:"MESSAGE"} popup toast message was not added to the Placeholders and Macros help popup modal. Are there any other missing Placeholders or Macros from this help screen? Make sure that creating new Placeholders and Macros documentation in the Placeholders & Macros popup reference modal is a requirement in SKILL.md .
+- [x] BUG: Built-in text editors swap files should be created and deleted in the exact directory where the file being edited is located.
+- [ ] FEATURE: Notebook editor: If the user has created a checkbox, or is creating a list, or similar related formatting item, when they hit enter, create a new line below the line they pressed enter on, and include the basic formatting for that item. For instance, if the user is creating a list of checkboxes, after they press enter, automatically create the next checkbox "- [ ] ", same for ordered, unordered lists, etc. Better yet, would be faint ghost text with tab to complete. Create a plan and present it to me as an artifact.
+- [x] BUG: Toast: Placeholders included in {toast:"{date_time_24_short}"} do not expand.
+- [ ] FEATURE: Make sure the copy and paste buffer for notes can pass information back to any interface such as the built-in text editor
+- [x] BUG: UI: Bashmenu editor property inspector panel is not utilizing as much space as it can for the preview pane:
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                  │
+│  ── Property Inspector ──                                                        │
+│                                                                                  │
+│   SCRIPT                                                                         │
+│                                                                                  │
+│  Title/Label: Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]                 │
+│                                                                                  │
+│  Icon/Glyph: {nf::#f422}                                                         │
+│                                                                                  │
+│  Action/Target: {scripts_dir}/glyphs.sh {param}                                  │
+│                                                                                  │
+│  Flags: stream=True                                                              │
+│                                                                                  │
+│  Preview:                                                                        │
+│    1.     Search     [/home/andrew/git[---This space could be used.----------]  │
+```
