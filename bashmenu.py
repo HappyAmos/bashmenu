@@ -2492,14 +2492,17 @@ class MainMenuView(Widget):
 
     def render_line(self, y: int) -> Strip:
         """Render a single line of content directly from pre-baked Strips."""
-        if not getattr(self, "_has_wallpaper", False):
-            return super().render_line(y)
-
         if self.BLANK:
             return Strip.blank(self.size.width, self.visual_style.rich_style)
 
-        if self._dirty_regions:
+        if self._dirty_regions or getattr(self, "_wallpaper_frame_state", None) is None:
             self._render_content()
+
+        if not getattr(self, "_has_wallpaper", False):
+            try:
+                return self._render_cache.lines[y]
+            except (AttributeError, IndexError):
+                return Strip.blank(self.size.width, self.visual_style.rich_style)
 
         state = getattr(self, "_wallpaper_frame_state", None)
         canvas = getattr(self, "_canvas", None)
