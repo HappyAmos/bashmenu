@@ -4,7 +4,7 @@
 - **Commit & Push Requirement:** Every completed task, bug fix, feature, or refactoring step must conclude by creating a concise, descriptive git commit (`git commit -m "..."`) and pushing directly to GitHub (`git push origin main`).
 - **Clean Workspace:** Never leave modified or newly created source/config files uncommitted or unpushed in the local repository.
 - **Remote CI Verification:** After pushing to GitHub, verify remote CI passes using the GitHub CLI:
-  - Query run ID: `gh run list --workflow=python-app.yml --limit 1`
+  - Query run ID: `gh run list --workflow=python-app.yml --limit 1` (and `--workflow=shellcheck-app.yml`)
   - Watch run: `gh run watch <ID>` (always pass an explicit ID to avoid interactive hangs).
 
 ## 2. Configuration & State Persistence

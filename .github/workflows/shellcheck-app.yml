@@ -1,6 +1,13 @@
 name: Lint Shell Scripts
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
 
 jobs:
   shellcheck:
@@ -10,9 +17,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Lint Specific Scripts
+      - name: Lint Shell Scripts
         run: |
-          # Fails the workflow if any script in your target folder has issues
-          shellcheck *.sh
-          shellcheck scripts/*.sh
-
+          shellcheck *.sh scripts/*.sh

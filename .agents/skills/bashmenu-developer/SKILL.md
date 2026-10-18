@@ -22,11 +22,13 @@ description: Core developer guidelines for the multi-platform BashMenu
 - **Configuration Header Preservation Invariant (`bashmenu.yml`):**
   - Never use raw `open(CONFIG_FILE, "w")` with `yaml.dump()` to persist settings to `bashmenu.yml`.
   - Always call `bashmenu.save_config(config)` so that `CONFIG_HEADER` comments, documentation, and placeholder references are cleanly preserved at the top of the file.
-- **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"`  and `pytest`.
+- **Verification & Linting:** Run `ruff check .tests/` and Python files frequently. Run `shellcheck *.sh scripts/*.sh` across shell scripts. Verify Python tests via `python3 -m unittest discover -s .tests -p "test_*.py"` and `pytest`.
 - **GitHub Actions CI Workflow & Remote Test Verification:**
-  - Automated testing is offloaded to GitHub Actions (`.github/workflows/python-app.yml`) across Python 3.10, 3.11, and 3.12.
+  - Automated testing and linting is offloaded to GitHub Actions:
+    - Python testing & linting: `.github/workflows/python-app.yml` across Python 3.10, 3.11, and 3.12.
+    - Shell script linting: `.github/workflows/shellcheck-app.yml`.
   - When testing changes, commit and push to `origin/main`, then track remote CI using GitHub CLI:
-    - Query run ID: `gh run list --workflow=python-app.yml --limit 1 --json databaseId -q '.[0].databaseId'`
+    - Query run ID: `gh run list --workflow=python-app.yml --limit 1 --json databaseId -q '.[0].databaseId'` (or `--workflow=shellcheck-app.yml`)
     - Inspect failures: `gh run view <ID> --log-failed`
     - Watch run: `gh run watch <ID>`
     - Invariant: Never run `gh run view` or `gh run watch` without an explicit run ID as interactive prompts hang non-interactive agent shells.

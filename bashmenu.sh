@@ -316,7 +316,8 @@ get_install_bin_dir() {
 
 # Install 'bm' and 'bashmenu' command symlinks pointing to bashmenu.sh
 install_bm() {
-    local target_dir="$(get_install_bin_dir)"
+    local target_dir
+    target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local real_script_path="${SCRIPT_DIR}/bashmenu.sh"
@@ -354,7 +355,8 @@ install_bm() {
 # Install 'cheat' command symlink pointing to bashmenu.sh
 install_cheat() {
     local shortcut_name="cheat"
-    local target_dir="$(get_install_bin_dir)"
+    local target_dir
+    target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local target_file="${target_dir}/${shortcut_name}"
@@ -386,7 +388,8 @@ install_cheat() {
 # Install 'rich' command symlink pointing to rich.sh
 install_rich() {
     local shortcut_name="rich"
-    local target_dir="$(get_install_bin_dir)"
+    local target_dir
+    target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local target_file="${target_dir}/${shortcut_name}"
@@ -418,7 +421,8 @@ install_rich() {
 # Install 'bmpager' command symlink pointing to pager.sh
 install_bmpager() {
     local shortcut_name="bmpager"
-    local target_dir="$(get_install_bin_dir)"
+    local target_dir
+    target_dir="$(get_install_bin_dir)"
 
     mkdir -p "$target_dir" 2>/dev/null || true
     local target_file="${target_dir}/${shortcut_name}"

@@ -6,6 +6,7 @@
 #              with flags to force GUI (--gui) or console/terminal (--tty/tty).
 # Usage: webopen.sh [--gui|--tty|tty] [url_or_file]
 # ==============================================================================
+# shellcheck disable=SC2015
 
 set -uo pipefail
 

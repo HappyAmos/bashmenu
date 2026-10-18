@@ -59,6 +59,7 @@ while true; do
     fi
     
     # Run the selected game
+    # shellcheck disable=SC1091
     case $choice in
         1)  run_game ninvaders ;;
         2)  run_game pacman4console ;;

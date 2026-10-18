@@ -4,6 +4,7 @@
 # DESCRIPTION: Renders a Markdown file using the Python Rich library.
 # Usage: rich.sh <filename>
 # ==============================================================================
+# shellcheck disable=SC2016
 
 set -eo pipefail
 
