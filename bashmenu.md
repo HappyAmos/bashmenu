@@ -540,6 +540,11 @@ Terminal emulators render text lines from left to right. When adjacent cells sha
 
 BashMenu's engine includes built-in horizontal delta clustering to mitigate this, but preparing your images with proper quantization ensures the fastest, snappiest navigation possible.
 
+For decent, but quick to create wallpapers, use an app like Krita, set the width
+to 80, height to 48. Use a maximum of 16 colors. Set the opacity in Krita to
+100%, turn off Pen if using a mouse (<f5>, Opacity, uncheck 'Enable Pen
+Settings'). Larger sizes work, but compression will introduce artifacts.
+
 ##### Recommended Image Types
 
 1. **Flat Vector & Minimalist Art (Fastest — < 3 ms redraws)**
