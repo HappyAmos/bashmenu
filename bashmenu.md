@@ -214,6 +214,7 @@ The visual theme editor provides a split-screen interface featuring a live, quar
 | `F9` | Auto-generate theme palette from an image file (`ThemeFromImageModal`). |
 | `Ctrl+R` | Rename current theme (`RenameThemeModal`). |
 | `Ctrl+D` | Delete current theme from `bashmenu.themes` (with confirmation modal). |
+| `Ctrl+O` | Open existing theme to edit (`ThemePickerModalScreen`, prompts to save pending changes). |
 | `Ctrl+S` / `s` | Save theme to `bashmenu.themes`. |
 | `Ctrl+A` | Save As under a new theme name and optionally activate in `bashmenu.yml`. |
 | `ESC` / `q` | Exit theme editor (prompts if unsaved changes exist). |
@@ -665,7 +666,7 @@ Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]
 * **Create Note (`[N]`):** When entering a notebook submenu, the bottom help gutter displays `[N]: New Note`. Pressing `n` or `N` prompts for a note title and opens the note editor.
 * **View Note (`ENTER`):** Opens `NoteViewerModalScreen` with wrapped, formatted Markdown or BBCode text and interactive widgets.
 * **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using Textual's full-screen TextArea editor modal.
-* **Delete Note (`[D]`):** Prompts for confirmation to remove the note from the YAML store.
+* **Delete Note (`[D]`):** In a notebook submenu, the help gutter displays `[D]: Delete`. Pressing `d` or `D` on a selected note prompts confirmation before removing it. Outside of a notebook, `[D]` is inactive and omitted from the gutter.
 
 ---
 

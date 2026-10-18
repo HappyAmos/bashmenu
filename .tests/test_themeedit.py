@@ -1581,6 +1581,109 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_action_open_theme_clean_and_dirty_prompts(self):
+        """Verify Ctrl+O opens theme picker, prompting to save if dirty."""
+        # 1. Verify keybinding
+        bindings_dict = {
+            b.key: b.action for b in themeedit.ThemeEditScreen.BINDINGS
+        }
+        self.assertEqual(bindings_dict.get("ctrl+o"), "open_theme")
+
+        # 2. Interactive workflow
+        async def _run():
+            app = themeedit.ThemeEditApp("dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                self.assertIsInstance(screen, themeedit.ThemeEditScreen)
+                self.assertFalse(screen.is_dirty)
+
+                # A. Clean state: opening another theme loads directly
+                screen.action_open_theme()
+                await pilot.pause()
+                self.assertIsInstance(
+                    app.screen, bashmenu_ui.ThemePickerModalScreen
+                )
+                picker = app.screen
+                picker.dismiss("monochrome")
+                await pilot.pause()
+
+                self.assertEqual(screen.theme_name, "monochrome")
+                self.assertFalse(screen.is_dirty)
+
+                # B. Dirty state: prompts with ConfirmModalScreen
+                pal_256 = screen._get_pal_256()
+                pal_256["title"] = [99, -1]
+                self.assertTrue(screen.is_dirty)
+
+                screen.action_open_theme()
+                await pilot.pause()
+                self.assertIsInstance(
+                    app.screen, bashmenu_ui.ThemePickerModalScreen
+                )
+                picker = app.screen
+                picker.dismiss("dracula")
+                await pilot.pause()
+
+                self.assertIsInstance(
+                    app.screen, bashmenu_ui.ConfirmModalScreen
+                )
+                confirm = app.screen
+                self.assertEqual(confirm.modal_title, "Unsaved Changes")
+
+                # Selecting "No" discards changes and loads selected theme
+                await pilot.click(confirm.query_one("#btn_no"))
+                await pilot.pause()
+                self.assertEqual(screen.theme_name, "dracula")
+                self.assertFalse(screen.is_dirty)
+
+                # C. Dirty state: selecting "Yes" saves and loads
+                pal_256 = screen._get_pal_256()
+                pal_256["title"] = [88, -1]
+                self.assertTrue(screen.is_dirty)
+
+                screen.action_open_theme()
+                await pilot.pause()
+                picker = app.screen
+                picker.dismiss("monochrome")
+                await pilot.pause()
+
+                confirm = app.screen
+                self.assertIsInstance(confirm, bashmenu_ui.ConfirmModalScreen)
+                with mock.patch("builtins.open", mock.mock_open()):
+                    await pilot.click(confirm.query_one("#btn_yes"))
+                    await pilot.pause()
+
+                # Dismiss saved message modal if present
+                if isinstance(app.screen, bashmenu_ui.MessageModalScreen):
+                    app.screen.dismiss()
+                    await pilot.pause()
+
+                self.assertEqual(screen.theme_name, "monochrome")
+                self.assertFalse(screen.is_dirty)
+
+                # D. Dirty state: selecting "Cancel" aborts load
+                pal_256 = screen._get_pal_256()
+                pal_256["title"] = [77, -1]
+                self.assertTrue(screen.is_dirty)
+
+                screen.action_open_theme()
+                await pilot.pause()
+                picker = app.screen
+                picker.dismiss("dracula")
+                await pilot.pause()
+
+                confirm = app.screen
+                self.assertIsInstance(confirm, bashmenu_ui.ConfirmModalScreen)
+                await pilot.click(confirm.query_one("#btn_cancel"))
+                await pilot.pause()
+
+                # Theme must remain monochrome and still dirty
+                self.assertEqual(screen.theme_name, "monochrome")
+                self.assertTrue(screen.is_dirty)
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()

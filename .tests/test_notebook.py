@@ -179,7 +179,7 @@ class TestNotebookFeature(unittest.IsolatedAsyncioTestCase):
         mock_screen.open_note_viewer.assert_called_once_with(self.notebook_path, "Note 1")
 
     def test_help_gutter_in_notebook_mode(self):
-        """Verify help gutter renders notebook-specific keys when _is_notebook is True."""
+        """Verify help gutter renders notebook keys when _is_notebook is True."""
         config = bashmenu.load_config()[0]
         sub = bashmenu.build_dynamic_notebook_submenu(self.notebook_path)
         mv = bashmenu.MainMenuView(config=config, menu_data=sub)
@@ -189,6 +189,18 @@ class TestNotebookFeature(unittest.IsolatedAsyncioTestCase):
         out_text = out.plain if hasattr(out, "plain") else str(out)
         self.assertIn("New Note", out_text)
         self.assertIn("Read", out_text)
+        self.assertIn("Delete", out_text)
+
+        # Non-notebook mode must not contain Delete shortcut in gutter
+        non_nb = {"title": "Standard Menu", "items": [{"title": "Item 1"}]}
+        mv_std = bashmenu.MainMenuView(config=config, menu_data=non_nb)
+        mv_std.menu_stack = [non_nb]
+        with patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)):
+            out_std = mv_std.render()
+        out_std_text = (
+            out_std.plain if hasattr(out_std, "plain") else str(out_std)
+        )
+        self.assertNotIn("Delete", out_std_text)
 
     def test_on_key_notebook_creates_new_note(self):
         """Verify pressing 'n' when active menu is notebook calls action_new_note."""
@@ -206,6 +218,46 @@ class TestNotebookFeature(unittest.IsolatedAsyncioTestCase):
             event.character = "n"
             screen.on_key(event)
             screen.action_new_note.assert_called_once()
+
+    def test_on_key_notebook_deletes_selected_note(self):
+        """Verify pressing 'd' when active menu is notebook calls action_delete_note."""
+        screen = bashmenu.BashMenuScreen(config=bashmenu.load_config()[0])
+        screen.action_delete_note = MagicMock()
+        sub = bashmenu.build_dynamic_notebook_submenu(self.notebook_path)
+
+        mock_mv = MagicMock()
+        mock_mv.current_menu.return_value = sub
+        mock_mv.show_shortcuts = False
+
+        with unittest.mock.patch.object(bashmenu.BashMenuScreen, "menu_view", new_callable=lambda: mock_mv):
+            event = MagicMock()
+            event.key = "d"
+            event.character = "d"
+            screen.on_key(event)
+            screen.action_delete_note.assert_called_once()
+
+    def test_on_key_outside_notebook_does_not_delete_note(self):
+        """Verify pressing 'd' outside notebook does not call action_delete_note."""
+        screen = bashmenu.BashMenuScreen(config=bashmenu.load_config()[0])
+        screen.action_delete_note = MagicMock()
+        std_menu = {"title": "Standard Menu", "items": [{"title": "Option 1"}]}
+
+        mock_mv = MagicMock()
+        mock_mv.current_menu.return_value = std_menu
+        mock_mv.show_shortcuts = False
+
+        with unittest.mock.patch.object(bashmenu.BashMenuScreen, "menu_view", new_callable=lambda: mock_mv):
+            event = MagicMock()
+            event.key = "d"
+            event.character = "d"
+            screen.on_key(event)
+            screen.action_delete_note.assert_not_called()
+
+            # Calling action_delete_note directly outside notebook returns immediately
+            real_action = bashmenu.BashMenuScreen.action_delete_note
+            screen.confirm_delete_note = MagicMock()
+            real_action(screen)
+            screen.confirm_delete_note.assert_not_called()
 
     def test_ymlcheck_valid_option_types(self):
         """Verify ymlcheck recognizes 'notebook' as a valid option type."""

@@ -2202,7 +2202,10 @@ class MainMenuView(Widget):
             help_lines, status_lines = cached_gutters[1], cached_gutters[2]
         else:
             if is_nb:
-                full_help_str = "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+                full_help_str = (
+                    "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [D]: Delete | "
+                    "[F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+                )
             elif self.show_shortcuts:
                 full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
             else:
@@ -2981,6 +2984,8 @@ class MainMenuView(Widget):
                         scr.action_quit()
                 elif ("new note" in item_lower or item_lower.startswith("[n]") or item_lower == "n") and hasattr(scr, "action_new_note"):
                     scr.action_new_note()
+                elif ("delete" in item_lower or item_lower.startswith("[d]") or item_lower == "d") and hasattr(scr, "action_delete_note"):
+                    scr.action_delete_note()
                 elif ("select" in item_lower or "read" in item_lower or "enter" in item_lower) and hasattr(scr, "action_select_option"):
                     scr.action_select_option()
                 return
@@ -3697,11 +3702,17 @@ class BashMenuScreen(Screen):
     def on_key(self, event: Key) -> None:
         mv = self.menu_view
         curr_m = mv.current_menu()
-        if curr_m.get("_is_notebook") and (event.key in ("n", "N") or getattr(event, "character", None) in ("n", "N")):
-            self.action_new_note()
-            event.stop()
-            event.prevent_default()
-            return
+        if curr_m.get("_is_notebook"):
+            if event.key in ("n", "N") or getattr(event, "character", None) in ("n", "N"):
+                self.action_new_note()
+                event.stop()
+                event.prevent_default()
+                return
+            if event.key in ("d", "D") or getattr(event, "character", None) in ("d", "D"):
+                self.action_delete_note()
+                event.stop()
+                event.prevent_default()
+                return
 
         opts = curr_m.get("items", curr_m.get("options", []))
         shortcut_chars = "123456789abcdefghijklmnopqrstuvwxyz"
@@ -3930,6 +3941,24 @@ class BashMenuScreen(Screen):
             bashmenu_ui.InputModalScreen("New Note", "Enter note title:", theme=theme),
             on_title_entered,
         )
+
+    def action_delete_note(self) -> None:
+        """Prompts to delete the currently selected notebook note."""
+        curr_m = self.menu_view.current_menu()
+        if not curr_m.get("_is_notebook"):
+            return
+        filepath = curr_m.get("_notebook_file")
+        if not filepath:
+            return
+
+        opts = curr_m.get("items", curr_m.get("options", []))
+        curr_row = self.menu_view.current_row()
+        if 0 <= curr_row < len(opts):
+            item = opts[curr_row]
+            if item.get("type") == "notebook_note":
+                note_title = item.get("_note_title") or item.get("title")
+                if note_title:
+                    self.confirm_delete_note(filepath, note_title)
 
     def open_note_viewer(self, filepath: str, note_title: str) -> None:
         """Open the formatted note viewer modal for an existing note."""

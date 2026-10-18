@@ -3127,6 +3127,7 @@ class ThemeEditScreen(Screen):
         Binding("f7", "derive_palettes", "Derive 16/8"),
         Binding("f8", "toggle_expand_all", "Expand/Collapse All"),
         Binding("f9", "theme_from_image", "From Image"),
+        Binding("ctrl+o", "open_theme", "Open"),
         Binding("ctrl+s", "save_theme", "Save"),
         Binding("ctrl+a", "save_as_theme", "Save As"),
         Binding("ctrl+r", "rename_theme", "Rename", show=False),
@@ -3587,6 +3588,8 @@ class ThemeEditScreen(Screen):
                 yield Label("[F4] ASCII/Glyphs", classes="footer_item", id="lbl_ascii", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F5] Reset", classes="footer_item", id="lbl_reset", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[Ctrl+O] Open", classes="footer_item", id="lbl_open", markup=False)
             with Horizontal(classes="footer_row"):
                 yield Label("[F6] Clone/Base", classes="footer_item", id="lbl_clone", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
@@ -3762,7 +3765,7 @@ class ThemeEditScreen(Screen):
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""
-        if not getattr(self, "_mounted_ready", False):
+        if not getattr(self, "_mounted_ready", False) or getattr(self, "_populating_inputs", False):
             return
 
         inp_id = event.input.id
@@ -3781,20 +3784,21 @@ class ThemeEditScreen(Screen):
             return
 
         if inp_id == "prop_indicator":
-            if str(self.current_theme.get("indicator", "")) == val:
+            if str(self.current_theme.get("indicator", "")) == event.value:
                 return
-            self.current_theme["indicator"] = val
+            self.current_theme["indicator"] = event.value
         elif inp_id == "prop_shadow_char":
             win = self.current_theme.setdefault("window", {})
-            if str(win.get("shadow_char", "")) == val:
+            if str(win.get("shadow_char", "")) == event.value:
                 return
-            win["shadow_char"] = val
+            win["shadow_char"] = event.value
         elif inp_id.startswith("prop_divider_"):
             sub_k = inp_id.replace("prop_divider_", "")
             div = self.current_theme.setdefault("divider", {})
-            if str(div.get(sub_k, "")) == val:
+            target_val = event.value if sub_k == "char" else val
+            if str(div.get(sub_k, "")) == target_val:
                 return
-            div[sub_k] = val
+            div[sub_k] = target_val
         elif inp_id.startswith("prop_marquee_"):
             sub_k = inp_id.replace("prop_marquee_", "")
             mq = self.current_theme.setdefault("marquee", {})
@@ -3810,9 +3814,9 @@ class ThemeEditScreen(Screen):
                     return
                 mq["gap"] = num_val
             else:
-                if str(mq.get("char", " ")) == val:
+                if str(mq.get("char", "•")) == event.value:
                     return
-                mq["char"] = val
+                mq["char"] = event.value
             self.is_dirty = True
             self._sync_preview()
             return
@@ -3989,6 +3993,8 @@ class ThemeEditScreen(Screen):
             self.action_save_as_theme()
         elif w_id == "lbl_reset":
             self.action_reset_theme()
+        elif w_id == "lbl_open":
+            self.action_open_theme()
         elif w_id == "lbl_exit":
             self.action_exit_editor()
 
@@ -4231,43 +4237,115 @@ class ThemeEditScreen(Screen):
             _on_theme_chosen,
         )
 
+    def action_open_theme(self) -> None:
+        """Opens theme picker to select and load an existing theme."""
+        self.raw_themes_data = (
+            bashmenu_ui.load_themes_file(self.themes_filepath) or {}
+        )
+
+        def _do_load(theme_key: str) -> None:
+            self.theme_name = theme_key
+            self.current_theme = copy.deepcopy(self.raw_themes_data[theme_key])
+            self._ensure_theme_structure()
+            self._populate_all_inputs()
+            self.is_new = False
+            self.is_dirty = False
+            self._sync_preview()
+
+        def _on_theme_chosen(theme_key: str | None) -> None:
+            if not theme_key or theme_key not in self.raw_themes_data:
+                return
+
+            if self.is_dirty:
+                def _on_confirm_save(choice: str | None) -> None:
+                    if choice == "yes":
+                        if not self.theme_name or self.theme_name == "untitled":
+                            def _on_save_as(res: tuple[str, bool] | None) -> None:
+                                if res:
+                                    new_name, set_active = res
+                                    self._save_theme_to_disk(
+                                        new_name, set_active=set_active
+                                    )
+                                    _do_load(theme_key)
+
+                            self.app.push_screen(
+                                SaveThemeModal(
+                                    "",
+                                    theme_styles=self.configured_theme_styles,
+                                ),
+                                _on_save_as,
+                            )
+                        else:
+                            self._save_theme_to_disk(
+                                self.theme_name, set_active=False
+                            )
+                            _do_load(theme_key)
+                    elif choice == "no":
+                        _do_load(theme_key)
+
+                msg = (
+                    "You have unsaved changes. Do you want to save them "
+                    f"before opening '{theme_key}'?"
+                )
+                self.app.push_screen(
+                    bashmenu_ui.ConfirmModalScreen(
+                        "Unsaved Changes",
+                        msg,
+                        theme=self.configured_theme_styles,
+                    ),
+                    _on_confirm_save,
+                )
+            else:
+                _do_load(theme_key)
+
+        self.app.push_screen(
+            bashmenu_ui.ThemePickerModalScreen(
+                self.theme_name, theme=self.configured_theme_styles
+            ),
+            _on_theme_chosen,
+        )
+
     def _populate_all_inputs(self) -> None:
         """Reflect current_theme values across all inspector input fields."""
-        with contextlib.suppress(Exception):
-            self.query_one("#prop_theme_name", Input).value = str(
-                self.theme_name if (self.theme_name and self.theme_name != "untitled") else ""
-            )
-            self.query_one("#prop_indicator", Input).value = str(self.current_theme.get("indicator", ">"))
-            self.query_one("#prop_shadow_char", Input).value = str(
-                self.current_theme.get("window", {}).get("shadow_char", "░")
-            )
-            div_char = str(self.current_theme.get("divider", {}).get("char", "─"))
-            div_len = str(self.current_theme.get("divider", {}).get("length", "{window_width}"))
-            self.query_one("#prop_divider_char", Input).value = div_char
-            self.query_one("#prop_divider_length", Input).value = div_len
+        self._populating_inputs = True
+        try:
+            with contextlib.suppress(Exception):
+                self.query_one("#prop_theme_name", Input).value = str(
+                    self.theme_name if (self.theme_name and self.theme_name != "untitled") else ""
+                )
+                self.query_one("#prop_indicator", Input).value = str(self.current_theme.get("indicator", ">"))
+                self.query_one("#prop_shadow_char", Input).value = str(
+                    self.current_theme.get("window", {}).get("shadow_char", "░")
+                )
+                div_char = str(self.current_theme.get("divider", {}).get("char", "─"))
+                div_len = str(self.current_theme.get("divider", {}).get("length", "{window_width}"))
+                self.query_one("#prop_divider_char", Input).value = div_char
+                self.query_one("#prop_divider_length", Input).value = div_len
 
-            m_cfg = self.current_theme.get("marquee", {})
-            m_char = str(m_cfg.get("char", "•")) if isinstance(m_cfg, dict) else "•"
-            m_gap = str(m_cfg.get("gap", 5)) if isinstance(m_cfg, dict) else "5"
-            self.query_one("#prop_marquee_char", Input).value = m_char
-            self.query_one("#prop_marquee_gap", Input).value = m_gap
+                m_cfg = self.current_theme.get("marquee", {})
+                m_char = str(m_cfg.get("char", "•")) if isinstance(m_cfg, dict) else "•"
+                m_gap = str(m_cfg.get("gap", 5)) if isinstance(m_cfg, dict) else "5"
+                self.query_one("#prop_marquee_char", Input).value = m_char
+                self.query_one("#prop_marquee_gap", Input).value = m_gap
 
-            bg_data = self.current_theme.get("background")
-            bg_img = ""
-            if isinstance(bg_data, dict):
-                bg_img = str(bg_data.get("image", ""))
-            elif isinstance(bg_data, str):
-                bg_img = bg_data
-            self.query_one("#prop_wallpaper_image", Input).value = bg_img
+                bg_data = self.current_theme.get("background")
+                bg_img = ""
+                if isinstance(bg_data, dict):
+                    bg_img = str(bg_data.get("image", ""))
+                elif isinstance(bg_data, str):
+                    bg_img = bg_data
+                self.query_one("#prop_wallpaper_image", Input).value = bg_img
 
-            for k, _ in self.BORDER_PROPERTIES:
-                b_val = str(self.current_theme.get("window", {}).get(k, ""))
-                self.query_one(f"#prop_{k}", Input).value = b_val
+                for k, _ in self.BORDER_PROPERTIES:
+                    b_val = str(self.current_theme.get("window", {}).get(k, ""))
+                    self.query_one(f"#prop_{k}", Input).value = b_val
 
-            pal_256 = self._get_pal_256()
-            for tok in self.COLOR_TOKENS:
-                c_val = str(pal_256.get(tok, -1))
-                self.query_one(f"#color_{tok}", Input).value = c_val
+                pal_256 = self._get_pal_256()
+                for tok in self.COLOR_TOKENS:
+                    c_val = str(pal_256.get(tok, -1))
+                    self.query_one(f"#color_{tok}", Input).value = c_val
+        finally:
+            self._populating_inputs = False
 
     def action_configure_background(self) -> None:
         """Open the background and wallpaper configuration dialog (b shortcut)."""

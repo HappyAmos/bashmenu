@@ -2228,7 +2228,7 @@ class MenuEditScreen(Screen):
             if item_type == "submenu" or "submenu" in item:
                 sub_opts = item.get("submenu", {}).get("items", item.get("submenu", {}).get("options", []))
                 self._build_tree_branch(node, sub_opts)
-                node.expand()
+                node.collapse()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
         """Update property inspector when a tree node is highlighted."""

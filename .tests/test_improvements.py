@@ -2667,21 +2667,23 @@ class TestImprovements(unittest.TestCase):
                 screen.action_toggle_tree_node()
                 self.assertTrue(root.is_expanded)
 
-                # Check children exist
+                # Check children exist and start collapsed by default
                 self.assertTrue(len(root.children) > 0)
-
-                # First F2 press toggles: should collapse all expandable children
-                screen.action_toggle_children()
-                self.assertTrue(root.is_expanded)
                 expandable_children = [c for c in root.children if c.children]
                 for c in expandable_children:
                     self.assertFalse(c.is_expanded)
 
-                # Second F2 press toggles: should expand all expandable children
+                # First F2 press toggles: should expand all expandable children
                 screen.action_toggle_children()
                 self.assertTrue(root.is_expanded)
                 for c in expandable_children:
                     self.assertTrue(c.is_expanded)
+
+                # Second F2 press toggles: should collapse all expandable children
+                screen.action_toggle_children()
+                self.assertTrue(root.is_expanded)
+                for c in expandable_children:
+                    self.assertFalse(c.is_expanded)
 
         asyncio.run(run_checks())
 
