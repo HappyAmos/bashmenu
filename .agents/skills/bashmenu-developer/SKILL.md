@@ -40,6 +40,15 @@ description: Core developer guidelines for the multi-platform BashMenu
 - **Dependencies & Virtualenv Hygiene:** `requirements.txt` must declare all runtime and test dependencies (including `Pillow` for wallpaper compositing, `textual`, `rich`, `PyYAML`, `ruff`, `flake8`, and `pytest`). Keep system prerequisites to a minimum (`python3` + `curl`). CI runners install freshly from `requirements.txt`; ensure no test relies on unlisted packages. Prefer Python standard library (`json`, `urllib.request`) over external CLI tools (`glow`, `jq`, `yq`) for out-of-the-box compatibility on Termux, Raspberry Pi, and Windows (Git Bash/WSL).
 - **Subprocess Test Environment Isolation:**
   - Tests executing shell scripts or wrapper binaries (`scripts/rich.sh`, `bashmenu.sh`) via `subprocess.run` must explicitly pass `PYTHON_BIN=sys.executable` and prepend `os.path.dirname(sys.executable)` to `PATH` in `env` to ensure multi-version CI runners (e.g. Python 3.10/3.11/3.12 under `pytest-xdist`) invoke the active virtual environment rather than system Python.
+- **Unmounted Widget Property Access (`NoActiveAppError`):**
+  - In Textual, accessing `widget.app` raises `textual._context.NoActiveAppError` if the widget has not been mounted in an active application.
+  - In Python 3.8+, `getattr(widget, "app", None)` only catches `AttributeError`; because `NoActiveAppError` does not inherit from `AttributeError`, unhandled calls crash unmounted widget styling routines (such as isolated unit tests).
+  - Invariant: When resolving `app` from an arbitrary widget, always wrap property retrieval:
+    ```python
+    app = None
+    with contextlib.suppress(Exception):
+        app = getattr(widget, "app", None)
+    ```
 - **Sub-Agent Delegation Policy:** Use local `opencode` CLI sparingly and strictly for small, low-risk draft tasks (test case drafts, isolated prototypes). Treat all output as untrusted draft code requiring strict review, linting, and automated test validation.
 - **Branching Discipline:** For structural overhauls (cross-platform compatibility, editor re-architecture, dependency reduction), always branch from git (e.g. `feat/<topic>`) and verify all tests and linters pass before merging.
 
@@ -221,6 +230,15 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Direct 2D Grid Access: Avoid unnecessary range tabs in picker modals; keep navigation centered directly on the 16×16 grid.
   - Quick Swatches & Palettes: Provide visual quick-pick buttons for borders (`Single`, `Double`, `Mixed`, `Shades`, `Blocks`) and standard/bright/extended ANSI colors. Avoid `Select` dropdowns for visual tokens where 1-click visual recognition is essential.
   - Event Decoupling: Grid `set_code(code, notify=True)` must accept `notify=False`. Pass `notify=False` when clicking swatches to prevent highlight events from overwriting named constants (`"COLOR_RED"`).
+  - **Theme Editor Color Picker Palette Tab (`ColorPickerModal`):**
+    - **80-Column Safe Mode Switcher:** Maintains strict 80-column dialog width using `#mode_row`:
+      - `[G] 256 Color Grid` (`ColorGridWidget`): 16×16 full terminal color spectrum.
+      - `[T] Theme Palette (<count>)` (`OptionList`): All colors currently in use throughout the active theme.
+    - **In-Use Color Grouping:** Groups all non-inherit colors defined across the theme palette, rendering:
+      - Formatted color swatch badge (`[  <code/name>  ]`) with dynamic luminance-calculated contrast foreground (`#000000` for luminance $> 130$, `#ffffff` otherwise).
+      - Comma-separated list of tokens currently using that color (e.g. `border(fg), footer(fg), divider(fg)`).
+    - **OptionList Construction:** Textual `OptionList.add_option()` does not take an `id=` keyword argument; items must be wrapped in `Option(prompt, id=...)` (`from textual.widgets.option_list import Option`).
+    - **Keyboard & Navigation Shortcuts:** Support `g` (256 Grid), `t` (Theme Palette), `1`/`f` (Foreground layer), `2`/`b` (Background layer), `i` (Inherit `-1`), and arrow keys for real-time live preview updates.
 - **Modal Geometry & Button Box Model Standards (80-Column Safe):**
   - Terminal Geometry Bounds: All modal dialogs must fit standard 80-column terminals:
     - Width: `#dialog` width must not exceed `78` columns (`80` columns with right shadow).
@@ -228,10 +246,17 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Textual Button Width Invariant: Textual's `Button.get_content_width` adds 2 cells to label text by default. For dense button rows (like swatch rows), set `.btn_swatch { padding: 0; margin: 0; min-width: 3; }` so that button width equals `len(label) + 2`.
   - Row Length Limit: Keep all horizontal swatch rows $\le 66$ columns. Split long button groups (e.g. Bright colors) across two clean rows of 4 buttons so labels like `Br-Magenta` are fully spelled out rather than truncated.
   - Preview Bar Sizing: Single-line status or preview bars inside modals must use `height: 1; border: none;` without dynamic borders, ensuring content is not squashed by border edges.
+  - **Modal Container Text Color & Light Theme Legibility Invariant (`apply_modal_theme`):**
+    - Whenever applying dynamic theme background (`dialog.styles.background = css_bg`), `apply_modal_theme` must explicitly apply the theme's text color directly to the container: `dialog.styles.color = css_text`.
+    - In Textual, child widgets (labels, markdown paragraphs, checkboxes) without explicit styles inherit their foreground from the container. Without `dialog.styles.color`, Textual defaults to dark-mode stylesheet `$text = #e0e0e0` (light grey). On light themes like `dayscape` (`#d7d7ff`), light-grey text against a light background yields ~1.1:1 contrast (illegible unless selected).
+    - Notes containing markdown task lists (`- [ ]`, `- [x]`) fragment into `.markdown_block` and `Checkbox` widgets and omit `#message` entirely. Style queries must explicitly target `#message, .markdown_block, Checkbox, .markdown_checkbox`.
 - **Tab Key Navigation & Modal Button Sizing:**
   - Never bind `tab` at the screen level (`Binding("tab", ...)`). Let Textual's default focus traversal handle <kbd>Tab</kbd> and <kbd>Shift+Tab</kbd> across tabs, grid, swatches, and action buttons.
   - Standard Action Button Sizing: Button variants apply 2-line borders. Never use `height: 1` or `border: none` on bottom dialog action buttons. Always use standard `#btn_row` styling: `#btn_row { height: 3; margin-top: 0; align: center middle; }` and `#btn_row Button { height: 3; min-width: 16; margin: 0 1; }`.
   - Provide distinct `:focus` styling for `.btn_swatch:focus`, `.tab_btn:focus`, and `#btn_row Button:focus`.
+  - **Button Semantic Alias Resolution (`apply_button_theme`):**
+    - Theme definitions in `bashmenu.themes` specify button colors under `button_primary`, `button_error`, `button_cancel`, and `button_success`.
+    - When modal screens or helper components request semantic aliases, `apply_button_theme` must resolve fallbacks (`button_danger -> button_error` and `button_default -> button_cancel`) before falling back to `button_primary`. This prevents action buttons (like Delete or Cancel) from unintentionally taking on primary highlight colors.
 - **Split-Screen Preview Maximization (`ThemePreviewWidget`):**
   - `#preview_panel` must use `padding: 0; overflow: hidden;`.
   - Compute `w = max(38, parent.size.width - 4)` and `num_rows = max(12, parent.size.height - 2)`. Pad body slots with options, dividers, plugin cards, and bordered spacer rows to fill 100% of pane interior.
