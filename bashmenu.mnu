@@ -556,6 +556,22 @@ items:
               quiet: false
               alt_buffer: true
               icon: '{nf::#f11e7}'
+          - Edit SKILL.md:
+              type: editor
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/SKILL.md'
+              tabstop: 4
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              icon: '{nf::#f11e7}'
+          - Edit TODO.md:
+              type: editor
+              icon: '{nf::#f11e7}'
+              tabstop: 4
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
           - Convert Image To BM Wallpaper:
               type: command
               icon: '{nf::#f11e7}'

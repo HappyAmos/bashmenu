@@ -111,3 +111,7 @@
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 MarkupError: closing tag '[/home/andrew/aut]' does not match any open tag
 ```
+- [ ] In the theme editor, the function keyboard shortcuts in the help gutter should be sequential. In otherwords, all the function key shortcuts should be in order, with the non function key shortcuts following them.
+- [ ] In bashmenu, when in a notebook, the keyboard shortcut for "delete" is not showing, it looks like this: ```[UP/DN]: Nav▀▀|▀▀▀[ENTER]: Read▀▀|▀▀▀[N]: New Note▀▀|▀▀: Delete▀▀|▀▀[F1]: Help
+[F2]: Themes▀▀▀▀|▀▀▀▀▀[F7]: Gutter▀▀▀▀|▀▀▀▀[F8]: ThemeEdit▀▀▀▀|▀▀▀▀[ESC]: Back```
+
