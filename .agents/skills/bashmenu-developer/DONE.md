@@ -86,3 +86,22 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 - **Item:** `- [x] FEATURE: Make sure the copy and paste buffer for notes can pass information back to any interface such as the built-in text editor`
 - **Design & Architecture:** Implemented unified clipboard subsystem in `bashmenu_ui.py` (`get_system_clipboard`, `set_system_clipboard`, `get_shared_cutbuffer_path`) supporting system CLI tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with persistent fallback to `~/.cache/bashmenu/cutbuffer.txt`. Integrated with `bashedit.py` so cutting, copying, and pasting seamlessly transfers between the built-in text editor, `NotebookTextArea`, and `NoteViewerModalScreen` (`[C]` / `Ctrl+C` raw markdown copy action).
 - **Tests:** Added `test_notebook_cross_interface_clipboard` in `.tests/test_notebook.py`.
+
+---
+
+### 12. Theme Editor Preview Pane Vertical Border Clickability Fix
+- **Item:** `- [x] BUG: Vertical borders in the preview pane of the theme editor are no longer clickable (outside/window borders).`
+- **Root Cause:** When preview tabs were introduced in commit `fbe2127`, `padding: 0 0 0 1;` was added to `#live_preview` CSS to align with the panel. This 1-column left padding shifted all content rendering 1 column to the right, desynchronizing visual characters from the hit map: clicking on the left vertical border (drawn at column 1) hit `color_background` at column 1, and the right vertical border (drawn at `w`) was pushed out of bounds and clipped.
+- **Fix:** In `themeedit.py`:
+  1. Updated `#live_preview` CSS to `padding: 0;`.
+  2. Enhanced `ThemePreviewWidget.on_click` to dynamically compute content-relative coordinates (`cx = event.x - gutter_l`, `cy = event.y - gutter_t`) respecting any container padding/gutter offsets.
+  3. Ensured contiguous element range calculations for visual flash feedback (`_flash_range`) index correctly into content columns.
+- **Tests:** Added assertions in `test_click_to_inspect_elements` in `.tests/test_themeedit.py` verifying left (`(0, 1)`) and right (`(w - 1, 1)`) vertical window borders properly focus `color_border`. All 46 tests pass.
+
+---
+
+### 13. Shared Notes TODO Reference & Workflow Directive
+- **Item:** `- [x] REQUEST: Start referencing {bashmenu_dir}/notebook/notes.yml -> notebook -> notes -> TODO update SKILL.md to add this to your workflow after completing tasks. Mark done items in this list as done, and continue writing completion summaries to DONE.md . You will still reference this file (TODO.md) after completing tasks as well.`
+- **Design & Architecture:** Updated `SKILL.md` Section 11 (`Continuation Directive`, `Self Organization & Shared Notes`, and `Done Log Directive`) to establish a unified workflow referencing both `.agents/skills/bashmenu-developer/TODO.md` and `{bashmenu_dir}/notebooks/notes.yml` (`notebook -> notes -> TODO`). Tasks in either file are checked off (`- [x]`) upon completion and documented in `DONE.md`.
+- **Tests:** Verified schema validity of `SKILL.md`, `TODO.md`, and `notebooks/notes.yml`.
+

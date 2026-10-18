@@ -2506,20 +2506,24 @@ class ThemePreviewWidget(Static):
 
     def on_click(self, event: events.Click) -> None:
         """Handle mouse click on preview element, flash clicked item, and emit ElementClicked message."""
-        pos = (event.x, event.y)
+        gutter_l = getattr(getattr(self, "gutter", None), "left", 0)
+        gutter_t = getattr(getattr(self, "gutter", None), "top", 0)
+        cx = event.x - gutter_l
+        cy = event.y - gutter_t
+        pos = (cx, cy)
         hit = self._hit_map.get(pos)
         if not hit and (
-            0 <= event.x < getattr(self, "_last_w", 56) + 3 and 0 <= event.y <= getattr(self, "_last_h", 12) + 5
+            0 <= cx < getattr(self, "_last_w", 56) + 3 and 0 <= cy <= getattr(self, "_last_h", 12) + 5
         ):
             hit = ("color_background", "color_background")
         if hit:
             # Determine contiguous element range on this row for haptic visual feedback
             target_key = hit[0]
-            ey = event.y
-            x1 = event.x
+            ey = cy
+            x1 = cx
             while x1 > 0 and self._hit_map.get((x1 - 1, ey), (None,))[0] == target_key:
                 x1 -= 1
-            x2 = event.x + 1
+            x2 = cx + 1
             while self._hit_map.get((x2, ey), (None,))[0] == target_key:
                 x2 += 1
 
@@ -3447,7 +3451,7 @@ class ThemeEditScreen(Screen):
     #live_preview {
         height: 1fr;
         width: 100%;
-        padding: 0 0 0 1;
+        padding: 0;
         align: left middle;
     }
     #inspector_panel {
@@ -3675,8 +3679,19 @@ class ThemeEditScreen(Screen):
         """Guarantee all essential theme blocks exist in the working copy."""
         self.current_theme.setdefault("indicator", ">")
         win = self.current_theme.setdefault("window", {})
-        self.current_theme.setdefault("divider", {"char": "─", "length": "{window_width}"})
-        self.current_theme.setdefault("marquee", {"char": "•", "gap": 5})
+        div = self.current_theme.setdefault("divider", {})
+        if isinstance(div, dict):
+            div.setdefault("char", "─")
+            div.setdefault("length", "{window_width}")
+        else:
+            self.current_theme["divider"] = {"char": str(div), "length": "{window_width}"}
+
+        mq = self.current_theme.setdefault("marquee", {})
+        if isinstance(mq, dict):
+            mq.setdefault("char", "•")
+            mq.setdefault("gap", 5)
+        else:
+            self.current_theme["marquee"] = {"char": str(mq), "gap": 5}
         if "256" in self.current_theme and 256 not in self.current_theme:
             self.current_theme[256] = self.current_theme.pop("256")
         if "16" in self.current_theme and 16 not in self.current_theme:

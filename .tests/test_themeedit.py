@@ -1088,6 +1088,12 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.click(preview, offset=(2, 0))
                 self.assertEqual(screen.focused.id, "color_border")
 
+                # 7b. Click outside vertical window borders (left and right)
+                await pilot.click(preview, offset=(0, 1))
+                self.assertEqual(screen.focused.id, "color_border")
+                await pilot.click(preview, offset=(preview._last_w - 1, 1))
+                self.assertEqual(screen.focused.id, "color_border")
+
                 # 8. Click panel margin area -> color_background
                 panel = screen.query_one("#preview_panel")
                 await pilot.click(panel, offset=(0, 0))

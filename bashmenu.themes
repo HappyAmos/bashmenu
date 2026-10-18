@@ -4780,7 +4780,7 @@ moonrise:
   divider:
     char: "\u2500"
     length: '{window_width}'
-treasuremap:
+tangyle:
   marquee:
     char: "\u2022"
     gap: 5
@@ -4804,67 +4804,73 @@ treasuremap:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
-    background: 234
+    background: COLOR_BLACK
     title:
-    - 143
+    - 136
     - -1
     border:
-    - 94
+    - 58
     - -1
     text:
     - 255
     - -1
     highlight:
-    - 16
-    - 143
+    - 255
+    - 136
     accent:
-    - 94
+    - 58
     - -1
     footer:
-    - 94
+    - 58
     - -1
     shadow:
     - 236
     - COLOR_BLACK
     gutter:
-    - 88
+    - 238
     - -1
     selection:
-    - 16
-    - 143
+    - 255
+    - 136
     shortcut_key:
-    - 94
+    - 58
     - -1
     divider:
-    - 94
+    - 58
     - -1
     button_primary:
-    - 16
-    - 143
+    - 255
+    - 136
     button_error:
     - 255
-    - 88
+    - 196
     button_cancel:
     - 255
-    - 88
+    - 238
     button_success:
     - 255
     - 40
     help_text:
-    - 94
+    - 58
     - -1
     plugin:
-    - 94
+    - 58
     - -1
     window_close_button:
     - 203
     - -1
     scrollbar:
-    - 143
+    - 136
     - 236
     whitespace:
-    - 88
+    - 238
     - -1
   16:
     background: COLOR_BLACK
@@ -4872,52 +4878,52 @@ treasuremap:
     - COLOR_YELLOW
     - -1
     border:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     text:
     - COLOR_BRIGHT_WHITE
     - -1
     highlight:
-    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
     - COLOR_YELLOW
     accent:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     footer:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     shadow:
     - COLOR_GREY
     - COLOR_BLACK
     gutter:
-    - COLOR_RED
+    - COLOR_GREY
     - -1
     selection:
-    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
     - COLOR_YELLOW
     shortcut_key:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     divider:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     button_primary:
-    - COLOR_BLACK
+    - COLOR_BRIGHT_WHITE
     - COLOR_YELLOW
     button_error:
     - COLOR_BRIGHT_WHITE
     - COLOR_RED
     button_cancel:
     - COLOR_BRIGHT_WHITE
-    - COLOR_RED
+    - COLOR_GREY
     button_success:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREEN
     help_text:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     plugin:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     window_close_button:
     - COLOR_BRIGHT_RED
@@ -4926,7 +4932,7 @@ treasuremap:
     - COLOR_YELLOW
     - COLOR_GREY
     whitespace:
-    - COLOR_RED
+    - COLOR_GREY
     - -1
   8:
     background: COLOR_BLACK
@@ -4934,52 +4940,52 @@ treasuremap:
     - COLOR_YELLOW
     - -1
     border:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     text:
     - COLOR_WHITE
     - -1
     highlight:
-    - COLOR_BLACK
+    - COLOR_WHITE
     - COLOR_YELLOW
     accent:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     footer:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     shadow:
     - COLOR_BLACK
     - COLOR_BLACK
     gutter:
-    - COLOR_RED
+    - COLOR_BLACK
     - -1
     selection:
-    - COLOR_BLACK
+    - COLOR_WHITE
     - COLOR_YELLOW
     shortcut_key:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     divider:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     button_primary:
-    - COLOR_BLACK
+    - COLOR_WHITE
     - COLOR_YELLOW
     button_error:
     - COLOR_WHITE
     - COLOR_RED
     button_cancel:
     - COLOR_WHITE
-    - COLOR_RED
+    - COLOR_BLACK
     button_success:
     - COLOR_WHITE
     - COLOR_GREEN
     help_text:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     plugin:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
     window_close_button:
     - COLOR_YELLOW
@@ -4988,12 +4994,15 @@ treasuremap:
     - COLOR_YELLOW
     - COLOR_BLACK
     whitespace:
-    - COLOR_RED
+    - COLOR_BLACK
     - -1
   background:
-    image: assets/wallpapers/treasuremap.png
-    opacity: 0.5
-    scaling: cover
+    image: assets/wallpapers/tangyle-tile.png
+    opacity: 0.15
+    scaling: tile
     mode: halfblock
-    clustering: 32
+    clustering: 64
     quantization: 16
+  divider:
+    char: "\u2500"
+    length: '{window_width}'
