@@ -3458,6 +3458,7 @@ class FilePickerModalScreen(ModalScreen[str]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+h", "toggle_hidden", "Toggle Hidden"),
+        Binding("ctrl+shift+h", "toggle_hidden", "Toggle Hidden", show=False),
         Binding("space", "select_dir", "Select Folder"),
         Binding("n", "new_item", "New", show=False),
         Binding("N", "new_item", "New", show=False),
@@ -3487,6 +3488,17 @@ class FilePickerModalScreen(ModalScreen[str]):
         self.current_path = resolved_start
         self.entries = []
 
+    def _get_footer_text(self) -> str:
+        if self.mode == "save":
+            return "[ENTER] Save/Nav | [Ctrl+H] Hidden | [ESC] Cancel"
+        if self.mode == "dir":
+            if self.allow_new:
+                return "[ENTER] Open | [SPACE] Select | [Ctrl+H] Hidden | [N] New | [ESC] Cancel"
+            return "[ENTER] Open | [SPACE] Select | [Ctrl+H] Hidden | [ESC] Cancel"
+        if self.allow_new:
+            return "[ENTER] Open/Select | [Ctrl+H] Hidden | [N] New File | [ESC] Cancel"
+        return "[ENTER] Open/Select | [Ctrl+H] Hidden | [ESC] Cancel"
+
     def compose(self) -> ComposeResult:
         with ModalFrame(id="modal_frame"):
             with Horizontal(id="dialog_hrow"):
@@ -3512,19 +3524,7 @@ class FilePickerModalScreen(ModalScreen[str]):
                                 new_lbl = "New Folder" if self.mode == "dir" else "New File"
                                 yield Button(new_lbl, variant="default", id="btn_new")
                             yield Button("Cancel", variant="default", id="btn_cancel")
-                    if self.mode == "save":
-                        footer_text = "[ENTER] Save/Navigate | [ESC] Cancel"
-                    elif self.mode == "dir":
-                        if self.allow_new:
-                            footer_text = "[ENTER] Open/Select | [SPACE] Use Dir | [N] New Folder | [ESC] Cancel"
-                        else:
-                            footer_text = "[ENTER] Open/Select | [SPACE] Use Dir | [ESC] Cancel"
-                    else:
-                        if self.allow_new:
-                            footer_text = "[ENTER] Open/Select | [N] New File | [ESC] Cancel"
-                        else:
-                            footer_text = "[ENTER] Open/Select | [ESC] Cancel"
-                    yield Label(footer_text, id="footer", markup=False)
+                    yield Label(self._get_footer_text(), id="footer", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
@@ -3738,6 +3738,9 @@ class FilePickerModalScreen(ModalScreen[str]):
     def action_toggle_hidden(self) -> None:
         self.show_hidden_state = not self.show_hidden_state
         self.load_directory()
+        msg = "Showing hidden files" if self.show_hidden_state else "Hiding hidden files"
+        with contextlib.suppress(Exception):
+            self.notify(msg, title="File Picker", timeout=1.5)
 
     def action_cancel(self) -> None:
         self.dismiss(None)

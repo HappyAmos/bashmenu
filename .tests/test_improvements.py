@@ -55,6 +55,40 @@ class TestImprovements(unittest.TestCase):
         binding_keys = [b.key for b in fp.BINDINGS]
         self.assertIn("n", binding_keys)
 
+    def test_file_picker_toggle_hidden_shortcut_and_footer(self):
+        """Verify FilePickerModalScreen ctrl+h bindings, footer text, and toggle state."""
+        fp = bashmenu_ui.FilePickerModalScreen("Test Picker", mode="file")
+        binding_actions = {b.key: b.action for b in fp.BINDINGS}
+        self.assertIn("ctrl+h", binding_actions)
+        self.assertEqual(binding_actions["ctrl+h"], "toggle_hidden")
+        self.assertIn("ctrl+shift+h", binding_actions)
+        self.assertEqual(binding_actions["ctrl+shift+h"], "toggle_hidden")
+
+        # Footer text checks
+        for mode in ("save", "dir", "file"):
+            fp.mode = mode
+            for allow_new in (True, False):
+                fp.allow_new = allow_new
+                footer = fp._get_footer_text()
+                self.assertIn("[Ctrl+H] Hidden", footer)
+                # Keep strictly within 72 columns so dialog won't wrap on 76-col screens
+                self.assertLessEqual(len(footer), 72)
+
+        # Action toggle state and notification
+        notified = []
+        fp.notify = lambda msg, **kwargs: notified.append(msg)
+        fp.load_directory = unittest.mock.MagicMock()
+
+        self.assertFalse(fp.show_hidden_state)
+        fp.action_toggle_hidden()
+        self.assertTrue(fp.show_hidden_state)
+        self.assertTrue(fp.load_directory.called)
+        self.assertIn("Showing hidden files", notified[-1])
+
+        fp.action_toggle_hidden()
+        self.assertFalse(fp.show_hidden_state)
+        self.assertIn("Hiding hidden files", notified[-1])
+
     def test_dir_picker_modal_ui_and_actions(self):
         """Verify FilePickerModalScreen in dir mode with allow_new=True."""
         dismissed = []

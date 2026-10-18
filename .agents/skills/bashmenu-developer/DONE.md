@@ -105,3 +105,10 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 - **Design & Architecture:** Updated `SKILL.md` Section 11 (`Continuation Directive`, `Self Organization & Shared Notes`, and `Done Log Directive`) to establish a unified workflow referencing both `.agents/skills/bashmenu-developer/TODO.md` and `{bashmenu_dir}/notebooks/notes.yml` (`notebook -> notes -> TODO`). Tasks in either file are checked off (`- [x]`) upon completion and documented in `DONE.md`.
 - **Tests:** Verified schema validity of `SKILL.md`, `TODO.md`, and `notebooks/notes.yml`.
 
+---
+
+### 14. File & Directory Picker Toggle Hidden Files Shortcut & Footer
+- **Item:** `- [x] Edit file/directory pickers to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden files.` (from `notebooks/notes.yml`)
+- **Design & Architecture:** In `bashmenu_ui.py`, enhanced `FilePickerModalScreen` with `<ctrl+h>` and `<ctrl+shift+h>` bindings mapped to `action_toggle_hidden()`. Updated `_get_footer_text()` across all picker modes (`save`, `dir`, `file`) with and without `allow_new` to clearly display `[Ctrl+H] Hidden`, while maintaining strict `< 76` column widths (<= 72 chars) to prevent line wrapping. Added a toast notification (`Showing hidden files` / `Hiding hidden files`) on toggle.
+- **Tests:** Added `test_file_picker_toggle_hidden_shortcut_and_footer` in `.tests/test_improvements.py` verifying keybindings, 72-col footer boundaries across all modes, state flipping, directory reload, and toast feedback. All tests pass.
+

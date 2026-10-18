@@ -8,4 +8,6 @@ notebook:
         content: |-
           ## TODO List (Shared With Agent).
 
-          - [ ] Edit file/directory pickers to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden files.
+          - [x] Edit file/directory pickers to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden files.
+          - [ ] UI: When in view mode of notebook notes (not edit mode) wrap text as necessary.
+          - [ ] RESPONSIVENESS: notebook UI, particularily in edit mode has become very sluggish. This needs an immediate fix as it's so sluggish it's almost unusable.
