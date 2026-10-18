@@ -65,3 +65,4 @@
 │  Preview:                                                                        │
 │    1.     Search     [/home/andrew/git[---This space could be used.----------]  │
 ```
+- [x] Add a directive to SKILL.md to append .agents/skills/bashmenu-developer/DONE.md with completed TODO.md items, and include a description and summary of what you did.

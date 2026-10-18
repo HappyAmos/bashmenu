@@ -2483,13 +2483,17 @@ class TestImprovements(unittest.TestCase):
                 tf_path = tf.name
 
             try:
+                env = os.environ.copy()
+                env["PYTHON_BIN"] = sys.executable
+                env["PATH"] = f"{os.path.dirname(sys.executable)}:{env.get('PATH', '')}"
                 res = subprocess.run(
                     [rich_sh, tf_path],
                     capture_output=True,
                     text=True,
+                    env=env,
                     check=False,
                 )
-                self.assertEqual(res.returncode, 0)
+                self.assertEqual(res.returncode, 0, f"rich.sh failed: STDOUT: {res.stdout} STDERR: {res.stderr}")
                 import re
 
                 h1_lines = [
@@ -3658,13 +3662,17 @@ G
             tf_path = tf.name
 
         try:
+            env = os.environ.copy()
+            env["PYTHON_BIN"] = sys.executable
+            env["PATH"] = f"{os.path.dirname(sys.executable)}:{env.get('PATH', '')}"
             res = subprocess.run(
                 [rich_sh, tf_path],
                 capture_output=True,
                 text=True,
+                env=env,
                 check=False,
             )
-            self.assertEqual(res.returncode, 0)
+            self.assertEqual(res.returncode, 0, f"rich.sh failed: STDOUT: {res.stdout} STDERR: {res.stderr}")
             cleaned_lines = [
                 re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", line)
                 for line in res.stdout.splitlines()
