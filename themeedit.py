@@ -26,7 +26,8 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Input, Label, Select, Static
+from textual.widgets import Button, Checkbox, Input, Label, OptionList, Select, Static
+from textual.widgets.option_list import Option
 
 import bashmenu
 import bashmenu_ui
@@ -335,7 +336,7 @@ class ColorPickerModal(ModalScreen[Any]):
     }
     #dialog {
         width: 80;
-        height: 29;
+        height: 30;
         border: thick #555;
         background: #181818;
         padding: 0 1;
@@ -364,6 +365,22 @@ class ColorPickerModal(ModalScreen[Any]):
     .btn_close_x:hover {
         background: #333;
         color: #fff;
+    }
+    #mode_row {
+        height: 1;
+        width: 100%;
+        align: center middle;
+        margin-bottom: 0;
+    }
+    .mode_btn {
+        height: 1;
+        min-width: 18;
+        margin: 0 1;
+        padding: 0 1;
+        border: none !important;
+    }
+    .mode_btn:focus {
+        text-style: underline bold reverse;
     }
     #tabs_row {
         height: 2;
@@ -398,6 +415,16 @@ class ColorPickerModal(ModalScreen[Any]):
     }
     ColorGridWidget:focus {
         border: none;
+    }
+    #theme_palette_list {
+        width: 76;
+        height: 16;
+        border: solid #444;
+        background: #181818;
+        display: none;
+    }
+    #theme_palette_list:focus {
+        border: solid #00aaff;
     }
     #preview_bar {
         height: 1;
@@ -479,6 +506,8 @@ class ColorPickerModal(ModalScreen[Any]):
         Binding("2", "select_bg_tab", "Background", show=False),
         Binding("f", "select_fg_tab", "Foreground", show=False),
         Binding("b", "select_bg_tab", "Background", show=False),
+        Binding("g", "switch_to_grid_mode", "Grid View", show=False),
+        Binding("t", "switch_to_palette_mode", "Theme Palette", show=False),
         Binding("i", "action_inherit", "Inherit", show=False),
     ]
 
@@ -488,12 +517,14 @@ class ColorPickerModal(ModalScreen[Any]):
         current_val: Any,
         bg_color_val: Any = None,
         theme_styles: dict | None = None,
+        theme_palette: dict | None = None,
     ):
         super().__init__()
         self.token_name = token_name
         self.current_val = current_val
         self.bg_color_val = bg_color_val
         self.theme_styles = theme_styles or {}
+        self.theme_palette = theme_palette or {}
 
         if token_name == "background":
             self.is_pair = False
@@ -521,6 +552,61 @@ class ColorPickerModal(ModalScreen[Any]):
                 self.bg_val = -1
 
         self.active_tab = "fg"
+        self.view_mode = "grid"
+        self.theme_colors_list = self._extract_theme_colors()
+
+    def _extract_theme_colors(self) -> list[tuple[Any, list[str]]]:
+        """Extract and group all unique non-inherit colors currently defined in theme palette."""
+        color_usage: dict[Any, list[str]] = {}
+        source = self.theme_palette or {}
+        if not source and self.theme_styles:
+            extracted = {}
+            for tok, st in self.theme_styles.items():
+                if isinstance(st, Style):
+                    fg = st.color.name if st.color else None
+                    bg = st.bgcolor.name if st.bgcolor else None
+                    if fg or bg:
+                        extracted[tok] = [fg, bg]
+            source = extracted
+
+        for token, val in source.items():
+            if token in (
+                "marquee", "window", "indicator", "theme_name",
+                "window_borders", "divider", "wallpaper", "theme_background",
+            ) and not isinstance(val, (int, str, list, tuple)):
+                continue
+            vals = val if isinstance(val, (list, tuple)) else [val]
+            for idx, c in enumerate(vals):
+                if c in (-1, "-1", None, ""):
+                    continue
+                tag = token if len(vals) == 1 else (f"{token}(fg)" if idx == 0 else f"{token}(bg)")
+                color_usage.setdefault(c, []).append(tag)
+        return list(color_usage.items())
+
+    def _build_palette_option(self, color_val: Any, tokens: list[str]) -> Text:
+        """Construct a formatted Text row for a theme palette option with contrast color badge."""
+        parsed = bashmenu_ui.parse_color_val(color_val)
+        css_hex = bashmenu_ui.parse_css_color(parsed) if parsed else None
+
+        swatch_bg = css_hex or "#333333"
+        swatch_fg = "#ffffff"
+        if css_hex and css_hex.startswith("#") and len(css_hex) == 7:
+            with contextlib.suppress(Exception):
+                r = int(css_hex[1:3], 16)
+                g = int(css_hex[3:5], 16)
+                b = int(css_hex[5:7], 16)
+                lum = 0.299 * r + 0.587 * g + 0.114 * b
+                swatch_fg = "#000000" if lum > 130 else "#ffffff"
+
+        t = Text()
+        code_str = str(color_val)
+        t.append(f" [ {code_str:^11} ] ", style=Style(bgcolor=swatch_bg, color=swatch_fg, bold=True))
+        t.append("  ")
+        tokens_str = ", ".join(tokens)
+        if len(tokens_str) > 46:
+            tokens_str = tokens_str[:43] + "..."
+        t.append(tokens_str, style=Style(color="cyan"))
+        return t
 
     @property
     def selected_color(self) -> Any:
@@ -566,6 +652,15 @@ class ColorPickerModal(ModalScreen[Any]):
                             id="btn_close_x",
                             classes="btn_close_x",
                         )
+                    with Horizontal(id="mode_row"):
+                        num_theme = len(self.theme_colors_list)
+                        yield Button("[G] 256 Color Grid", id="btn_mode_grid", classes="mode_btn", variant="primary")
+                        yield Button(
+                            f"[T] Theme Palette ({num_theme})",
+                            id="btn_mode_palette",
+                            classes="mode_btn",
+                            variant="default",
+                        )
                     with Horizontal(id="tabs_row"):
                         if self.is_pair:
                             yield Button(f"[1] Foreground: {self.fg_val}", id="btn_tab_fg", classes="tab_btn", variant="primary")
@@ -579,6 +674,7 @@ class ColorPickerModal(ModalScreen[Any]):
                         if init_code == -1:
                             init_code = 0
                         yield ColorGridWidget(initial_code=init_code, id="color_grid")
+                        yield OptionList(id="theme_palette_list")
 
                     yield Static(id="preview_bar")
 
@@ -654,6 +750,23 @@ class ColorPickerModal(ModalScreen[Any]):
                 if css_e_fg:
                     b.styles.color = css_e_fg
 
+        # Populate theme palette list
+        with contextlib.suppress(Exception):
+            ol = self.query_one("#theme_palette_list", OptionList)
+            ol.clear_options()
+            if not self.theme_colors_list:
+                ol.add_option(Option(Text(" No colors configured in theme yet", style="dim italic"), disabled=True))
+            else:
+                for idx, (c_val, tokens) in enumerate(self.theme_colors_list):
+                    opt_text = self._build_palette_option(c_val, tokens)
+                    ol.add_option(Option(opt_text, id=f"opt_theme_{idx}"))
+
+            b_style = ts.get("border") or ts.get("accent")
+            if b_style and b_style.color and b_style.color.name:
+                css_b = bashmenu_ui.parse_css_color(b_style.color.name)
+                if css_b:
+                    ol.styles.border = ("solid", css_b)
+
         # Explicitly apply vibrant color backgrounds and contrast text to all swatch buttons
         for btn in self.query(".btn_swatch"):
             bid = getattr(btn, "id", "")
@@ -682,13 +795,30 @@ class ColorPickerModal(ModalScreen[Any]):
         self._sync_tabs_ui()
         self._update_preview()
 
-        # Focus color grid so arrow keys immediately respond
+        # Focus active view so keys immediately respond
         with contextlib.suppress(Exception):
-            self.query_one("#color_grid", ColorGridWidget).focus()
+            if self.view_mode == "grid":
+                self.query_one("#color_grid", ColorGridWidget).focus()
+            else:
+                self.query_one("#theme_palette_list", OptionList).focus()
 
     def _sync_tabs_ui(self) -> None:
+        with contextlib.suppress(Exception):
+            btn_mode_grid = self.query_one("#btn_mode_grid", Button)
+            btn_mode_pal = self.query_one("#btn_mode_palette", Button)
+            if self.view_mode == "grid":
+                btn_mode_grid.variant = "primary"
+                btn_mode_pal.variant = "default"
+            else:
+                btn_mode_grid.variant = "default"
+                btn_mode_pal.variant = "primary"
+
         if not self.is_pair:
+            with contextlib.suppress(Exception):
+                lbl = self.query_one("#tab_single", Label)
+                lbl.update(f"Editing Single Color: {self.token_name} ({self.fg_val})")
             return
+
         with contextlib.suppress(Exception):
             btn_fg = self.query_one("#btn_tab_fg", Button)
             btn_bg = self.query_one("#btn_tab_bg", Button)
@@ -710,8 +840,11 @@ class ColorPickerModal(ModalScreen[Any]):
         else:
             parsed_bg = bashmenu_ui.parse_color_val(self.bg_val) or "color(233)"
 
-        grid = self.query_one("#color_grid", ColorGridWidget)
-        curr_code = grid.cursor_code
+        active_val = self.fg_val if self.active_tab == "fg" else self.bg_val
+        curr_code = self._val_to_code(active_val)
+        if curr_code == -1 and self.view_mode == "grid":
+            with contextlib.suppress(Exception):
+                curr_code = self.query_one("#color_grid", ColorGridWidget).cursor_code
         const_name = CODE_TO_CONST.get(curr_code)
         const_str = f" ({const_name})" if const_name else ""
 
@@ -740,12 +873,66 @@ class ColorPickerModal(ModalScreen[Any]):
     def on_color_grid_widget_color_selected(self, event: ColorGridWidget.ColorSelected) -> None:
         self._confirm()
 
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if self.view_mode != "palette" or not self.theme_colors_list:
+            return
+        idx = event.option_index
+        if 0 <= idx < len(self.theme_colors_list):
+            color_val = self.theme_colors_list[idx][0]
+            if self.active_tab == "fg":
+                self.fg_val = color_val
+            else:
+                self.bg_val = color_val
+            c = self._val_to_code(color_val)
+            if c != -1:
+                with contextlib.suppress(Exception):
+                    self.query_one("#color_grid", ColorGridWidget).set_code(c, notify=False)
+            self._sync_tabs_ui()
+            self._update_preview()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self._confirm()
+
+    def action_switch_to_grid_mode(self) -> None:
+        self.view_mode = "grid"
+        with contextlib.suppress(Exception):
+            self.query_one("#color_grid", ColorGridWidget).styles.display = "block"
+            self.query_one("#theme_palette_list", OptionList).styles.display = "none"
+            val = self.fg_val if self.active_tab == "fg" else self.bg_val
+            c = self._val_to_code(val)
+            grid = self.query_one("#color_grid", ColorGridWidget)
+            if c != -1:
+                grid.cursor_code = c
+                grid.refresh()
+            grid.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
+    def action_switch_to_palette_mode(self) -> None:
+        self.view_mode = "palette"
+        with contextlib.suppress(Exception):
+            self.query_one("#color_grid", ColorGridWidget).styles.display = "none"
+            ol = self.query_one("#theme_palette_list", OptionList)
+            ol.styles.display = "block"
+            val = self.fg_val if self.active_tab == "fg" else self.bg_val
+            for idx, (c_val, _) in enumerate(self.theme_colors_list):
+                if str(c_val) == str(val):
+                    ol.highlighted = idx
+                    break
+            ol.focus()
+        self._sync_tabs_ui()
+        self._update_preview()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id
         if not btn_id:
             return
 
-        if btn_id == "btn_tab_fg":
+        if btn_id == "btn_mode_grid":
+            self.action_switch_to_grid_mode()
+        elif btn_id == "btn_mode_palette":
+            self.action_switch_to_palette_mode()
+        elif btn_id == "btn_tab_fg":
             self.action_select_fg_tab()
         elif btn_id == "btn_tab_bg":
             self.action_select_bg_tab()
@@ -763,7 +950,16 @@ class ColorPickerModal(ModalScreen[Any]):
                 code = STANDARD_CONST_MAP.get(swatch_name, 0)
                 grid = self.query_one("#color_grid", ColorGridWidget)
                 grid.set_code(code, notify=False)
-                grid.focus()
+                if self.view_mode == "grid":
+                    grid.focus()
+                else:
+                    with contextlib.suppress(Exception):
+                        ol = self.query_one("#theme_palette_list", OptionList)
+                        for idx, (c_val, _) in enumerate(self.theme_colors_list):
+                            if str(c_val) == swatch_name or (isinstance(c_val, int) and c_val == code):
+                                ol.highlighted = idx
+                                break
+                        ol.focus()
                 if self.active_tab == "fg":
                     self.fg_val = swatch_name
                 else:
@@ -781,12 +977,21 @@ class ColorPickerModal(ModalScreen[Any]):
 
     def action_select_fg_tab(self) -> None:
         self.active_tab = "fg"
-        grid = self.query_one("#color_grid", ColorGridWidget)
-        c = self._val_to_code(self.fg_val)
-        if c != -1:
-            grid.cursor_code = c
-            grid.refresh()
-        grid.focus()
+        if self.view_mode == "grid":
+            grid = self.query_one("#color_grid", ColorGridWidget)
+            c = self._val_to_code(self.fg_val)
+            if c != -1:
+                grid.cursor_code = c
+                grid.refresh()
+            grid.focus()
+        else:
+            with contextlib.suppress(Exception):
+                ol = self.query_one("#theme_palette_list", OptionList)
+                for idx, (c_val, _) in enumerate(self.theme_colors_list):
+                    if str(c_val) == str(self.fg_val):
+                        ol.highlighted = idx
+                        break
+                ol.focus()
         self._sync_tabs_ui()
         self._update_preview()
 
@@ -794,12 +999,21 @@ class ColorPickerModal(ModalScreen[Any]):
         if not self.is_pair:
             return
         self.active_tab = "bg"
-        grid = self.query_one("#color_grid", ColorGridWidget)
-        c = self._val_to_code(self.bg_val)
-        if c != -1:
-            grid.cursor_code = c
-            grid.refresh()
-        grid.focus()
+        if self.view_mode == "grid":
+            grid = self.query_one("#color_grid", ColorGridWidget)
+            c = self._val_to_code(self.bg_val)
+            if c != -1:
+                grid.cursor_code = c
+                grid.refresh()
+            grid.focus()
+        else:
+            with contextlib.suppress(Exception):
+                ol = self.query_one("#theme_palette_list", OptionList)
+                for idx, (c_val, _) in enumerate(self.theme_colors_list):
+                    if str(c_val) == str(self.bg_val):
+                        ol.highlighted = idx
+                        break
+                ol.focus()
         self._sync_tabs_ui()
         self._update_preview()
 
@@ -808,8 +1022,11 @@ class ColorPickerModal(ModalScreen[Any]):
             self.fg_val = -1
         else:
             self.bg_val = -1
-        grid = self.query_one("#color_grid", ColorGridWidget)
-        grid.focus()
+        with contextlib.suppress(Exception):
+            if self.view_mode == "grid":
+                self.query_one("#color_grid", ColorGridWidget).focus()
+            else:
+                self.query_one("#theme_palette_list", OptionList).focus()
         self._sync_tabs_ui()
         self._update_preview()
 
@@ -3728,7 +3945,13 @@ class ThemeEditScreen(Screen):
                         inp.value = str(chosen)
 
             self.app.push_screen(
-                ColorPickerModal(tok, curr_val, bg_color_val=bg_val, theme_styles=self.configured_theme_styles),
+                ColorPickerModal(
+                    tok,
+                    curr_val,
+                    bg_color_val=bg_val,
+                    theme_styles=self.configured_theme_styles,
+                    theme_palette=pal_256,
+                ),
                 _on_color_picked,
             )
 
@@ -3817,7 +4040,13 @@ class ThemeEditScreen(Screen):
                     focused.value = str(c)
 
             self.app.push_screen(
-                ColorPickerModal(tok, curr_val, bg_color_val=bg_val, theme_styles=self.configured_theme_styles),
+                ColorPickerModal(
+                    tok,
+                    curr_val,
+                    bg_color_val=bg_val,
+                    theme_styles=self.configured_theme_styles,
+                    theme_palette=pal_256,
+                ),
                 _cb,
             )
             return
@@ -3836,7 +4065,13 @@ class ThemeEditScreen(Screen):
                     inp.value = str(c)
 
             self.app.push_screen(
-                ColorPickerModal(tok, curr_val, bg_color_val=bg_val, theme_styles=self.configured_theme_styles),
+                ColorPickerModal(
+                    tok,
+                    curr_val,
+                    bg_color_val=bg_val,
+                    theme_styles=self.configured_theme_styles,
+                    theme_palette=pal_256,
+                ),
                 _cb_def,
             )
 

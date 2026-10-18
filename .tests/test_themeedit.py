@@ -308,6 +308,72 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_color_picker_modal_theme_palette_tab(self):
+        """Verify ColorPickerModal Theme Palette tab displays in-use colors, supports keyboard navigation and switching."""
+        from textual.widgets import OptionList
+
+        async def _run():
+            app = themeedit.ThemeEditApp("dayscape")
+            async with app.run_test(size=(100, 35)) as pilot:
+                pal = app.screen.current_theme.get(256, {})
+                modal = themeedit.ColorPickerModal("title", [235, -1], bg_color_val=189, theme_palette=pal)
+                app.push_screen(modal)
+                await pilot.pause()
+
+                # Verify mode buttons exist
+                btn_grid = modal.query_one("#btn_mode_grid", themeedit.Button)
+                btn_pal = modal.query_one("#btn_mode_palette", themeedit.Button)
+                self.assertIsNotNone(btn_grid)
+                self.assertIsNotNone(btn_pal)
+                self.assertEqual(modal.view_mode, "grid")
+
+                # Verify OptionList exists and has in-use theme colors
+                ol = modal.query_one("#theme_palette_list", OptionList)
+                self.assertGreater(ol.option_count, 0)
+                self.assertEqual(len(modal.theme_colors_list), ol.option_count)
+
+                # Switch to Theme Palette tab via button click
+                await pilot.click(btn_pal)
+                await pilot.pause()
+                self.assertEqual(modal.view_mode, "palette")
+                self.assertEqual(str(modal.query_one("#color_grid").styles.display), "none")
+                self.assertEqual(str(ol.styles.display), "block")
+
+                # Initial highlight should match 235 (index 1 in dayscape palette)
+                self.assertEqual(ol.highlighted, 1)
+
+                # Move down in palette list to select next color (64)
+                await pilot.press("down")
+                await pilot.pause()
+                self.assertEqual(modal.fg_val, 64)
+
+                # Switch to BG layer and select another color
+                await pilot.click(modal.query_one("#btn_tab_bg", themeedit.Button))
+                await pilot.pause()
+                self.assertEqual(modal.active_tab, "bg")
+
+                await pilot.press("down")
+                await pilot.pause()
+                self.assertEqual(modal.bg_val, 16)
+
+                # Switch back to 256 Grid view via 'g' key
+                await pilot.press("g")
+                await pilot.pause()
+                self.assertEqual(modal.view_mode, "grid")
+                self.assertEqual(str(modal.query_one("#color_grid").styles.display), "block")
+                self.assertEqual(str(ol.styles.display), "none")
+
+                # Color grid cursor should be synchronized with active BG color (16)
+                grid = modal.query_one("#color_grid", themeedit.ColorGridWidget)
+                self.assertEqual(grid.cursor_code, 16)
+
+                # Confirm selection
+                modal._confirm()
+                await pilot.pause()
+                self.assertEqual(modal.selected_color, [64, 16])
+
+        asyncio.run(_run())
+
     def test_theme_editor_footer_spread_layout(self):
         """Verify update_footer_layout spreads footer items and separators proportionally across screen width."""
         async def _run():
