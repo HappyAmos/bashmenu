@@ -1,10 +1,44 @@
-- [x] REQUEST: bashmenu.py, I think I would prefer to change how launching the theme editor works. I would like pressing `<f8>` to launch the theme editor, AND load the currently configured theme. Currently, it loads `Dracula` theme by default.
-- [x] FEATURE: Add a <ctl> + <n> keyboard shortcut to the theme editor to create a new theme.
-- [x] BUG: Selecting the highlighted selection in the preview pane opens up "selection" not "highlighter". 
-- [x] Critical BUG: Click mouse in the "highlight" text widget of the property inspector in the theme editor, click the backspace button. App becomes unresponsive.
-- [x] FEATURE: display the background image in the preview pane mock menu.
-- [x] FEATURE: By default the preview pane of the theme editor shows the mock menu. However, I would also like to see a tab at the top so the preview pane could be changed over to preview the menu editor, various configurations of popup modals (help, input, etc.) so the user can see the effects of theme colors on scrollbars, close buttons, popup buttons, text in scrolling windows, etc.
-- [x] BUG: When the plugin colors background are set to -1 (inherit) they do not appear transparent, but black.
-- [x] RESEARCH: Utilizing a swap file for open documents in the built-in text editor, similar to how Vim handles open documents.
-- [x] FEATURE: It would be nice if in the theme editor, the up and down arrow keys navigated between items (vertically, then tab to navigate horizontally).
-- [x] FEATURE: {toast: SECONDS_TO_DISPLAY: "Message to display"} I've noticed occasional toast like messages when, for instance, clicking a UI item in the preview pane of the theme editor (toast message appears bottom right corner). I would like a new configurable toast directive so that users can display text for a brief amount of seconds (default 1-2 seconds) using this toast like interface.
+
+- [ ] BUG: border misalignment in theme editor 'menu editor' tab:
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Mock Menu  Menu Editor  Modals & Popups                                         │
+│━━━━━━━━━━━╸━━━━━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
+│                                                                                 │
+│ ┌──[ Menu Editor ]──────────────────────────────────────────────────────[X]──┐░░│
+│ │ ▼ Main Menu▀▀▀▀▀▀▀▀▀▀▀▀│ Title: [ My Menu▀▀▀▀]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▲│░░   │
+│ │▀▀▀▶ Applications▀▀▀▀▀▀▀│ Icon:▀▀[ 📁▀▀▀▀▀▀▀▀▀]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█│░░   │
+│ │▀▀▀▀▀• Terminal▀▀▀▀▀▀▀▀▀│ Type:▀▀[ submenu▀▀▀▀]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█│░░   │
+```
+- [ ] BUG: Misalignment of borders in Modals & Popups tab of theme editor:
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Mock Menu  Menu Editor  Modals & Popups                                         │
+│━━━━━━━━━━━━━━━━━━━━━━━━╸━━━━━━━━━━━━━━━╺━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│
+│                                                                                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀    │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀┌──[ Notice Modal ]───────────────────────[X]──┐░░               │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀│ Are you sure you want to apply these▀▀▀▀▀▲ │░░                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀│ changes? All pending configurations will █ │░░                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀│ be persisted to disk immediately.▀▀▀▀▀▀▀▀█ │░░                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀│ Press [Yes] to proceed, [Cancel] to abort▼ │░░                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀├────────────────────────────────────────────┤░░                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀│▀▀▀▀▀▀▀▀ [ Confirm ]    [ Cancel ] ▀▀▀▀▀▀▀▀▀│░░                 │
+│ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀└────────────────────────────────────────────┘░░                 │
+```
+- [ ] BUG: Background of plugins still does not appear 'transparent', meaning it does not show the wallpaper behind the text of the plugins:
+```
+│▀▀─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────▀▀│
+│▀▀┌───────────────────────────────────────┬───────────────────────────────────────┬───────────────────────────────────────┬───────────────────────────────────────┐▀▀│
+│▀▀│ 49079: ☀  🌡+59°F 🌬↗14mph              │ Alienware:                            │ Pi3b:                                 │ Halftop:                              │▀▀│
+│▀▀│                                       │   192.168.4.46 | UP                   │   192.168.4.47 | UP                   │   192.168.4.96 | DOWN                 │▀▀│
+│▀▀└───────────────────────────────────────┴───────────────────────────────────────┴───────────────────────────────────────┴───────────────────────────────────────┘▀▀│
+│▀▀─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────▀▀│
+│▀▀On This Day:                                                                                                                                                     ▀▀│
+│▀▀320 – Pappus of Alexandria, Greek philosopher, observes an eclipse of the Sun and writes a commentary on The Great Astronomer (Almagest).                        ▀▀│
+│▀▀https://en.wikipedia.org/wiki/Pappus_of_Alexandria                                                                                                               ▀▀│
+│▀▀On This Day courtesy of https://today.zenquotes.io/                                                                                                              ▀▀│
+│▀▀─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────▀▀│
+```
+- [ ] CRITICAL BUG: the time is displaying two hours ahead of the actual system time.
+- [ ] BUG: {toast:SECONDS:"MESSAGE"} popup toast message was not added to the Placeholders and Macros help popup modal. Are there any other missing Placeholders or Macros from this help screen? Make sure that creating new Placeholders and Macros documentation in the Placeholders & Macros popup reference modal is a requirement in SKILL.md .

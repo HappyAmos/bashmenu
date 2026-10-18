@@ -4,11 +4,16 @@ bashedit.py - Built-in Nano-style text editor implemented in Textual.
 """
 
 import contextlib
+import getpass
+import hashlib
+import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 from typing import ClassVar
 
 from rich.color import Color, ColorParseError
@@ -23,9 +28,9 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.events import Click, Key
 from textual.reactive import reactive
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Label
+from textual.widgets import Button, Label
 
 import bashmenu_ui
 
@@ -1049,10 +1054,301 @@ def set_system_clipboard(text: str) -> bool:
     return False
 
 
+SWAP_MAGIC = "BASHMENU_SWP_V1"
+SWAP_DELIMITER = "\n---PAYLOAD---\n"
+
+
+def compute_file_sha256(path: str) -> str:
+    """Calculate SHA-256 hash of a file on disk."""
+    if not path or not os.path.exists(path):
+        return ""
+    try:
+        hasher = hashlib.sha256()
+        with open(path, "rb") as f:
+            while chunk := f.read(65536):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def get_swap_path(file_path: str) -> str:
+    """Determine the hidden swap file path for a given target file path.
+    Prefers colocated .<filename>.swp, falling back to ~/.cache/bashmenu/swap/<hash>.swp."""
+    if not file_path:
+        return ""
+    abs_path = os.path.abspath(file_path)
+    dir_name = os.path.dirname(abs_path)
+    base_name = os.path.basename(abs_path)
+    colocated_path = os.path.join(dir_name, f".{base_name}.swp")
+
+    if os.path.exists(dir_name) and os.access(dir_name, os.W_OK):
+        return colocated_path
+
+    cache_dir = os.path.expanduser("~/.cache/bashmenu/swap")
+    with contextlib.suppress(Exception):
+        os.makedirs(cache_dir, exist_ok=True)
+    path_hash = hashlib.sha256(abs_path.encode("utf-8")).hexdigest()[:16]
+    return os.path.join(cache_dir, f"{base_name}.{path_hash}.swp")
+
+
+def is_pid_running(pid: int) -> bool:
+    """Return True if a process with the given PID is currently active on this system."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as err:
+        import errno
+
+        return err.errno == errno.EPERM
+    return True
+
+
+def write_swap_file(
+    swap_path: str,
+    file_path: str,
+    lines: list[str],
+    base_mtime: float = 0.0,
+    base_sha256: str = "",
+) -> bool:
+    """Write swap metadata and document lines atomically to disk."""
+    if not swap_path or not file_path:
+        return False
+    try:
+        user_name = os.environ.get("USER") or getpass.getuser()
+    except Exception:  # noqa: BLE001
+        user_name = "unknown"
+
+    try:
+        host_name = socket.gethostname()
+    except Exception:  # noqa: BLE001
+        host_name = "localhost"
+
+    now = time.time()
+    header = {
+        "magic": SWAP_MAGIC,
+        "pid": os.getpid(),
+        "user": user_name,
+        "host": host_name,
+        "file_path": os.path.abspath(file_path),
+        "updated_at": now,
+        "base_mtime": base_mtime,
+        "base_sha256": base_sha256,
+        "line_count": len(lines),
+    }
+
+    payload = "\n".join(lines)
+    content = json.dumps(header) + SWAP_DELIMITER + payload
+
+    temp_path = f"{swap_path}.{os.getpid()}.tmp"
+    try:
+        parent_dir = os.path.dirname(swap_path)
+        if parent_dir and not os.path.exists(parent_dir):
+            os.makedirs(parent_dir, exist_ok=True)
+        with open(temp_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(temp_path, swap_path)
+        return True
+    except Exception:  # noqa: BLE001
+        with contextlib.suppress(Exception):
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        return False
+
+
+def read_swap_file(swap_path: str) -> tuple[dict | None, list[str] | None]:
+    """Read and parse swap file header and lines payload."""
+    if not swap_path or not os.path.exists(swap_path):
+        return None, None
+    try:
+        with open(swap_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        if SWAP_DELIMITER not in content:
+            return None, None
+        header_raw, payload = content.split(SWAP_DELIMITER, 1)
+        header = json.loads(header_raw)
+        if not isinstance(header, dict) or header.get("magic") != SWAP_MAGIC:
+            return None, None
+        lines = payload.splitlines()
+        return header, lines
+    except Exception:  # noqa: BLE001
+        return None, None
+
+
+def remove_swap_file(swap_path: str | None) -> bool:
+    """Remove swap file if it exists."""
+    if not swap_path or not os.path.exists(swap_path):
+        return False
+    try:
+        os.remove(swap_path)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+class SwapPromptModalScreen(ModalScreen[str]):
+    """Modal dialog prompting user when a swap file is detected (crash recovery or concurrent edit)."""
+
+    DEFAULT_CSS = """
+    SwapPromptModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.7);
+    }
+    #swap_dialog {
+        width: 70;
+        height: auto;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #swap_title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #swap_title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+    }
+    #swap_message {
+        text-align: left;
+        margin-bottom: 1;
+        color: $text;
+    }
+    #swap_buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+    }
+    #swap_buttons Button {
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "dismiss_abort", "Abort"),
+        Binding("q", "dismiss_abort", "Abort", show=False),
+        Binding("r", "dismiss_recover", "Recover", show=False),
+        Binding("d", "dismiss_delete", "Delete Swap", show=False),
+        Binding("o", "dismiss_readonly", "Read-Only", show=False),
+        Binding("e", "dismiss_edit_anyway", "Edit Anyway", show=False),
+    ]
+
+    def __init__(
+        self,
+        mode: str,
+        file_path: str,
+        header: dict,
+        swap_lines_count: int,
+        disk_lines_count: int,
+        theme: dict | None = None,
+    ):
+        super().__init__()
+        self.mode = mode
+        self.file_path = file_path
+        self.header = header
+        self.swap_lines_count = swap_lines_count
+        self.disk_lines_count = disk_lines_count
+        self.theme = theme or {}
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="swap_dialog"):
+            with Horizontal(id="swap_title_bar"):
+                title_text = (
+                    "Swap File: Concurrent Edit Detected"
+                    if self.mode == "collision"
+                    else "Swap File: Crash Recovery Detected"
+                )
+                yield Label(title_text, id="swap_title")
+
+            msg_lines = []
+            f_name = os.path.basename(self.file_path)
+            user = self.header.get("user", "unknown")
+            host = self.header.get("host", "unknown")
+            pid = self.header.get("pid", 0)
+            updated_ts = self.header.get("updated_at", 0)
+            updated_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(updated_ts)) if updated_ts else "unknown"
+
+            if self.mode == "collision":
+                msg_lines.append(f"Another active process is currently editing '{f_name}':")
+                msg_lines.append(f"  • Process: {user}@{host} (PID {pid})")
+                msg_lines.append(f"  • Last Saved to Swap: {updated_str}")
+                msg_lines.append("")
+                msg_lines.append("Options:")
+                msg_lines.append("  [O] Open Read-Only: View without risking write conflicts")
+                msg_lines.append("  [E] Edit Anyway: Open with edit lock and risk collisions")
+                msg_lines.append("  [Q] Abort: Cancel opening this file")
+            else:
+                msg_lines.append(f"Found a swap file for '{f_name}' from an earlier session")
+                msg_lines.append("that appears to have crashed or terminated unexpectedly:")
+                msg_lines.append(f"  • Process ID: {pid} (No longer running)")
+                msg_lines.append(f"  • Swap Edits Saved: {updated_str}")
+                msg_lines.append(f"  • Swap Content: {self.swap_lines_count} lines")
+                msg_lines.append(f"  • Disk Content: {self.disk_lines_count} lines")
+                msg_lines.append("")
+                msg_lines.append("Options:")
+                msg_lines.append("  [R] Recover: Load the recovered uncommitted edits from swap")
+                msg_lines.append("  [D] Delete Swap: Discard swap file and load clean disk file")
+                msg_lines.append("  [Q] Abort: Cancel opening this file")
+
+            yield Label("\n".join(msg_lines), id="swap_message")
+
+            with Horizontal(id="swap_buttons"):
+                if self.mode == "collision":
+                    yield Button("Open Read-Only (O)", variant="primary", id="btn_readonly")
+                    yield Button("Edit Anyway (E)", variant="warning", id="btn_edit_anyway")
+                    yield Button("Abort (Q)", variant="error", id="btn_abort")
+                else:
+                    yield Button("Recover Edits (R)", variant="success", id="btn_recover")
+                    yield Button("Delete Swap (D)", variant="error", id="btn_delete")
+                    yield Button("Abort (Q)", variant="primary", id="btn_abort")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        btn_id = getattr(event.button, "id", "")
+        if btn_id == "btn_readonly":
+            self.dismiss("readonly")
+        elif btn_id == "btn_edit_anyway":
+            self.dismiss("edit_anyway")
+        elif btn_id == "btn_recover":
+            self.dismiss("recover")
+        elif btn_id == "btn_delete":
+            self.dismiss("delete")
+        else:
+            self.dismiss("abort")
+
+    def action_dismiss_abort(self) -> None:
+        self.dismiss("abort")
+
+    def action_dismiss_recover(self) -> None:
+        if self.mode == "recovery":
+            self.dismiss("recover")
+
+    def action_dismiss_delete(self) -> None:
+        if self.mode == "recovery":
+            self.dismiss("delete")
+
+    def action_dismiss_readonly(self) -> None:
+        if self.mode == "collision":
+            self.dismiss("readonly")
+
+    def action_dismiss_edit_anyway(self) -> None:
+        if self.mode == "collision":
+            self.dismiss("edit_anyway")
+
+
 class EditorTab:
     """Represents an open document tab buffer in BashEdit."""
 
-    def __init__(self, file_path: str | None = None, lines: list[str] | None = None, show_markdown: bool = False):
+    def __init__(
+        self,
+        file_path: str | None = None,
+        lines: list[str] | None = None,
+        show_markdown: bool = False,
+        read_only: bool = False,
+    ):
         self.file_path = file_path
         self.lines = list(lines) if lines else [""]
         self.cursor_y = 0
@@ -1066,6 +1362,12 @@ class EditorTab:
         self.redo_stack = []
         self.modified = False
         self.show_markdown = show_markdown
+        self.read_only = read_only
+        self.swap_path = get_swap_path(file_path) if file_path else None
+        self.base_mtime = os.path.getmtime(file_path) if (file_path and os.path.exists(file_path)) else 0.0
+        self.base_sha256 = compute_file_sha256(file_path) if (file_path and os.path.exists(file_path)) else ""
+        self.swap_enabled = bool(file_path and not read_only)
+        self.edit_op_count = 0
 
 
 class BashEditScreen(Screen):
@@ -1283,6 +1585,21 @@ class BashEditScreen(Screen):
         self.initial_lines = lines
         self.tabs = [EditorTab(file_path=self.file_path, lines=self.initial_lines)]
         self.active_tab_idx = 0
+        self._pending_swap_check = None
+        if self.file_path and os.path.exists(self.file_path):
+            swp = get_swap_path(self.file_path)
+            if swp and os.path.exists(swp):
+                hdr, swp_lines = read_swap_file(swp)
+                if hdr and hdr.get("magic") == SWAP_MAGIC and hdr.get("pid") != os.getpid():
+                    mode = "collision" if is_pid_running(hdr.get("pid", 0)) else "recovery"
+                    self._pending_swap_check = {
+                        "mode": mode,
+                        "file_path": self.file_path,
+                        "swap_path": swp,
+                        "header": hdr,
+                        "swap_lines": swp_lines or [],
+                        "disk_lines": list(lines),
+                    }
 
     def compose(self) -> ComposeResult:
         file_name = os.path.basename(self.file_path) if self.file_path else "Untitled"
@@ -1351,7 +1668,7 @@ class BashEditScreen(Screen):
                     yield Label("Alt+←/→ Tab", id="lbl_tabs", classes="footer_item", markup=False)
                     yield Label("|", classes="footer_sep", markup=False)
                     yield Label("^Q/ESC Exit", id="lbl_exit", classes="footer_item footer_item_last", markup=False)
-            yield Label("  Line 1/1, Col 1  ", id="editor_status")
+            yield Label("  Line 1/1, Col 1  ", id="editor_status", markup=False)
 
     def on_click(self, event) -> None:
         """Route mouse click events across tabs, close buttons, and interactive footer action labels."""
@@ -1554,10 +1871,17 @@ class BashEditScreen(Screen):
         except Exception:  # noqa: BLE001, S110
             pass
 
-    def action_new_tab(self, file_path: str | None = None, lines: list[str] | None = None) -> None:
+    def action_new_tab(
+        self,
+        file_path: str | None = None,
+        lines: list[str] | None = None,
+        read_only: bool = False,
+    ) -> None:
         self.save_active_tab_state()
-        new_tab = EditorTab(file_path=file_path, lines=lines or [""])
+        new_tab = EditorTab(file_path=file_path, lines=lines or [""], read_only=read_only)
         self.tabs.append(new_tab)
+        if new_tab.swap_enabled:
+            self.flush_tab_swap(new_tab)
         self.load_tab_state(len(self.tabs) - 1)
 
     def action_next_tab(self) -> None:
@@ -1580,6 +1904,8 @@ class BashEditScreen(Screen):
         target_tab = self.tabs[index]
 
         def do_close():
+            if target_tab.swap_enabled and not target_tab.read_only:
+                remove_swap_file(target_tab.swap_path)
             if len(self.tabs) == 1:
                 self.tabs[0] = EditorTab()
                 self.load_tab_state(0)
@@ -1614,6 +1940,9 @@ class BashEditScreen(Screen):
             do_close()
 
     def action_exit_editor_force(self) -> None:
+        for tab in self.tabs:
+            if tab.swap_enabled and not tab.read_only:
+                remove_swap_file(tab.swap_path)
         if len(self.app.screen_stack) > 1:
             try:
                 self.dismiss(False)
@@ -1794,9 +2123,163 @@ class BashEditScreen(Screen):
         self.query_one("#editor_widget", EditorWidget).focus()
         self.apply_theme()
         self.update_legend_layout()
+        self.set_interval(3.0, self.flush_dirty_swaps)
+        if getattr(self, "_pending_swap_check", None):
+            self._handle_pending_swap()
+        else:
+            if self.tabs and self.tabs[0].swap_enabled:
+                self.flush_tab_swap(self.tabs[0])
+
+    def flush_tab_swap(self, tab: EditorTab, lines: list[str] | None = None) -> bool:
+        """Atomically flush document lines of tab to its swap file."""
+        if not tab.swap_enabled or tab.read_only or not tab.file_path or not tab.swap_path:
+            return False
+        doc_lines = lines if lines is not None else tab.lines
+        return write_swap_file(
+            tab.swap_path,
+            tab.file_path,
+            doc_lines,
+            base_mtime=tab.base_mtime,
+            base_sha256=tab.base_sha256,
+        )
+
+    def flush_dirty_swaps(self) -> None:
+        """Periodic timer callback to sync all modified open tabs to disk swap files."""
+        self.save_active_tab_state()
+        for tab in self.tabs:
+            if tab.swap_enabled and not tab.read_only and tab.file_path and tab.modified:
+                self.flush_tab_swap(tab)
+
+    def _record_edit_op(self) -> None:
+        """Increment edit counter and trigger flush if keystroke threshold is reached."""
+        if 0 <= self.active_tab_idx < len(self.tabs):
+            tab = self.tabs[self.active_tab_idx]
+            if tab.swap_enabled and not tab.read_only:
+                tab.edit_op_count += 1
+                if tab.edit_op_count >= 50:
+                    tab.edit_op_count = 0
+                    self.save_active_tab_state()
+                    self.flush_tab_swap(tab)
+
+    def _handle_pending_swap(self) -> None:
+        info = self._pending_swap_check
+        self._pending_swap_check = None
+        if not info:
+            return
+
+        def modal_cb(res: str) -> None:
+            tab = self.tabs[0] if self.tabs else None
+            ed = None
+            with contextlib.suppress(Exception):
+                ed = self.query_one("#editor_widget", EditorWidget)
+
+            if res == "abort":
+                self.action_exit_editor_force()
+                return
+
+            if res == "recover":
+                swp_lines = info["swap_lines"]
+                if tab:
+                    tab.lines = list(swp_lines)
+                    tab.modified = True
+                    tab.swap_enabled = True
+                    tab.read_only = False
+                if ed:
+                    ed.lines = list(swp_lines)
+                    ed.modified = True
+                    ed.refresh()
+                self.refresh_tab_bar()
+                self.update_status("Recovered uncommitted changes from swap")
+                if tab:
+                    self.flush_tab_swap(tab)
+            elif res == "delete":
+                remove_swap_file(info["swap_path"])
+                if tab:
+                    tab.swap_enabled = True
+                    tab.read_only = False
+                    self.flush_tab_swap(tab)
+                self.update_status("Swap file deleted; loaded clean disk file")
+            elif res == "readonly":
+                if tab:
+                    tab.read_only = True
+                    tab.swap_enabled = False
+                self.update_status("[Read-Only Mode] File locked by another process")
+            elif res == "edit_anyway":
+                if tab:
+                    tab.read_only = False
+                    tab.swap_enabled = True
+                    self.flush_tab_swap(tab)
+                self.update_status("Editing anyway despite collision")
+
+        self.app.push_screen(
+            SwapPromptModalScreen(
+                mode=info["mode"],
+                file_path=info["file_path"],
+                header=info["header"],
+                swap_lines_count=len(info["swap_lines"]),
+                disk_lines_count=len(info["disk_lines"]),
+                theme=self.theme_styles,
+            ),
+            modal_cb,
+        )
+
+    def _load_file_into_editor(
+        self,
+        path: str,
+        lines: list[str],
+        modified: bool = False,
+        read_only: bool = False,
+        swap_enabled: bool = True,
+    ) -> None:
+        ed = self.query_one("#editor_widget", EditorWidget)
+        if not self.file_path and not ed.modified and ed.lines == [""]:
+            self.file_path = path
+            ed.lines = list(lines)
+            ed.cursor_y = 0
+            ed.cursor_x = 0
+            ed.top_line = 0
+            ed.left_col = 0
+            ed.modified = modified
+            ed.refresh()
+            if 0 <= self.active_tab_idx < len(self.tabs):
+                cur_tab = self.tabs[self.active_tab_idx]
+                cur_tab.file_path = path
+                cur_tab.lines = list(lines)
+                cur_tab.modified = modified
+                cur_tab.read_only = read_only
+                cur_tab.swap_path = get_swap_path(path)
+                cur_tab.base_mtime = os.path.getmtime(path) if os.path.exists(path) else 0.0
+                cur_tab.base_sha256 = compute_file_sha256(path) if os.path.exists(path) else ""
+                cur_tab.swap_enabled = swap_enabled
+                if swap_enabled:
+                    self.flush_tab_swap(cur_tab)
+            file_name = os.path.basename(path)
+            borders = getattr(self, "theme_styles", {}).get("window_borders") or bashmenu_ui.get_theme_window_borders(
+                getattr(self, "theme_name", "dracula")
+            )
+            l_cap = borders.get("title_left_cap", "[").strip() or "["
+            r_cap = borders.get("title_right_cap", "]").strip() or "]"
+            self.query_one("#editor_header", Label).update(f"  {l_cap} BashEdit - {file_name} {r_cap}  ")
+            status_suffix = " (Read-Only)" if read_only else (" (Recovered)" if modified else "")
+            self.update_status(f"Opened {file_name}{status_suffix}")
+            self.refresh_tab_bar()
+        else:
+            self.action_new_tab(file_path=path, lines=lines, read_only=read_only)
+            if 0 <= self.active_tab_idx < len(self.tabs):
+                cur_tab = self.tabs[self.active_tab_idx]
+                cur_tab.modified = modified
+                cur_tab.swap_enabled = swap_enabled
+                ed.modified = modified
+                if swap_enabled:
+                    self.flush_tab_swap(cur_tab)
+            status_suffix = " (Read-Only)" if read_only else (" (Recovered)" if modified else "")
+            self.update_status(f"Opened {os.path.basename(path)} in new tab{status_suffix}")
+            self.refresh_tab_bar()
 
     def update_status(self, msg: str | None = None):
         ed = self.query_one("#editor_widget", EditorWidget)
+        active_tab = self.tabs[self.active_tab_idx] if 0 <= self.active_tab_idx < len(self.tabs) else None
+        ro_tag = " [RO]" if (active_tab and active_tab.read_only) else ""
         if ed.show_markdown:
             total_lines = len(ed._get_rendered_md_lines())
             cur_line = min(total_lines, ed.top_line + 1)
@@ -1819,11 +2302,11 @@ class BashEditScreen(Screen):
                     sel_info = f" [{count} lines selected]"
         mod = " *" if ed.modified else ""
         if msg:
-            text = f"  {pos_info}{sel_info}{mod} | {msg}  "
+            text = f"  {pos_info}{ro_tag}{sel_info}{mod} | {msg}  "
         elif sel_info:
-            text = f"  {pos_info}{sel_info}{mod}  "
+            text = f"  {pos_info}{ro_tag}{sel_info}{mod}  "
         else:
-            text = f"  {pos_info}{mod}  "
+            text = f"  {pos_info}{ro_tag}{mod}  "
         self.query_one("#editor_status", Label).update(text)
 
     def on_key(self, event: Key) -> None:
@@ -1831,6 +2314,8 @@ class BashEditScreen(Screen):
         ed = self.query_one("#editor_widget", EditorWidget)
         key_lower = (event.key or "").lower()
         char_lower = (event.character or "").lower()
+        active_tab = self.tabs[self.active_tab_idx] if 0 <= self.active_tab_idx < len(self.tabs) else None
+        is_readonly = active_tab.read_only if active_tab else False
 
         if key_lower in ["alt+]", "meta+]", "ctrl+tab", "alt+right"]:
             event.prevent_default()
@@ -1930,6 +2415,9 @@ class BashEditScreen(Screen):
         if key_lower in ["ctrl+x", "ctrl+shift+x", "ctrl_x", "ctrl_shift_x"] or char_lower in ["\x18"]:
             event.prevent_default()
             event.stop()
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             self.action_cut_line()
             return
 
@@ -1942,18 +2430,27 @@ class BashEditScreen(Screen):
         if key_lower in ["ctrl+v", "ctrl+shift+v", "ctrl_v", "ctrl_shift_v"] or char_lower in ["\x16"]:
             event.prevent_default()
             event.stop()
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             self.action_paste_buffer()
             return
 
         if key_lower in ["ctrl+z", "ctrl_z"] or char_lower in ["\x1a"]:
             event.prevent_default()
             event.stop()
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             self.action_undo()
             return
 
         if key_lower in ["ctrl+y", "ctrl_y", "ctrl+shift+z", "ctrl_shift_z"] or char_lower in ["\x19"]:
             event.prevent_default()
             event.stop()
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             self.action_redo()
             return
 
@@ -2143,28 +2640,48 @@ class BashEditScreen(Screen):
 
         # Core editing keys (Enter, Backspace, Delete, Tab, Space)
         if key_lower in ["enter", "return", "ctrl+m", "ctrl+j"] or char_lower in ["\r", "\n"]:
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.insert_newline()
+            self._record_edit_op()
             self.update_status()
             return
 
         if key_lower in ["delete", "del"]:
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.delete_char()
+            self._record_edit_op()
             self.update_status()
             return
 
         if key_lower in ["backspace", "ctrl+h"] or char_lower in ["\x08", "\x7f"]:
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.backspace()
+            self._record_edit_op()
             self.update_status()
             return
 
         if key_lower in ["tab", "ctrl+i"] or char_lower in ["\t"]:
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             indent = " " * ed.tabstop if ed.tab_to_spaces else "\t"
             ed.insert_char(indent)
+            self._record_edit_op()
             self.update_status()
             return
 
         if key_lower == "space" or char_lower == " ":
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.insert_char(" ")
+            self._record_edit_op()
             self.update_status()
             return
 
@@ -2194,13 +2711,25 @@ class BashEditScreen(Screen):
             return
 
         if len(event.character or "") == 1 and event.character.isprintable():
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.insert_char(event.character)
+            self._record_edit_op()
             self.update_status()
         elif event.key == "full_stop":
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.insert_char(".")
+            self._record_edit_op()
             self.update_status()
         elif len(event.key or "") == 1 and event.key.isprintable():
+            if is_readonly:
+                self.update_status("[Read-Only Mode] File locked by another process")
+                return
             ed.insert_char(event.key)
+            self._record_edit_op()
             self.update_status()
 
     def on_mouse_scroll_down(self, event) -> None:
@@ -2227,6 +2756,12 @@ class BashEditScreen(Screen):
 
     def action_save_file(self) -> None:
         ed = self.query_one("#editor_widget", EditorWidget)
+        if 0 <= self.active_tab_idx < len(self.tabs):
+            active_tab = self.tabs[self.active_tab_idx]
+            if active_tab.read_only:
+                self.update_status("[Read-Only Mode] Cannot overwrite locked file. Use ^A to Save As.")
+                return
+
         if not self.file_path:
             start_dir = os.getcwd()
 
@@ -2253,8 +2788,13 @@ class BashEditScreen(Screen):
                 f.write("\n".join(ed.lines))
             ed.modified = False
             if 0 <= self.active_tab_idx < len(self.tabs):
-                self.tabs[self.active_tab_idx].modified = False
-                self.tabs[self.active_tab_idx].file_path = self.file_path
+                active_tab = self.tabs[self.active_tab_idx]
+                active_tab.modified = False
+                active_tab.file_path = self.file_path
+                active_tab.base_mtime = os.path.getmtime(self.file_path)
+                active_tab.base_sha256 = compute_file_sha256(self.file_path)
+                if active_tab.swap_enabled and not active_tab.read_only:
+                    self.flush_tab_swap(active_tab, lines=ed.lines)
             self.refresh_tab_bar()
             self.update_status("Wrote file successfully")
         except (OSError, ValueError) as e:
@@ -2262,8 +2802,6 @@ class BashEditScreen(Screen):
 
     def action_open_file(self) -> None:
         """Prompt user with file picker modal and load chosen file into current or new editor tab."""
-        ed = self.query_one("#editor_widget", EditorWidget)
-
         def open_cb(path):
             if path and os.path.exists(path):
                 # Check if file is already open in a tab
@@ -2273,39 +2811,62 @@ class BashEditScreen(Screen):
                         self.update_status(f"Switched to open tab {os.path.basename(path)}")
                         return
 
-                # If current active tab is empty and unmodified, load into current tab
-                if not self.file_path and not ed.modified and ed.lines == [""]:
-                    try:
-                        with open(path, "r", encoding="utf-8", errors="replace") as f:
-                            content = f.read().splitlines()
-                            lines = content if content else [""]
-                        self.file_path = path
-                        ed.lines = lines
-                        ed.cursor_y = 0
-                        ed.cursor_x = 0
-                        ed.top_line = 0
-                        ed.left_col = 0
-                        ed.modified = False
-                        ed.refresh()
-                        if 0 <= self.active_tab_idx < len(self.tabs):
-                            self.tabs[self.active_tab_idx].file_path = path
-                            self.tabs[self.active_tab_idx].lines = lines
-                            self.tabs[self.active_tab_idx].modified = False
-                        self.query_one("#editor_header", Label).update(f"  BashEdit - {os.path.basename(path)}  ")
-                        self.update_status(f"Opened {os.path.basename(path)}")
-                        self.refresh_tab_bar()
-                    except (OSError, UnicodeDecodeError, ValueError) as e:
-                        self.update_status(f"Error opening file: {e}")
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read().splitlines()
+                        disk_lines = content if content else [""]
+                except (OSError, UnicodeDecodeError, ValueError) as e:
+                    self.update_status(f"Error opening file: {e}")
+                    return
+
+                swp = get_swap_path(path)
+                hdr, swp_lines = read_swap_file(swp) if (swp and os.path.exists(swp)) else (None, None)
+                if hdr and hdr.get("magic") == SWAP_MAGIC and hdr.get("pid") != os.getpid():
+                    mode = "collision" if is_pid_running(hdr.get("pid", 0)) else "recovery"
+
+                    def swap_dialog_cb(res: str) -> None:
+                        if res == "abort":
+                            return
+                        lines_to_load = disk_lines
+                        is_modified = False
+                        is_readonly = False
+                        is_swap_enabled = True
+
+                        if res == "recover":
+                            lines_to_load = swp_lines or disk_lines
+                            is_modified = True
+                        elif res == "delete":
+                            remove_swap_file(swp)
+                        elif res == "readonly":
+                            is_readonly = True
+                            is_swap_enabled = False
+                        elif res == "edit_anyway":
+                            is_readonly = False
+                            is_swap_enabled = True
+
+                        self._load_file_into_editor(
+                            path,
+                            lines_to_load,
+                            modified=is_modified,
+                            read_only=is_readonly,
+                            swap_enabled=is_swap_enabled,
+                        )
+
+                    self.app.push_screen(
+                        SwapPromptModalScreen(
+                            mode=mode,
+                            file_path=path,
+                            header=hdr,
+                            swap_lines_count=len(swp_lines or []),
+                            disk_lines_count=len(disk_lines),
+                            theme=self.theme_styles,
+                        ),
+                        swap_dialog_cb,
+                    )
                 else:
-                    # Open in new tab
-                    try:
-                        with open(path, "r", encoding="utf-8", errors="replace") as f:
-                            content = f.read().splitlines()
-                            lines = content if content else [""]
-                        self.action_new_tab(file_path=path, lines=lines)
-                        self.update_status(f"Opened {os.path.basename(path)} in new tab")
-                    except (OSError, UnicodeDecodeError, ValueError) as e:
-                        self.update_status(f"Error opening file: {e}")
+                    self._load_file_into_editor(
+                        path, disk_lines, modified=False, read_only=False, swap_enabled=True
+                    )
 
         start_dir = (
             os.path.dirname(os.path.abspath(self.file_path))
@@ -2330,6 +2891,9 @@ class BashEditScreen(Screen):
             return
 
         def safe_exit(res_val):
+            for tab in self.tabs:
+                if tab.swap_enabled and not tab.read_only:
+                    remove_swap_file(tab.swap_path)
             if len(self.app.screen_stack) > 1:
                 try:
                     self.dismiss(res_val)
@@ -2362,23 +2926,39 @@ class BashEditScreen(Screen):
         )
 
     def action_cut_line(self) -> None:
+        if 0 <= self.active_tab_idx < len(self.tabs) and self.tabs[self.active_tab_idx].read_only:
+            self.update_status("[Read-Only Mode] File locked by another process")
+            return
         ed = self.query_one("#editor_widget", EditorWidget)
         msg = ed.cut_line()
+        self._record_edit_op()
         self.update_status(msg)
 
     def action_paste_buffer(self) -> None:
+        if 0 <= self.active_tab_idx < len(self.tabs) and self.tabs[self.active_tab_idx].read_only:
+            self.update_status("[Read-Only Mode] File locked by another process")
+            return
         ed = self.query_one("#editor_widget", EditorWidget)
         msg = ed.paste_buffer()
+        self._record_edit_op()
         self.update_status(msg)
 
     def action_undo(self) -> None:
+        if 0 <= self.active_tab_idx < len(self.tabs) and self.tabs[self.active_tab_idx].read_only:
+            self.update_status("[Read-Only Mode] File locked by another process")
+            return
         ed = self.query_one("#editor_widget", EditorWidget)
         msg = ed.undo()
+        self._record_edit_op()
         self.update_status(msg)
 
     def action_redo(self) -> None:
+        if 0 <= self.active_tab_idx < len(self.tabs) and self.tabs[self.active_tab_idx].read_only:
+            self.update_status("[Read-Only Mode] File locked by another process")
+            return
         ed = self.query_one("#editor_widget", EditorWidget)
         msg = ed.redo()
+        self._record_edit_op()
         self.update_status(msg)
 
     def action_toggle_mark(self) -> None:
@@ -2458,15 +3038,34 @@ class BashEditScreen(Screen):
 
         def save_cb(path):
             if path:
+                if 0 <= self.active_tab_idx < len(self.tabs):
+                    active_tab = self.tabs[self.active_tab_idx]
+                    old_swap = active_tab.swap_path if (active_tab.swap_enabled and not active_tab.read_only) else None
+                    if old_swap:
+                        remove_swap_file(old_swap)
                 self.file_path = path
                 try:
                     with open(self.file_path, "w", encoding="utf-8") as f:
                         f.write("\n".join(ed.lines))
                     ed.modified = False
                     if 0 <= self.active_tab_idx < len(self.tabs):
-                        self.tabs[self.active_tab_idx].modified = False
-                        self.tabs[self.active_tab_idx].file_path = self.file_path
-                    self.query_one("#editor_header", Label).update(f"  BashEdit - {os.path.basename(path)}  ")
+                        active_tab = self.tabs[self.active_tab_idx]
+                        active_tab.modified = False
+                        active_tab.file_path = self.file_path
+                        active_tab.swap_path = get_swap_path(self.file_path)
+                        active_tab.base_mtime = os.path.getmtime(self.file_path)
+                        active_tab.base_sha256 = compute_file_sha256(self.file_path)
+                        active_tab.read_only = False
+                        active_tab.swap_enabled = True
+                        self.flush_tab_swap(active_tab, lines=ed.lines)
+                    borders = getattr(self, "theme_styles", {}).get("window_borders") or bashmenu_ui.get_theme_window_borders(
+                        getattr(self, "theme_name", "dracula")
+                    )
+                    l_cap = borders.get("title_left_cap", "[").strip() or "["
+                    r_cap = borders.get("title_right_cap", "]").strip() or "]"
+                    self.query_one("#editor_header", Label).update(
+                        f"  {l_cap} BashEdit - {os.path.basename(path)} {r_cap}  "
+                    )
                     self.refresh_tab_bar()
                     self.update_status(f"Saved as {os.path.basename(path)}")
                 except (OSError, ValueError) as e:
