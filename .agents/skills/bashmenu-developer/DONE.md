@@ -112,3 +112,33 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 - **Design & Architecture:** In `bashmenu_ui.py`, enhanced `FilePickerModalScreen` with `<ctrl+h>` and `<ctrl+shift+h>` bindings mapped to `action_toggle_hidden()`. Updated `_get_footer_text()` across all picker modes (`save`, `dir`, `file`) with and without `allow_new` to clearly display `[Ctrl+H] Hidden`, while maintaining strict `< 76` column widths (<= 72 chars) to prevent line wrapping. Added a toast notification (`Showing hidden files` / `Hiding hidden files`) on toggle.
 - **Tests:** Added `test_file_picker_toggle_hidden_shortcut_and_footer` in `.tests/test_improvements.py` verifying keybindings, 72-col footer boundaries across all modes, state flipping, directory reload, and toast feedback. All tests pass.
 
+---
+
+### 15. Pending Task Marker Workflow Directive
+- **Item:** `- [x] BUG: Mark items you are currently working on in the TODO as "PENDING" after the check box.` (from `notebooks/notes.yml`)
+- **Design & Architecture:** Updated `SKILL.md` Section 11 (`Pending Task Marker`) establishing the mandatory workflow to immediately tag active tasks with `PENDING:` directly after the checkbox (e.g. `- [ ] PENDING: ...`) in `TODO.md` and `notebooks/notes.yml`, removing the marker when marked completed `- [x]`.
+- **Tests:** Verified schema validity of `SKILL.md` and `notebooks/notes.yml`.
+
+---
+
+### 16. Menu Screen Background Ticks Pause When Covered by Modals
+- **Item:** `- [x] RESPONSIVENESS: notebook UI, particularily in edit mode has become very sluggish. This needs an immediate fix as it's so sluggish it's almost unusable. When any window is currently over the main menu UI (i.e., help modal, reference modals, selection popups, etc, notebook notes) background ticks should ALL pause until the window is closed.` (from `notebooks/notes.yml`)
+- **Root Cause:** In `bashmenu.py`, `MenuScreen`'s periodic refresh timer (`1.0s`/`5.0s`), `MenuWidget`'s marquee timer (`0.25s`), and `MarqueeLabel`'s timer (`0.25s`) continued firing in the background when modal dialogs (notebook viewer/editor, help, file picker) were opened over the main menu. On every periodic refresh tick, geometry was recalculated, and background worker threads (`_fetch_plugin_worker`) executed shell scripts and subprocesses for plugins, flooding Textual's async event loop and starving keystroke processing in `NotebookTextArea`.
+- **Fix:** In `bashmenu.py`:
+  1. Implemented `BashMenuScreen._is_covered()` checking if `app.screen is not self` or another modal is on top of `screen_stack`.
+  2. Implemented `on_screen_suspend()` and `on_screen_resume()` lifecycle hooks on `BashMenuScreen` that pause all timers (`_refresh_timer.pause()`, `_marquee_timer.pause()`, `MarqueeLabel._timer.pause()`) when covered, and resume them with an immediate sync refresh upon returning.
+  3. Added defense-in-depth guards in `_periodic_refresh()`, `MenuWidget._tick_marquee()`, and `MarqueeLabel._on_tick()` to immediately short-circuit when covered.
+- **Tests:** Added `test_modal_pauses_background_ticks` in `.tests/test_notebook.py` verifying timer pausing and resuming during modal display.
+
+---
+
+### 17. Multi-Line Text Wrapping for Notebook Checkboxes in View Mode
+- **Item:** `- [x] UI: When in view mode of notebook notes (not edit mode) wrap text as necessary.` (from `notebooks/notes.yml`)
+- **Root Cause:** Textual's built-in `Checkbox` (inherited from `ToggleButton`) hardcodes `get_content_height() -> 1`, strips labels to `first_line`, and uses `text-wrap: nowrap; text-overflow: ellipsis;`. Long task list items were truncated to a single line with `...`, hiding all subsequent sentences.
+- **Fix:** In `bashmenu_ui.py`:
+  1. Implemented `MarkdownCheckbox(Checkbox)` with custom `get_content_height()` and `render()` calculating word wrapping based on container width.
+  2. Implemented clean hanging indent formatting: line 1 displays `[ ]` or `[x]` with styled box, and subsequent wrapped lines indent by 4 spaces directly under the text.
+  3. Preserved full `label` property, keyboard navigation (<kbd>Up</kbd>, <kbd>Down</kbd>, <kbd>j</kbd>, <kbd>k</kbd>), and toggle triggers (<kbd>Space</kbd>, <kbd>Enter</kbd>, click).
+  4. Added `overflow-x: hidden;` to `#scroll_container` in `NoteViewerModalScreen`.
+- **Tests:** Added `test_note_viewer_text_wrapping_for_checkboxes` in `.tests/test_notebook.py` verifying that long task items wrap across multiple lines without truncation while short items remain single-line.
+

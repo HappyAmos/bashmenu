@@ -760,6 +760,95 @@ Detailed section content here.
             self.assertEqual(ed.text, "")
             self.assertEqual(bashedit.get_system_clipboard(), "Copied from bashedit editor")
 
+    async def test_note_viewer_text_wrapping_for_checkboxes(self):
+        """Verify NoteViewerModalScreen uses MarkdownCheckbox to wrap multi-line task text without truncation."""
+        from textual.app import App
+        from textual.widgets import Checkbox
+
+        long_task = (
+            "RESPONSIVENESS: notebook UI, particularily in edit mode has become very sluggish. "
+            "This needs an immediate fix as it's so sluggish it's almost unusable. When any window "
+            "is currently over the main menu UI (i.e., help modal, reference modals, selection popups, "
+            "etc, notebook notes) background ticks should ALL pause until the window is closed."
+        )
+        content = f"- [ ] Short item\n- [x] {long_task}"
+
+        class ViewerApp(App):
+            pass
+
+        app = ViewerApp()
+        async with app.run_test() as pilot:
+            screen = bashmenu_ui.NoteViewerModalScreen("Test", content)
+            app.push_screen(screen)
+            await pilot.pause()
+
+            cbs = list(screen.query(Checkbox))
+            self.assertEqual(len(cbs), 2)
+
+            # Check that MarkdownCheckbox is used and subclasses Checkbox
+            self.assertIsInstance(cbs[0], bashmenu_ui.MarkdownCheckbox)
+            self.assertIsInstance(cbs[1], bashmenu_ui.MarkdownCheckbox)
+
+            # Short task height is 1, long wrapped task height is > 1 (e.g. 3-8 lines)
+            self.assertEqual(cbs[0].size.height, 1)
+            self.assertGreater(cbs[1].size.height, 1)
+
+            # Label preserves full text without truncation or ellipsis
+            self.assertEqual(str(cbs[1].label), long_task)
+
+            # Interactive toggle via space and click
+            cbs[0].focus()
+            await pilot.press("space")
+            await pilot.pause()
+            self.assertTrue(cbs[0].value)
+
+            await pilot.click(cbs[1])
+            await pilot.pause()
+            self.assertFalse(cbs[1].value)
+
+    async def test_modal_pauses_background_ticks(self):
+        """Verify opening any modal window pauses background timers on BashMenuScreen."""
+        from textual.app import App
+
+        import bashmenu
+
+        cfg = {
+            "version": "0.0.1",
+            "theme": "default",
+            "menu": {"title": "Test Menu", "items": [{"name": "Item 1", "action": "echo 1"}]},
+        }
+
+        class MenuApp(App):
+            pass
+
+        app = MenuApp()
+        async with app.run_test() as pilot:
+            screen = bashmenu.BashMenuScreen(config=cfg)
+            await app.push_screen(screen)
+            await pilot.pause()
+
+            # Background timers initially active
+            self.assertFalse(screen._is_covered())
+            self.assertTrue(screen._refresh_timer._active.is_set())
+            self.assertTrue(screen.menu_view._marquee_timer._active.is_set())
+
+            # Pushing a modal screen pauses timers and marks screen covered
+            modal = bashmenu_ui.NoteViewerModalScreen("Notes", "- [ ] Task")
+            await app.push_screen(modal)
+            await pilot.pause()
+
+            self.assertTrue(screen._is_covered())
+            self.assertFalse(screen._refresh_timer._active.is_set())
+            self.assertFalse(screen.menu_view._marquee_timer._active.is_set())
+
+            # Popping modal resumes timers and marks screen uncovered
+            app.pop_screen()
+            await pilot.pause()
+
+            self.assertFalse(screen._is_covered())
+            self.assertTrue(screen._refresh_timer._active.is_set())
+            self.assertTrue(screen.menu_view._marquee_timer._active.is_set())
+
 
 if __name__ == "__main__":
     unittest.main()

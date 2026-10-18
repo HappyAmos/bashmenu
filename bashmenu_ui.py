@@ -7,6 +7,7 @@ import ctypes
 import os
 import re
 import subprocess
+import textwrap
 import threading
 import time
 import unicodedata
@@ -35,6 +36,7 @@ from textual import events, on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.geometry import Size
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -1422,6 +1424,11 @@ class MarqueeLabel(Label):
             self.refresh()
 
     def _on_tick(self) -> None:
+        with contextlib.suppress(Exception):
+            app = getattr(self, "app", None)
+            scr = getattr(self, "screen", None)
+            if app and (len(getattr(app, "screen_stack", [])) > 1 or (scr and getattr(app, "screen", None) is not scr)):
+                return
         if self.tracker.tick():
             self.refresh()
 
@@ -4558,6 +4565,78 @@ def set_system_clipboard(text: str) -> bool:
 TASK_LIST_RE = re.compile(r"^(\s*)([-*+]|\d+\.)\s+\[([ xX])\]\s*(.*)$")
 
 
+class MarkdownCheckbox(Checkbox):
+    """Interactive markdown task list item supporting multi-line text wrapping."""
+
+    DEFAULT_CSS = """
+    MarkdownCheckbox {
+        width: 100%;
+        height: auto;
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+        text-wrap: wrap;
+    }
+    MarkdownCheckbox:focus {
+        background: $accent 25%;
+    }
+    MarkdownCheckbox:hover {
+        background: $accent 15%;
+    }
+    """
+
+    def __init__(
+        self,
+        raw_text: str,
+        value: bool = False,
+        indent: str = "",
+        line_idx: int = 0,
+        **kwargs,
+    ) -> None:
+        super().__init__(raw_text, value=value, **kwargs)
+        self.raw_text = raw_text
+        self.indent = indent
+        self._line_idx = line_idx
+
+    @property
+    def label(self) -> str:
+        return self.raw_text
+
+    def _get_wrapped_lines(self, width: int) -> list[str]:
+        inner_w = max(10, width - 2 - len(self.indent))
+        text_w = max(10, inner_w - 4)
+        return textwrap.wrap(self.raw_text, width=text_w) or [self.raw_text]
+
+    def get_content_height(self, container: Size, viewport: Size, width: int) -> int:
+        lines = self._get_wrapped_lines(width)
+        return len(lines)
+
+    def render(self) -> Text:
+        w = max(20, self.size.width or 80)
+        wrapped = self._get_wrapped_lines(w)
+        box_prefix = "[x] " if self.value else "[ ] "
+        box_len = 4
+        result = Text()
+        ind = self.indent
+
+        box_style = Style(color="green", bold=True) if self.value else Style(color="yellow", bold=True)
+        text_style = Style(dim=True) if self.value else Style()
+
+        for i, line in enumerate(wrapped):
+            if i > 0:
+                result.append("\n")
+            if i == 0:
+                result.append(ind)
+                result.append(box_prefix, style=box_style)
+                result.append(line, style=text_style)
+            else:
+                result.append(ind + (" " * box_len))
+                result.append(line, style=text_style)
+
+        return result
+
+
 class NoteViewerModalScreen(ModalScreen[str | None]):
     """Modal screen to view a formatted notebook note in Markdown or BBCode."""
 
@@ -4619,26 +4698,29 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
     #scroll_container {
         height: 1fr;
         max-height: 100%;
+        overflow-x: hidden;
     }
     #message {
         width: 100%;
+        height: auto;
     }
     .markdown_block {
         width: 100%;
         height: auto;
     }
-    Checkbox.markdown_checkbox {
+    MarkdownCheckbox.markdown_checkbox, Checkbox.markdown_checkbox {
         border: none;
         padding: 0;
         margin: 0;
-        height: 1;
+        height: auto;
         width: 100%;
         background: transparent;
+        text-wrap: wrap;
     }
-    Checkbox.markdown_checkbox:focus {
+    MarkdownCheckbox.markdown_checkbox:focus, Checkbox.markdown_checkbox:focus {
         background: $accent 25%;
     }
-    Checkbox.markdown_checkbox:hover {
+    MarkdownCheckbox.markdown_checkbox:hover, Checkbox.markdown_checkbox:hover {
         background: $accent 15%;
     }
     #buttons {
@@ -4748,10 +4830,14 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
                                 yield Static(Markdown(md_text, hyperlinks=True), classes="markdown_block")
                         elif b[0] == "checkbox":
                             line_idx, indent, _, is_checked, text = b[1], b[2], b[3], b[4], b[5]
-                            cb = Checkbox(text, value=is_checked, classes="markdown_checkbox", id=f"cb_{line_idx}")
-                            cb._line_idx = line_idx
-                            if indent:
-                                cb.styles.margin = (0, 0, 0, len(indent))
+                            cb = MarkdownCheckbox(
+                                text,
+                                value=is_checked,
+                                indent=indent or "",
+                                line_idx=line_idx,
+                                classes="markdown_checkbox",
+                                id=f"cb_{line_idx}",
+                            )
                             yield cb
             with Horizontal(id="buttons"):
                 yield Button("Copy [C]", variant="default", id="btn_copy")

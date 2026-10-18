@@ -2020,6 +2020,13 @@ class MainMenuView(Widget):
         self._marquee_timer = self.set_interval(0.25, self._tick_marquee)
 
     def _tick_marquee(self) -> None:
+        with contextlib.suppress(Exception):
+            scr = getattr(self, "screen", None)
+            if scr and hasattr(scr, "_is_covered") and scr._is_covered():
+                return
+            app = getattr(self, "app", None)
+            if app and (len(getattr(app, "screen_stack", [])) > 1 or getattr(app, "screen", None) is not scr):
+                return
         opts = self.current_menu().get("items", self.current_menu().get("options", []))
         if not opts:
             return
@@ -3801,11 +3808,56 @@ class BashMenuScreen(Screen):
                 pb.styles.height = plugin_count
                 pb.refresh()
 
+    def _is_covered(self) -> bool:
+        """Return True if any modal, popup, or overlay window is currently over this screen."""
+        with contextlib.suppress(Exception):
+            app = getattr(self, "app", None) or getattr(self, "_app", None)
+            if not app:
+                return False
+            if getattr(app, "screen", None) is not self:
+                return True
+            screen_stack = getattr(app, "screen_stack", None)
+            if screen_stack and self in screen_stack and screen_stack[-1] is not self:
+                return True
+        return False
+
+    def on_screen_suspend(self) -> None:
+        """Pause all background timers and ticks when another screen/modal covers MenuScreen."""
+        with contextlib.suppress(Exception):
+            if hasattr(self, "_refresh_timer") and self._refresh_timer:
+                self._refresh_timer.pause()
+        with contextlib.suppress(Exception):
+            mv = getattr(self, "menu_view", None)
+            if mv and getattr(mv, "_marquee_timer", None):
+                mv._marquee_timer.pause()
+        with contextlib.suppress(Exception):
+            for mq in self.query(bashmenu_ui.MarqueeLabel):
+                if getattr(mq, "_timer", None):
+                    mq._timer.pause()
+
+    def on_screen_resume(self) -> None:
+        """Resume background timers and trigger a refresh when returning to MenuScreen."""
+        with contextlib.suppress(Exception):
+            if hasattr(self, "_refresh_timer") and self._refresh_timer:
+                self._refresh_timer.resume()
+        with contextlib.suppress(Exception):
+            mv = getattr(self, "menu_view", None)
+            if mv and getattr(mv, "_marquee_timer", None):
+                mv._marquee_timer.resume()
+        with contextlib.suppress(Exception):
+            for mq in self.query(bashmenu_ui.MarqueeLabel):
+                if getattr(mq, "_timer", None):
+                    mq._timer.resume()
+        with contextlib.suppress(Exception):
+            self._periodic_refresh()
+
     def _periodic_refresh(self) -> None:
         """The `_periodic_refresh` method refreshes the menu view periodically.
         When only the clock/gutter or plugins update, it limits refreshes to the
         affected regions to decouple background wallpaper from timer ticks.
         """
+        if self._is_covered():
+            return
         with contextlib.suppress(Exception):
             mv = self.menu_view
             h = max(10, mv.size.height or 24)

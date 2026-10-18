@@ -9,5 +9,7 @@ notebook:
           ## TODO List (Shared With Agent).
 
           - [x] Edit file/directory pickers to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden files.
-          - [ ] UI: When in view mode of notebook notes (not edit mode) wrap text as necessary.
-          - [ ] RESPONSIVENESS: notebook UI, particularily in edit mode has become very sluggish. This needs an immediate fix as it's so sluggish it's almost unusable.
+          - [x] BUG: Mark items you are currently working on in the TODO as "PENDING" after the check box.
+          - [x] UI: When in view mode of notebook notes (not edit mode) wrap text as necessary.
+          - [x] RESPONSIVENESS: notebook UI, particularily in edit mode has become very sluggish. This needs an immediate fix as it's so sluggish it's almost unusable. When any window is currently over the main menu UI (i.e., help modal, reference modals, selection popups, etc, notebook notes) background ticks should ALL pause until the window is closed.
+          - [ ] BUG: Open dialogs, such as the one to choose a background wallpaper in the theme editor, or the open dialog to select a file in the text editor, do not include the <ctl> + <h> functionality to toggle hidden files displayed/hidden.
