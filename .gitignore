@@ -6,3 +6,5 @@ __pycache__/
 .gemini
 *.old
 *.bak
+*.swp
+.*.swp

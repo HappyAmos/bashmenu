@@ -3,6 +3,8 @@
 # SCRIPT: asteroids.sh
 # DESCRIPTION: Cross-platform runner and build installer for the terminal
 #              Asteroids C game clone.
+# USAGE:       asteroids.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 # Helper to determine writable binary installation directory

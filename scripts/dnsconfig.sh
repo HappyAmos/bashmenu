@@ -5,9 +5,11 @@
 # ==============================================================================
 # SCRIPT: dnsconfig.sh
 # DESCRIPTION: Automatically detects the active network management tool on
-#              Linux systems (Debian/Ubuntu, Fedora/RHEL, Arch, openSUSE) and macOS,
-#              and configures IPv4 & IPv6 DNS.
-# FALLBACK: Directly edits /etc/resolv.conf if no manager is available.
+#              Linux systems (Debian/Ubuntu, Fedora/RHEL, Arch, openSUSE) and
+#              macOS, and configures IPv4 & IPv6 DNS.
+# FALLBACK:    Directly edits /etc/resolv.conf if no manager is available.
+# USAGE:       dnsconfig.sh <IPv4_1> <IPv4_2> <IPv6_1> <IPv6_2>
+# OPTIONS:     None.
 # ==============================================================================
 
 # Exit immediately if a command exits with a non-zero status during critical operations

@@ -2,10 +2,12 @@
 # ==============================================================================
 # SCRIPT: install_basics.sh
 # DESCRIPTION: Cross-platform basic tools installer for Termux, macOS, and
-#              various Linux distributions (Debian/Ubuntu, Fedora/RHEL, Arch, openSUSE, Alpine).
-#              Installs each app independently so failures do not block others.
-#              Invokes custom fallback installer scripts if available.
-#              Generates a final report with status and solutions.
+#              various Linux distributions (Debian/Ubuntu, Fedora/RHEL, Arch,
+#              openSUSE, Alpine). Installs each app independently so failures do
+#              not block others. Invokes custom fallback installer scripts if
+#              available and generates a final report with status and solutions.
+# USAGE:       install_basics.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

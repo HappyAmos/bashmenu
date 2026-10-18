@@ -2,6 +2,8 @@
 # ==============================================================================
 # SCRIPT: serverup.sh
 # DESCRIPTION: Cross-platform script to check the status of a server.
+# USAGE:       serverup.sh <ip> [server-name]
+# OPTIONS:     None.
 # ==============================================================================
 
 param="$#"

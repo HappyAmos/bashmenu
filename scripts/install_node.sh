@@ -3,6 +3,8 @@
 # SCRIPT: install_node.sh
 # DESCRIPTION: Cross-platform installer for Node.js and npm via system package
 #              managers, winget, or nvm.
+# USAGE:       install_node.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 # Detect OS

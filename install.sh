@@ -1,10 +1,11 @@
 #!/bin/sh
 # ==============================================================================
-# BashMenu Universal Installation Script
-# https://github.com/HappyAmos/bashmenu
-#
-# One-liner usage:
-#   sh -c "$(wget -qO- https://raw.githubusercontent.com/HappyAmos/bashmenu/main/install.sh 2>/dev/null || curl -fsSL https://raw.githubusercontent.com/HappyAmos/bashmenu/main/install.sh)"
+# SCRIPT: install.sh
+# DESCRIPTION: BashMenu Universal Installation Script. Clones repository, sets
+#              up Python virtual environment, and installs command shortcuts.
+# USAGE:       install.sh
+#              sh -c "$(curl -fsSL https://raw.githubusercontent.com/.../install.sh)"
+# OPTIONS:     None.
 # ==============================================================================
 
 set -e

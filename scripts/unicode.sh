@@ -2,7 +2,10 @@
 # ==============================================================================
 # SCRIPT: unicode.sh
 # DESCRIPTION: Interactive Unicode Block Explorer. Allows viewing predefined
-#              or custom ranges of Unicode characters printed directly to the terminal.
+#              or custom ranges of Unicode characters printed directly to the
+#              terminal.
+# USAGE:       unicode.sh
+# OPTIONS:     None (interactive menu).
 # ==============================================================================
 
 # Simple bash script to print unicode characters to the screen.

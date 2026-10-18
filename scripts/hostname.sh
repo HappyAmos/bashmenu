@@ -3,6 +3,8 @@
 # SCRIPT: hostname.sh
 # DESCRIPTION: Hostname and system identity discovery tool. Reports hostname,
 #              FQDN/domain, kernel, architecture, OS distribution, and container.
+# USAGE:       hostname.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 echo "=========================================="

@@ -4,7 +4,11 @@
 # DESCRIPTION: Cross-platform web browser launcher wrapper. Opens a specified
 #              URL, file, or the default configured web browser (GUI or CLI)
 #              with flags to force GUI (--gui) or console/terminal (--tty/tty).
-# Usage: webopen.sh [--gui|--tty|tty] [url_or_file]
+# USAGE:       webopen.sh [options] [url_or_file]
+# OPTIONS:     --gui | -g         Force GUI browser launch.
+#              --tty | -t | tty   Force terminal/console browser launch.
+#              --auto | -a        Auto-detect browser based on session.
+#              --help | -h        Display usage summary and exit.
 # ==============================================================================
 # shellcheck disable=SC2015
 

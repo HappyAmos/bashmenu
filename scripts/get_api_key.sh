@@ -3,6 +3,8 @@
 # SCRIPT: get_api_key.sh
 # DESCRIPTION: Retrieves text from a file on a remote server via SSH.
 #              Useful for fetching API keys or tokens securely.
+# USAGE:       get_api_key.sh [options] <filename>
+# OPTIONS:     -h, --help        Show usage information and exit.
 # ==============================================================================
 
 SERVER="pi3b.lan"

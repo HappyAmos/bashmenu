@@ -2,6 +2,8 @@
 # ==============================================================================
 # SCRIPT: otd.sh
 # DESCRIPTION: Prints a random item from on this day from today.zenquotes.io
+# USAGE:       otd.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 # Determine terminal width (with fallback) and export for subprocesses

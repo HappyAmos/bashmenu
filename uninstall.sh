@@ -1,12 +1,10 @@
 #!/bin/sh
 # ==============================================================================
-# BashMenu Uninstallation Script
-# https://github.com/HappyAmos/bashmenu
-#
-# Usage:
-#   uninstall.sh [-y|--yes]
-#   or:
-#   sh -c "$(wget -qO- https://raw.githubusercontent.com/HappyAmos/bashmenu/main/uninstall.sh 2>/dev/null || curl -fsSL https://raw.githubusercontent.com/HappyAmos/bashmenu/main/uninstall.sh)"
+# SCRIPT: uninstall.sh
+# DESCRIPTION: BashMenu Uninstallation Script. Removes repository files,
+#              cache, virtual environment, and command shortcuts.
+# USAGE:       uninstall.sh [options]
+# OPTIONS:     -y, --yes         Bypass confirmation prompts and auto-confirm.
 # ==============================================================================
 
 set -e

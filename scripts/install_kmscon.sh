@@ -3,6 +3,8 @@
 # SCRIPT: install_kmscon.sh
 # DESCRIPTION: Installs kmscon on a Linux system (Debian/Ubuntu/Mint) and configures
 #              it as a systemd service. Useful for headless base systems.
+# USAGE:       install_kmscon.sh
+# OPTIONS:     None.
 # ==============================================================================
 # Version: 0.0.1
 # Author:  HA Bash Menu Development Team

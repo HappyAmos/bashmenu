@@ -3,6 +3,8 @@
 # SCRIPT: install_games.sh
 # DESCRIPTION: Cross-platform wrapper script to install games using the
 #              system's native package manager (apt, dnf, pacman, pkg, or brew).
+# USAGE:       install_games.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

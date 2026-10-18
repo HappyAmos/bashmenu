@@ -3,6 +3,9 @@
 # SCRIPT: ping.sh
 # DESCRIPTION: Cross-platform ping utility wrapper with unprivileged fallback
 #              for minimal containers and BusyBox environments (e.g. Alpine).
+# USAGE:       ping.sh [target] [count]
+# OPTIONS:     target     Host or IP address to ping (default: 1.1.1.1).
+#              count      Number of ping packets to send (default: 4).
 # ==============================================================================
 
 TARGET="${1:-1.1.1.1}"

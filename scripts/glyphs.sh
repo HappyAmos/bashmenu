@@ -3,6 +3,8 @@
 # SCRIPT: glyphs.sh
 # DESCRIPTION: Searches for Nerd Fonts and Emoji glyphs using online JSON
 #              databases and caches them locally for faster subsequent lookups.
+# USAGE:       glyphs.sh [options] <search-term>
+# OPTIONS:     -h, --help        Show usage information and exit.
 # ==============================================================================
 
 export LANG=en_US.UTF-8

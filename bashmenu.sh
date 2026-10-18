@@ -4,6 +4,17 @@
 # SCRIPT: bashmenu.sh
 # DESCRIPTION: Primary BashMenu launcher script with POSIX /bin/sh trampoline,
 #              virtual environment setup, dependency verification, and self-healing.
+# USAGE:       bashmenu.sh [options]
+# OPTIONS:     -h, --help        Display help message and exit.
+#              -v, --version     Display version information and exit.
+#              --check-env       Inspect platform detection, paths, and deps.
+#              --install-bm      Install 'bm' command shortcut.
+#              --install-cheat   Install 'cheat' command shortcut.
+#              --install-rich    Install 'rich' command shortcut.
+#              --install-bmpager Install 'bmpager' command shortcut.
+#              --install-man     Install bashmenu.1 man page.
+#              --setup           Run non-interactive setup and exit.
+#              -y, --yes         Automatically answer yes to prompts.
 # ==============================================================================
 # Version: 0.0.7
 # Author:  HA Bash Menu
@@ -352,7 +363,7 @@ install_bm() {
     fi
 }
 
-# Install 'cheat' command symlink pointing to bashmenu.sh
+# Install 'cheat' command symlink pointing to cheat.sh
 install_cheat() {
     local shortcut_name="cheat"
     local target_dir

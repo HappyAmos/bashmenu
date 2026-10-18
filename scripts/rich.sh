@@ -2,7 +2,8 @@
 # ==============================================================================
 # SCRIPT: rich.sh
 # DESCRIPTION: Renders a Markdown file using the Python Rich library.
-# Usage: rich.sh <filename>
+# USAGE:       rich.sh [options] <filename>
+# OPTIONS:     --no-file | --no-edit | --view-only  Disallow launching editor.
 # ==============================================================================
 # shellcheck disable=SC2016
 

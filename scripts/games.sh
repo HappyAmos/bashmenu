@@ -2,6 +2,8 @@
 # ==============================================================================
 # SCRIPT: games.sh
 # DESCRIPTION: Cross-platform wrapper script to run terminal games.
+# USAGE:       games.sh
+# OPTIONS:     None (interactive menu).
 # ==============================================================================
 
 # Get the script directory path for this script

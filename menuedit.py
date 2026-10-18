@@ -1680,6 +1680,7 @@ class MenuEditScreen(Screen):
                 yield Label("[ESC/q] Exit", id="lbl_exit", classes="footer_item", markup=False)
 
     def action_toggle_tree_node(self) -> None:
+        """Toggle the expand or collapse state of the focused tree node."""
         with contextlib.suppress(Exception):
             tree = self.query_one("#tree", Tree)
             if tree.cursor_node and tree.cursor_node != tree.root:
@@ -1788,6 +1789,7 @@ class MenuEditScreen(Screen):
     action_show_help = action_help
 
     def action_lookup_ascii(self) -> None:
+        """Display the interactive ASCII character table modal."""
         try:
             app_obj = self.app
             cfg = getattr(app_obj, "config", {})
@@ -1807,6 +1809,7 @@ class MenuEditScreen(Screen):
             app_obj.push_screen(bashmenu_ui.StreamOutputModalScreen("ASCII Character Table", cmd, theme=self.theme_styles))
 
     def action_lookup_glyphs(self) -> None:
+        """Prompt for a search query and display matching Nerd Font and Emoji glyphs."""
         try:
             app_obj = self.app
             cfg = getattr(app_obj, "config", {})
@@ -1839,6 +1842,7 @@ class MenuEditScreen(Screen):
             )
 
     def action_show_placeholders(self) -> None:
+        """Display modal dialog listing available placeholders and macros."""
         try:
             app_obj = self.app
         except Exception:  # noqa: BLE001
@@ -2039,6 +2043,7 @@ class MenuEditScreen(Screen):
         self.update_footer_layout(width=w)
 
     def on_mount(self) -> None:
+        """Initialize tree, apply themes, and set initial focus on mount."""
         self.populate_tree()
         self.apply_theme()
         self.update_footer_layout()
@@ -2048,6 +2053,7 @@ class MenuEditScreen(Screen):
             self.set_timer(0.05, lambda: self._focus_target_node(tn))
 
     def _focus_target_node(self, target_node) -> None:
+        """Expand ancestor branches, focus target tree node, and scroll into view."""
         with contextlib.suppress(Exception):
             tree = self.query_one("#tree", Tree)
             curr = target_node.parent
@@ -2060,6 +2066,7 @@ class MenuEditScreen(Screen):
             self.update_inspector(target_node.data)
 
     def _find_node_by_chain(self, root_node, title_chain):
+        """Locate a tree node matching a hierarchical list of menu item titles."""
         if not title_chain:
             return None
         curr_node = root_node
@@ -2084,6 +2091,7 @@ class MenuEditScreen(Screen):
         return curr_node if curr_node != root_node else None
 
     def _find_node_for_item(self, parent_node, target_item):
+        """Find a tree node for a menu item dict by identity or attributes."""
         if not target_item or not isinstance(target_item, dict):
             return None
 
@@ -2175,12 +2183,15 @@ class MenuEditScreen(Screen):
                 node.expand()
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
+        """Update property inspector when a tree node is highlighted."""
         self.update_inspector(event.node.data if event.node else None)
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        """Update property inspector when a tree node is selected."""
         self.update_inspector(event.node.data if event.node else None)
 
     def on_tree_node_collapsed(self, event: Tree.NodeCollapsed) -> None:
+        """Prevent the root menu node from collapsing."""
         with contextlib.suppress(Exception):
             tree = self.query_one("#tree", Tree)
             if event.node == tree.root:
@@ -2344,6 +2355,7 @@ class MenuEditScreen(Screen):
         inspector.update("\n\n".join(lines))
 
     def action_edit_item(self) -> None:
+        """Open the modal property editor for the currently selected menu item."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if not node or not node.data or node == tree.root:
@@ -2371,6 +2383,7 @@ class MenuEditScreen(Screen):
         self.app.push_screen(ItemEditModal(node.data, theme=self.theme_styles), save_cb)
 
     def action_change_item_type(self) -> None:
+        """Prompt to change the item type of the selected menu item."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if not node or not node.data or node == tree.root:
@@ -2428,6 +2441,7 @@ class MenuEditScreen(Screen):
             app_obj.push_screen(ItemTypePickerModal(theme=self.theme_styles), type_cb)
 
     def action_add_item(self) -> None:
+        """Prompt for item type and insert a new menu item into the active container."""
         tree = self.query_one("#tree", Tree)
         cursor_node = tree.cursor_node or tree.root
 
@@ -2491,6 +2505,7 @@ class MenuEditScreen(Screen):
             app_obj.push_screen(ItemTypePickerModal(theme=self.theme_styles), type_cb)
 
     def action_delete_item(self) -> None:
+        """Prompt for confirmation and delete the currently selected menu item."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if not node or not node.data or node == tree.root:
@@ -2517,6 +2532,7 @@ class MenuEditScreen(Screen):
         )
 
     def _find_item_parent_list(self, item_data):
+        """Locate the parent list and index containing the specified item dict."""
         def search(opts):
             for idx, el in enumerate(opts):
                 if el is item_data:
@@ -2565,6 +2581,7 @@ class MenuEditScreen(Screen):
             self._save_menu_quietly()
 
     def action_move_up(self) -> None:
+        """Move the selected menu item up one position within its sibling list."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if (not node or not node.data or node == tree.root) and self.selected_item:
@@ -2601,6 +2618,7 @@ class MenuEditScreen(Screen):
             self._schedule_save_quietly()
 
     def action_move_down(self) -> None:
+        """Move the selected menu item down one position within its sibling list."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if (not node or not node.data or node == tree.root) and self.selected_item:
@@ -2637,6 +2655,7 @@ class MenuEditScreen(Screen):
             self._schedule_save_quietly()
 
     def action_indent_item(self) -> None:
+        """Nest the selected menu item into the preceding sibling submenu."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if (not node or not node.data or node == tree.root) and self.selected_item:
@@ -2672,6 +2691,7 @@ class MenuEditScreen(Screen):
                 self._schedule_save_quietly()
 
     def action_outdent_item(self) -> None:
+        """Move selected menu item out of its parent submenu up one level."""
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if (not node or not node.data or node == tree.root) and self.selected_item:
@@ -2696,6 +2716,7 @@ class MenuEditScreen(Screen):
             self._schedule_save_quietly()
 
     def action_save_menu(self) -> None:
+        """Save current menu data structure to disk and display status modal."""
         if getattr(self, "_save_timer", None) is not None:
             with contextlib.suppress(Exception):
                 self._save_timer.stop()
@@ -2709,9 +2730,11 @@ class MenuEditScreen(Screen):
             self.app.push_screen(bashmenu_ui.MessageModalScreen("Error", f"Failed to save menu:\n{e}", theme=self.theme_styles))
 
     def on_unmount(self) -> None:
+        """Ensure pending debounced auto-save writes to disk upon screen unmount."""
         self._flush_pending_save()
 
     def action_exit_editor(self) -> None:
+        """Prompt to save unsaved modifications before exiting the menu editor."""
         self._flush_pending_save()
 
         def safe_exit(res_val):
@@ -2757,6 +2780,7 @@ class MenuEditApp(App):
             self.config = {}
 
     def on_mount(self) -> None:
+        """Push MenuEditScreen onto the application screen stack on startup."""
         self.push_screen(MenuEditScreen(menu_file_path=self.menu_file_path, selected_item=self.selected_item))
 
 

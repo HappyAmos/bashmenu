@@ -3,6 +3,8 @@
 # SCRIPT: cheat.sh
 # DESCRIPTION: Terminal cheatsheet CLI wrapper. Resolves paths, activates the
 #              virtual environment, and executes cheat.py.
+# USAGE:       cheat.sh [topic] [options]
+# OPTIONS:     Passes all options and arguments through to cheat.py.
 # ==============================================================================
 # Version: 0.0.8
 # Author:  HA Bash Menu

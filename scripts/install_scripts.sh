@@ -3,6 +3,8 @@
 # SCRIPT: install_scripts.sh
 # DESCRIPTION: Clones a private scripts repository from Github into a local
 #              directory. Uses get_api_key.sh to securely fetch the Git PAT.
+# USAGE:       install_scripts.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 # Personal script to clone a private repo from Github. Uses get_api_key.sh to retrieve

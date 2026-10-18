@@ -2,6 +2,8 @@
 # ==============================================================================
 # SCRIPT: install_glow.sh
 # DESCRIPTION: Cross-platform installer for the Glow markdown viewer utility.
+# USAGE:       install_glow.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 set -euo pipefail

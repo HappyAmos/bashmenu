@@ -2,6 +2,8 @@
 # ==============================================================================
 # SCRIPT: bsdgames.sh
 # DESCRIPTION: Cross-platform wrapper script to run bsdgames on macOS and Linux.
+# USAGE:       bsdgames.sh
+# OPTIONS:     None (interactive menu).
 # ==============================================================================
 
 # Function to run a game searching across common system paths

@@ -2,7 +2,10 @@
 # ==============================================================================
 # SCRIPT: system_update.sh
 # DESCRIPTION: Cross-platform wrapper script to update packages using the
-#              system's native package manager (apt, dnf, yum, pacman, zypper, apk, brew, pkg).
+#              system's native package manager (apt, dnf, yum, pacman,
+#              zypper, apk, brew, pkg).
+# USAGE:       system_update.sh
+# OPTIONS:     None.
 # ==============================================================================
 
 IS_TERMUX=false
