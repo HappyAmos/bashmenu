@@ -996,7 +996,12 @@ def parse_color_val(val):
     if isinstance(val, str):
         if val.isdigit():
             return f"color({val})"
-        return val
+        try:
+            from rich.color import Color
+            Color.parse(val)
+            return val
+        except Exception:  # noqa: BLE001
+            return None
     return None
 
 
@@ -1136,7 +1141,19 @@ def get_theme_window_borders(
         "gutter_bottom_tee": ["gutter_bottom_tee", "gutter_tee_bottom", "window_gutter_bottom_tee"],
     }
 
+    cfg_win_dict = cfg_win if (isinstance(config, dict) and isinstance(cfg_win, dict)) else {}
     for target_key, candidate_keys in aliases.items():
+        found = False
+        for ck in candidate_keys:
+            if ck in cfg_win_dict:
+                res = _resolve_val(cfg_win_dict[ck])
+                if res:
+                    borders[target_key] = res
+                    found = True
+                    break
+        if found:
+            continue
+
         for ck in candidate_keys:
             if ck in window_def:
                 res = _resolve_val(window_def[ck])
@@ -1467,13 +1484,20 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     for key, spec in palette.items():
         if key == "background":
             continue
-        if isinstance(spec, list) and len(spec) >= 2:
-            fg = parse_color_val(spec[0])
-            bg = parse_color_val(spec[1]) or bg_color
-            styles[key] = Style(color=fg, bgcolor=bg)
-        elif isinstance(spec, str):
-            styles[key] = Style(color=parse_color_val(spec), bgcolor=bg_color)
-        else:
+        try:
+            if isinstance(spec, list) and len(spec) >= 2:
+                fg = parse_color_val(spec[0])
+                if key == "plugin" and (spec[1] == -1 or str(spec[1]).strip() in ("-1", "inherit", "transparent", "None")):
+                    bg = None
+                else:
+                    bg = parse_color_val(spec[1]) or bg_color
+                styles[key] = Style(color=fg, bgcolor=bg)
+            elif isinstance(spec, (str, int)):
+                bg = None if key == "plugin" else bg_color
+                styles[key] = Style(color=parse_color_val(spec), bgcolor=bg)
+            else:
+                styles[key] = Style(bgcolor=bg_color)
+        except Exception:  # noqa: BLE001
             styles[key] = Style(bgcolor=bg_color)
 
     # Provide fallback styles if keys are missing
@@ -1494,7 +1518,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles.setdefault("button_cancel", Style(color="white", bgcolor="grey37"))
     styles.setdefault("button_success", Style(color="white", bgcolor="green"))
     styles.setdefault("help_text", Style(color="cyan", bgcolor=bg_color))
-    styles.setdefault("plugin", Style(color="cyan", bgcolor=bg_color))
+    styles.setdefault("plugin", Style(color="cyan"))
     styles.setdefault("window_close_button", Style(color="red", bold=True, bgcolor=bg_color))
     styles.setdefault("scrollbar", Style(color="cyan", bgcolor=bg_color or "grey19"))
     default_ws = (
@@ -1873,11 +1897,22 @@ def composite_single_row(
     for seg in line.render(console):
         text = seg.text
         style = seg.style or base_line_style
-        is_highlight_bg = (
-            style is not None
-            and style.bgcolor is not None
-            and (theme_default_bg is None or style.bgcolor != theme_default_bg)
-        )
+        is_highlight_bg = False
+        if style is not None and style.bgcolor is not None:
+            if theme_default_bg is None:
+                is_highlight_bg = True
+            elif style.bgcolor == theme_default_bg:
+                is_highlight_bg = False
+            elif isinstance(theme_default_bg, tuple):
+                if hasattr(style.bgcolor, "triplet") and style.bgcolor.triplet == theme_default_bg:
+                    is_highlight_bg = False
+                elif hasattr(style.bgcolor, "number") and style.bgcolor.number is not None and 0 <= style.bgcolor.number < 256:
+                    trip = EIGHT_BIT_PALETTE[style.bgcolor.number]
+                    is_highlight_bg = ((trip.red, trip.green, trip.blue) != theme_default_bg)
+                else:
+                    is_highlight_bg = True
+            else:
+                is_highlight_bg = True
 
         for ch in text:
             w_ch = 1 if ord(ch) < 128 else cell_len(ch)

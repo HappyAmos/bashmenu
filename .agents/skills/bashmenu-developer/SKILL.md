@@ -211,6 +211,7 @@ description: Core developer guidelines for the multi-platform BashMenu
     - `F9`: Auto-generate theme palette from image (`ThemeFromImageModal`)
     - `Ctrl+R`: Rename theme (`RenameThemeModal`)
     - `Ctrl+D`: Delete theme (confirmation prompt)
+    - `Ctrl+N`: Create new theme ('untitled')
     - `Ctrl+O`: Open existing theme to load (prompts if unsaved changes exist)
     - `Ctrl+S`: Save theme directly to disk
     - `Ctrl+A`: Save As new theme

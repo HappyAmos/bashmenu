@@ -1025,9 +1025,9 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.click(preview, offset=(preview._last_w // 2, 0))
                 self.assertEqual(screen.focused.id, "color_title")
 
-                # 3. Click selected option text (row 2, col 15) -> color_selection
+                # 3. Click selected option text (row 2, col 15) -> color_highlight
                 await pilot.click(preview, offset=(15, 2))
-                self.assertEqual(screen.focused.id, "color_selection")
+                self.assertEqual(screen.focused.id, "color_highlight")
 
                 # 4. Click indicator glyph (row 2, col 5) -> prop_indicator
                 await pilot.click(preview, offset=(5, 2))
@@ -1715,6 +1715,7 @@ class TestThemeEditor(unittest.TestCase):
                     "[F7] Derive 16/8",
                     "[F8] Expand All",
                     "[F9] From Image",
+                    "[Ctrl+N] New",
                     "[Ctrl+O] Open",
                     "[Ctrl+S] Save",
                     "[Ctrl+A] Save As",
@@ -1722,6 +1723,83 @@ class TestThemeEditor(unittest.TestCase):
                 ])
 
         asyncio.run(_run())
+
+    def test_ctrl_n_creates_new_theme(self):
+        """Verify Ctrl+N shortcut triggers action_new_theme and creates untitled theme."""
+        import asyncio
+
+        app = themeedit.ThemeEditApp("dracula")
+
+        async def _run():
+            async with app.run_test(size=(120, 40)) as pilot:
+                screen = app.screen
+                self.assertEqual(screen.theme_name, "dracula")
+                # Trigger action_new_theme via keyboard binding
+                await pilot.press("ctrl+n")
+                await pilot.pause()
+                self.assertEqual(screen.theme_name, "untitled")
+                self.assertTrue(screen.is_new)
+                self.assertTrue(screen.is_dirty)
+                # Name input should be blank for untitled theme
+                name_inp = screen.query_one("#prop_theme_name")
+                self.assertEqual(name_inp.value, "")
+
+        asyncio.run(_run())
+
+    def test_highlight_backspace_color_parsing_resilience(self):
+        """Verify backspacing inside highlight token input does not freeze compositor or crash."""
+        import asyncio
+
+        from textual.widgets import Input
+
+        app = themeedit.ThemeEditApp("dracula")
+
+        async def _run():
+            async with app.run_test(size=(120, 40)) as pilot:
+                screen = app.screen
+                highlight_inp = screen.query_one("#color_highlight", Input)
+                # Simulate backspacing the closing bracket: '[255, 201]' -> '[255, 201'
+                highlight_inp.value = "[255, 201"
+                await pilot.pause()
+                # App remains responsive and preview render does not crash
+                preview = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+                rendered = preview.render()
+                self.assertIsNotNone(rendered)
+                self.assertTrue(len(rendered.plain) > 0)
+
+        asyncio.run(_run())
+
+    def test_preview_widget_renders_background_wallpaper(self):
+        """Verify ThemePreviewWidget renders half-block wallpaper characters when background is set."""
+        theme_def = {
+            "indicator": ">",
+            "divider": {"char": "─", "length": "{window_width}"},
+            "window": dict(bashmenu_ui.DEFAULT_WINDOW_BORDER),
+            "background": {
+                "image": "assets/wallpapers/twilight.png",
+                "opacity": 0.5,
+                "scaling": "stretch",
+                "mode": "halfblock",
+            },
+            256: {
+                "background": 0,
+                "title": [15, -1],
+                "border": [15, -1],
+                "text": [255, -1],
+                "highlight": [16, 15],
+                "selection": [15, 19],
+                "shortcut_key": [53, -1],
+                "divider": [15, -1],
+                "plugin": [53, -1],
+                "gutter": [238, -1],
+                "help_text": [53, -1],
+                "shadow": [236, "COLOR_BLACK"],
+            },
+        }
+        preview = themeedit.ThemePreviewWidget(theme_def, theme_name="test_bg_theme")
+        rendered = preview.render()
+        has_halfblock = ("\u2580" in rendered.plain) or ("\u2584" in rendered.plain)
+        self.assertTrue(has_halfblock, "Mock preview should contain composited halfblock characters")
 
 
 if __name__ == "__main__":

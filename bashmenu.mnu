@@ -2,6 +2,49 @@ version: 0.0.1
 title: Bash Menu
 items:
   - '{divider}':
+  - BM Developer Shortcuts:
+      type: submenu
+      submenu:
+        title: New submenu
+        items:
+          - Convert Image To BM Wallpaper:
+              type: command
+              icon: '{nf::#f11e7}'
+              command: convert "{file_picker}" -resize 80x48\! -blur 0x0.5 +dither
+                -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
+              prompt: 'Convert image to BM friendly wallpaper:'
+              start_dir: ~/Pictures
+              interactive: true
+              quiet: false
+              alt_buffer: true
+          - Edit bashmenu.md [{bashmenu_dir}/bashmenu.md]:
+              type: editor
+              file: '{bashmenu_dir}/bashmenu.md'
+              tabstop: 4
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              icon: '{nf::#f11e7}'
+          - Edit SKILL.md:
+              type: editor
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/SKILL.md'
+              tabstop: 4
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              icon: '{nf::#f11e7}'
+          - Edit TODO.md:
+              type: editor
+              icon: '{nf::#f11e7}'
+              tabstop: 4
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
+      interactive: true
+      quiet: false
+      alt_buffer: true
+      icon: '{nf:/:#f14d3}'
   - Notes:
       type: notebook
       file: '{notebooks_dir}/notes.yml'
@@ -548,40 +591,6 @@ items:
               type: editor
               action: '{home}/autoexec.sh'
               icon: '{nf::#f11e7}'
-          - Edit bashmenu.md [{bashmenu_dir}/bashmenu.md]:
-              type: editor
-              file: '{bashmenu_dir}/bashmenu.md'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f11e7}'
-          - Edit SKILL.md:
-              type: editor
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/SKILL.md'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              icon: '{nf::#f11e7}'
-          - Edit TODO.md:
-              type: editor
-              icon: '{nf::#f11e7}'
-              tabstop: 4
-              interactive: true
-              quiet: false
-              alt_buffer: true
-              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
-          - Convert Image To BM Wallpaper:
-              type: command
-              icon: '{nf::#f11e7}'
-              command: convert "{file_picker}" -resize 80x48\! -blur 0x0.5 +dither
-                -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
-              prompt: 'Convert image to BM friendly wallpaper:'
-              start_dir: ~/Pictures
-              interactive: true
-              quiet: false
-              alt_buffer: true
           - Edit .bashrc [{bashrc}]:
               type: editor
               action: '{bashrc}'

@@ -721,6 +721,38 @@ class TestPluginSystem(unittest.TestCase):
         top_spans_with_bg = [s for s in top_div_line.spans if s.style and s.style.bgcolor == expected_bg]
         self.assertTrue(len(top_spans_with_bg) > 0)
 
+    def test_plugin_background_transparent_when_negative_one(self):
+        """Verify that when plugin colors background is set to -1, it is transparent and not black."""
+        # dracula has plugin: [212, -1]
+        theme_styles = bashmenu.bashmenu_ui.init_theme_colors("dracula")
+        plugin_style = theme_styles.get("plugin")
+        self.assertIsNotNone(plugin_style)
+        self.assertIsNone(plugin_style.bgcolor, "Plugin bgcolor must be None when configured as -1")
+
+        config = {
+            "theme": "dracula",
+            "settings": {
+                "plugins": {
+                    "sample": {
+                        "script": "echo hello",
+                        "standalone": True,
+                    },
+                }
+            },
+        }
+        with bashmenu._plugin_lock:
+            bashmenu._plugin_output_cache["sample"] = {
+                "lines": ["Hello World"],
+                "time": time.time(),
+            }
+
+        items = bashmenu.get_plugin_display_items(config, avail_w=74, screen_div_w=78, has_screen_divider=False)
+        self.assertGreaterEqual(len(items), 1)
+        row = items[0][2]
+        # Spans in padding should not have an opaque bgcolor
+        pad_spans_with_bg = [s for s in row.spans if s.style and s.style.bgcolor is not None and s.end == 74]
+        self.assertEqual(len(pad_spans_with_bg), 0, "Padding spans must be transparent (bgcolor=None)")
+
 
 if __name__ == "__main__":
     unittest.main()

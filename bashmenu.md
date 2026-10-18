@@ -214,6 +214,7 @@ The visual theme editor provides a split-screen interface featuring a live, quar
 | `F9` | Auto-generate theme palette from an image file (`ThemeFromImageModal`). |
 | `Ctrl+R` | Rename current theme (`RenameThemeModal`). |
 | `Ctrl+D` | Delete current theme from `bashmenu.themes` (with confirmation modal). |
+| `Ctrl+N` | Create a new theme ('untitled'). |
 | `Ctrl+O` | Open existing theme to edit (`ThemePickerModalScreen`, prompts to save pending changes). |
 | `Ctrl+S` / `s` | Save theme to `bashmenu.themes`. |
 | `Ctrl+A` | Save As under a new theme name and optionally activate in `bashmenu.yml`. |
@@ -542,8 +543,11 @@ BashMenu's engine includes built-in horizontal delta clustering to mitigate this
 
 For decent, but quick to create wallpapers, use an app like Krita, set the width
 to 80, height to 48. Use a maximum of 16 colors. Set the opacity in Krita to
-100%, turn off Pen if using a mouse (<f5>, Opacity, uncheck 'Enable Pen
-Settings'). Larger sizes work, but compression will introduce artifacts.
+100%, turn off Pen if using a mouse (press `<f5>`, select Opacity, uncheck 'Enable Pen
+Settings'). Larger sizes work, but compression will introduce artifacts. If the menu feels
+sluggish with the background image, with the configured theme loaded, open the theme editor
+and press `<f2>` to open the background modal. Try setting opacity to 0.5, clustering to 32, 
+and quantization to 16.
 
 ##### Recommended Image Types
 

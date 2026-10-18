@@ -1593,7 +1593,7 @@ def get_plugin_display_items(
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": 10}
 
     plugin_bg_color = plugin_style.bgcolor if plugin_style else None
-    plugin_bg_style = Style(bgcolor=plugin_bg_color) if plugin_bg_color else bg_style
+    plugin_bg_style = Style(bgcolor=plugin_bg_color) if plugin_bg_color else Style()
 
     with _plugin_lock:
         has_cached_data = any(
@@ -3290,7 +3290,13 @@ def process_item_action(screen, item, config):
             screen.app.push_screen(gorillas.GorillasScreen(), lambda res: screen.menu_view.refresh())
         elif action_name in ("theme_editor", "action_theme_editor") or "themeedit" in str(action_name):
             import themeedit
-            active_theme = getattr(screen.app, "theme_name", "dracula")
+            cfg = getattr(screen, "config", None)
+            if not cfg:
+                with contextlib.suppress(Exception):
+                    cfg = screen.menu_view.config
+            if not cfg:
+                cfg = getattr(screen.app, "config", None) or {}
+            active_theme = get_config_value(cfg, "theme") or getattr(screen.app, "theme_name", None) or "dracula"
             screen.app.push_screen(
                 themeedit.ThemeEditScreen(initial_theme=active_theme),
                 lambda res: screen.refresh_environment(),
@@ -3298,7 +3304,13 @@ def process_item_action(screen, item, config):
 
     elif item_type in ("theme_editor", "theme_edit"):
         import themeedit
-        active_theme = getattr(screen.app, "theme_name", "dracula")
+        cfg = getattr(screen, "config", None)
+        if not cfg:
+            with contextlib.suppress(Exception):
+                cfg = screen.menu_view.config
+        if not cfg:
+            cfg = getattr(screen.app, "config", None) or {}
+        active_theme = get_config_value(cfg, "theme") or getattr(screen.app, "theme_name", None) or "dracula"
         screen.app.push_screen(
             themeedit.ThemeEditScreen(initial_theme=active_theme),
             lambda res: screen.refresh_environment(),
@@ -3653,8 +3665,11 @@ class BashMenuScreen(Screen):
             plugin_style = theme_styles.get("plugin", Style(color="cyan"))
             bg_style = theme_styles.get("background")
             bg_hex = get_hex_from_style(bg_style, "#000000")
-            plugin_bg_hex = get_hex_from_style(plugin_style, bg_hex) if (plugin_style and plugin_style.bgcolor) else bg_hex
-            pb.styles.background = plugin_bg_hex
+            if plugin_style and plugin_style.bgcolor:
+                plugin_bg_hex = get_hex_from_style(plugin_style, bg_hex)
+                pb.styles.background = plugin_bg_hex
+            else:
+                pb.styles.background = None
             self.menu_view.styles.background = bg_hex
 
             if plugin_count == 0:
@@ -3835,7 +3850,13 @@ class BashMenuScreen(Screen):
         if not app_obj:
             with contextlib.suppress(Exception):
                 app_obj = self.app
-        active_theme = getattr(app_obj, "theme_name", "dracula")
+        cfg = getattr(self, "config", None)
+        if not cfg:
+            with contextlib.suppress(Exception):
+                cfg = self.menu_view.config
+        if not cfg:
+            cfg = getattr(app_obj, "config", None) or {}
+        active_theme = get_config_value(cfg, "theme") or getattr(app_obj, "theme_name", None) or "dracula"
         import themeedit
 
         if app_obj:
@@ -4128,8 +4149,11 @@ class BashMenuScreen(Screen):
         if hasattr(self, "plugin_buffer") and hasattr(self.plugin_buffer, "styles"):
             with contextlib.suppress(Exception):
                 p_style = new_styles.get("plugin")
-                p_hex = get_hex_from_style(p_style, bg_hex) if (p_style and p_style.bgcolor) else bg_hex
-                self.plugin_buffer.styles.background = p_hex
+                if p_style and p_style.bgcolor:
+                    p_hex = get_hex_from_style(p_style, bg_hex)
+                    self.plugin_buffer.styles.background = p_hex
+                else:
+                    self.plugin_buffer.styles.background = None
         if hasattr(mv, "styles"):
             with contextlib.suppress(Exception):
                 mv.styles.background = bg_hex
@@ -4208,6 +4232,7 @@ class BashMenuApp(App):
     def __init__(self, config=None, **kwargs):
         super().__init__(**kwargs)
         self.config = config
+        self.theme_name = get_config_value(config or {}, "theme", "dracula")
         self._inactivity_timer = None
         self._is_screensaver_active = False
         self.watchdog = ResponsivenessWatchdog(threshold_ms=35.0)

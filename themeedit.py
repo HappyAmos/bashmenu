@@ -2555,13 +2555,16 @@ class ThemePreviewWidget(Static):
             t_dict[256] = t_dict["256"]
 
         t_data = {self.theme_name: t_dict}
-        styles = bashmenu_ui.init_theme_colors(self.theme_name, raw_theme_data=t_data)
+        try:
+            styles = bashmenu_ui.init_theme_colors(self.theme_name, raw_theme_data=t_data)
+        except Exception:  # noqa: BLE001
+            styles = bashmenu_ui.init_theme_colors("dracula")
         borders = bashmenu_ui.get_theme_window_borders(self.theme_name, raw_theme_data=t_data)
 
         b_style = styles.get("border", Style(color="blue"))
         t_style = styles.get("title", Style(color="magenta", bold=True))
         text_style = styles.get("text", Style(color="white"))
-        sel_style = styles.get("selection", Style(color="white", bgcolor="blue"))
+        sel_style = styles.get("highlight", styles.get("selection", Style(color="white", bgcolor="blue")))
         key_style = styles.get("shortcut_key", Style(color="magenta", bold=True))
         div_style = styles.get("divider", Style(color="blue"))
         plug_style = styles.get("plugin", Style(color="cyan"))
@@ -2813,14 +2816,14 @@ class ThemePreviewWidget(Static):
                 if kind == "opt":
                     num, label, is_sel = meta[1], meta[2], meta[3]
                     if is_sel:
-                        set_hit_range(y, 3, 5, "color_selection", "color_highlight")
+                        set_hit_range(y, 3, 5, "color_highlight", "color_selection")
                         ind_len = len(indicator)
-                        set_hit_range(y, 5, 5 + ind_len, "prop_indicator", "color_selection")
-                        set_hit_range(y, 5 + ind_len, 6 + ind_len, "color_selection", "prop_indicator")
+                        set_hit_range(y, 5, 5 + ind_len, "prop_indicator", "color_highlight")
+                        set_hit_range(y, 5 + ind_len, 6 + ind_len, "color_highlight", "prop_indicator")
                         sc_start = 6 + ind_len
                         sc_str = f"[{num}]"
-                        set_hit_range(y, sc_start, sc_start + len(sc_str), "color_shortcut_key", "color_selection")
-                        set_hit_range(y, sc_start + len(sc_str), w - 3, "color_selection", "color_highlight")
+                        set_hit_range(y, sc_start, sc_start + len(sc_str), "color_shortcut_key", "color_highlight")
+                        set_hit_range(y, sc_start + len(sc_str), w - 3, "color_highlight", "color_selection")
                     else:
                         set_hit_range(y, 3, 7, "color_background", "color_text")
                         sc_str = f"[{num}]"
@@ -2977,6 +2980,8 @@ class ThemePreviewWidget(Static):
 
                     if compositor and compositor._raw_image:
                         theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
+                        theme_bg_style = styles.get("background")
+                        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
                         grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
                         if grid:
                             out = bashmenu_ui.composite_menu_text(
@@ -2984,7 +2989,7 @@ class ThemePreviewWidget(Static):
                                 grid,
                                 w + 3,
                                 len(lines),
-                                theme_default_bg=theme_bg_rgb,
+                                theme_default_bg=theme_default_bg,
                             )
 
         return out
@@ -3127,6 +3132,7 @@ class ThemeEditScreen(Screen):
         Binding("f7", "derive_palettes", "Derive 16/8"),
         Binding("f8", "toggle_expand_all", "Expand/Collapse All"),
         Binding("f9", "theme_from_image", "From Image"),
+        Binding("ctrl+n", "new_theme", "New Theme"),
         Binding("ctrl+o", "open_theme", "Open"),
         Binding("ctrl+s", "save_theme", "Save"),
         Binding("ctrl+a", "save_as_theme", "Save As"),
@@ -3597,6 +3603,8 @@ class ThemeEditScreen(Screen):
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[F9] From Image", classes="footer_item", id="lbl_from_image", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
+                yield Label("[Ctrl+N] New", classes="footer_item", id="lbl_new", markup=False)
+                yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[Ctrl+O] Open", classes="footer_item", id="lbl_open", markup=False)
                 yield Label("|", classes="footer_sep", markup=False)
                 yield Label("[Ctrl+S] Save", classes="footer_item", id="lbl_save", markup=False)
@@ -3775,8 +3783,13 @@ class ThemeEditScreen(Screen):
             return
 
         if inp_id == "prop_theme_name":
-            val_slug = sanitize_theme_name(val) if sanitize_theme_name else re.sub(r"[^\w\-]+", "_", val.lower()).strip("_")
-            if val_slug and self.theme_name != val_slug:
+            if not val:
+                val_slug = "untitled"
+            else:
+                val_slug = re.sub(r"[^\w\-]+", "_", val.lower()).strip("_")
+                if not val_slug:
+                    val_slug = "untitled"
+            if self.theme_name != val_slug:
                 self.theme_name = val_slug
                 self.is_new = val_slug not in self.raw_themes_data
                 self.is_dirty = True
@@ -3880,7 +3893,10 @@ class ThemeEditScreen(Screen):
                 return
             try:
                 # Parse python/yaml lists e.g. [201, -1] or scalar 233
-                parsed = yaml.safe_load(val)
+                candidate = val
+                if candidate.startswith("[") and not candidate.endswith("]"):
+                    candidate = candidate.rstrip(", ") + "]"
+                parsed = yaml.safe_load(candidate)
                 pal[tok] = parsed
             except Exception:  # noqa: BLE001
                 pal[tok] = val
@@ -3993,6 +4009,8 @@ class ThemeEditScreen(Screen):
             self.action_save_as_theme()
         elif w_id == "lbl_reset":
             self.action_reset_theme()
+        elif w_id == "lbl_new":
+            self.action_new_theme()
         elif w_id == "lbl_open":
             self.action_open_theme()
         elif w_id == "lbl_exit":
@@ -4236,6 +4254,77 @@ class ThemeEditScreen(Screen):
             bashmenu_ui.ThemePickerModalScreen(self.theme_name, theme=self.configured_theme_styles),
             _on_theme_chosen,
         )
+
+    def action_new_theme(self) -> None:
+        """Create a new theme ('untitled') with default dark palette, prompting to save if dirty."""
+        def _do_create() -> None:
+            self.theme_name = "untitled"
+            self.current_theme = {
+                "divider": {"char": "{ascii:196}", "length": "{window_width}"},
+                "indicator": ">",
+                "window": {
+                    "border_horizontal": "─",
+                    "border_vertical": "│",
+                    "border_top_left": "┌",
+                    "border_top_right": "┐",
+                    "border_bottom_left": "└",
+                    "border_bottom_right": "┘",
+                    "shadow_char": "░",
+                },
+                256: {
+                    "background": [234, -1],
+                    "title": [255, -1],
+                    "border": [240, -1],
+                    "text": [250, -1],
+                    "highlight": ["COLOR_BLACK", 255],
+                    "selection": [232, 250],
+                    "shortcut_key": [255, -1],
+                    "divider": [245, -1],
+                    "plugin": [250, -1],
+                    "gutter": [239, -1],
+                    "help_text": [248, -1],
+                    "shadow": [235, "COLOR_BLACK"],
+                },
+            }
+            self._ensure_theme_structure()
+            self.is_new = True
+            self.is_dirty = True
+            self._populate_all_inputs()
+            self._sync_preview()
+            with contextlib.suppress(Exception):
+                self.notify("Created new theme 'untitled'", title="New Theme", timeout=2.0)
+
+        if self.is_dirty:
+            def _on_confirm_save(choice: str | None) -> None:
+                if choice == "yes":
+                    if not self.theme_name or self.theme_name == "untitled":
+                        def _on_save_as(res: tuple[str, bool] | None) -> None:
+                            if res:
+                                new_name, set_active = res
+                                self._save_theme_to_disk(new_name, set_active=set_active)
+                                _do_create()
+
+                        self.app.push_screen(
+                            SaveThemeModal(self.theme_name, theme_styles=self.configured_theme_styles),
+                            _on_save_as,
+                        )
+                    else:
+                        self._save_theme_to_disk()
+                        _do_create()
+                elif choice == "no":
+                    _do_create()
+
+            self.app.push_screen(
+                bashmenu_ui.ConfirmModalScreen(
+                    "Unsaved Changes",
+                    "Current theme has unsaved modifications. Save before creating a new theme?",
+                    theme=self.configured_theme_styles,
+                    allow_cancel=True,
+                ),
+                _on_confirm_save,
+            )
+        else:
+            _do_create()
 
     def action_open_theme(self) -> None:
         """Opens theme picker to select and load an existing theme."""
