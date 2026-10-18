@@ -26,7 +26,17 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Input, Label, OptionList, Select, Static
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Input,
+    Label,
+    OptionList,
+    Select,
+    Static,
+    Tab,
+    Tabs,
+)
 from textual.widgets.option_list import Option
 
 import bashmenu
@@ -2477,10 +2487,11 @@ class ThemePreviewWidget(Static):
             self.primary = primary
             self.secondary = secondary
 
-    def __init__(self, theme_dict: dict, theme_name: str = "custom", **kwargs):
+    def __init__(self, theme_dict: dict, theme_name: str = "custom", preview_mode: str = "menu", **kwargs):
         super().__init__(**kwargs)
         self.theme_dict = theme_dict
         self.theme_name = theme_name
+        self.preview_mode = preview_mode
         self._hit_map: dict[tuple[int, int], tuple[str, str]] = {}
         self._last_w = 56
         self._last_h = 12
@@ -2521,12 +2532,398 @@ class ThemePreviewWidget(Static):
 
             self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1]))
 
+    def set_preview_mode(self, mode: str) -> None:
+        """Switch preview pane mode between 'menu', 'editor', and 'modals'."""
+        self.preview_mode = mode
+        self._flash_range = None
+        self.refresh()
+
     def update_theme(self, theme_dict: dict, theme_name: str = "custom") -> None:
         """Update active theme definition and trigger instant re-render."""
         self.theme_dict = theme_dict
         self.theme_name = theme_name
         self._flash_range = None
         self.refresh()
+
+    def _render_menu_editor(
+        self,
+        w: int,
+        num_rows: int,
+        styles: dict,
+        borders: dict,
+        shadow_ch: str,
+        shadow_style: Style,
+        set_hit_range: Any,
+        b_tl: str,
+        b_tr: str,
+        b_bl: str,
+        b_br: str,
+        b_h_top: str,
+        b_h_bot: str,
+        b_v_left: str,
+        b_v_right: str,
+        b_cap_l: str,
+        b_cap_r: str,
+        b_style: Style,
+        t_style: Style,
+        text_style: Style,
+        sel_style: Style,
+        gutter_style: Style,
+        help_style: Style,
+    ) -> list[Text]:
+        lines: list[Text] = []
+
+        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
+        btn_primary_style = styles.get("button_primary", Style(color="green", bold=True))
+        btn_error_style = styles.get("button_error", Style(color="red", bold=True))
+        scrollbar_style = styles.get("scrollbar", Style(color="blue", bold=True))
+
+        # Top border with title and close button [X]
+        title_str = f"{b_cap_l} Menu Editor {b_cap_r}"
+        close_str = f"{b_cap_l}X{b_cap_r}"
+
+        avail_top = max(4, w - len(title_str) - len(close_str) - 4)
+        top_line = Text()
+        top_line.append(b_tl + b_h_top * 2, style=b_style)
+        top_line.append(title_str, style=t_style)
+        top_line.append(b_h_top * avail_top, style=b_style)
+        top_line.append(close_str, style=close_btn_style)
+        top_line.append(b_h_top * 2 + b_tr, style=b_style)
+        top_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(top_line)
+
+        set_hit_range(0, 0, 3, "color_border", "prop_border_top_left")
+        title_start = 3
+        title_end = title_start + len(title_str)
+        set_hit_range(0, title_start, title_end, "color_title", "title")
+        close_start = title_end + avail_top
+        close_end = close_start + len(close_str)
+        set_hit_range(0, title_end, close_start, "color_border", "prop_border_horizontal")
+        set_hit_range(0, close_start, close_end, "color_window_close_button", "close_button")
+        set_hit_range(0, close_end, w, "color_border", "prop_border_top_right")
+        set_hit_range(0, w, w + 2, "color_shadow", "prop_shadow_char")
+
+        # Inner body
+        split_x = max(18, min(24, w // 2 - 2))
+        right_w = max(10, w - split_x - 3)
+
+        body_rows = max(5, num_rows - 3)
+        editor_items = [
+            ("▼ Main Menu", "Title: [ My Menu    ]"),
+            ("  ▶ Applications", "Icon:  [ 📁         ]"),
+            ("    • Terminal", "Type:  [ submenu    ]"),
+            ("  • System Status", "Action:[ htop       ]"),
+            ("  • Preferences", "[ Save ]   [ Delete ]"),
+        ]
+
+        while len(editor_items) < body_rows:
+            editor_items.append(("", ""))
+
+        for row_idx, (tree_item, prop_item) in enumerate(editor_items[:body_rows]):
+            y_curr = 1 + row_idx
+            row_line = Text()
+            row_line.append(b_v_left, style=b_style)
+
+            is_selected = "System Status" in tree_item
+            t_text = Text(tree_item)
+            if t_text.cell_len > split_x - 1:
+                t_text.truncate(split_x - 1)
+            t_pad = max(0, split_x - 1 - t_text.cell_len)
+            t_text.append(" " * t_pad)
+
+            row_line.append(" ", style=text_style)
+            row_line.append_text(t_text)
+            if is_selected:
+                row_line.stylize(sel_style, 1, 1 + split_x)
+
+            row_line.append(b_v_left, style=b_style)
+
+            sb_char = "▲" if row_idx == 0 else ("▼" if row_idx == body_rows - 1 else "█")
+            p_text = Text()
+
+            if "[ Save ]" in prop_item:
+                p_text.append(" [ Save ] ", style=btn_primary_style)
+                p_text.append("  [ Delete ]", style=btn_error_style)
+            else:
+                p_text.append(f" {prop_item}", style=text_style)
+
+            if p_text.cell_len > right_w - 2:
+                p_text.truncate(right_w - 2)
+            p_pad = max(0, right_w - 2 - p_text.cell_len)
+            p_text.append(" " * p_pad)
+
+            row_line.append_text(p_text)
+            row_line.append(sb_char, style=scrollbar_style)
+            row_line.append(b_v_right, style=b_style)
+            row_line.append(shadow_ch * 2, style=shadow_style)
+            lines.append(row_line)
+
+            set_hit_range(y_curr, 0, 1, "color_border", "prop_border_vertical")
+            if is_selected:
+                set_hit_range(y_curr, 1, 1 + split_x, "color_selection", "color_highlight")
+            else:
+                set_hit_range(y_curr, 1, 1 + split_x, "color_text", "tree_item")
+            set_hit_range(y_curr, 1 + split_x, 2 + split_x, "color_border", "prop_border_vertical")
+
+            if "[ Save ]" in prop_item:
+                set_hit_range(y_curr, 2 + split_x, 2 + split_x + 10, "color_button_primary", "button_save")
+                set_hit_range(y_curr, 2 + split_x + 10, w - 2, "color_button_error", "button_delete")
+            else:
+                set_hit_range(y_curr, 2 + split_x, w - 2, "color_text", "property")
+
+            set_hit_range(y_curr, w - 2, w - 1, "color_scrollbar", "scrollbar")
+            set_hit_range(y_curr, w - 1, w, "color_border", "prop_border_vertical")
+            set_hit_range(y_curr, w, w + 2, "color_shadow", "prop_shadow_char")
+
+        # Bottom gutter / shortcut line
+        y_g = 1 + body_rows
+        g_line = Text()
+        g_line.append("├", style=b_style)
+        g_text = "[F1] Help | [F3] Add | [Del] Delete | [ESC] Back"
+        g_part = Text(f" {g_text} ", style=help_style)
+        if g_part.cell_len > w - 2:
+            g_part.truncate(w - 2)
+        g_pad = max(0, w - 2 - g_part.cell_len)
+        g_line.append_text(g_part)
+        g_line.append(b_h_bot * g_pad + "┤", style=b_style)
+        g_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(g_line)
+
+        set_hit_range(y_g, 0, 1, "color_border", "gutter_border")
+        set_hit_range(y_g, 1, w - 1, "color_gutter", "color_help_text")
+        set_hit_range(y_g, w - 1, w, "color_border", "gutter_border")
+        set_hit_range(y_g, w, w + 2, "color_shadow", "prop_shadow_char")
+
+        # Bottom border
+        y_bot = y_g + 1
+        b_line = Text()
+        b_line.append(b_bl + b_h_bot * (w - 2) + b_br, style=b_style)
+        b_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(b_line)
+
+        set_hit_range(y_bot, 0, w, "color_border", "prop_border_bottom")
+        set_hit_range(y_bot, w, w + 2, "color_shadow", "prop_shadow_char")
+
+        # Drop shadow below
+        y_sh = y_bot + 1
+        s_line = Text("  " + shadow_ch * w, style=shadow_style)
+        lines.append(s_line)
+        set_hit_range(y_sh, 2, 2 + w, "color_shadow", "prop_shadow_char")
+
+        return lines
+
+    def _render_modals(
+        self,
+        w: int,
+        num_rows: int,
+        styles: dict,
+        borders: dict,
+        shadow_ch: str,
+        shadow_style: Style,
+        set_hit_range: Any,
+        b_tl: str,
+        b_tr: str,
+        b_bl: str,
+        b_br: str,
+        b_h_top: str,
+        b_h_bot: str,
+        b_v_left: str,
+        b_v_right: str,
+        b_cap_l: str,
+        b_cap_r: str,
+        b_style: Style,
+        t_style: Style,
+        text_style: Style,
+    ) -> list[Text]:
+        lines: list[Text] = []
+
+        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
+        btn_success_style = styles.get("button_success", styles.get("button_primary", Style(color="green", bold=True)))
+        btn_cancel_style = styles.get("button_cancel", Style(color="yellow", bold=True))
+        scrollbar_style = styles.get("scrollbar", Style(color="blue", bold=True))
+
+        modal_w = max(34, min(w - 4, 46))
+        left_margin = max(1, (w - modal_w) // 2)
+
+        blank_top = Text(" " * w)
+        lines.append(blank_top)
+        set_hit_range(0, 0, w, "color_background")
+
+        title_str = f"{b_cap_l} Notice Modal {b_cap_r}"
+        close_str = f"{b_cap_l}X{b_cap_r}"
+        avail_top = max(2, modal_w - len(title_str) - len(close_str) - 4)
+
+        top_line = Text(" " * left_margin)
+        top_line.append(b_tl + b_h_top * 2, style=b_style)
+        top_line.append(title_str, style=t_style)
+        top_line.append(b_h_top * avail_top, style=b_style)
+        top_line.append(close_str, style=close_btn_style)
+        top_line.append(b_h_top * 2 + b_tr, style=b_style)
+        top_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(top_line)
+
+        set_hit_range(1, 0, left_margin, "color_background")
+        set_hit_range(1, left_margin, left_margin + 3, "color_border", "prop_border_top_left")
+        t_start = left_margin + 3
+        t_end = t_start + len(title_str)
+        set_hit_range(1, t_start, t_end, "color_title", "title")
+        c_start = t_end + avail_top
+        c_end = c_start + len(close_str)
+        set_hit_range(1, t_end, c_start, "color_border", "prop_border_horizontal")
+        set_hit_range(1, c_start, c_end, "color_window_close_button", "close_button")
+        set_hit_range(1, c_end, left_margin + modal_w, "color_border", "prop_border_top_right")
+        set_hit_range(1, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+
+        msg_rows = [
+            "Are you sure you want to apply these",
+            "changes? All pending configurations will",
+            "be persisted to disk immediately.",
+            "Press [Yes] to proceed, [Cancel] to abort.",
+        ]
+        text_inner_w = modal_w - 4
+
+        for idx, msg in enumerate(msg_rows):
+            y_curr = 2 + idx
+            m_line = Text(" " * left_margin)
+            m_line.append(b_v_left + " ", style=b_style)
+
+            msg_part = Text(msg, style=text_style)
+            if msg_part.cell_len > text_inner_w - 1:
+                msg_part.truncate(text_inner_w - 1)
+            pad = max(0, text_inner_w - 1 - msg_part.cell_len)
+            msg_part.append(" " * pad)
+            m_line.append_text(msg_part)
+
+            sb_char = "▲" if idx == 0 else ("▼" if idx == len(msg_rows) - 1 else "█")
+            m_line.append(sb_char, style=scrollbar_style)
+            m_line.append(" " + b_v_right, style=b_style)
+            m_line.append(shadow_ch * 2, style=shadow_style)
+            lines.append(m_line)
+
+            set_hit_range(y_curr, 0, left_margin, "color_background")
+            set_hit_range(y_curr, left_margin, left_margin + 1, "color_border", "prop_border_vertical")
+            set_hit_range(y_curr, left_margin + 1, left_margin + modal_w - 3, "color_text", "modal_text")
+            set_hit_range(y_curr, left_margin + modal_w - 3, left_margin + modal_w - 2, "color_scrollbar", "scrollbar")
+            set_hit_range(y_curr, left_margin + modal_w - 2, left_margin + modal_w, "color_border", "prop_border_vertical")
+            set_hit_range(y_curr, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+
+        y_div = 2 + len(msg_rows)
+        div_line = Text(" " * left_margin)
+        div_line.append("├" + b_h_bot * (modal_w - 2) + "┤", style=b_style)
+        div_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(div_line)
+
+        set_hit_range(y_div, 0, left_margin, "color_background")
+        set_hit_range(y_div, left_margin, left_margin + modal_w, "color_border", "divider")
+        set_hit_range(y_div, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+
+        y_btn = y_div + 1
+        btn_line = Text(" " * left_margin)
+        btn_line.append(b_v_left, style=b_style)
+
+        buttons_text = Text()
+        buttons_text.append(" [ Confirm ] ", style=btn_success_style)
+        buttons_text.append("   [ Cancel ] ", style=btn_cancel_style)
+
+        pad_left = max(1, (modal_w - 2 - buttons_text.cell_len) // 2)
+        pad_right = max(1, modal_w - 2 - pad_left - buttons_text.cell_len)
+
+        btn_line.append(" " * pad_left)
+        btn_line.append_text(buttons_text)
+        btn_line.append(" " * pad_right)
+        btn_line.append(b_v_right, style=b_style)
+        btn_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(btn_line)
+
+        b1_start = left_margin + 1 + pad_left
+        b1_end = b1_start + 13
+        b2_start = b1_end + 3
+        b2_end = b2_start + 12
+
+        set_hit_range(y_btn, 0, left_margin, "color_background")
+        set_hit_range(y_btn, left_margin, left_margin + 1, "color_border", "prop_border_vertical")
+        set_hit_range(y_btn, left_margin + 1, b1_start, "color_background")
+        set_hit_range(y_btn, b1_start, b1_end, "color_button_success", "color_button_primary")
+        set_hit_range(y_btn, b1_end, b2_start, "color_background")
+        set_hit_range(y_btn, b2_start, b2_end, "color_button_cancel", "button_cancel")
+        set_hit_range(y_btn, b2_end, left_margin + modal_w - 1, "color_background")
+        set_hit_range(y_btn, left_margin + modal_w - 1, left_margin + modal_w, "color_border", "prop_border_vertical")
+        set_hit_range(y_btn, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+
+        y_bot = y_btn + 1
+        bot_line = Text(" " * left_margin)
+        bot_line.append(b_bl + b_h_bot * (modal_w - 2) + b_br, style=b_style)
+        bot_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(bot_line)
+
+        set_hit_range(y_bot, 0, left_margin, "color_background")
+        set_hit_range(y_bot, left_margin, left_margin + modal_w, "color_border", "prop_border_bottom")
+        set_hit_range(y_bot, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+
+        y_sh = y_bot + 1
+        sh_line = Text(" " * (left_margin + 2) + shadow_ch * modal_w, style=shadow_style)
+        lines.append(sh_line)
+        set_hit_range(y_sh, left_margin + 2, left_margin + 2 + modal_w, "color_shadow", "prop_shadow_char")
+
+        return lines
+
+    def _finalize_preview_lines(self, lines: list[Text], styles: dict, w: int) -> Text:
+        """Apply active flash inversion, composite lines to Text, and apply wallpaper if configured."""
+        if getattr(self, "_flash_range", None):
+            fy, fx1, fx2 = self._flash_range
+            if 0 <= fy < len(lines):
+                lines[fy].stylize(Style(reverse=True), fx1, fx2)
+
+        out = Text()
+        for idx, line in enumerate(lines):
+            out.append_text(line)
+            if idx < len(lines) - 1:
+                out.append("\n")
+
+        bg_spec = styles.get("theme_background")
+        if isinstance(bg_spec, dict) and bg_spec.get("image"):
+            img_path = str(bg_spec.get("image", "")).strip()
+            if img_path:
+                with contextlib.suppress(Exception):
+                    opacity = float(bg_spec.get("opacity", 0.85))
+                    scaling = str(bg_spec.get("scaling", "cover"))
+                    clustering = int(bg_spec.get("clustering", 0) or 0)
+                    quantization = int(bg_spec.get("quantization", 1) or 1)
+                    cached_comp = getattr(self, "_wallpaper_compositor", None)
+                    if (
+                        cached_comp is not None
+                        and getattr(cached_comp, "image_path", None) == img_path
+                        and getattr(cached_comp, "opacity", None) == opacity
+                        and getattr(cached_comp, "scaling", None) == scaling
+                        and getattr(cached_comp, "clustering", None) == clustering
+                        and getattr(cached_comp, "quantization", None) == quantization
+                    ):
+                        compositor = cached_comp
+                    else:
+                        compositor = bashmenu_ui.WallpaperCompositor(
+                            img_path,
+                            opacity=opacity,
+                            scaling=scaling,
+                            base_dir=bashmenu.BASHMENU_DIR,
+                            clustering=clustering,
+                            quantization=quantization,
+                        )
+                        self._wallpaper_compositor = compositor
+
+                    if compositor and compositor._raw_image:
+                        theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
+                        theme_bg_style = styles.get("background")
+                        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
+                        grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
+                        if grid:
+                            out = bashmenu_ui.composite_menu_text(
+                                out,
+                                grid,
+                                w + 3,
+                                len(lines),
+                                theme_default_bg=theme_default_bg,
+                            )
+        return out
 
     def render(self) -> Text:
         """Render complete simulated BashMenu frame with active borders and styles."""
@@ -2648,7 +3045,57 @@ class ThemePreviewWidget(Static):
             div_char = _resolve_border_char(divider_def, "─")
             div_len = "{window_width}"
 
-        out = Text()
+        if self.preview_mode == "editor":
+            lines = self._render_menu_editor(
+                w,
+                num_rows,
+                styles,
+                borders,
+                shadow_ch,
+                shadow_style,
+                set_hit_range,
+                b_tl,
+                b_tr,
+                b_bl,
+                b_br,
+                b_h_top,
+                b_h_bot,
+                b_v_left,
+                b_v_right,
+                b_cap_l,
+                b_cap_r,
+                b_style,
+                t_style,
+                text_style,
+                sel_style,
+                gutter_style,
+                help_style,
+            )
+            return self._finalize_preview_lines(lines, styles, w)
+        if self.preview_mode == "modals":
+            lines = self._render_modals(
+                w,
+                num_rows,
+                styles,
+                borders,
+                shadow_ch,
+                shadow_style,
+                set_hit_range,
+                b_tl,
+                b_tr,
+                b_bl,
+                b_br,
+                b_h_top,
+                b_h_bot,
+                b_v_left,
+                b_v_right,
+                b_cap_l,
+                b_cap_r,
+                b_style,
+                t_style,
+                text_style,
+            )
+            return self._finalize_preview_lines(lines, styles, w)
 
         # Row 0: Top Window Border with Title
         title_text = f" {b_cap_l} Bash Menu {b_cap_r} "
@@ -2659,7 +3106,7 @@ class ThemePreviewWidget(Static):
         top_line.append(b_tl + b_h_top * pad_l, style=b_style)
         top_line.append(title_text, style=t_style)
         top_line.append(b_h_top * pad_r + b_tr, style=b_style)
-        lines: list[Text] = [top_line]
+        lines = [top_line]
 
         set_hit_range(0, 0, 1, "prop_border_top_left", "color_border")
         set_hit_range(0, 1, 1 + pad_l, "color_border", "prop_border_horizontal")
@@ -2936,63 +3383,7 @@ class ThemePreviewWidget(Static):
         y_sh = y_gt + 3
         set_hit_range(y_sh, 2, 2 + w, "color_shadow", "prop_shadow_char")
 
-        # Apply brief inverted colors to clicked item (haptic feedback)
-        if getattr(self, "_flash_range", None):
-            fy, fx1, fx2 = self._flash_range
-            if 0 <= fy < len(lines):
-                lines[fy].stylize(Style(reverse=True), fx1, fx2)
-
-        out = Text()
-        for idx, line in enumerate(lines):
-            out.append_text(line)
-            if idx < len(lines) - 1:
-                out.append("\n")
-
-        bg_spec = styles.get("theme_background")
-        if isinstance(bg_spec, dict) and bg_spec.get("image"):
-            img_path = str(bg_spec.get("image", "")).strip()
-            if img_path:
-                with contextlib.suppress(Exception):
-                    opacity = float(bg_spec.get("opacity", 0.85))
-                    scaling = str(bg_spec.get("scaling", "cover"))
-                    clustering = int(bg_spec.get("clustering", 0) or 0)
-                    quantization = int(bg_spec.get("quantization", 1) or 1)
-                    cached_comp = getattr(self, "_wallpaper_compositor", None)
-                    if (
-                        cached_comp is not None
-                        and getattr(cached_comp, "image_path", None) == img_path
-                        and getattr(cached_comp, "opacity", None) == opacity
-                        and getattr(cached_comp, "scaling", None) == scaling
-                        and getattr(cached_comp, "clustering", None) == clustering
-                        and getattr(cached_comp, "quantization", None) == quantization
-                    ):
-                        compositor = cached_comp
-                    else:
-                        compositor = bashmenu_ui.WallpaperCompositor(
-                            img_path,
-                            opacity=opacity,
-                            scaling=scaling,
-                            base_dir=bashmenu.BASHMENU_DIR,
-                            clustering=clustering,
-                            quantization=quantization,
-                        )
-                        self._wallpaper_compositor = compositor
-
-                    if compositor and compositor._raw_image:
-                        theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
-                        theme_bg_style = styles.get("background")
-                        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
-                        grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
-                        if grid:
-                            out = bashmenu_ui.composite_menu_text(
-                                out,
-                                grid,
-                                w + 3,
-                                len(lines),
-                                theme_default_bg=theme_default_bg,
-                            )
-
-        return out
+        return self._finalize_preview_lines(lines, styles, w)
 
 
 # ==============================================================================
@@ -3042,8 +3433,19 @@ class ThemeEditScreen(Screen):
         width: 1fr;
         height: 100%;
         border: solid #444;
-        padding: 0 0 0 1;
+        padding: 0;
         overflow: hidden;
+    }
+    #preview_tabs {
+        dock: top;
+        height: 3;
+        margin-bottom: 0;
+        background: #1e1e1e;
+    }
+    #live_preview {
+        height: 1fr;
+        width: 100%;
+        padding: 0 0 0 1;
         align: left middle;
     }
     #inspector_panel {
@@ -3479,6 +3881,12 @@ class ThemeEditScreen(Screen):
 
         with Horizontal(id="workspace"):
             with Vertical(id="preview_panel"):
+                yield Tabs(
+                    Tab("Mock Menu", id="tab_mock_menu"),
+                    Tab("Menu Editor", id="tab_menu_editor"),
+                    Tab("Modals & Popups", id="tab_modals"),
+                    id="preview_tabs",
+                )
                 yield ThemePreviewWidget(
                     self.current_theme, theme_name=self.theme_name, id="live_preview"
                 )
@@ -3690,6 +4098,19 @@ class ThemeEditScreen(Screen):
         """Handle click in preview panel margin area and select background color."""
         if event.widget and getattr(event.widget, "id", None) == "preview_panel":
             self.focus_inspector_target("color_background")
+
+    @on(Tabs.TabActivated, "#preview_tabs")
+    def on_preview_tab_changed(self, event: Tabs.TabActivated) -> None:
+        """Handle preview tab toggle between Mock Menu, Menu Editor, and Modals."""
+        tab_id = getattr(event.tab, "id", "")
+        with contextlib.suppress(Exception):
+            preview = self.query_one("#live_preview", ThemePreviewWidget)
+            if tab_id == "tab_menu_editor":
+                preview.set_preview_mode("editor")
+            elif tab_id == "tab_modals":
+                preview.set_preview_mode("modals")
+            else:
+                preview.set_preview_mode("menu")
 
     def toggle_inspector_section(self, header: Label | str, expand: bool | None = None) -> bool:
         """Toggle or set the collapsed state of an inspector section.
@@ -4016,22 +4437,100 @@ class ThemeEditScreen(Screen):
         elif w_id == "lbl_exit":
             self.action_exit_editor()
 
+    def _is_inside_inspector(self, widget: Widget | None) -> bool:
+        curr = widget
+        while curr is not None:
+            if getattr(curr, "id", None) == "inspector_panel":
+                return True
+            curr = getattr(curr, "parent", None)
+        return False
+
+    def get_inspector_vertical_items(self) -> list[Widget]:
+        """Return an ordered list of visible, vertically navigable items in the inspector panel."""
+        items: list[Widget] = []
+        try:
+            panel = self.query_one("#inspector_panel")
+        except Exception:  # noqa: BLE001
+            return items
+
+        for child in panel.children:
+            if isinstance(child, Label) and "section_header" in getattr(child, "classes", []):
+                items.append(child)
+            elif isinstance(child, Vertical) and "section_body" in getattr(child, "classes", []):
+                if child.has_class("collapsed"):
+                    continue
+                for row in child.children:
+                    if isinstance(row, Horizontal) and "prop_row" in getattr(row, "classes", []):
+                        inps = [w for w in row.children if isinstance(w, Input)]
+                        if inps:
+                            items.append(inps[0])
+                        else:
+                            focusable = [w for w in row.children if getattr(w, "can_focus", False)]
+                            if focusable:
+                                items.append(focusable[0])
+        return items
+
+    def navigate_inspector_vertical(self, forward: bool) -> bool:
+        """Navigate focus vertically between inspector items (section headers and row inputs)."""
+        items = self.get_inspector_vertical_items()
+        if not items:
+            return False
+
+        focused = self.focused
+        curr_idx = -1
+        if focused in items:
+            curr_idx = items.index(focused)
+        else:
+            curr = focused
+            while curr is not None:
+                if isinstance(curr, Horizontal) and "prop_row" in getattr(curr, "classes", []):
+                    for inp in curr.children:
+                        if inp in items:
+                            curr_idx = items.index(inp)
+                            break
+                    break
+                curr = getattr(curr, "parent", None)
+
+        if curr_idx == -1:
+            target_idx = 0 if forward else len(items) - 1
+        else:
+            target_idx = curr_idx + 1 if forward else curr_idx - 1
+
+        target_idx = max(0, min(len(items) - 1, target_idx))
+        target = items[target_idx]
+        target.scroll_visible()
+        target.focus()
+        return True
+
     def on_key(self, event: events.Key) -> None:
-        """Handle keyboard interactions for collapsible section headers."""
+        """Handle keyboard interactions for inspector panel navigation and collapsible headers."""
         focused = self.focused
         if focused and isinstance(focused, Label) and "section_header" in getattr(focused, "classes", []):
             if event.key in ("enter", "space"):
                 event.prevent_default()
                 event.stop()
                 self.toggle_inspector_section(focused)
+                return
             elif event.key == "left":
                 event.prevent_default()
                 event.stop()
                 self.toggle_inspector_section(focused, expand=False)
+                return
             elif event.key == "right":
                 event.prevent_default()
                 event.stop()
                 self.toggle_inspector_section(focused, expand=True)
+                return
+
+        if (
+            focused
+            and self._is_inside_inspector(focused)
+            and event.key in ("up", "down")
+            and self.navigate_inspector_vertical(event.key == "down")
+        ):
+            event.prevent_default()
+            event.stop()
+            return
 
     def action_show_help(self) -> None:
         """Display the HA Bash Menu manual modal (F1 / ? shortcut)."""

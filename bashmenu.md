@@ -677,6 +677,23 @@ Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]
 * **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using Textual's full-screen TextArea editor modal.
 * **Delete Note (`[D]`):** In a notebook submenu, the help gutter displays `[D]: Delete`. Pressing `d` or `D` on a selected note prompts confirmation before removing it. Outside of a notebook, `[D]` is inactive and omitted from the gutter.
 
+### 5.2 Toast Notifications (`type: toast`)
+Menu items can trigger non-blocking, self-dismissing toast notifications rendered in the bottom corner of the active screen:
+
+```yaml
+- Quick Status Toast:
+    type: toast
+    message: "Settings saved successfully!"
+    seconds: 2.5
+    title: "Notice"
+```
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `message` / `text` | String | The notification message to display. Supports macro and placeholder interpolation. |
+| `seconds` / `timeout` / `duration` | Float | Number of seconds before the toast self-dismisses (default: `2.0`). |
+| `title` / `label` | String | Optional bold title displayed atop the toast notification. |
+
 ---
 
 ## 6. Dynamic Directives & Variables
@@ -775,6 +792,7 @@ These variables are dynamically resolved using active configuration and environm
 | `{ascii:decimal}` | Prints characters by their decimal code (using CP437 for extended ASCII, e.g. `{ascii:168}` resolves to `¿`). |
 | `{app.<key.path>}` / `{<key.path>}` | Resolves any configuration path from `bashmenu.yml` using the explicit `{app.<key>}` namespace (e.g., `{app.theme}`, `{app.settings.tabstop}`, `{app.user.postal_code}`) or shorthand format (e.g., `{settings.cache_dir}`, `{user.editor}`). |
 | `{command:shell_cmd}` | Dynamic shell command execution placeholder. Runs `shell_cmd` via system shell, sanitizes and strips trailing whitespace/newlines, and replaces the tag with the command output (supports nested braces, 30.0s cache, and 3.0s execution timeout). |
+| `{toast:SECONDS:"Message"}` / `{toast:"Message"}` | Configurable non-blocking toast notification directive. Displays a brief floating toast notification on the bottom-right corner for specified seconds (defaults to 1-2 seconds if omitted) and resolves to an empty string. Supports double quotes, single quotes, or unquoted strings (e.g. `{toast: 2: "Saved"}` or `{toast: "Done"}`). |
 
 ### 6.3 Nerd Fonts & Emoji Adaptive Resolution
 The application resolves icons dynamically according to terminal features and

@@ -3870,6 +3870,61 @@ G
 
         asyncio.run(run_checks())
 
+    def test_toast_directive_interpolation(self):
+        """Verify {toast:...} directive triggers toast and cleans placeholder text."""
+        config = bashmenu.load_config()[0]
+        with patch("bashmenu.trigger_toast") as mock_toast:
+            # 1. With seconds and double quotes
+            text1 = "Pre {toast: 2.5: \"Operation Succeeded\"} Post"
+            res1 = bashmenu.interpolate_placeholders(text1, config, trigger_toasts=True)
+            self.assertEqual(res1, "Pre  Post")
+            mock_toast.assert_called_with("Operation Succeeded", timeout=2.5)
+
+            # 2. With single quotes and default seconds
+            mock_toast.reset_mock()
+            text2 = "{toast: 'Quick Note'}"
+            res2 = bashmenu.interpolate_placeholders(text2, config, trigger_toasts=True)
+            self.assertEqual(res2, "")
+            mock_toast.assert_called_with("Quick Note", timeout=2.0)
+
+            # 3. Suppressed toasts during render
+            mock_toast.reset_mock()
+            text3 = "Label {toast: 3: 'Silent'}"
+            res3 = bashmenu.interpolate_placeholders(text3, config, trigger_toasts=False)
+            self.assertEqual(res3, "Label ")
+            mock_toast.assert_not_called()
+
+    def test_toast_menu_item_action(self):
+        """Verify process_item_action handles type: toast."""
+        config = bashmenu.load_config()[0]
+        mock_screen = MagicMock()
+        mock_screen.app = MagicMock()
+
+        with patch("bashmenu.trigger_toast") as mock_toast:
+            # Direct message and seconds
+            item = {
+                "type": "toast",
+                "message": "Direct message test",
+                "seconds": 3.5,
+                "title": "Alert",
+            }
+            bashmenu.process_item_action(mock_screen, item, config)
+            mock_toast.assert_called_with(
+                "Direct message test",
+                timeout=3.5,
+                title="Alert",
+                app_or_screen=mock_screen.app,
+            )
+
+            # Embedded directive inside message
+            mock_toast.reset_mock()
+            item_embedded = {
+                "type": "toast",
+                "message": "{toast: 1.5: 'Embedded Msg'}",
+            }
+            bashmenu.process_item_action(mock_screen, item_embedded, config)
+            mock_toast.assert_called_with("Embedded Msg", timeout=1.5)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -732,14 +732,51 @@ _CMD_CACHE_TTL = 30.0
 COMMAND_PATTERN = re.compile(r"\{command:((?:[^{}]|\{[^{}]*\})+)\}")
 ASCII_PATTERN = re.compile(r"\{ascii:\s*(\d+)[a-zA-Z_\-]*\s*\}", re.IGNORECASE)
 DOT_VAR_PATTERN = re.compile(r"\{([a-zA-Z0-9_\-]+(?:\.[a-zA-Z0-9_\-]+)+)\}")
+TOAST_PATTERN = re.compile(
+    r"\{toast:\s*(?:(\d+(?:\.\d+)?)\s*:\s*)?(?:\"([^\"]*)\"|'([^']*)'|([^}]+))\s*\}",
+    re.IGNORECASE,
+)
 
 
-def interpolate_placeholders(text, config, depth=0, extra_vars=None):
+def trigger_toast(
+    message: str,
+    timeout: float = 2.0,
+    title: str | None = None,
+    app_or_screen=None,
+) -> None:
+    """Display a non-blocking toast message on the active Textual screen or app."""
+    target = app_or_screen
+    if target is None:
+        with contextlib.suppress(Exception):
+            from textual._context import active_app
+
+            target = active_app.get()
+    if target is not None:
+        with contextlib.suppress(Exception):
+            target.notify(message, title=title or None, timeout=float(timeout))
+
+
+def interpolate_placeholders(text, config, depth=0, extra_vars=None, trigger_toasts=True):
     """Interpolate placeholders like {user}, {battery}, {window_width}, {scripts_dir}."""
     if not text or not isinstance(text, str) or "{" not in text:
         return text if text is not None else ""
 
     now = datetime.datetime.now(datetime.timezone.utc)
+
+    def replace_toast(match):
+        sec_str = match.group(1)
+        timeout = float(sec_str) if sec_str else 2.0
+        msg = (
+            match.group(2)
+            if match.group(2) is not None
+            else (match.group(3) if match.group(3) is not None else match.group(4))
+        )
+        msg_clean = (msg or "").strip()
+        if trigger_toasts:
+            trigger_toast(msg_clean, timeout=timeout)
+        return ""
+
+    res_text = TOAST_PATTERN.sub(replace_toast, text)
 
     def replace_ascii(match):
         code_str = match.group(1)
@@ -749,7 +786,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
         except (ValueError, OverflowError):
             return match.group(0)
 
-    res_text = ASCII_PATTERN.sub(replace_ascii, text)
+    res_text = ASCII_PATTERN.sub(replace_ascii, res_text)
 
     # Command substitution: {command:cmd} with TTL caching to eliminate UI thread latency
     def replace_command(match):
@@ -918,7 +955,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None):
     res_text = DOT_VAR_PATTERN.sub(replace_dot_var, res_text)
 
     if "{" in res_text and depth < 3:
-        res_text = interpolate_placeholders(res_text, config, depth + 1, extra_vars=extra_vars)
+        res_text = interpolate_placeholders(res_text, config, depth + 1, extra_vars=extra_vars, trigger_toasts=trigger_toasts)
 
     return res_text
 
@@ -2216,7 +2253,7 @@ class MainMenuView(Widget):
             status_gutter_raw = get_config_value(self.config, "settings.status_gutter", "{user} | {battery} | {date_time_24}")
             raw_badges = split_gutter_badges(status_gutter_raw)
             init_extra_vars = {"window_width": right_gutter_w, "screen_width": screen_div_w}
-            all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars).strip() for b in raw_badges if b.strip()]
+            all_badges = [interpolate_placeholders(b, self.config, extra_vars=init_extra_vars, trigger_toasts=False).strip() for b in raw_badges if b.strip()]
             all_badges = [b for b in all_badges if b]
             status_lines = wrap_gutter_items(all_badges, right_gutter_w, max_lines=2, config=self.config, bottom_up=True)
             self._cached_gutters = (gutter_key, help_lines, status_lines)
@@ -2309,7 +2346,7 @@ class MainMenuView(Widget):
             div_cfg = get_effective_divider_config(self.config)
             length_val = div_cfg.get("length", "{window_width}")
             is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
-            indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config), self.config)
+            indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config, trigger_toasts=False), self.config)
             extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
 
             raw_active = self._render_raw_option_line(
@@ -2418,7 +2455,7 @@ class MainMenuView(Widget):
         extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
 
         # 1. Header border line: ┌──[ Title ]──┐
-        title_raw = interpolate_placeholders(curr_menu.get("title", "HA Bash Menu"), self.config, extra_vars=extra_vars)
+        title_raw = interpolate_placeholders(curr_menu.get("title", "HA Bash Menu"), self.config, extra_vars=extra_vars, trigger_toasts=False)
         title_body = f" {title_raw} "
         title_full = f"{title_l_cap}{title_body}{title_r_cap}"
         title_len = get_visible_len(title_full, self.config)
@@ -2540,7 +2577,7 @@ class MainMenuView(Widget):
                 sc_idx += 1
         self._shortcut_map = shortcut_map
 
-        indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config), self.config)
+        indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config, trigger_toasts=False), self.config)
         for idx, opt in enumerate(options):
             sc_char = shortcut_map.get(idx, "")
             line_unsel = self._render_raw_option_line(
@@ -2696,7 +2733,7 @@ class MainMenuView(Widget):
             icon_str, icon_w, left_label, right_bracket = cached_opt[1:]
         else:
             icon_raw = opt.get("icon") or opt.get("glyph") or ""
-            icon_resolved = resolve_glyph(interpolate_placeholders(icon_raw, self.config, extra_vars=extra_vars), self.config) if icon_raw else ""
+            icon_resolved = resolve_glyph(interpolate_placeholders(icon_raw, self.config, extra_vars=extra_vars, trigger_toasts=False), self.config) if icon_raw else ""
             if icon_resolved:
                 clean_icon = icon_resolved.replace("\ufe0f", "").replace("\ufe0e", "")
                 vis_w = get_display_width(clean_icon, self.config)
@@ -2707,7 +2744,7 @@ class MainMenuView(Widget):
                 icon_str = "    "
                 icon_w = 4
 
-            raw_label = interpolate_placeholders(opt.get("label") or opt.get("title") or "", self.config, extra_vars=extra_vars)
+            raw_label = interpolate_placeholders(opt.get("label") or opt.get("title") or "", self.config, extra_vars=extra_vars, trigger_toasts=False)
             if opt.get("set_theme") == self.config.get("theme"):
                 raw_label += " (Active)"
 
@@ -3153,6 +3190,19 @@ def process_item_action(screen, item, config):
         screen.menu_view.refresh()
         if hasattr(screen, "_update_plugin_buffer_geometry"):
             screen._update_plugin_buffer_geometry()
+
+    elif item_type == "toast":
+        raw_msg = item.get("message", item.get("text", item.get("prompt", item.get("action", ""))))
+        sec = item.get("seconds") or item.get("timeout") or item.get("duration") or 2.0
+        title = item.get("title", item.get("label", ""))
+        title_interp = interpolate_placeholders(title, config, trigger_toasts=False) if title else None
+        target = screen.app if hasattr(screen, "app") and screen.app else screen
+        if TOAST_PATTERN.search(str(raw_msg)):
+            interpolate_placeholders(str(raw_msg), config, trigger_toasts=True)
+        else:
+            msg = interpolate_placeholders(str(raw_msg), config, trigger_toasts=False)
+            if msg:
+                trigger_toast(msg, timeout=float(sec), title=title_interp, app_or_screen=target)
 
     elif item_type in ["message", "popup", "info"]:
         msg_title = interpolate_placeholders(item.get("title", item.get("label", "Notice")), config)

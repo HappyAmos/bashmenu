@@ -41,6 +41,13 @@ items:
               quiet: false
               alt_buffer: true
               file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
+          - Toast Test:
+              type: script
+              script: '{toast:2:"Hello, world."}'
+              interactive: true
+              quiet: false
+              alt_buffer: true
+              icon: '{nf:t:#f0669}'
       interactive: true
       quiet: false
       alt_buffer: true

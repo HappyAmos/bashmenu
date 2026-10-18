@@ -1801,6 +1801,74 @@ class TestThemeEditor(unittest.TestCase):
         has_halfblock = ("\u2580" in rendered.plain) or ("\u2584" in rendered.plain)
         self.assertTrue(has_halfblock, "Mock preview should contain composited halfblock characters")
 
+    def test_inspector_vertical_navigation(self):
+        """Verify Up and Down arrow keys navigate vertically between inspector items."""
+        app = themeedit.ThemeEditApp("dracula")
+
+        async def _run():
+            async with app.run_test(size=(120, 40)) as pilot:
+                screen = app.screen
+                # Expand colors section
+                screen.toggle_inspector_section("hdr_colors", expand=True)
+                await pilot.pause()
+
+                # Focus on color_highlight
+                hl_inp = screen.query_one("#color_highlight", Input)
+                hl_inp.focus()
+                await pilot.pause()
+                self.assertEqual(screen.focused, hl_inp)
+
+                # Press down: moves to next color token (selection)
+                await pilot.press("down")
+                await pilot.pause()
+                sel_inp = screen.query_one("#color_selection", Input)
+                self.assertEqual(screen.focused, sel_inp)
+
+                # Press up: moves back to color_highlight
+                await pilot.press("up")
+                await pilot.pause()
+                self.assertEqual(screen.focused, hl_inp)
+
+        asyncio.run(_run())
+
+    def test_preview_pane_tabs_and_modes(self):
+        """Verify preview panel tabs switch between Mock Menu, Menu Editor, and Modals preview modes."""
+        app = themeedit.ThemeEditApp("dracula")
+
+        async def _run():
+            async with app.run_test(size=(120, 40)) as pilot:
+                screen = app.screen
+                preview = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+                tabs = screen.query_one("#preview_tabs", themeedit.Tabs)
+
+                # Default mode is mock menu
+                self.assertEqual(preview.preview_mode, "menu")
+                rendered_menu = preview.render().plain
+                self.assertIn("Bash Menu", rendered_menu)
+
+                # Switch to Menu Editor tab
+                tabs.active = "tab_menu_editor"
+                await pilot.pause()
+                self.assertEqual(preview.preview_mode, "editor")
+                rendered_editor = preview.render().plain
+                self.assertIn("Menu Editor", rendered_editor)
+                self.assertIn("Save", rendered_editor)
+
+                # Switch to Modals & Popups tab
+                tabs.active = "tab_modals"
+                await pilot.pause()
+                self.assertEqual(preview.preview_mode, "modals")
+                rendered_modals = preview.render().plain
+                self.assertIn("Notice Modal", rendered_modals)
+                self.assertIn("Confirm", rendered_modals)
+
+                # Switch back to Mock Menu
+                tabs.active = "tab_mock_menu"
+                await pilot.pause()
+                self.assertEqual(preview.preview_mode, "menu")
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()
