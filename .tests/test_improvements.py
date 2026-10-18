@@ -25,6 +25,14 @@ class TestImprovements(unittest.TestCase):
         self.assertNotIn("{date_time_12_short}", result)
         self.assertTrue("AM" in result or "PM" in result)
 
+    def test_local_time_interpolation_not_utc(self):
+        """Verify {time_24_short} matches local system time rather than UTC."""
+        import datetime
+        config = bashmenu.load_config()[0]
+        result = bashmenu.interpolate_placeholders("{time_24_short}", config)
+        expected_hour = datetime.datetime.now(datetime.timezone.utc).astimezone().strftime("%H")
+        self.assertTrue(result.startswith(expected_hour))
+
     def test_battery_stat_interpolation(self):
         """Verify {battery_stat} and {battery_status} placeholder interpolation and caching."""
         config = bashmenu.load_config()[0]

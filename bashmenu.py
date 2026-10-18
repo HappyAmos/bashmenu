@@ -761,7 +761,7 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None, trigger_toa
     if not text or not isinstance(text, str) or "{" not in text:
         return text if text is not None else ""
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.timezone.utc).astimezone()
 
     def replace_toast(match):
         sec_str = match.group(1)
