@@ -621,7 +621,147 @@ Detailed section content here.
         self.assertTrue(len(rendered) > 0)
         self.assertIn("[D]: Delete", rendered[0].plain)
 
+    async def test_notebook_text_area_auto_format_checkboxes(self):
+        """Verify Enter automatically continues checkboxes and de-escalates empty checkboxes."""
+        from textual.app import App, ComposeResult
+
+        class AreaApp(App):
+            def compose(self) -> ComposeResult:
+                yield bashmenu_ui.NotebookTextArea("", id="editor")
+
+        app = AreaApp()
+        async with app.run_test() as pilot:
+            ed = app.query_one("#editor", bashmenu_ui.NotebookTextArea)
+            ed.load_text("- [ ] Task 1")
+            ed.move_cursor((0, len("- [ ] Task 1")))
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "- [ ] Task 1\n- [ ] ")
+
+            # Hitting Enter on empty checkbox de-escalates to empty line
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "- [ ] Task 1\n")
+
+            # Checkbox with checked mark [x] continues as unchecked [ ]
+            ed.load_text("- [x] Done Task")
+            ed.move_cursor((0, len("- [x] Done Task")))
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "- [x] Done Task\n- [ ] ")
+
+            # Indented checkbox
+            ed.load_text("  - [ ] Subtask")
+            ed.move_cursor((0, len("  - [ ] Subtask")))
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "  - [ ] Subtask\n  - [ ] ")
+            # De-escalate indented checkbox preserves leading indentation
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "  - [ ] Subtask\n  ")
+
+    async def test_notebook_text_area_ordered_and_unordered_lists(self):
+        """Verify Enter continues ordered/unordered lists and de-escalates empty items."""
+        from textual.app import App, ComposeResult
+
+        class AreaApp(App):
+            def compose(self) -> ComposeResult:
+                yield bashmenu_ui.NotebookTextArea("", id="editor")
+
+        app = AreaApp()
+        async with app.run_test() as pilot:
+            ed = app.query_one("#editor", bashmenu_ui.NotebookTextArea)
+            # Ordered numbered list
+            ed.load_text("1. First item")
+            ed.move_cursor((0, len("1. First item")))
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "1. First item\n2. ")
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "1. First item\n")
+
+            # Parenthesis ordered list
+            ed.load_text("1) Alpha")
+            ed.move_cursor((0, len("1) Alpha")))
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "1) Alpha\n2) ")
+
+            # Unordered bullet lists: -, *, +
+            for bullet in ("-", "*", "+"):
+                ed.load_text(f"{bullet} Bullet item")
+                ed.move_cursor((0, len(f"{bullet} Bullet item")))
+                await pilot.press("enter")
+                self.assertEqual(ed.text, f"{bullet} Bullet item\n{bullet} ")
+                await pilot.press("enter")
+                self.assertEqual(ed.text, f"{bullet} Bullet item\n")
+
+            # Blockquotes
+            ed.load_text("> Quote")
+            ed.move_cursor((0, len("> Quote")))
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "> Quote\n> ")
+            await pilot.press("enter")
+            self.assertEqual(ed.text, "> Quote\n")
+
+    async def test_notebook_text_area_ghost_text_and_tab_completion(self):
+        """Verify ghost text suggestions appear for partial checkboxes and Tab completes them."""
+        from textual.app import App, ComposeResult
+
+        class AreaApp(App):
+            def compose(self) -> ComposeResult:
+                yield bashmenu_ui.NotebookTextArea("", id="editor")
+
+        app = AreaApp()
+        async with app.run_test() as pilot:
+            ed = app.query_one("#editor", bashmenu_ui.NotebookTextArea)
+            # Type "- [" -> ghost suggestion should be " ] "
+            await pilot.press("-", " ", "[")
+            self.assertEqual(ed.text, "- [")
+            self.assertEqual(ed.suggestion, " ] ")
+            await pilot.press("tab")
+            self.assertEqual(ed.text, "- [ ] ")
+            self.assertEqual(ed.suggestion, "")
+
+    async def test_notebook_cross_interface_clipboard(self):
+        """Verify clipboard and cutbuffer interoperability between notes and bashedit."""
+        import bashedit
+
+        test_msg = "Hello Notebook Clipboard Sync 123"
+        # Test unified setting
+        bashmenu_ui.set_system_clipboard(test_msg)
+        # Should be retrievable from bashmenu_ui and bashedit
+        self.assertEqual(bashmenu_ui.get_system_clipboard(), test_msg)
+        self.assertEqual(bashedit.get_system_clipboard(), test_msg)
+
+        # Shared cutbuffer file fallback
+        cb_path = bashmenu_ui.get_shared_cutbuffer_path()
+        self.assertTrue(os.path.isfile(cb_path))
+        with open(cb_path, "r", encoding="utf-8") as f:  # noqa: ASYNC230
+            self.assertEqual(f.read(), test_msg)
+
+        # NoteViewerModalScreen copy action
+        viewer = bashmenu_ui.NoteViewerModalScreen("Test Note", "Markdown body content to copy")
+        viewer.action_copy_note()
+        self.assertEqual(bashmenu_ui.get_system_clipboard(), "Markdown body content to copy")
+        self.assertEqual(bashedit.get_system_clipboard(), "Markdown body content to copy")
+
+        # Copy from bashedit into NotebookTextArea
+        bashedit.set_system_clipboard("Copied from bashedit editor")
+        from textual.app import App, ComposeResult
+
+        class AreaApp(App):
+            def compose(self) -> ComposeResult:
+                yield bashmenu_ui.NotebookTextArea("", id="editor")
+
+        app = AreaApp()
+        async with app.run_test():
+            ed = app.query_one("#editor", bashmenu_ui.NotebookTextArea)
+            ed.action_paste()
+            self.assertEqual(ed.text, "Copied from bashedit editor")
+
+            # Cut line in NotebookTextArea and verify bashedit can paste it
+            ed.move_cursor((0, 0))
+            ed.action_cut()
+            self.assertEqual(ed.text, "")
+            self.assertEqual(bashedit.get_system_clipboard(), "Copied from bashedit editor")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

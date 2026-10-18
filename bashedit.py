@@ -1009,49 +1009,20 @@ class EditorWidget(Widget):
         self.refresh()
         return "Pasted"
 
+def get_shared_cutbuffer_path() -> str:
+    """Return path to shared cutbuffer fallback file (~/.cache/bashmenu/cutbuffer.txt)."""
+    return bashmenu_ui.get_shared_cutbuffer_path()
+
 
 def get_system_clipboard() -> str | None:
-    """Read plain text from system clipboard using platform tools (wl-paste, pbpaste, termux, xclip, xsel)."""
-    candidates = [
-        ["wl-paste", "--no-newline"],
-        ["wl-paste"],
-        ["pbpaste"],
-        ["termux-clipboard-get"],
-        ["xclip", "-selection", "clipboard", "-o"],
-        ["xsel", "--clipboard", "--output"],
-        ["powershell.exe", "-NoProfile", "-Command", "Get-Clipboard"],
-    ]
-    for cmd in candidates:
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=1, check=False)
-            if res.returncode == 0 and res.stdout is not None:
-                return res.stdout
-        except Exception:  # noqa: BLE001, S110
-            pass
-    return None
+    """Read plain text from system clipboard using platform tools or shared cutbuffer fallback."""
+    return bashmenu_ui.get_system_clipboard()
 
 
 def set_system_clipboard(text: str) -> bool:
-    """Copy text to system clipboard using platform tools (wl-copy, pbcopy, termux, xclip, xsel, clip.exe)."""
-    if text is None:
-        return False
-    candidates = [
-        ["wl-copy"],
-        ["pbcopy"],
-        ["termux-clipboard-set"],
-        ["xclip", "-selection", "clipboard"],
-        ["xsel", "--clipboard", "--input"],
-        ["clip.exe"],
-    ]
-    for cmd in candidates:
-        try:
-            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            p.communicate(input=text.encode("utf-8"), timeout=1)
-            if p.returncode == 0:
-                return True
-        except Exception:  # noqa: BLE001, S110
-            pass
-    return False
+    """Copy text to system clipboard using platform tools and shared cutbuffer fallback."""
+    return bashmenu_ui.set_system_clipboard(text)
+
 
 
 SWAP_MAGIC = "BASHMENU_SWP_V1"

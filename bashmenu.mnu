@@ -41,6 +41,14 @@ items:
               quiet: false
               alt_buffer: true
               file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/TODO.md'
+          - Edit DONE.md:
+              type: editor
+              icon: '{nf:\:#ec46}'
+              file: '{bashmenu_dir}/.agents/skills/bashmenu-developer/DONE.md'
+              tabstop: 4
+              interactive: true
+              quiet: false
+              alt_buffer: true
           - Toast Test:
               type: script
               script: '{toast:2:"Hello, world. {date_time_24_short}"}'

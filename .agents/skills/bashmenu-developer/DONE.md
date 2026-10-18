@@ -72,3 +72,17 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 - **Item:** `- [x] Add a directive to SKILL.md to append .agents/skills/bashmenu-developer/DONE.md with completed TODO.md items, and include a description and summary of what you did.`
 - **Root Cause:** Absence of a standardized log for recording completed tasks, their root causes, and resolutions.
 - **Fix:** Added `Done Log Directive (DONE.md)` to `SKILL.md` Section 11 and initialized `.agents/skills/bashmenu-developer/DONE.md` with all completed items.
+
+---
+
+### 10. Notebook Editor List & Checkbox Auto-Formatting with Faint Ghost Text
+- **Item:** `- [x] FEATURE: Notebook editor: If the user has created a checkbox, or is creating a list, or similar related formatting item, when they hit enter, create a new line below the line they pressed enter on, and include the basic formatting for that item...`
+- **Design & Architecture:** Implemented `NotebookTextArea(TextArea)` in `bashmenu_ui.py`. Intercepted `<Enter>` to continue task-list checkboxes (`- [ ]`, `* [ ]`, `+ [ ]`, `1. [ ]`), ordered numbered lists (`1. ` -> `2. `, `1) ` -> `2) `), unordered bullet lists (`- `, `* `, `+ `), and blockquotes (`> `), preserving leading indentation. Implemented smart de-escalation: pressing Enter on an empty marker clears the marker from that line. Integrated Textual reactive `suggestion` for faint ghost text completion on partial markers (`- [` -> ` ] `) accepted via <kbd>Tab</kbd>.
+- **Tests:** Added `test_notebook_text_area_auto_format_checkboxes`, `test_notebook_text_area_ordered_and_unordered_lists`, and `test_notebook_text_area_ghost_text_and_tab_completion` in `.tests/test_notebook.py`.
+
+---
+
+### 11. Cross-Interface Clipboard Interoperability for Notes and Built-in Editor
+- **Item:** `- [x] FEATURE: Make sure the copy and paste buffer for notes can pass information back to any interface such as the built-in text editor`
+- **Design & Architecture:** Implemented unified clipboard subsystem in `bashmenu_ui.py` (`get_system_clipboard`, `set_system_clipboard`, `get_shared_cutbuffer_path`) supporting system CLI tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with persistent fallback to `~/.cache/bashmenu/cutbuffer.txt`. Integrated with `bashedit.py` so cutting, copying, and pasting seamlessly transfers between the built-in text editor, `NotebookTextArea`, and `NoteViewerModalScreen` (`[C]` / `Ctrl+C` raw markdown copy action).
+- **Tests:** Added `test_notebook_cross_interface_clipboard` in `.tests/test_notebook.py`.

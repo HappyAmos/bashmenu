@@ -674,8 +674,14 @@ Notes formatted in Markdown support interactive GFM task-list checkboxes (`- [ ]
 #### Help Gutter & Note Actions
 * **Create Note (`[N]`):** When entering a notebook submenu, the bottom help gutter displays `[N]: New Note`. Pressing `n` or `N` prompts for a note title and opens the note editor.
 * **View Note (`ENTER`):** Opens `NoteViewerModalScreen` with wrapped, formatted Markdown or BBCode text and interactive widgets.
+* **Copy Note (`[C]` / `Ctrl+C`):** Copies the raw note markdown text to the system clipboard and shared cutbuffer, enabling instant cross-interface pasting into the built-in text editor (`bashedit`), terminal prompts, or external applications.
 * **Edit Note (`[E]`):** Accessible directly from the note viewer to modify raw note text using Textual's full-screen TextArea editor modal.
 * **Delete Note (`[D]`):** In a notebook submenu, the help gutter displays `[D]: Delete`. Pressing `d` or `D` on a selected note prompts confirmation before removing it. Outside of a notebook, `[D]` is inactive and omitted from the gutter.
+
+#### Smart Auto-Formatting, Ghost Text & Clipboard Interoperability
+* **Auto-Formatting on Enter:** When editing notes in `NoteEditorModalScreen`, pressing `Enter` automatically continues checkboxes (`- [ ]`), unordered bullets (`- `, `* `, `+ `), numbered lists (`1. ` -> `2. `), and blockquotes (`> `). Pressing `Enter` on an empty marker clears the marker (smart de-escalation).
+* **Faint Ghost Text & Tab Completion:** When starting a checkbox marker (e.g., typing `- [ `), faint ghost text appears suggesting `] ` which can be completed by pressing `Tab`.
+* **Unified Cutbuffer & Clipboard:** Notes and the built-in text editor (`bashedit.py`) share a unified clipboard subsystem utilizing platform tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`, `pbcopy`/`pbpaste`, `termux`) with seamless fallback to `~/.cache/bashmenu/cutbuffer.txt` on headless systems.
 
 ### 5.2 Toast Notifications (`type: toast`)
 Menu items can trigger non-blocking, self-dismissing toast notifications rendered in the bottom corner of the active screen:

@@ -6,24 +6,6 @@ notebook:
         type: note
         format: markdown
         content: |-
-          ## TODO List (Shared with agent).
+          ## TODO List (Shared With Agent).
 
-          - [ ] UI: Bashmenu editor property inspector panel is not utilizing as much space as it can for the preview pane:
-          ```
-          ┌──────────────────────────────────────────────────────────────────────────────────┐
-          │                                                                                  │
-          │  ── Property Inspector ──                                                        │
-          │                                                                                  │
-          │   SCRIPT                                                                         │
-          │                                                                                  │
-          │  Title/Label: Search Nerd Font & Emoji [{scripts_dir}/glyphs.sh]                 │
-          │                                                                                  │
-          │  Icon/Glyph: {nf::#f422}                                                         │
-          │                                                                                  │
-          │  Action/Target: {scripts_dir}/glyphs.sh {param}                                  │
-          │                                                                                  │
-          │  Flags: stream=True                                                              │
-          │                                                                                  │
-          │  Preview:                                                                        │
-          │    1.     Search     [/home/andrew/git[---This space could be used.----------]  │
-          ```
+          - [ ] Edit file/directory pickers to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden files.

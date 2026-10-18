@@ -4131,11 +4131,17 @@ class BashMenuScreen(Screen):
             elif not is_new:
                 self.open_note_viewer(filepath, note_title)
 
+        auto_format = True
+        with contextlib.suppress(Exception):
+            cfg = getattr(self.menu_view, "config", getattr(self, "config", {}))
+            auto_format = get_config_value(cfg, "settings.notebook_auto_format", True)
+
         self.app.push_screen(
             bashmenu_ui.NoteEditorModalScreen(
                 title=f"Editing: {note_title}",
                 content=initial_content,
                 theme=theme,
+                auto_format=auto_format,
             ),
             on_editor_saved,
         )

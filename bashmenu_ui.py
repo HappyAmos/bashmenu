@@ -4473,6 +4473,85 @@ def delete_note(notebook_data: dict, title: str) -> bool:
     return False
 
 
+def get_shared_cutbuffer_path() -> str:
+    """Return path to shared cutbuffer fallback file (~/.cache/bashmenu/cutbuffer.txt)."""
+    cache_dir = os.environ.get("CACHE_DIR") or os.environ.get("XDG_CACHE_HOME")
+    if not cache_dir:
+        cache_dir = os.path.expanduser("~/.cache/bashmenu")
+    else:
+        cache_dir = os.path.expanduser(cache_dir)
+        if not cache_dir.endswith("bashmenu"):
+            cache_dir = os.path.join(cache_dir, "bashmenu")
+    with contextlib.suppress(Exception):
+        os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, "cutbuffer.txt")
+
+
+def get_system_clipboard() -> str | None:
+    """Read plain text from system clipboard using platform tools or shared cutbuffer fallback."""
+    candidates = [
+        ["wl-paste", "--no-newline"],
+        ["wl-paste"],
+        ["pbpaste"],
+        ["termux-clipboard-get"],
+        ["xclip", "-selection", "clipboard", "-o"],
+        ["xsel", "--clipboard", "--output"],
+        ["powershell.exe", "-NoProfile", "-Command", "Get-Clipboard"],
+    ]
+    for cmd in candidates:
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=1, check=False)
+            if res.returncode == 0 and res.stdout:
+                return res.stdout
+        except Exception:  # noqa: BLE001, S110
+            pass
+
+    # Fallback to shared cutbuffer file if platform CLI tool is unavailable
+    try:
+        cb_path = get_shared_cutbuffer_path()
+        if os.path.isfile(cb_path):
+            with open(cb_path, "r", encoding="utf-8", errors="replace") as f:
+                return f.read()
+    except Exception:  # noqa: BLE001, S110
+        pass
+    return None
+
+
+def set_system_clipboard(text: str) -> bool:
+    """Copy text to system clipboard using platform tools and shared cutbuffer fallback."""
+    if text is None:
+        return False
+    success = False
+    candidates = [
+        ["wl-copy"],
+        ["pbcopy"],
+        ["termux-clipboard-set"],
+        ["xclip", "-selection", "clipboard"],
+        ["xsel", "--clipboard", "--input"],
+        ["clip.exe"],
+    ]
+    for cmd in candidates:
+        try:
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            p.communicate(input=text.encode("utf-8"), timeout=1)
+            if p.returncode == 0:
+                success = True
+                break
+        except Exception:  # noqa: BLE001, S110
+            pass
+
+    # Always persist to shared cutbuffer file for cross-interface consistency
+    try:
+        cb_path = get_shared_cutbuffer_path()
+        with open(cb_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        success = True
+    except Exception:  # noqa: BLE001, S110
+        pass
+
+    return success
+
+
 TASK_LIST_RE = re.compile(r"^(\s*)([-*+]|\d+\.)\s+\[([ xX])\]\s*(.*)$")
 
 
@@ -4576,6 +4655,9 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "close_modal", "Close"),
         Binding("enter", "close_modal", "Close"),
+        Binding("c", "copy_note", "Copy"),
+        Binding("ctrl+c", "copy_note", "Copy", show=False),
+        Binding("ctrl+shift+c", "copy_note", "Copy", show=False),
         Binding("e", "edit_note", "Edit"),
         Binding("d", "delete_note", "Delete"),
     ]
@@ -4669,13 +4751,14 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
                                 cb.styles.margin = (0, 0, 0, len(indent))
                             yield cb
             with Horizontal(id="buttons"):
+                yield Button("Copy [C]", variant="default", id="btn_copy")
                 yield Button("Edit [E]", variant="primary", id="btn_edit")
                 yield Button("Delete [D]", variant="error", id="btn_delete")
                 yield Button("Close [ESC]", variant="default", id="btn_close")
             if has_checkboxes:
-                yield Label("[SPACE] Toggle | [E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
+                yield Label("[SPACE] Toggle | [C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
             else:
-                yield Label("[E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
+                yield Label("[C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
 
         with ModalFrame(id="modal_frame"):
             with Horizontal(id="dialog_hrow"):
@@ -4687,6 +4770,7 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
         with contextlib.suppress(Exception):
+            apply_button_theme(self.query_one("#btn_copy", Button), theme=self.theme, button_type="button_default")
             apply_button_theme(self.query_one("#btn_edit", Button), theme=self.theme, button_type="button_primary")
             apply_button_theme(self.query_one("#btn_delete", Button), theme=self.theme, button_type="button_danger")
             apply_button_theme(self.query_one("#btn_close", Button), theme=self.theme, button_type="button_default")
@@ -4730,6 +4814,15 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
                     with contextlib.suppress(Exception):
                         self.on_content_change(self.content)
 
+    def action_copy_note(self) -> None:
+        """Copy raw note markdown text to system clipboard and shared cutbuffer."""
+        text = self.content
+        set_system_clipboard(text)
+        with contextlib.suppress(Exception):
+            self.app.copy_to_clipboard(text)
+        with contextlib.suppress(Exception):
+            self.notify("Note copied to clipboard", timeout=2.0)
+
     def action_edit_note(self) -> None:
         self.dismiss("edit")
 
@@ -4740,7 +4833,9 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         self.dismiss("close")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn_edit":
+        if event.button.id == "btn_copy":
+            self.action_copy_note()
+        elif event.button.id == "btn_edit":
             self.action_edit_note()
         elif event.button.id == "btn_delete":
             self.action_delete_note()
@@ -4751,6 +4846,185 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
         if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
             self.action_close_modal()
+
+
+class NotebookTextArea(TextArea):
+    """Enhanced TextArea for notes with markdown auto-formatting, ghost text, and unified clipboard."""
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("ctrl+c", "copy", "Copy"),
+        Binding("ctrl+shift+c", "copy", "Copy", show=False),
+        Binding("ctrl+x", "cut", "Cut"),
+        Binding("ctrl+shift+x", "cut", "Cut", show=False),
+        Binding("ctrl+v", "paste", "Paste"),
+        Binding("ctrl+shift+v", "paste", "Paste", show=False),
+    ]
+
+    def __init__(self, *args, auto_format: bool = True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.auto_format = auto_format
+
+    def action_copy(self) -> None:
+        """Copy selection (or current line if no selection) to unified clipboard."""
+        text = self.selected_text
+        if not text:
+            row, _ = self.cursor_location
+            if row < self.document.line_count:
+                text = self.document.get_line(row)
+        if text:
+            set_system_clipboard(text)
+            with contextlib.suppress(Exception):
+                self.app.copy_to_clipboard(text)
+
+    def action_cut(self) -> None:
+        """Cut selection (or current line if no selection) to unified clipboard."""
+        if self.read_only:
+            return
+        start, end = self.selection
+        if start == end:
+            edit_result = self._delete_cursor_line()
+        else:
+            edit_result = self._delete_via_keyboard(start, end)
+        if edit_result is not None:
+            text = edit_result.replaced_text
+            set_system_clipboard(text)
+            with contextlib.suppress(Exception):
+                self.app.copy_to_clipboard(text)
+
+    def action_paste(self) -> None:
+        """Paste from system clipboard (or shared cutbuffer fallback) at cursor position."""
+        if self.read_only:
+            return
+        clip = get_system_clipboard()
+        if not clip:
+            with contextlib.suppress(Exception):
+                clip = self.app.clipboard
+        if clip and (result := self._replace_via_keyboard(clip, *self.selection)):
+            self.move_cursor(result.end_location)
+
+    def update_suggestion(self) -> None:
+        """Hook to compute faint ghost text suggestion for markdown formatting."""
+        if not self.auto_format or self.read_only:
+            self.suggestion = ""
+            return
+
+        row, col = self.cursor_location
+        if row >= self.document.line_count:
+            self.suggestion = ""
+            return
+
+        line = self.document.get_line(row)
+        prefix = line[:col]
+
+        # 1. Partial checkbox bracket: e.g. "- [", "* [", "+ [", "1. [" -> suggest " ] "
+        if re.search(r"^\s*([-*+]|\d+[.)])\s+\[$", prefix):
+            self.suggestion = " ] "
+            return
+
+        # 2. Checkbox bracket with space: e.g. "- [ " -> suggest "] "
+        if re.search(r"^\s*([-*+]|\d+[.)])\s+\[\s+$", prefix):
+            self.suggestion = "] "
+            return
+
+        self.suggestion = ""
+
+    async def _on_key(self, event: events.Key) -> None:
+        """Handle key presses with markdown list continuation and ghost text completion."""
+        self._restart_blink()
+
+        if self.read_only:
+            return
+
+        # Handle Tab to accept suggestion if ghost text is present
+        if event.key == "tab" and self.suggestion:
+            event.stop()
+            event.prevent_default()
+            sug = self.suggestion
+            self.suggestion = ""
+            self.insert(sug)
+            return
+
+        # Handle Enter for auto-formatting continuation / de-escalation
+        if event.key == "enter" and self.auto_format and self._handle_auto_format_enter():
+            event.stop()
+            event.prevent_default()
+            return
+
+        await super()._on_key(event)
+
+    def _handle_auto_format_enter(self) -> bool:
+        """Inspect current line and insert continuation prefix or de-escalate empty marker."""
+        row, col = self.cursor_location
+        if row >= self.document.line_count:
+            return False
+
+        line = self.document.get_line(row)
+        prefix = line[:col]
+
+        # 1. Checkbox item: - [ ] text, * [x] text, + [ ] text, 1. [ ] text
+        m_box = re.match(r"^(\s*)([-*+]|\d+[.)])\s+\[([ xX])\]\s*(.*)$", prefix)
+        if m_box:
+            indent, marker, _check_val, item_text = m_box.groups()
+            if item_text.strip() == "":
+                # De-escalate empty checkbox
+                self._replace_via_keyboard(indent, (row, 0), (row, len(line)))
+                self.suggestion = ""
+                return True
+            # Compute next checkbox marker
+            if marker in ("-", "*", "+"):
+                next_prefix = f"{indent}{marker} [ ] "
+            else:
+                delim = marker[-1]
+                num = int(marker[:-1]) + 1
+                next_prefix = f"{indent}{num}{delim} [ ] "
+            self._replace_via_keyboard("\n" + next_prefix, *self.selection)
+            self.suggestion = ""
+            return True
+
+        # 2. Ordered list item: 1. text, 2) text
+        m_num = re.match(r"^(\s*)(\d+)([.)])\s+(.*)$", prefix)
+        if m_num:
+            indent, num_str, delim, item_text = m_num.groups()
+            if item_text.strip() == "":
+                # De-escalate empty numbered item
+                self._replace_via_keyboard(indent, (row, 0), (row, len(line)))
+                self.suggestion = ""
+                return True
+            next_num = int(num_str) + 1
+            next_prefix = f"{indent}{next_num}{delim} "
+            self._replace_via_keyboard("\n" + next_prefix, *self.selection)
+            self.suggestion = ""
+            return True
+
+        # 3. Unordered list item: - text, * text, + text
+        m_bullet = re.match(r"^(\s*)([-*+])\s+(.*)$", prefix)
+        if m_bullet:
+            indent, marker, item_text = m_bullet.groups()
+            if item_text.strip() == "":
+                # De-escalate empty bullet
+                self._replace_via_keyboard(indent, (row, 0), (row, len(line)))
+                self.suggestion = ""
+                return True
+            next_prefix = f"{indent}{marker} "
+            self._replace_via_keyboard("\n" + next_prefix, *self.selection)
+            self.suggestion = ""
+            return True
+
+        # 4. Blockquote item: > text, >> text
+        m_quote = re.match(r"^(\s*)(>+)\s*(.*)$", prefix)
+        if m_quote:
+            indent, marker, item_text = m_quote.groups()
+            if item_text.strip() == "":
+                # De-escalate empty quote
+                self._replace_via_keyboard(indent, (row, 0), (row, len(line)))
+                self.suggestion = ""
+                return True
+            next_prefix = f"{indent}{marker} "
+            self._replace_via_keyboard("\n" + next_prefix, *self.selection)
+            self.suggestion = ""
+            return True
+
+        return False
 
 
 class NoteEditorModalScreen(ModalScreen[str | None]):
@@ -4832,6 +5106,12 @@ class NoteEditorModalScreen(ModalScreen[str | None]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("ctrl+s", "save_note", "Save"),
         Binding("escape", "cancel_note", "Cancel"),
+        Binding("ctrl+c", "copy_text", "Copy", show=False),
+        Binding("ctrl+shift+c", "copy_text", "Copy", show=False),
+        Binding("ctrl+v", "paste_text", "Paste", show=False),
+        Binding("ctrl+shift+v", "paste_text", "Paste", show=False),
+        Binding("ctrl+x", "cut_text", "Cut", show=False),
+        Binding("ctrl+shift+x", "cut_text", "Cut", show=False),
     ]
 
     def __init__(
@@ -4840,12 +5120,14 @@ class NoteEditorModalScreen(ModalScreen[str | None]):
         content: str = "",
         note_format: str = "markdown",
         theme: dict | None = None,
+        auto_format: bool = True,
     ):
         super().__init__()
         self.modal_title = title
         self.initial_content = content or ""
         self.note_format = (note_format or "markdown").lower()
         self.theme = theme or {}
+        self.auto_format = auto_format
 
     def compose(self) -> ComposeResult:
         lang = "markdown" if self.note_format == "markdown" else None
@@ -4854,17 +5136,18 @@ class NoteEditorModalScreen(ModalScreen[str | None]):
             with Horizontal(id="title_bar"):
                 yield Label(self.modal_title or "Edit Note", id="title")
                 yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
-            yield TextArea(
+            yield NotebookTextArea(
                 text=self.initial_content,
                 language=lang,
                 theme="vscode_dark",
                 soft_wrap=True,
+                auto_format=self.auto_format,
                 id="text_editor",
             )
             with Horizontal(id="buttons"):
                 yield Button("Save [Ctrl+S]", variant="primary", id="btn_save")
                 yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
-            yield Label("[Ctrl+S] Save | [ESC] Cancel", id="footer", markup=False)
+            yield Label("[Ctrl+S] Save | [Ctrl+C] Copy | [Ctrl+V] Paste | [ESC] Cancel", id="footer", markup=False)
 
         with ModalFrame(id="modal_frame"):
             with Horizontal(id="dialog_hrow"):
@@ -4882,17 +5165,29 @@ class NoteEditorModalScreen(ModalScreen[str | None]):
 
     def _focus_editor(self) -> None:
         with contextlib.suppress(Exception):
-            self.query_one("#text_editor", TextArea).focus()
+            self.query_one("#text_editor", NotebookTextArea).focus()
 
     def action_save_note(self) -> None:
         try:
-            editor = self.query_one("#text_editor", TextArea)
+            editor = self.query_one("#text_editor", NotebookTextArea)
             self.dismiss(editor.text)
         except (LookupError, AttributeError):
             self.dismiss(self.initial_content)
 
     def action_cancel_note(self) -> None:
         self.dismiss(None)
+
+    def action_copy_text(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one("#text_editor", NotebookTextArea).action_copy()
+
+    def action_paste_text(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one("#text_editor", NotebookTextArea).action_paste()
+
+    def action_cut_text(self) -> None:
+        with contextlib.suppress(Exception):
+            self.query_one("#text_editor", NotebookTextArea).action_cut()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_save":
