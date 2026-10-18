@@ -1415,10 +1415,12 @@ class ItemEditModal(ModalScreen[dict]):
 
 
 class MenuEditTree(Tree):
-    """Custom Tree widget using Enter to edit items, Space to expand/collapse, and F2 to toggle children."""
+    """Tree widget with Left/Right/Space expand/collapse and Enter to edit."""
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("space", "toggle_node", "Expand/Collapse", show=False),
+        Binding("left", "collapse_node", "Collapse Node", show=False),
+        Binding("right", "expand_node", "Expand Node", show=False),
         Binding("enter", "edit_node", "Edit Item", show=False),
         Binding("f2", "toggle_children", "Toggle All", show=False),
     ]
@@ -1444,15 +1446,38 @@ class MenuEditTree(Tree):
         super()._toggle_node(node)
 
     def action_toggle_node(self) -> None:
+        """Toggles the expanded or collapsed state of the focused tree node."""
         if self.cursor_node and self.cursor_node != self.root:
             self._toggle_node(self.cursor_node)
 
+    def action_expand_node(self) -> None:
+        """Expands the focused tree node, or moves to child if expanded."""
+        if self.cursor_node and self.cursor_node != self.root:
+            if self.cursor_node.children and not self.cursor_node.is_expanded:
+                self.cursor_node.expand()
+            elif self.cursor_node.children and self.cursor_node.is_expanded:
+                first_child = self.cursor_node.children[0]
+                self.select_node(first_child)
+                self.scroll_to_node(first_child)
+
+    def action_collapse_node(self) -> None:
+        """Collapses the focused tree node, or moves to parent if collapsed."""
+        if self.cursor_node and self.cursor_node != self.root:
+            if self.cursor_node.is_expanded and self.cursor_node.children:
+                self.cursor_node.collapse()
+            elif self.cursor_node.parent and self.cursor_node.parent != self.root:
+                parent_node = self.cursor_node.parent
+                self.select_node(parent_node)
+                self.scroll_to_node(parent_node)
+
     def action_toggle_children(self) -> None:
+        """Toggles all child branches on MenuEditScreen."""
         screen = getattr(self, "screen", None)
         if screen and hasattr(screen, "action_toggle_children"):
             screen.action_toggle_children()
 
     def action_edit_node(self) -> None:
+        """Opens the modal property editor for the focused item."""
         if self.cursor_node and self.cursor_node != self.root:
             screen = getattr(self, "screen", None)
             if screen and hasattr(screen, "action_edit_item"):
@@ -1594,6 +1619,8 @@ class MenuEditScreen(Screen):
         Binding("enter", "edit_item", "Edit Item"),
         Binding("t", "change_item_type", "Change Type"),
         Binding("space", "toggle_tree_node", "Expand/Collapse", show=False),
+        Binding("left", "collapse_tree_node", "Collapse Node", show=False),
+        Binding("right", "expand_tree_node", "Expand Node", show=False),
         Binding("d", "delete_item", "Delete Item"),
         Binding("m", "move_down", "Move Down"),
         Binding("M", "move_up", "Move Up"),
@@ -1689,14 +1716,26 @@ class MenuEditScreen(Screen):
                 yield Label("[ESC/q] Exit", id="lbl_exit", classes="footer_item", markup=False)
 
     def action_toggle_tree_node(self) -> None:
-        """Toggle the expand or collapse state of the focused tree node."""
+        """Toggles the expand or collapse state of the focused tree node."""
         with contextlib.suppress(Exception):
             tree = self.query_one("#tree", Tree)
             if tree.cursor_node and tree.cursor_node != tree.root:
                 tree.cursor_node.toggle()
 
+    def action_expand_tree_node(self) -> None:
+        """Expands the focused tree node using the right arrow key."""
+        with contextlib.suppress(Exception):
+            tree = self.query_one("#tree", MenuEditTree)
+            tree.action_expand_node()
+
+    def action_collapse_tree_node(self) -> None:
+        """Collapses the focused tree node using the left arrow key."""
+        with contextlib.suppress(Exception):
+            tree = self.query_one("#tree", MenuEditTree)
+            tree.action_collapse_node()
+
     def action_toggle_children(self) -> None:
-        """Toggle all direct children and submenus of the top root node between collapsed and expanded states (F2)."""
+        """Toggles all direct children and submenus of top root node (F2)."""
         with contextlib.suppress(Exception):
             tree = self.query_one("#tree", Tree)
             root = tree.root

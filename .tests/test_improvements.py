@@ -3792,6 +3792,83 @@ G
         self.assertIn("Edit autoexec.sh", str(updated_content[0]))
 
 
+    def test_menuedit_tree_left_right_arrow_expand_collapse(self):
+        """Verifies left and right arrow keys expand and collapse tree nodes."""
+        import asyncio
+
+        from textual.app import App
+
+        import menuedit
+
+        # 1. Verify keybindings on Tree and Screen
+        tree_bindings = {b.key: b.action for b in menuedit.MenuEditTree.BINDINGS}
+        self.assertEqual(tree_bindings.get("left"), "collapse_node")
+        self.assertEqual(tree_bindings.get("right"), "expand_node")
+
+        screen_bindings = {
+            b.key: b.action for b in menuedit.MenuEditScreen.BINDINGS
+        }
+        self.assertEqual(screen_bindings.get("left"), "collapse_tree_node")
+        self.assertEqual(screen_bindings.get("right"), "expand_tree_node")
+
+        # 2. Test interactive tree node expand and collapse behavior
+        class EditorApp(App):
+            def compose(self):
+                yield menuedit.MenuEditScreen()
+
+        async def run_checks():
+            app = EditorApp()
+            async with app.run_test():
+                screen = app.query_one(menuedit.MenuEditScreen)
+                tree = screen.query_one("#tree", menuedit.MenuEditTree)
+
+                # Locate a node with children (e.g. Submenu)
+                node_with_children = next(
+                    (c for c in tree.root.children if c.children), None
+                )
+                self.assertIsNotNone(node_with_children)
+
+                # Ensure node is expanded initially
+                node_with_children.expand()
+                self.assertTrue(node_with_children.is_expanded)
+
+                # Focus the node with children
+                tree.select_node(node_with_children)
+                self.assertEqual(tree.cursor_node, node_with_children)
+
+                # Left arrow collapses the expanded node
+                tree.action_collapse_node()
+                self.assertFalse(node_with_children.is_expanded)
+
+                # Left arrow on collapsed node navigates to its parent
+                tree.action_collapse_node()
+                # If parent is root, root cannot be selected so it stays or selects
+                if node_with_children.parent and node_with_children.parent != tree.root:
+                    self.assertEqual(tree.cursor_node, node_with_children.parent)
+
+                # Select the node again
+                tree.select_node(node_with_children)
+                self.assertFalse(node_with_children.is_expanded)
+
+                # Right arrow expands the collapsed node
+                tree.action_expand_node()
+                self.assertTrue(node_with_children.is_expanded)
+
+                # Right arrow on expanded node navigates to its first child
+                tree.action_expand_node()
+                self.assertEqual(tree.cursor_node, node_with_children.children[0])
+
+                # Screen-level actions forward to tree properly
+                tree.select_node(node_with_children)
+                screen.action_collapse_tree_node()
+                self.assertFalse(node_with_children.is_expanded)
+
+                screen.action_expand_tree_node()
+                self.assertTrue(node_with_children.is_expanded)
+
+        asyncio.run(run_checks())
+
+
 if __name__ == "__main__":
     unittest.main()
 
