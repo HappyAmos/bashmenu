@@ -3448,6 +3448,12 @@ dayscape:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: 189
     title:
@@ -3472,7 +3478,7 @@ dayscape:
     - 236
     - COLOR_BLACK
     gutter:
-    - 101
+    - 11
     - -1
     selection:
     - 255
@@ -3496,7 +3502,7 @@ dayscape:
     - 255
     - 64
     help_text:
-    - 58
+    - 15
     - -1
     plugin:
     - 58
@@ -3641,6 +3647,9 @@ dayscape:
     mode: halfblock
     clustering: 32
     quantization: 8
+  divider:
+    char: "\u2500"
+    length: '{window_width}'
 mountain:
   marquee:
     char: ''
