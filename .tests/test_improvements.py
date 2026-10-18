@@ -63,6 +63,12 @@ class TestImprovements(unittest.TestCase):
         self.assertEqual(binding_actions["ctrl+h"], "toggle_hidden")
         self.assertIn("ctrl+shift+h", binding_actions)
         self.assertEqual(binding_actions["ctrl+shift+h"], "toggle_hidden")
+        self.assertIn("backspace", binding_actions)
+        self.assertEqual(binding_actions["backspace"], "toggle_hidden")
+        self.assertIn("h", binding_actions)
+        self.assertEqual(binding_actions["h"], "toggle_hidden")
+        self.assertIn("H", binding_actions)
+        self.assertEqual(binding_actions["H"], "toggle_hidden")
 
         # Footer text checks
         for mode in ("save", "dir", "file"):
@@ -88,6 +94,71 @@ class TestImprovements(unittest.TestCase):
         fp.action_toggle_hidden()
         self.assertFalse(fp.show_hidden_state)
         self.assertIn("Hiding hidden files", notified[-1])
+
+    def test_file_picker_on_key_toggle_hidden(self):
+        """Verify on_key handles ctrl+h, backspace, h, and H appropriately across modes and focus states."""
+        import asyncio
+
+        from textual.app import App
+        from textual.widgets import Input
+
+        async def run_checks():
+            class PickerTestApp(App):
+                async def on_mount(self):
+                    screen = bashmenu_ui.FilePickerModalScreen("Test Picker", mode="file")
+                    await self.push_screen(screen)
+
+            app = PickerTestApp()
+            async with app.run_test() as pilot:
+                screen = app.screen
+                self.assertFalse(screen.show_hidden_state)
+
+                # Test ctrl+h
+                await pilot.press("ctrl+h")
+                self.assertTrue(screen.show_hidden_state)
+
+                # Test backspace (terminal Ctrl+H)
+                await pilot.press("backspace")
+                self.assertFalse(screen.show_hidden_state)
+
+                # Test h
+                await pilot.press("h")
+                self.assertTrue(screen.show_hidden_state)
+
+                # Test H
+                await pilot.press("H")
+                self.assertFalse(screen.show_hidden_state)
+
+                # Test ctrl+shift+h
+                await pilot.press("ctrl+shift+h")
+                self.assertTrue(screen.show_hidden_state)
+
+            # Test save mode with Input focus: backspace and typing should not toggle hidden
+            class SaveTestApp(App):
+                async def on_mount(self):
+                    screen = bashmenu_ui.FilePickerModalScreen("Save File", mode="save", default_val="test")
+                    await self.push_screen(screen)
+
+            save_app = SaveTestApp()
+            async with save_app.run_test() as pilot:
+                screen = save_app.screen
+                inp = screen.query_one("#filename_input", Input)
+                inp.focus()
+                self.assertFalse(screen.show_hidden_state)
+
+                # Typing h in input should not toggle hidden
+                await pilot.press("h")
+                self.assertFalse(screen.show_hidden_state)
+
+                # Backspace in input should not toggle hidden
+                await pilot.press("backspace")
+                self.assertFalse(screen.show_hidden_state)
+
+                # ctrl+h should toggle hidden even when input is focused
+                await pilot.press("ctrl+h")
+                self.assertTrue(screen.show_hidden_state)
+
+        asyncio.run(run_checks())
 
     def test_dir_picker_modal_ui_and_actions(self):
         """Verify FilePickerModalScreen in dir mode with allow_new=True."""

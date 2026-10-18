@@ -154,5 +154,13 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   4. Updated documentation in `bashmenu.md` and `bashmenu.1` to reflect all five supported scaling modes.
 - **Tests:** Added `test_wallpaper_compositor_all_scaling_modes` in `.tests/test_themeedit.py` verifying that `cover`, `stretch`, `fit`, `center`, and `tile` successfully construct 2D ANSI cell grids across valid dimensions.
 
+---
 
-
+### 19. Fix Hidden Files Toggle in Open Dialogs (FilePickerModalScreen)
+- **Item:** `- [x] BUG: Open dialogs, such as the one to choose a background wallpaper in the theme editor, or the open dialog to select a file in the text editor, do not include the <ctl> + <h> functionality to toggle hidden files displayed/hidden.` (from `notebooks/notes.yml`)
+- **Root Cause:** Standard Linux terminal emulators transmit byte `0x08` (ASCII Backspace) when <kbd>Ctrl+H</kbd> is pressed. Textual decodes `\x08` as `Key(key="backspace")` rather than `"ctrl+h"`. Because `FilePickerModalScreen` only had `"ctrl+h"` in `BINDINGS`, pressing <kbd>Ctrl+H</kbd> in typical terminal sessions resulted in an unhandled `"backspace"` event, leaving hidden files un-toggled. Furthermore, entries with permission errors during `is_dir()` scans could abort directory listing.
+- **Fix:** In `bashmenu_ui.py`:
+  1. Extended `FilePickerModalScreen.BINDINGS` with `"backspace"`, `"h"`, and `"H"` bound to `toggle_hidden`.
+  2. Implemented `on_key(self, event: events.Key)` to intercept `"ctrl+h"`, `"ctrl+shift+h"`, `"backspace"`, `"h"`, and `"H"`. When focused widget is not an `Input` (i.e. user is browsing file list or buttons), it immediately stops the event and triggers `self.action_toggle_hidden()`. When `Input` is focused (in save mode), `"backspace"` and letter typing are preserved for editing while `"ctrl+h"` still toggles hidden files.
+  3. Added safe `_is_dir_safe` error handling in `load_directory` to gracefully handle `OSError` on restricted entries or broken symlinks.
+- **Tests:** Added `test_file_picker_on_key_toggle_hidden` in `.tests/test_improvements.py` verifying `ctrl+h`, `ctrl+shift+h`, `backspace`, `h`, and `H` across modes and input focus states.

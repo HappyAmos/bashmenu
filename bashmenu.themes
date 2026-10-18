@@ -4998,10 +4998,10 @@ tangyle:
     - -1
   background:
     image: assets/wallpapers/tangyle-tile.png
-    opacity: 0.15
+    opacity: 0.35
     scaling: tile
     mode: halfblock
-    clustering: 64
+    clustering: 16
     quantization: 16
   divider:
     char: "\u2500"
@@ -5224,10 +5224,10 @@ redgyle:
     - -1
   background:
     image: assets/wallpapers/redgyle-tile.png
-    opacity: 0.15
-    scaling: center
+    opacity: 0.45
+    scaling: tile
     mode: halfblock
-    clustering: 64
+    clustering: 70
     quantization: 16
   divider:
     char: "\u2500"

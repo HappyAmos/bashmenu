@@ -3498,6 +3498,9 @@ class FilePickerModalScreen(ModalScreen[str]):
         Binding("escape", "cancel", "Cancel"),
         Binding("ctrl+h", "toggle_hidden", "Toggle Hidden"),
         Binding("ctrl+shift+h", "toggle_hidden", "Toggle Hidden", show=False),
+        Binding("backspace", "toggle_hidden", "Toggle Hidden", show=False),
+        Binding("h", "toggle_hidden", "Toggle Hidden", show=False),
+        Binding("H", "toggle_hidden", "Toggle Hidden", show=False),
         Binding("space", "select_dir", "Select Folder"),
         Binding("n", "new_item", "New", show=False),
         Binding("N", "new_item", "New", show=False),
@@ -3664,12 +3667,18 @@ class FilePickerModalScreen(ModalScreen[str]):
             if not self.show_hidden_state:
                 all_entries = [e for e in all_entries if not e.name.startswith(".")]
 
+            def _is_dir_safe(e: os.DirEntry) -> bool:
+                try:
+                    return e.is_dir()
+                except OSError:
+                    return False
+
             dirs = sorted(
-                [e for e in all_entries if e.is_dir()],
+                [e for e in all_entries if _is_dir_safe(e)],
                 key=lambda e: e.name.lower(),
             )
             files = sorted(
-                [e for e in all_entries if not e.is_dir()],
+                [e for e in all_entries if not _is_dir_safe(e)],
                 key=lambda e: e.name.lower(),
             )
 
@@ -3780,6 +3789,18 @@ class FilePickerModalScreen(ModalScreen[str]):
         msg = "Showing hidden files" if self.show_hidden_state else "Hiding hidden files"
         with contextlib.suppress(Exception):
             self.notify(msg, title="File Picker", timeout=1.5)
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key in ("ctrl+h", "ctrl+shift+h"):
+            event.stop()
+            event.prevent_default()
+            self.action_toggle_hidden()
+            return
+        if event.key in ("backspace", "h", "H") and not isinstance(self.focused, Input):
+            event.stop()
+            event.prevent_default()
+            self.action_toggle_hidden()
+            return
 
     def action_cancel(self) -> None:
         self.dismiss(None)
