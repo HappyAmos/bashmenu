@@ -477,6 +477,63 @@ Detailed section content here.
             expected_y = anchors["2-second-section--extra"]
             self.assertEqual(scroller.scroll_y, expected_y)
 
+    async def test_note_viewer_modal_theme_contrast_and_colors(self):
+        """Verify NoteViewerModalScreen applies high-contrast theme text and button colors under light themes."""
+        from textual.app import App
+        from textual.widgets import Button, Checkbox
+
+        theme = bashmenu_ui.init_theme_colors("dayscape")
+        note_content = "# Test Note\nThis is a paragraph.\n- [ ] Task Item 1\n- [x] Task Item 2"
+
+        class TestModalApp(App):
+            pass
+
+        app = TestModalApp()
+        async with app.run_test() as pilot:
+            screen = bashmenu_ui.NoteViewerModalScreen("Test", note_content, theme=theme)
+            app.push_screen(screen)
+            await pilot.pause()
+
+            # Dialog container text and background
+            dialog = screen.query_one("#dialog")
+            self.assertEqual(str(dialog.styles.color), "Color(0, 0, 0)")
+            self.assertEqual(str(dialog.styles.background), "Color(215, 215, 255)")
+
+            # Markdown blocks and checkboxes
+            for mb in screen.query(".markdown_block"):
+                self.assertEqual(str(mb.styles.color), "Color(0, 0, 0)")
+
+            for cb in screen.query(Checkbox):
+                self.assertEqual(str(cb.styles.color), "Color(0, 0, 0)")
+
+            # Buttons fallback mapping
+            btn_edit = screen.query_one("#btn_edit", Button)
+            btn_delete = screen.query_one("#btn_delete", Button)
+            btn_close = screen.query_one("#btn_close", Button)
+
+            # btn_edit uses button_primary (charcoal bg #262626)
+            self.assertEqual(str(btn_edit.styles.background), "Color(38, 38, 38)")
+            # btn_delete falls back from button_danger to button_error (red bg #ff0000)
+            self.assertEqual(str(btn_delete.styles.background), "Color(255, 0, 0)")
+            # btn_close falls back from button_default to button_cancel (olive-grey bg #87875f)
+            self.assertEqual(str(btn_close.styles.background), "Color(135, 135, 95)")
+
+    def test_apply_button_theme_semantic_fallbacks(self):
+        """Verify apply_button_theme properly resolves danger->error and default->cancel fallbacks."""
+        from textual.widgets import Button
+
+        theme = bashmenu_ui.init_theme_colors("dayscape")
+        btn = Button("Test")
+
+        # button_danger maps to button_error
+        bashmenu_ui.apply_button_theme(btn, theme=theme, button_type="button_danger")
+        self.assertEqual(str(btn.styles.background), "Color(255, 0, 0)")
+
+        # button_default maps to button_cancel
+        bashmenu_ui.apply_button_theme(btn, theme=theme, button_type="button_default")
+        self.assertEqual(str(btn.styles.background), "Color(135, 135, 95)")
+
 
 if __name__ == "__main__":
     unittest.main()
+

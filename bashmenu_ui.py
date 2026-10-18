@@ -2161,7 +2161,10 @@ class PrebakedWallpaperCanvas:
 
 def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
     """Apply theme border, background, title, message, prompt, and footer colors to a modal screen."""
-    theme_dict = resolve_theme_dict(theme, getattr(screen, "app", None))
+    app = None
+    with contextlib.suppress(Exception):
+        app = getattr(screen, "app", None)
+    theme_dict = resolve_theme_dict(theme, app)
     if not theme_dict:
         return
     t_name = theme_dict.get("theme_name") if isinstance(theme_dict, dict) else theme
@@ -2211,6 +2214,11 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             css_bg = parse_css_color(bg_style.bgcolor.name)
             if css_bg:
                 dialog.styles.background = css_bg
+        text_style = theme_dict.get("text")
+        if text_style and text_style.color and text_style.color.name:
+            css_text = parse_css_color(text_style.color.name)
+            if css_text:
+                dialog.styles.color = css_text
 
     with contextlib.suppress(Exception):
         title = screen.query_one("#title", Label)
@@ -2228,13 +2236,13 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             title.update(f"{l_cap} {raw_text.strip()} {r_cap}")
 
     with contextlib.suppress(Exception):
-        msg = screen.query_one("#message")
         msg_style = theme_dict.get("text")
         if msg_style and msg_style.color and msg_style.color.name:
             css_msg = parse_css_color(msg_style.color.name)
             if css_msg:
-                msg.styles.color = css_msg
-                msg.styles.auto_color = False
+                for target in screen.query("#message, .markdown_block, Checkbox, .markdown_checkbox"):
+                    target.styles.color = css_msg
+                    target.styles.auto_color = False
 
     with contextlib.suppress(Exception):
         prompt = screen.query_one("#prompt", Static)
@@ -2312,10 +2320,22 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
 
 def apply_button_theme(button: Button, theme=None, button_type: str = "button_primary") -> None:
     """Apply foreground and background colors to a Textual Button based on theme dictionary."""
-    theme_dict = resolve_theme_dict(theme, getattr(button, "app", None))
+    app = None
+    with contextlib.suppress(Exception):
+        app = getattr(button, "app", None)
+    theme_dict = resolve_theme_dict(theme, app)
     if not theme_dict:
         return
-    style = theme_dict.get(button_type) or theme_dict.get("button_primary")
+    style = theme_dict.get(button_type)
+    if not style:
+        if button_type in ("button_danger", "button_error"):
+            style = theme_dict.get("button_error") or theme_dict.get("button_danger")
+        elif button_type in ("button_default", "button_cancel"):
+            style = theme_dict.get("button_cancel") or theme_dict.get("button_default")
+        elif button_type == "button_success":
+            style = theme_dict.get("button_success")
+    if not style:
+        style = theme_dict.get("button_primary")
     if isinstance(style, Style):
         if style.color and style.color.name:
             css_fg = parse_css_color(style.color.name)
