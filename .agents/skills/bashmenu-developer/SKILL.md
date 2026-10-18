@@ -274,6 +274,10 @@ description: Core developer guidelines for the multi-platform BashMenu
     - `FilePickerModalScreen` (`#path_label`): smoothly scrolls deep file paths.
     - `bashedit.py` (`#editor_header`): marquees long file paths in narrow Netbook terminal windows.
     - `menuedit.py` (`render_menu_item_preview`): synchronizes preview rendering with 50/50 partition and theme marquee rules.
+- **Visual Menu Editor In-Place Sibling Reordering & Debounced Auto-Save Invariant (`menuedit.py`):**
+  - In `action_move_up` and `action_move_down`: Never call `self.populate_tree()` to reorder siblings. `populate_tree()` calls `tree.clear()`, destroying all DOM nodes, resetting expansion/collapse states across the menu, and causing a visible full-screen blink/flash.
+  - Reorder siblings in-place directly in `node.parent._children`, then call `tree._invalidate()`, `tree._build()`, `tree.select_node(node)`, and `tree.scroll_to_node(node)`. Fall back to `populate_tree()` only if `node.parent` is absent or the node is not found in `_children`.
+  - Never run synchronous YAML serialization (`bashmenu.dump_menu_yaml()`) and disk write on every keystroke (`~61ms` per call). Debounce autosaves via `self.set_timer(0.35, self._save_menu_quietly)` and flush immediately on manual save (`action_save_menu`), exit (`action_exit_editor`), or screen unmount (`on_unmount`). If unmounted or not running an active application loop, execute the write immediately without scheduling timers.
 
 ---
 
@@ -354,6 +358,7 @@ description: Core developer guidelines for the multi-platform BashMenu
 ---
 
 ## 10. Documentation Standards & 6-Tier Parity
+- **What To Document:** Every script must document its purpose, usage, and configuration options. This directive includes .py, and .sh files. Be sure to document every function, macro, def, directive, and attribute. There should be no undocumented spaghetti code. Keep documentation up-to-date, lines under 80 characters (except inline code documentation or comments), be brief, but clear and precise about what the code does.
 - **Tone & Formatting Constraints:** Maintain a professional, dry tone without promotional adjectives. Format lists as GitHub-Flavored Markdown tables with collapsible `<details><summary><b>Table of Contents</b></summary></details>`. Wrap documentation lines under 80 characters. Precede code block fences with an empty line. Docstrings must be in the third person.
 - **Universal 6-Tier Parity Invariant:** Every placeholder, macro, directive, and attribute must be 100% synchronized across all six documentation tiers:
   1. `bashmenu_ui.py`: `PLACEHOLDER_SECTIONS` and `PLACEHOLDER_HELP_TEXT` (`^P`/`Alt+M` in editor).

@@ -22,6 +22,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
+from textual.timer import Timer
 from textual.widgets import Button, Checkbox, Input, Label, OptionList, Static, Tree
 from textual.widgets.option_list import Option
 
@@ -1630,6 +1631,7 @@ class MenuEditScreen(Screen):
             self.config = {}
         self._target_node_to_focus = None
         self.modified = False
+        self._save_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         """Compose the primary visual editor workspace including header, tree, inspector, and footer."""
@@ -2530,18 +2532,44 @@ class MenuEditScreen(Screen):
         return search(root_opts)
 
     def _save_menu_quietly(self) -> None:
+        """Persist the current menu data to disk silently and clear modified status."""
+        if getattr(self, "_save_timer", None) is not None:
+            with contextlib.suppress(Exception):
+                self._save_timer.stop()
+            self._save_timer = None
         with contextlib.suppress(Exception):
             content = bashmenu.dump_menu_yaml(self.menu_data)
             with open(self.menu_file_path, "w", encoding="utf-8") as f:
                 f.write(content)
             self.modified = False
 
+    def _schedule_save_quietly(self, delay: float = 0.35) -> None:
+        """Debounce auto-saving menu data to disk during rapid interactive operations."""
+        self.modified = True
+        app = None
+        with contextlib.suppress(Exception):
+            app = getattr(self, "app", None)
+        if not app or not getattr(app, "_running", False):
+            self._save_menu_quietly()
+            return
+
+        if getattr(self, "_save_timer", None) is not None:
+            with contextlib.suppress(Exception):
+                self._save_timer.stop()
+        with contextlib.suppress(Exception):
+            self._save_timer = self.set_timer(delay, self._save_menu_quietly)
+
+    def _flush_pending_save(self) -> None:
+        """Flush any pending quiet save immediately to disk."""
+        if getattr(self, "_save_timer", None) is not None:
+            self._save_menu_quietly()
+
     def action_move_up(self) -> None:
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if (not node or not node.data or node == tree.root) and self.selected_item:
             node = self._find_node_for_item(tree.root, self.selected_item)
-        if not node or not node.data or node == tree.root:
+        if not node or not node.data or node == tree.root or not node.parent:
             return
 
         res = self._find_item_parent_list(node.data)
@@ -2552,16 +2580,32 @@ class MenuEditScreen(Screen):
             target_item = node.data
             opts[idx], opts[idx - 1] = opts[idx - 1], opts[idx]
             self.selected_item = target_item
-            self.modified = True
-            self.populate_tree(target_item=target_item)
-            self._save_menu_quietly()
+
+            parent_node = node.parent
+            if parent_node and node in parent_node._children:
+                child_idx = parent_node._children.index(node)
+                if child_idx > 0:
+                    parent_node._children[child_idx], parent_node._children[child_idx - 1] = (
+                        parent_node._children[child_idx - 1],
+                        parent_node._children[child_idx],
+                    )
+                    tree._invalidate()
+                    tree._build()
+                    tree.select_node(node)
+                    tree.scroll_to_node(node)
+                else:
+                    self.populate_tree(target_item=target_item)
+            else:
+                self.populate_tree(target_item=target_item)
+
+            self._schedule_save_quietly()
 
     def action_move_down(self) -> None:
         tree = self.query_one("#tree", Tree)
         node = tree.cursor_node
         if (not node or not node.data or node == tree.root) and self.selected_item:
             node = self._find_node_for_item(tree.root, self.selected_item)
-        if not node or not node.data or node == tree.root:
+        if not node or not node.data or node == tree.root or not node.parent:
             return
 
         res = self._find_item_parent_list(node.data)
@@ -2572,9 +2616,25 @@ class MenuEditScreen(Screen):
             target_item = node.data
             opts[idx], opts[idx + 1] = opts[idx + 1], opts[idx]
             self.selected_item = target_item
-            self.modified = True
-            self.populate_tree(target_item=target_item)
-            self._save_menu_quietly()
+
+            parent_node = node.parent
+            if parent_node and node in parent_node._children:
+                child_idx = parent_node._children.index(node)
+                if child_idx < len(parent_node._children) - 1:
+                    parent_node._children[child_idx], parent_node._children[child_idx + 1] = (
+                        parent_node._children[child_idx + 1],
+                        parent_node._children[child_idx],
+                    )
+                    tree._invalidate()
+                    tree._build()
+                    tree.select_node(node)
+                    tree.scroll_to_node(node)
+                else:
+                    self.populate_tree(target_item=target_item)
+            else:
+                self.populate_tree(target_item=target_item)
+
+            self._schedule_save_quietly()
 
     def action_indent_item(self) -> None:
         tree = self.query_one("#tree", Tree)
@@ -2609,7 +2669,7 @@ class MenuEditScreen(Screen):
                 self.selected_item = target_item
                 self.modified = True
                 self.populate_tree(target_item=target_item)
-                self._save_menu_quietly()
+                self._schedule_save_quietly()
 
     def action_outdent_item(self) -> None:
         tree = self.query_one("#tree", Tree)
@@ -2633,9 +2693,13 @@ class MenuEditScreen(Screen):
             self.selected_item = target_item
             self.modified = True
             self.populate_tree(target_item=target_item)
-            self._save_menu_quietly()
+            self._schedule_save_quietly()
 
     def action_save_menu(self) -> None:
+        if getattr(self, "_save_timer", None) is not None:
+            with contextlib.suppress(Exception):
+                self._save_timer.stop()
+            self._save_timer = None
         try:
             with open(self.menu_file_path, "w", encoding="utf-8") as f:
                 f.write(bashmenu.dump_menu_yaml(self.menu_data))
@@ -2644,7 +2708,12 @@ class MenuEditScreen(Screen):
         except (yaml.YAMLError, OSError) as e:
             self.app.push_screen(bashmenu_ui.MessageModalScreen("Error", f"Failed to save menu:\n{e}", theme=self.theme_styles))
 
+    def on_unmount(self) -> None:
+        self._flush_pending_save()
+
     def action_exit_editor(self) -> None:
+        self._flush_pending_save()
+
         def safe_exit(res_val):
             if len(self.app.screen_stack) > 1:
                 try:

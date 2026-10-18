@@ -9,8 +9,11 @@ from unittest.mock import MagicMock, patch
 # Ensure the parent directory is in the import path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import contextlib
+
 import bashmenu
 import bashmenu_ui
+import menuedit
 import ymlcheck
 
 
@@ -3674,6 +3677,96 @@ G
         self.assertEqual(pushed[0].modal_title, "ASCII Character Table")
         self.assertIn("rich.sh", pushed[0].command)
         self.assertIn("ascii.md", pushed[0].command)
+
+    def test_menuedit_action_move_inplace_and_debounced_save(self):
+        """Verify MenuEditScreen moves items in-place without rebuilding tree and debounces quiet autosaves."""
+        import asyncio
+        import tempfile
+
+        from textual.app import App, ComposeResult
+        from textual.widgets import Tree
+
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".mnu") as temp_menu:
+            temp_path = temp_menu.name
+            temp_menu.write(
+                "version: 0.0.1\n"
+                "title: Test Menu\n"
+                "items:\n"
+                "  - title: Item A\n"
+                "    type: command\n"
+                "    command: echo A\n"
+                "  - title: Item B\n"
+                "    type: command\n"
+                "    command: echo B\n"
+                "  - title: Sub C\n"
+                "    type: submenu\n"
+                "    submenu:\n"
+                "      title: Sub C\n"
+                "      items:\n"
+                "        - title: Child 1\n"
+                "          type: command\n"
+                "          command: echo 1\n"
+                "        - title: Child 2\n"
+                "          type: command\n"
+                "          command: echo 2\n"
+            )
+
+        try:
+            class TestApp(App):
+                def compose(self) -> ComposeResult:
+                    yield menuedit.MenuEditScreen(menu_file_path=temp_path)
+
+            async def run():
+                app = TestApp()
+                async with app.run_test() as pilot:
+                    screen = app.query_one(menuedit.MenuEditScreen)
+                    tree = screen.query_one(Tree)
+                    await pilot.pause()
+
+                    node_a = tree.root.children[0]
+                    node_b = tree.root.children[1]
+                    sub_c = tree.root.children[2]
+                    sub_c.expand()
+                    await pilot.pause()
+                    child_1 = sub_c.children[0]
+                    child_2 = sub_c.children[1]
+
+                    # Move Item A down
+                    tree.select_node(node_a)
+                    screen.action_move_down()
+                    await pilot.pause()
+
+                    self.assertEqual(tree.root.children[0], node_b)
+                    self.assertEqual(tree.root.children[1], node_a)
+                    self.assertEqual(tree.cursor_node, node_a)
+                    self.assertTrue(sub_c.is_expanded)
+
+                    # Move Item A back up
+                    screen.action_move_up()
+                    await pilot.pause()
+                    self.assertEqual(tree.root.children[0], node_a)
+                    self.assertEqual(tree.root.children[1], node_b)
+                    self.assertEqual(tree.cursor_node, node_a)
+
+                    # Move inside submenu: Child 1 down
+                    tree.select_node(child_1)
+                    screen.action_move_down()
+                    await pilot.pause()
+                    self.assertEqual(sub_c.children[0], child_2)
+                    self.assertEqual(sub_c.children[1], child_1)
+                    self.assertEqual(tree.cursor_node, child_1)
+                    self.assertTrue(sub_c.is_expanded)
+
+                    # Verify debounced timer & flush
+                    self.assertIsNotNone(screen._save_timer)
+                    screen._flush_pending_save()
+                    self.assertIsNone(screen._save_timer)
+                    self.assertFalse(screen.modified)
+
+            asyncio.run(run())
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(temp_path)
 
 
 if __name__ == "__main__":

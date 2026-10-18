@@ -255,27 +255,34 @@ class TestWallpaperCompositor(unittest.TestCase):
         """Verify MainMenuView uses PrebakedWallpaperCanvas and updates selection across row changes."""
         cfg, _ = bashmenu.load_config()
         cfg["theme"] = "twilight"
-        menu, _ = bashmenu.load_menu()
+        menu = {
+            "version": "0.0.1",
+            "title": "Bash Menu",
+            "items": [
+                {"title": "Option 1", "type": "command", "command": "echo 1"},
+                {"title": "Option 2", "type": "command", "command": "echo 2"},
+            ],
+        }
 
         mv = bashmenu.MainMenuView(config=cfg, menu_data=menu)
         with patch.object(
             bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)
         ):
-            # First render warms the canvas (row 1 is initially selected)
-            mv.set_current_row(1)
+            # First render warms the canvas (row 0 is initially selected)
+            mv.set_current_row(0)
             frame1 = mv.render()
             self.assertIsNotNone(mv._canvas)
             self.assertTrue(mv._canvas.is_valid(mv._canvas._canvas_key))
 
-            # Navigate to row 3 (Applications, next selectable option after row 1)
-            mv.set_current_row(3)
+            # Navigate to row 1 (Option 2)
+            mv.set_current_row(1)
             frame2 = mv.render()
 
-            # Ensure row 1 and row 3 changed selection states (lines 4 and 6 in output)
+            # Ensure row 0 and row 1 changed selection states (lines 3 and 4 in output)
             lines1 = frame1.plain.splitlines()
             lines2 = frame2.plain.splitlines()
+            self.assertNotEqual(lines1[3], lines2[3])
             self.assertNotEqual(lines1[4], lines2[4])
-            self.assertNotEqual(lines1[6], lines2[6])
 
     def test_compositor_clustering_and_quantization_defaults(self):
         """Verify default WallpaperCompositor has clustering=0 and quantization=1, producing high color fidelity."""
