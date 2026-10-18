@@ -37,6 +37,7 @@ from textual.binding import Binding
 from textual.events import Key
 from textual.geometry import Region
 from textual.screen import Screen
+from textual.strip import Strip
 from textual.widget import Widget
 from textual.widgets import Static
 
@@ -761,7 +762,9 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None, trigger_toa
     if not text or not isinstance(text, str) or "{" not in text:
         return text if text is not None else ""
 
-    now = datetime.datetime.now(datetime.timezone.utc).astimezone()
+    now = None
+    if any(t_tok in text for t_tok in ("{date", "{time", "{utc_seconds}")):
+        now = datetime.datetime.now(datetime.timezone.utc).astimezone()
 
     def replace_toast(match):
         sec_str = match.group(1)
@@ -858,7 +861,8 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None, trigger_toa
         if "{bashmenu_dir}" in raw_cache:
             raw_cache = raw_cache.replace("{bashmenu_dir}", BASHMENU_DIR)
         resolved_cache = os.path.abspath(os.path.expanduser(raw_cache))
-        os.environ["CACHE_DIR"] = resolved_cache
+        if os.environ.get("CACHE_DIR") != resolved_cache:
+            os.environ["CACHE_DIR"] = resolved_cache
         cache_dir_setting = resolved_cache
 
     cur_profile = (
@@ -908,16 +912,16 @@ def interpolate_placeholders(text, config, depth=0, extra_vars=None, trigger_toa
         "{window_width}": str(win_w),
         "{screen_width}": str(scr_w),
         "{window_height}": str(win_h),
-        "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p") if "{date_time_12}" in res_text else "",
-        "{date_time_12_short}": now.strftime("%Y-%m-%d %I:%M %p") if "{date_time_12_short}" in res_text else "",
-        "{date_time_24}": now.strftime("%Y-%m-%d %H:%M:%S") if "{date_time_24}" in res_text else "",
-        "{date_time_24_short}": now.strftime("%Y-%m-%d %H:%M") if "{date_time_24_short}" in res_text else "",
-        "{date}": now.strftime("%Y-%m-%d") if "{date}" in res_text else "",
-        "{time_12}": now.strftime("%I:%M:%S %p") if "{time_12}" in res_text else "",
-        "{time_12_short}": now.strftime("%I:%M %p") if "{time_12_short}" in res_text else "",
-        "{time_24}": now.strftime("%H:%M:%S") if "{time_24}" in res_text else "",
-        "{time_24_short}": now.strftime("%H:%M") if "{time_24_short}" in res_text else "",
-        "{utc_seconds}": str(int(now.timestamp())) if "{utc_seconds}" in res_text else "",
+        "{date_time_12}": now.strftime("%Y-%m-%d %I:%M:%S %p") if (now and "{date_time_12}" in res_text) else "",
+        "{date_time_12_short}": now.strftime("%Y-%m-%d %I:%M %p") if (now and "{date_time_12_short}" in res_text) else "",
+        "{date_time_24}": now.strftime("%Y-%m-%d %H:%M:%S") if (now and "{date_time_24}" in res_text) else "",
+        "{date_time_24_short}": now.strftime("%Y-%m-%d %H:%M") if (now and "{date_time_24_short}" in res_text) else "",
+        "{date}": now.strftime("%Y-%m-%d") if (now and "{date}" in res_text) else "",
+        "{time_12}": now.strftime("%I:%M:%S %p") if (now and "{time_12}" in res_text) else "",
+        "{time_12_short}": now.strftime("%I:%M %p") if (now and "{time_12_short}" in res_text) else "",
+        "{time_24}": now.strftime("%H:%M:%S") if (now and "{time_24}" in res_text) else "",
+        "{time_24_short}": now.strftime("%H:%M") if (now and "{time_24_short}" in res_text) else "",
+        "{utc_seconds}": str(int(now.timestamp())) if (now and "{utc_seconds}" in res_text) else "",
         "{user-mode}": "Root" if os.geteuid() == 0 else "User",
         "{version}": __version__,
         "{localip}": get_primary_ip() if "{localip}" in res_text else PRIMARY_IP,
@@ -1904,34 +1908,17 @@ class PluginBuffer(Static):
             screen_div_w = max(20, screen_w - 2)
             avail_w = max(20, screen_w - 6)
 
-        raw_lines = get_plugin_display_lines(cfg, width=avail_w)
-        if not raw_lines:
+        raw_plugin_lines = get_plugin_outputs(cfg)
+        if not raw_plugin_lines:
             return Text()
 
         has_screen_divider = is_screen and any(
             any(tok in line for tok in ("{divider}", "{user.divider}", "{settings.divider}"))
-            for line in raw_lines
+            for line in raw_plugin_lines
         )
 
         if has_screen_divider:
             avail_w = max(20, screen_div_w - 4)
-
-        max_rows = min(10, len(raw_lines))
-        extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": max_rows}
-
-        items = get_plugin_display_items(
-            cfg,
-            avail_w=avail_w,
-            screen_div_w=screen_div_w,
-            has_screen_divider=has_screen_divider,
-            extra_vars=extra_vars,
-            theme_styles=theme_styles,
-            plugin_style=plugin_style,
-            bg_style=bg_style,
-        )
-
-        if not items:
-            return Text()
 
         grid = None
         theme_default_bg = None
@@ -1968,6 +1955,37 @@ class PluginBuffer(Static):
                     y_offset = 3 + total_content_rows - len(raw_p_lines) - sep_rows
                     x_offset = 1 if has_screen_divider else 3
 
+        theme_name = cfg.get("theme", "dracula")
+        cache_key = (
+            id(grid),
+            x_offset,
+            y_offset,
+            theme_name,
+            avail_w,
+            screen_div_w,
+            has_screen_divider,
+            tuple(raw_plugin_lines),
+        )
+        if getattr(self, "_cached_render_key", None) == cache_key and getattr(self, "_cached_render_text", None) is not None:
+            return self._cached_render_text.copy()
+
+        max_rows = min(10, len(raw_plugin_lines))
+        extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": max_rows}
+
+        items = get_plugin_display_items(
+            cfg,
+            avail_w=avail_w,
+            screen_div_w=screen_div_w,
+            has_screen_divider=has_screen_divider,
+            extra_vars=extra_vars,
+            theme_styles=theme_styles,
+            plugin_style=plugin_style,
+            bg_style=bg_style,
+        )
+
+        if not items:
+            return Text()
+
         out = Text()
         num_items = min(10, len(items))
         for idx in range(num_items):
@@ -1983,6 +2001,9 @@ class PluginBuffer(Static):
             out.append_text(line_rt)
             if idx < num_items - 1:
                 out.append("\n")
+
+        self._cached_render_key = cache_key
+        self._cached_render_text = out.copy()
         return out
 
 
@@ -2231,7 +2252,7 @@ class MainMenuView(Widget):
                 return self._render_menu_buffer()
         return self._render_menu_buffer()
 
-    def _render_menu_buffer(self) -> Text:
+    def _render_menu_buffer(self, assemble: bool = True) -> Text:
         """Constructs top/bottom window borders, menu titles, options with fixed 4-column
         icon slots and column 11 label alignment, shortcut badges, divider rules,
         and bottom status/help gutter using an in-memory pre-baked canvas for sub-millisecond assembly.
@@ -2402,32 +2423,53 @@ class MainMenuView(Widget):
         )
 
         active_opt_line = None
+        active_opt_strip = None
         if 0 <= curr_row < len(options) and not is_divider(options[curr_row]):
-            sc_char = getattr(self, "_shortcut_map", {}).get(curr_row, "")
-            borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
-            div_cfg = get_effective_divider_config(self.config)
-            length_val = div_cfg.get("length", "{window_width}")
-            is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
-            indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config, trigger_toasts=False), self.config)
-            extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
-
-            raw_active = self._render_raw_option_line(
-                curr_row,
-                options[curr_row],
-                True,
-                sc_char,
-                avail_w,
-                screen_div_w,
-                extra_vars,
-                theme_styles,
-                borders,
-                div_cfg,
-                is_screen,
-                indicator_symbol,
-                marquee_offset=self._marquee_tracker.offset,
-            )
             active_y = 3 + (curr_row - scroll_start)
-            active_opt_line = canvas.composite_dynamic_line(active_y, raw_active)
+            if self._marquee_tracker.offset != 0:
+                sc_char = getattr(self, "_shortcut_map", {}).get(curr_row, "")
+                borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
+                div_cfg = get_effective_divider_config(self.config)
+                length_val = div_cfg.get("length", "{window_width}")
+                is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
+                indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config, trigger_toasts=False), self.config)
+                extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
+
+                raw_active = self._render_raw_option_line(
+                    curr_row,
+                    options[curr_row],
+                    True,
+                    sc_char,
+                    avail_w,
+                    screen_div_w,
+                    extra_vars,
+                    theme_styles,
+                    borders,
+                    div_cfg,
+                    is_screen,
+                    indicator_symbol,
+                    marquee_offset=self._marquee_tracker.offset,
+                )
+                active_opt_line = canvas.composite_dynamic_line(active_y, raw_active)
+                active_opt_strip = bashmenu_ui.text_to_strip(active_opt_line)
+            else:
+                active_opt_line = canvas.get_option_line(active_y, curr_row, True)
+                active_opt_strip = canvas.get_option_strip(active_y, curr_row, True)
+
+        self._has_wallpaper = has_bg
+        self._wallpaper_frame_state = {
+            "h": h,
+            "scroll_start": scroll_start,
+            "curr_row": curr_row,
+            "visible_option_rows": visible_option_rows,
+            "num_options": len(options),
+            "gutter_y_start": gutter_y_start,
+            "num_gutter_lines": len(gutter_lines),
+            "active_option_strip": active_opt_strip,
+        }
+
+        if not assemble:
+            return Text()
 
         return canvas.assemble_frame(
             h,
@@ -2438,6 +2480,41 @@ class MainMenuView(Widget):
             gutter_y_start,
             gutter_lines,
             active_option_line=active_opt_line,
+        )
+
+    def _render_content(self) -> None:
+        """Render all lines, bypassing full Text->Content->Strip overhead when wallpaper canvas is active."""
+        self._render_menu_buffer(assemble=False)
+        if getattr(self, "_has_wallpaper", False):
+            self._dirty_regions.clear()
+            return
+        super()._render_content()
+
+    def render_line(self, y: int) -> Strip:
+        """Render a single line of content directly from pre-baked Strips."""
+        if not getattr(self, "_has_wallpaper", False):
+            return super().render_line(y)
+
+        if self.BLANK:
+            return Strip.blank(self.size.width, self.visual_style.rich_style)
+
+        if self._dirty_regions:
+            self._render_content()
+
+        state = getattr(self, "_wallpaper_frame_state", None)
+        canvas = getattr(self, "_canvas", None)
+        if not state or not canvas:
+            return Strip.blank(self.size.width, self.visual_style.rich_style)
+
+        return canvas.get_line_strip(
+            y,
+            scroll_start=state["scroll_start"],
+            curr_row=state["curr_row"],
+            visible_option_rows=state["visible_option_rows"],
+            num_options=state["num_options"],
+            gutter_y_start=state["gutter_y_start"],
+            num_gutter_lines=state["num_gutter_lines"],
+            active_option_strip=state.get("active_option_strip"),
         )
 
     def _build_canvas(

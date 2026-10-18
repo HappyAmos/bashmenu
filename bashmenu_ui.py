@@ -38,6 +38,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.geometry import Size
 from textual.screen import ModalScreen
+from textual.strip import Strip
 from textual.widgets import (
     Button,
     Checkbox,
@@ -2046,12 +2047,18 @@ def composite_menu_text(
     return out
 
 
+def text_to_strip(text: Text, console=None) -> Strip:
+    """Convert a Rich Text object to a Textual Strip without trailing newlines."""
+    c = console or get_compositor_console()
+    return Strip([s for s in c.render(text) if s.text != "\n"])
+
+
 class PrebakedWallpaperCanvas:
     """In-memory pre-baked canvas that pre-renders and caches wallpaper rows,
     static window borders/margins, and menu option rows.
 
-    Eliminates runtime compositing, regex parsing, and string formatting during keyboard
-    navigation, achieving sub-millisecond frame assembly.
+    Eliminates runtime compositing, regex parsing, string formatting, and Rich->Strip
+    conversions during keyboard navigation, achieving sub-millisecond frame assembly.
     """
 
     def __init__(
@@ -2065,23 +2072,29 @@ class PrebakedWallpaperCanvas:
 
         self._canvas_key: tuple | None = None
         self._static_lines: dict[int, Text] = {}
+        self._static_strips: dict[int, Strip] = {}
         self._raw_option_lines: dict[tuple[int, bool], Text] = {}
         self._option_line_cache: dict[tuple[int, int, bool], Text] = {}
+        self._option_strip_cache: dict[tuple[int, int, bool], Strip] = {}
         self._cached_gutter_key: tuple | None = None
         self._cached_gutter_lines: list[Text] = []
+        self._cached_gutter_strips: list[Strip] = []
 
     def is_valid(self, canvas_key: tuple) -> bool:
         """Check if the cached canvas matches the current state key."""
         return self._canvas_key == canvas_key and self._canvas_key is not None
 
     def invalidate(self) -> None:
-        """Clear all pre-baked lines and cached states."""
+        """Clear all pre-baked lines, strips, and cached states."""
         self._canvas_key = None
         self._static_lines.clear()
+        self._static_strips.clear()
         self._raw_option_lines.clear()
         self._option_line_cache.clear()
+        self._option_strip_cache.clear()
         self._cached_gutter_key = None
         self._cached_gutter_lines.clear()
+        self._cached_gutter_strips.clear()
 
     def set_grid(
         self,
@@ -2095,7 +2108,7 @@ class PrebakedWallpaperCanvas:
         self.console = console or get_compositor_console()
 
     def set_static_line(self, y: int, raw_line: Text) -> None:
-        """Pre-bake and store a static frame line at screen row y."""
+        """Pre-bake and store a static frame line and Strip at screen row y."""
         clean_line = raw_line.copy()
         if clean_line.plain.endswith("\n"):
             clean_line.rstrip()
@@ -2110,6 +2123,7 @@ class PrebakedWallpaperCanvas:
         else:
             composited = clean_line
         self._static_lines[y] = composited
+        self._static_strips[y] = text_to_strip(composited, self.console)
 
     def set_raw_option_line(self, opt_idx: int, is_selected: bool, raw_line: Text) -> None:
         """Store the uncomposited formatted line for an option."""
@@ -2119,7 +2133,7 @@ class PrebakedWallpaperCanvas:
         self._raw_option_lines[(opt_idx, is_selected)] = clean_line
 
     def prebake_option(self, y: int, opt_idx: int, is_selected: bool) -> Text:
-        """Composite and cache an option row at screen row y."""
+        """Composite and cache an option row and Strip at screen row y."""
         cached = self._option_line_cache.get((y, opt_idx, is_selected))
         if cached is not None:
             return cached
@@ -2140,6 +2154,7 @@ class PrebakedWallpaperCanvas:
             composited = raw_line
 
         self._option_line_cache[(y, opt_idx, is_selected)] = composited
+        self._option_strip_cache[(y, opt_idx, is_selected)] = text_to_strip(composited, self.console)
         return composited
 
     def get_option_line(self, y: int, opt_idx: int, is_selected: bool) -> Text:
@@ -2149,13 +2164,33 @@ class PrebakedWallpaperCanvas:
             return cached
         return self.prebake_option(y, opt_idx, is_selected)
 
+    def get_option_strip(self, y: int, opt_idx: int, is_selected: bool) -> Strip:
+        """Retrieve pre-baked option Strip from cache, or pre-bake if not cached."""
+        cached = self._option_strip_cache.get((y, opt_idx, is_selected))
+        if cached is not None:
+            return cached
+        self.prebake_option(y, opt_idx, is_selected)
+        return self._option_strip_cache.get((y, opt_idx, is_selected)) or Strip.blank(0)
+
+    def get_static_strip(self, y: int) -> Strip:
+        """Retrieve pre-baked static Strip from cache."""
+        cached = self._static_strips.get(y)
+        if cached is not None:
+            return cached
+        line = self._static_lines.get(y)
+        if line is not None:
+            st = text_to_strip(line, self.console)
+            self._static_strips[y] = st
+            return st
+        return Strip.blank(0)
+
     def get_gutter_lines(
         self,
         gutter_key: tuple,
         gutter_y_start: int,
         raw_gutter_lines: list[Text],
     ) -> list[Text]:
-        """Retrieve or composite gutter lines (help text and status badges)."""
+        """Retrieve or composite gutter lines and Strips (help text and status badges)."""
         if self._cached_gutter_key == gutter_key and self._cached_gutter_lines:
             return self._cached_gutter_lines
 
@@ -2179,7 +2214,43 @@ class PrebakedWallpaperCanvas:
 
         self._cached_gutter_key = gutter_key
         self._cached_gutter_lines = composited_gutters
+        self._cached_gutter_strips = [text_to_strip(line, self.console) for line in composited_gutters]
         return composited_gutters
+
+    def get_gutter_strip(self, g_idx: int) -> Strip:
+        """Retrieve pre-baked gutter Strip by index."""
+        if 0 <= g_idx < len(self._cached_gutter_strips):
+            return self._cached_gutter_strips[g_idx]
+        if 0 <= g_idx < len(self._cached_gutter_lines):
+            return text_to_strip(self._cached_gutter_lines[g_idx], self.console)
+        return Strip.blank(0)
+
+    def get_line_strip(
+        self,
+        y: int,
+        scroll_start: int,
+        curr_row: int,
+        visible_option_rows: int,
+        num_options: int,
+        gutter_y_start: int,
+        num_gutter_lines: int,
+        active_option_strip: Strip | None = None,
+    ) -> Strip:
+        """Retrieve pre-baked Strip for screen row y with zero concatenation or compositing overhead."""
+        if y < 3:
+            return self.get_static_strip(y)
+        if 3 <= y < 3 + visible_option_rows:
+            opt_offset = y - 3
+            opt_idx = scroll_start + opt_offset
+            if opt_idx < num_options:
+                if opt_idx == curr_row and active_option_strip is not None:
+                    return active_option_strip
+                return self.get_option_strip(y, opt_idx, opt_idx == curr_row)
+            return self.get_static_strip(y)
+        if gutter_y_start <= y < gutter_y_start + num_gutter_lines:
+            g_idx = y - gutter_y_start
+            return self.get_gutter_strip(g_idx)
+        return self.get_static_strip(y)
 
     def composite_dynamic_line(self, y: int, raw_line: Text) -> Text:
         """Composite a dynamic/marqueeing raw option line at screen row y without caching."""
@@ -3491,6 +3562,7 @@ class FilePickerModalScreen(ModalScreen[str]):
     #footer {
         text-align: center;
         margin-top: 1;
+        color: $text;
     }
     """
 
@@ -3531,15 +3603,16 @@ class FilePickerModalScreen(ModalScreen[str]):
         self.entries = []
 
     def _get_footer_text(self) -> str:
+        h_status = "Hidden*" if self.show_hidden_state else "Hidden"
         if self.mode == "save":
-            return "[ENTER] Save/Nav | [Ctrl+H] Hidden | [ESC] Cancel"
+            return f"[ENTER] Save/Nav | [Ctrl+H] {h_status} | [ESC] Cancel"
         if self.mode == "dir":
             if self.allow_new:
-                return "[ENTER] Open | [SPACE] Select | [Ctrl+H] Hidden | [N] New | [ESC] Cancel"
-            return "[ENTER] Open | [SPACE] Select | [Ctrl+H] Hidden | [ESC] Cancel"
+                return f"[ENTER] Open | [SPACE] Pick | [Ctrl+H] {h_status} | [N] New | [ESC] Cancel"
+            return f"[ENTER] Open | [SPACE] Select | [Ctrl+H] {h_status} | [ESC] Cancel"
         if self.allow_new:
-            return "[ENTER] Open/Select | [Ctrl+H] Hidden | [N] New File | [ESC] Cancel"
-        return "[ENTER] Open/Select | [Ctrl+H] Hidden | [ESC] Cancel"
+            return f"[ENTER] Open | [Ctrl+H] {h_status} | [N] New File | [ESC] Cancel"
+        return f"[ENTER] Open/Select | [Ctrl+H] {h_status} | [ESC] Cancel"
 
     def compose(self) -> ComposeResult:
         with ModalFrame(id="modal_frame"):
@@ -3786,6 +3859,8 @@ class FilePickerModalScreen(ModalScreen[str]):
     def action_toggle_hidden(self) -> None:
         self.show_hidden_state = not self.show_hidden_state
         self.load_directory()
+        with contextlib.suppress(Exception):
+            self.query_one("#footer", Label).update(self._get_footer_text())
         msg = "Showing hidden files" if self.show_hidden_state else "Hiding hidden files"
         with contextlib.suppress(Exception):
             self.notify(msg, title="File Picker", timeout=1.5)

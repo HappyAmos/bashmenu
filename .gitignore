@@ -1,6 +1,8 @@
 .gemini_chat_history.json
 .venv/
 __pycache__/
+.ruff_cache/
+.pytest_cache/
 .aicontext.txt
 .gemini.yaml
 .gemini

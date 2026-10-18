@@ -1944,10 +1944,11 @@ class BackgroundConfigModal(ModalScreen[dict | None]):
         self,
         current_background: dict | str | None = None,
         theme_styles: dict | None = None,
+        theme: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self.theme_styles = theme_styles or {}
+        self.theme_styles = theme_styles or theme or {}
         if isinstance(current_background, dict):
             self.bg_cfg = copy.deepcopy(current_background)
         elif isinstance(current_background, str):

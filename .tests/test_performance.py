@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from rich.text import Text
-from textual.geometry import Size
+from textual.geometry import Region, Size
 
 import bashmenu
 
@@ -55,6 +55,42 @@ class TestPerformanceAndResponsiveness(unittest.TestCase):
             self.assertLess(avg_ms, 15.0, f"Average render latency too high: {avg_ms:.2f}ms (target < 15ms)")
             max_limit = 100.0 if os.getenv("CI") else 35.0
             self.assertLess(max_ms, max_limit, f"Maximum single-frame latency too high: {max_ms:.2f}ms (target < {max_limit}ms)")
+
+    def test_wallpaper_strip_navigation_latency(self):
+        """Verify full-fidelity wallpaper strip rendering latency is < 2.0ms on navigation."""
+        wp_cfg = dict(self.cfg)
+        wp_cfg["theme"] = "twilight"
+        wp_cfg["settings"] = {
+            "background": {
+                "enabled": True,
+                "image": "assets/wallpapers/twilight.png",
+                "opacity": 0.35,
+                "scaling": "cover",
+                "clustering": 0,
+                "quantization": 1,
+            }
+        }
+        mv = bashmenu.MainMenuView(config=wp_cfg, menu_data=self.menu)
+        with patch.object(bashmenu.MainMenuView, "size", new_callable=PropertyMock, return_value=Size(80, 24)):
+            # Initial render warm-up
+            mv.render()
+
+            durations = []
+            for r in range(50):
+                mv.selected_rows = [r % 5]
+                # Simulate dirty row refresh in Textual
+                mv._dirty_regions.add(Region(0, 3 + (r % 5), 80, 1))
+                t0 = time.perf_counter()
+                s1 = mv.render_line(3 + (r % 5))
+                durations.append((time.perf_counter() - t0) * 1000.0)
+
+            avg_ms = sum(durations) / len(durations)
+            max_ms = max(durations)
+
+            self.assertGreater(s1.cell_length, 0)
+            self.assertLess(avg_ms, 2.0, f"Wallpaper navigation strip latency too high: {avg_ms:.2f}ms (target < 2.0ms)")
+            max_limit = 50.0 if os.getenv("CI") else 10.0
+            self.assertLess(max_ms, max_limit, f"Maximum wallpaper strip latency too high: {max_ms:.2f}ms")
 
     def test_mouse_move_intra_row_latency(self):
         """Verify intra-row mouse movements are debounced and execute in < 0.2ms."""

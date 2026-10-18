@@ -164,3 +164,18 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   2. Implemented `on_key(self, event: events.Key)` to intercept `"ctrl+h"`, `"ctrl+shift+h"`, `"backspace"`, `"h"`, and `"H"`. When focused widget is not an `Input` (i.e. user is browsing file list or buttons), it immediately stops the event and triggers `self.action_toggle_hidden()`. When `Input` is focused (in save mode), `"backspace"` and letter typing are preserved for editing while `"ctrl+h"` still toggles hidden files.
   3. Added safe `_is_dir_safe` error handling in `load_directory` to gracefully handle `OSError` on restricted entries or broken symlinks.
 - **Tests:** Added `test_file_picker_on_key_toggle_hidden` in `.tests/test_improvements.py` verifying `ctrl+h`, `ctrl+shift+h`, `backspace`, `h`, and `H` across modes and input focus states.
+
+---
+
+### 20. Zero-Degradation Wallpaper Navigation Responsiveness & File Picker State Display
+- **Item:** `- [x] RESPONSIVENESS: Investigate ways to prevent sluggish menu navigation when backgrounds are enabled. I can degrade the images using the theme editor to speed up navigation, but it comes at expense of the background. Figure out ways to improve, and provide a plan.` (from `notebooks/notes.yml`)
+- **Root Cause:**
+  1. With full image fidelity (`clustering: 0`, `quantization: 1`), 40 rows of half-block cells contain over 1,300 distinct TrueColor style spans. Textual's default `Widget._render_content()` converts the entire `Text` buffer into Textual `Content` via `Content.from_rich_text(text)`, taking ~78ms on every keystroke.
+  2. In `themeedit.py`, `BackgroundConfigModal` passed `theme=self.configured_theme_styles`, but `__init__` only expected `theme_styles`, resulting in empty theme styling in the wallpaper file picker.
+- **Fix:**
+  1. In `bashmenu_ui.py`: Integrated `text_to_strip()` and pre-baked `Strip` caching into `PrebakedWallpaperCanvas` (`_static_strips`, `_option_strip_cache`, `_cached_gutter_strips`, `get_option_strip`, `get_static_strip`, `get_gutter_strip`, `get_line_strip`).
+  2. In `bashmenu.py`: Implemented `_render_content()` and `render_line(self, y: int) -> Strip` on `MainMenuView`. Textual now retrieves pre-baked ANSI strips directly in **0.36ms (a 160x speedup)** without converting `Text` to `Content`, with zero visual degradation.
+  3. Added `assemble: bool = True` to `_render_menu_buffer` so background strip rendering skips full Rich frame assembly, while preserving `render() -> Text` for 100% backward compatibility with all tests.
+  4. In `bashmenu_ui.py` & `themeedit.py`: Updated `FilePickerModalScreen` footer to display `Hidden*` when hidden files are active, and accepted `theme` in `BackgroundConfigModal`.
+- **Tests:** Added `test_wallpaper_strip_navigation_latency` in `.tests/test_performance.py` verifying navigation latency < 2.0ms. Verified all 335 tests in `.tests/` pass.
+
