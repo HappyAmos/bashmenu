@@ -15,3 +15,4 @@ notebook:
           - [x] BUG: Open dialogs, such as the one to choose a background wallpaper in the theme editor, or the open dialog to select a file in the text editor, do not include the <ctl> + <h> functionality to toggle hidden files displayed/hidden.
           - [x] RESPONSIVENESS: Investigate ways to prevent sluggish menu navigation when backgrounds are enabled. Implemented zero-degradation Strip caching on PrebakedWallpaperCanvas and MainMenuView render_line fast-path, reducing navigation latency from 58ms to 0.36ms.
           - [ ] FEATURE: Add a keyboard shortcut toggle in the notebooks to show or hide completed checkboxes (view mode only). Default state should be hidden for completed items.
+          - [ ] Update the dialogs for choosing a background wallpaper in the theme editor, and the open files dialog for the text editor to display help text to display hidden files.
