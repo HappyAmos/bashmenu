@@ -1,0 +1,18 @@
+name: Lint Shell Scripts
+
+on: [push, pull_request]
+
+jobs:
+  shellcheck:
+    name: Run Native ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint Specific Scripts
+        run: |
+          # Fails the workflow if any script in your target folder has issues
+          shellcheck *.sh
+          shellcheck scripts/*.sh
+
