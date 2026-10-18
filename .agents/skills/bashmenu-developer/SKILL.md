@@ -374,3 +374,5 @@ description: Core developer guidelines for the multi-platform BashMenu
 
 ## 11. Additional Directives
 - **Continuation Directive:** When you are done working on a task, check `.agents/skills/bashmenu-developer/TODO.md` for additional tasks, bugs or improvements to work on as soon as you finish. This document is a standard markdown TODO list, utilizing markdown checkboxes. When you are done working on the new task in `.agents/skills/bashmenu-developer/TODO.md`, check off the todo item to indicate it is finished, and inform the user that the task is complete, with a description of what you found/discovered and how you fixed it. If you encounter something you need feedback on, pause the task and ask the user for guidance.
+- **Self Organization:** If you are given multiple tasks, add them to the TODO.md list, and then work on them in the order they appear. Check them off as you complete them, and be sure to describe what you found and how you fixed it to the user.
+
