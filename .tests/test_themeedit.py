@@ -128,7 +128,7 @@ class TestThemeEditor(unittest.TestCase):
         }
 
         # 1. Menu Editor preview tab
-        widget_ed = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="editor")
+        widget_ed = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="menu_editor")
         rendered_ed = widget_ed.render()
         lines_ed = rendered_ed.plain.split("\n")
         window_rows_ed = [l for l in lines_ed if "░" in l and not l.strip().startswith("░")]
@@ -136,7 +136,16 @@ class TestThemeEditor(unittest.TestCase):
         self.assertTrue(len(widths_ed) > 3)
         self.assertEqual(len(set(widths_ed)), 1, f"Menu editor rows width mismatch: {widths_ed}")
 
-        # 2. Modals & Popups preview tab
+        # 2. Text Editor preview tab
+        widget_text = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="text_editor")
+        rendered_text = widget_text.render()
+        lines_text = rendered_text.plain.split("\n")
+        window_rows_text = [l for l in lines_text if "░" in l and not l.strip().startswith("░")]
+        widths_text = [cell_len(l) for l in window_rows_text]
+        self.assertTrue(len(widths_text) > 3)
+        self.assertEqual(len(set(widths_text)), 1, f"Text editor rows width mismatch: {widths_text}")
+
+        # 3. Modals & Popups preview tab
         widget_modal = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="modals")
         rendered_modal = widget_modal.render()
         lines_modal = rendered_modal.plain.split("\n")
@@ -1898,7 +1907,7 @@ class TestThemeEditor(unittest.TestCase):
         asyncio.run(_run())
 
     def test_preview_pane_tabs_and_modes(self):
-        """Verify preview panel tabs switch between Mock Menu, Menu Editor, and Modals preview modes."""
+        """Verify preview panel tabs switch between Mock Menu, Menu Editor, Text Editor, and Modals preview modes."""
         app = themeedit.ThemeEditApp("dracula")
 
         async def _run():
@@ -1915,10 +1924,18 @@ class TestThemeEditor(unittest.TestCase):
                 # Switch to Menu Editor tab
                 tabs.active = "tab_menu_editor"
                 await pilot.pause()
-                self.assertEqual(preview.preview_mode, "editor")
+                self.assertEqual(preview.preview_mode, "menu_editor")
                 rendered_editor = preview.render().plain
                 self.assertIn("Menu Editor", rendered_editor)
                 self.assertIn("Save", rendered_editor)
+
+                # Switch to Text Editor tab
+                tabs.active = "tab_text_editor"
+                await pilot.pause()
+                self.assertEqual(preview.preview_mode, "text_editor")
+                rendered_textedit = preview.render().plain
+                self.assertIn("BashEdit", rendered_textedit)
+                self.assertIn("Help", rendered_textedit)
 
                 # Switch to Modals & Popups tab
                 tabs.active = "tab_modals"
@@ -1934,6 +1951,52 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertEqual(preview.preview_mode, "menu")
 
         asyncio.run(_run())
+
+    def test_auto_derive_fallback_depths_nested(self):
+        """Verify recursive palette derivation for nested menu_editor, editor, and modals blocks."""
+        pal_256 = {
+            "background": 234,
+            "title": [212, -1],
+            "border": [61, -1],
+            "text": [255, -1],
+            "menu_editor": {
+                "background": 234,
+                "header": [212, -1],
+                "border": [61, -1],
+                "text": [255, -1],
+                "selection": [255, 61],
+            },
+            "editor": {
+                "background": 234,
+                "header": [212, -1],
+                "tab_active": [255, 61],
+                "gutter": [239, -1],
+                "text": [255, -1],
+            },
+            "modals": {
+                "backdrop": [236, "COLOR_BLACK"],
+                "background": 234,
+                "border": [61, -1],
+                "title": [212, -1],
+                "button_confirm": [255, 40],
+            },
+        }
+
+        pal_16, pal_8 = themeedit.auto_derive_fallback_depths(pal_256)
+
+        # Check nested structures exist
+        self.assertIn("menu_editor", pal_16)
+        self.assertIn("editor", pal_16)
+        self.assertIn("modals", pal_16)
+        self.assertIn("menu_editor", pal_8)
+        self.assertIn("editor", pal_8)
+        self.assertIn("modals", pal_8)
+
+        # Check values are converted to valid ANSI color names
+        self.assertIn("COLOR_", str(pal_16["menu_editor"]["header"][0]))
+        self.assertEqual(pal_16["menu_editor"]["header"][1], -1)
+        self.assertIn("COLOR_", str(pal_8["editor"]["tab_active"][1]))
+        self.assertIn("COLOR_", str(pal_8["modals"]["button_confirm"][1]))
 
 
 if __name__ == "__main__":

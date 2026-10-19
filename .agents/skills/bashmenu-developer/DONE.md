@@ -195,3 +195,33 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   - Added `test_note_viewer_toggle_completed_checkboxes_h_key` in `.tests/test_notebook.py`.
   - Updated `test_note_viewer_interactive_checkboxes_space_and_click` and `test_note_viewer_text_wrapping_for_checkboxes` to verify default hidden state and toggle behavior.
 
+---
+
+### 22. Theme Editor Reality Backgrounds, Text Editor Preview Tab & Dedicated Color Settings
+- **Item:** `- [x] UI: Theme editor: the backgrounds of the Menu Editor tab, and the Modals & Popups tab do not reflect reality. Further, I would like an additional tab "Editor" to display a mock version of the built-in text editor. Dedicated color settings in property inspector for menu_editor, editor, and modals with recursive 16/8 derivation and theme generation from image.` (from `notebooks/notes.yml`)
+- **Root Cause:**
+  1. In `themeedit.py`, `_finalize_preview_lines` was unconditionally calling `composite_menu_text()` on the full canvas across all preview tabs, bleeding half-block wallpaper through the Menu Editor workspace and directly across the solid interior of modal dialogs.
+  2. The Theme Editor lacked a preview tab for the built-in text editor (`bashedit.py`), as well as dedicated UI color controls for Menu Editor, Text Editor, and Modals.
+- **Fix:**
+  1. In `themeedit.py`:
+     - Added parameter `allow_wallpaper: bool = True` and `dialog_bounds: tuple[int, int, int, int] | None = None` to `_finalize_preview_lines`. Wallpaper half-block bleed is completely disabled on Menu Editor and Text Editor tabs (rendering authentic solid backgrounds).
+     - In `_render_modals`, protected the inner modal dialog area using `self._modal_dialog_bounds`, compositing dimmed wallpaper only in the outer backdrop.
+     - Added `_render_text_editor()` rendering a high-fidelity mock of `bashedit.py` (window header with close button, multi-file tab bar, line number gutter `1 │`, text/selection/cursor, divider, status line, and nano-style shortcut legend).
+     - Added `Tab("Text Editor", id="tab_text_editor")` to `preview_tabs` and wired `on_preview_tab_changed` to switch among `menu`, `menu_editor`, `text_editor`, and `modals`.
+     - Defined `MENU_EDITOR_TOKENS`, `EDITOR_TOKENS`, and `MODALS_TOKENS` and added 3 collapsible dropdown sections in property inspector: `▶ Menu Editor Colors`, `▶ Text Editor Colors`, and `▶ Modals & Popups Colors`.
+     - Updated `on_input_changed`, `on_button_pressed`, `action_pick_color`, and `_populate_inputs` to support nested double-underscore IDs (e.g. `color_menu_editor__header`, `color_editor__gutter`, `color_modals__border`).
+  2. In `bashmenu_ui.py`:
+     - Updated `init_theme_colors()` to parse nested dictionaries under depth sections into nested Rich `Style` mappings.
+  3. In `ymlcheck.py`:
+     - Updated `validate_depth_section()` to support nested dictionary blocks under `256`, `16`, and `8` palettes.
+  4. In `themeedit.py` (`auto_derive_fallback_depths`):
+     - Made `auto_derive_fallback_depths` recursive so all nested sections under `256` automatically derive compatible 16-color and 8-color fallback dictionaries.
+  5. In `scripts/theme_from_image.py`:
+     - Automatically generates complete nested `menu_editor`, `editor`, and `modals` color blocks in `palette_256`, auto-deriving 16 and 8 tiers.
+- **Tests:**
+  - Added `test_auto_derive_fallback_depths_nested` in `.tests/test_themeedit.py` verifying recursive derivation.
+  - Updated `test_preview_pane_tabs_and_modes` to verify all 4 preview modes (`menu`, `menu_editor`, `text_editor`, `modals`).
+  - Updated `test_theme_preview_tabs_border_alignment` to verify alignment across Menu Editor, Text Editor, and Modals tabs.
+  - Verified full test suite (337 tests) passes cleanly.
+
+

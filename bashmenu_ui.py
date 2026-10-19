@@ -1496,7 +1496,22 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
         if key == "background":
             continue
         try:
-            if isinstance(spec, list) and len(spec) >= 2:
+            if isinstance(spec, dict):
+                sub_styles = {}
+                sub_bg_spec = spec.get("background")
+                sub_bg = parse_color_val(sub_bg_spec) if sub_bg_spec is not None else bg_color
+                sub_styles["background"] = Style(bgcolor=sub_bg) if sub_bg else styles["background"]
+                for s_k, s_v in spec.items():
+                    if s_k == "background":
+                        continue
+                    if isinstance(s_v, list) and len(s_v) >= 2:
+                        s_fg = parse_color_val(s_v[0])
+                        s_bg = parse_color_val(s_v[1]) if s_v[1] != -1 and str(s_v[1]).strip() not in ("-1", "None", "transparent") else sub_bg
+                        sub_styles[s_k] = Style(color=s_fg, bgcolor=s_bg)
+                    elif isinstance(s_v, (str, int)):
+                        sub_styles[s_k] = Style(color=parse_color_val(s_v), bgcolor=sub_bg)
+                styles[key] = sub_styles
+            elif isinstance(spec, list) and len(spec) >= 2:
                 fg = parse_color_val(spec[0])
                 if key == "plugin" and (spec[1] == -1 or str(spec[1]).strip() in ("-1", "inherit", "transparent", "None")):
                     bg = None

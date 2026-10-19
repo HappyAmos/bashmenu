@@ -25,7 +25,7 @@ notebook:
         \ navigation latency from 58ms to 0.36ms.\n- [x] FEATURE: Add a keyboard\
         \ shortcut toggle in the notebooks to show or hide completed checkboxes (view\
         \ mode only). Default state should be hidden for completed items. The shortcut\
-        \ should be displayed in the help gutter of the view-mode editor.\n- [ ] PENDING: UI:\
+        \ should be displayed in the help gutter of the view-mode editor.\n- [x] UI:\
         \ Theme editor: the backgrounds of the Menu Editor tab, and the Modals & Popups\
         \ tab do not reflect reality. Further, I would like an additional tab \"Editor\"\
         \ to display a mock version of the built-in text editor. I am going to be\

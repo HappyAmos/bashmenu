@@ -154,7 +154,11 @@ def auto_derive_fallback_depths(palette_256: dict) -> tuple[dict, dict]:
     palette_8 = {}
 
     for k, val in palette_256.items():
-        if k == "background":
+        if isinstance(val, dict):
+            sub16, sub8 = auto_derive_fallback_depths(val)
+            palette_16[k] = sub16
+            palette_8[k] = sub8
+        elif k == "background":
             palette_16[k] = nearest_ansi_color(val, 16)
             palette_8[k] = nearest_ansi_color(val, 8)
         elif isinstance(val, (list, tuple)) and len(val) >= 2:
@@ -2578,10 +2582,16 @@ class ThemePreviewWidget(Static):
     ) -> list[Text]:
         lines: list[Text] = []
 
-        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
-        btn_primary_style = styles.get("button_primary", Style(color="green", bold=True))
-        btn_error_style = styles.get("button_error", Style(color="red", bold=True))
+        me_styles = styles.get("menu_editor", {}) if isinstance(styles.get("menu_editor"), dict) else {}
+        b_style = me_styles.get("border") or b_style
+        t_style = me_styles.get("header") or t_style
+        text_style = me_styles.get("text") or text_style
+        sel_style = me_styles.get("selection") or sel_style
+        btn_primary_style = me_styles.get("button_save") or styles.get("button_primary", Style(color="green", bold=True))
+        btn_error_style = me_styles.get("button_delete") or styles.get("button_error", Style(color="red", bold=True))
+        help_style = me_styles.get("footer") or help_style
         scrollbar_style = styles.get("scrollbar", Style(color="blue", bold=True))
+        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
 
         # Top border with title and close button [X]
         title_str = f"{b_cap_l} Menu Editor {b_cap_r}"
@@ -2598,15 +2608,15 @@ class ThemePreviewWidget(Static):
         top_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(top_line)
 
-        set_hit_range(0, 0, 3, "color_border", "prop_border_top_left")
+        set_hit_range(0, 0, 3, "color_menu_editor__border", "prop_border_top_left")
         title_start = 3
         title_end = title_start + len(title_str)
-        set_hit_range(0, title_start, title_end, "color_title", "title")
+        set_hit_range(0, title_start, title_end, "color_menu_editor__header", "title")
         close_start = title_end + avail_top
         close_end = close_start + len(close_str)
-        set_hit_range(0, title_end, close_start, "color_border", "prop_border_horizontal")
+        set_hit_range(0, title_end, close_start, "color_menu_editor__border", "prop_border_horizontal")
         set_hit_range(0, close_start, close_end, "color_window_close_button", "close_button")
-        set_hit_range(0, close_end, w, "color_border", "prop_border_top_right")
+        set_hit_range(0, close_end, w, "color_menu_editor__border", "prop_border_top_right")
         set_hit_range(0, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Inner body
@@ -2664,21 +2674,21 @@ class ThemePreviewWidget(Static):
             row_line.append(shadow_ch * 2, style=shadow_style)
             lines.append(row_line)
 
-            set_hit_range(y_curr, 0, 1, "color_border", "prop_border_vertical")
+            set_hit_range(y_curr, 0, 1, "color_menu_editor__border", "prop_border_vertical")
             if is_selected:
-                set_hit_range(y_curr, 1, 1 + split_x, "color_selection", "color_highlight")
+                set_hit_range(y_curr, 1, 1 + split_x, "color_menu_editor__selection", "color_highlight")
             else:
-                set_hit_range(y_curr, 1, 1 + split_x, "color_text", "tree_item")
-            set_hit_range(y_curr, 1 + split_x, 2 + split_x, "color_border", "prop_border_vertical")
+                set_hit_range(y_curr, 1, 1 + split_x, "color_menu_editor__text", "tree_item")
+            set_hit_range(y_curr, 1 + split_x, 2 + split_x, "color_menu_editor__border", "prop_border_vertical")
 
             if "[ Save ]" in prop_item:
-                set_hit_range(y_curr, 2 + split_x, 2 + split_x + 10, "color_button_primary", "button_save")
-                set_hit_range(y_curr, 2 + split_x + 10, w - 2, "color_button_error", "button_delete")
+                set_hit_range(y_curr, 2 + split_x, 2 + split_x + 10, "color_menu_editor__button_save", "button_save")
+                set_hit_range(y_curr, 2 + split_x + 10, w - 2, "color_menu_editor__button_delete", "button_delete")
             else:
-                set_hit_range(y_curr, 2 + split_x, w - 2, "color_text", "property")
+                set_hit_range(y_curr, 2 + split_x, w - 2, "color_menu_editor__text", "property")
 
             set_hit_range(y_curr, w - 2, w - 1, "color_scrollbar", "scrollbar")
-            set_hit_range(y_curr, w - 1, w, "color_border", "prop_border_vertical")
+            set_hit_range(y_curr, w - 1, w, "color_menu_editor__border", "prop_border_vertical")
             set_hit_range(y_curr, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Bottom gutter / shortcut line
@@ -2695,9 +2705,9 @@ class ThemePreviewWidget(Static):
         g_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(g_line)
 
-        set_hit_range(y_g, 0, 1, "color_border", "gutter_border")
-        set_hit_range(y_g, 1, w - 1, "color_gutter", "color_help_text")
-        set_hit_range(y_g, w - 1, w, "color_border", "gutter_border")
+        set_hit_range(y_g, 0, 1, "color_menu_editor__border", "gutter_border")
+        set_hit_range(y_g, 1, w - 1, "color_menu_editor__footer", "color_help_text")
+        set_hit_range(y_g, w - 1, w, "color_menu_editor__border", "gutter_border")
         set_hit_range(y_g, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Bottom border
@@ -2707,7 +2717,7 @@ class ThemePreviewWidget(Static):
         b_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(b_line)
 
-        set_hit_range(y_bot, 0, w, "color_border", "prop_border_bottom")
+        set_hit_range(y_bot, 0, w, "color_menu_editor__border", "prop_border_bottom")
         set_hit_range(y_bot, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Drop shadow below
@@ -2715,6 +2725,213 @@ class ThemePreviewWidget(Static):
         s_line = Text("  " + shadow_ch * w, style=shadow_style)
         lines.append(s_line)
         set_hit_range(y_sh, 2, 2 + w, "color_shadow", "prop_shadow_char")
+
+        return lines
+
+    def _render_text_editor(
+        self,
+        w: int,
+        num_rows: int,
+        styles: dict,
+        borders: dict,
+        shadow_ch: str,
+        shadow_style: Style,
+        set_hit_range: Any,
+        b_tl: str,
+        b_tr: str,
+        b_bl: str,
+        b_br: str,
+        b_h_top: str,
+        b_h_bot: str,
+        b_v_left: str,
+        b_v_right: str,
+        b_cap_l: str,
+        b_cap_r: str,
+        b_style: Style,
+        t_style: Style,
+        text_style: Style,
+        sel_style: Style,
+        gutter_style: Style,
+        help_style: Style,
+    ) -> list[Text]:
+        lines: list[Text] = []
+
+        ed_styles = styles.get("editor", {}) if isinstance(styles.get("editor"), dict) else {}
+        ed_b_style = ed_styles.get("border") or b_style
+        ed_hdr_style = ed_styles.get("header") or t_style
+        ed_text_style = ed_styles.get("text") or text_style
+        ed_sel_style = ed_styles.get("selection") or sel_style
+        ed_gutter_style = ed_styles.get("gutter") or gutter_style
+        ed_tab_act_style = ed_styles.get("tab_active") or sel_style
+        ed_tab_inact_style = ed_styles.get("tab_inactive") or text_style
+        ed_status_style = ed_styles.get("status") or ed_hdr_style
+        ed_footer_style = ed_styles.get("footer") or help_style
+        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
+
+        # Row 0: Top window border / header bar with title and close button
+        title_str = f"{b_cap_l} BashEdit - notes.md {b_cap_r}"
+        close_str = f"{b_cap_l}X{b_cap_r}"
+        avail_top = max(1, w - len(title_str) - len(close_str) - 6)
+        top_line = Text()
+        top_line.append(b_tl + b_h_top * 2, style=ed_b_style)
+        top_line.append(title_str, style=ed_hdr_style)
+        top_line.append(b_h_top * avail_top, style=ed_b_style)
+        top_line.append(close_str, style=close_btn_style)
+        rem_top = max(1, w - 3 - len(title_str) - avail_top - len(close_str) - 1)
+        top_line.append(b_h_top * rem_top + b_tr, style=ed_b_style)
+        top_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(top_line)
+
+        set_hit_range(0, 0, 3, "color_editor__header", "prop_border_top_left")
+        set_hit_range(0, 3, 3 + len(title_str), "color_editor__header", "title")
+        set_hit_range(0, 3 + len(title_str), 3 + len(title_str) + avail_top, "color_editor__border", "prop_border_horizontal")
+        set_hit_range(0, 3 + len(title_str) + avail_top, 3 + len(title_str) + avail_top + len(close_str), "color_window_close_button", "close_button")
+        set_hit_range(0, 3 + len(title_str) + avail_top + len(close_str), w, "color_editor__border", "prop_border_top_right")
+        set_hit_range(0, w, w + 2, "color_shadow", "prop_shadow_char")
+
+        # Row 1: Editor tab bar
+        tab_line = Text()
+        tab_line.append(b_v_left, style=ed_b_style)
+        t_active = " 1: notes.md * "
+        t_close = "✕ "
+        t_inact = " 2: config.sh "
+        t_add = " [+] "
+        tab_line.append(t_active, style=ed_tab_act_style)
+        tab_line.append(t_close, style=ed_tab_act_style)
+        tab_line.append(t_inact, style=ed_tab_inact_style)
+        tab_line.append(t_add, style=ed_tab_inact_style)
+        used_tab = len(t_active) + len(t_close) + len(t_inact) + len(t_add)
+        pad_tab = max(0, w - 2 - used_tab)
+        tab_line.append(" " * pad_tab, style=ed_text_style)
+        tab_line.append(b_v_right, style=ed_b_style)
+        tab_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(tab_line)
+
+        set_hit_range(1, 0, 1, "color_editor__border")
+        set_hit_range(1, 1, 1 + len(t_active) + len(t_close), "color_editor__tab_active")
+        set_hit_range(1, 1 + len(t_active) + len(t_close), 1 + used_tab, "color_editor__tab_inactive")
+        set_hit_range(1, 1 + used_tab, w - 1, "color_editor__background", "color_background")
+        set_hit_range(1, w - 1, w, "color_editor__border")
+        set_hit_range(1, w, w + 2, "color_shadow")
+
+        # Row 2: Divider below tab bar
+        tdiv_line = Text()
+        tdiv_line.append("├" + b_h_top * (w - 2) + "┤", style=ed_b_style)
+        tdiv_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(tdiv_line)
+        set_hit_range(2, 0, w, "color_editor__border")
+        set_hit_range(2, w, w + 2, "color_shadow")
+
+        # Body rows (code / text buffer)
+        body_rows = max(4, num_rows - 5)
+        mock_code = [
+            (" 1 │ ", "# Project Checklist & Tasks"),
+            (" 2 │ ", "- [x] Setup architecture review"),
+            (" 3 │ ", "- [ ] Deploy release to cluster█"),
+            (" 4 │ ", "      port: 8080"),
+            (" 5 │ ", "      workers: 4"),
+            (" ~ │ ", ""),
+            (" ~ │ ", ""),
+        ]
+        while len(mock_code) < body_rows:
+            mock_code.append((" ~ │ ", ""))
+
+        for r_i, (gutter_str, code_str) in enumerate(mock_code[:body_rows]):
+            y_r = 3 + r_i
+            c_line = Text()
+            c_line.append(b_v_left, style=ed_b_style)
+            c_line.append(gutter_str, style=ed_gutter_style)
+
+            inner_code_w = max(4, w - 2 - len(gutter_str))
+            code_text = Text()
+            if r_i == 1:
+                # Highlight "Setup architecture review" as selection
+                code_text.append("- [x] ", style=ed_text_style)
+                code_text.append("Setup architecture review", style=ed_sel_style)
+            elif r_i == 2:
+                # With cursor
+                code_text.append("- [ ] Deploy release to cluster", style=ed_text_style)
+                code_text.append("█", style=Style(color="cyan", bold=True))
+            else:
+                code_text.append(code_str, style=ed_text_style)
+
+            if code_text.cell_len > inner_code_w:
+                code_text.truncate(inner_code_w)
+            c_pad = max(0, inner_code_w - code_text.cell_len)
+            code_text.append(" " * c_pad)
+            c_line.append_text(code_text)
+            c_line.append(b_v_right, style=ed_b_style)
+            c_line.append(shadow_ch * 2, style=shadow_style)
+            lines.append(c_line)
+
+            set_hit_range(y_r, 0, 1, "color_editor__border")
+            set_hit_range(y_r, 1, 1 + len(gutter_str), "color_editor__gutter")
+            if r_i == 1:
+                set_hit_range(y_r, 1 + len(gutter_str) + 6, w - 2, "color_editor__selection")
+            else:
+                set_hit_range(y_r, 1 + len(gutter_str), w - 2, "color_editor__text")
+            set_hit_range(y_r, w - 1, w, "color_editor__border")
+            set_hit_range(y_r, w, w + 2, "color_shadow")
+
+        # Divider above status
+        y_div2 = 3 + body_rows
+        d_line2 = Text()
+        d_line2.append("├" + b_h_bot * (w - 2) + "┤", style=ed_b_style)
+        d_line2.append(shadow_ch * 2, style=shadow_style)
+        lines.append(d_line2)
+        set_hit_range(y_div2, 0, w, "color_editor__border")
+        set_hit_range(y_div2, w, w + 2, "color_shadow")
+
+        # Status row
+        y_st = y_div2 + 1
+        st_line = Text()
+        st_line.append(b_v_left, style=ed_b_style)
+        st_left = " [ Read 18 lines ] "
+        st_right = " Line: 3  Col: 15 "
+        st_pad = max(0, w - 2 - len(st_left) - len(st_right))
+        st_line.append(st_left, style=ed_status_style)
+        st_line.append(" " * st_pad, style=ed_status_style)
+        st_line.append(st_right, style=ed_status_style)
+        st_line.append(b_v_right, style=ed_b_style)
+        st_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(st_line)
+        set_hit_range(y_st, 0, 1, "color_editor__border")
+        set_hit_range(y_st, 1, w - 1, "color_editor__status")
+        set_hit_range(y_st, w - 1, w, "color_editor__border")
+        set_hit_range(y_st, w, w + 2, "color_shadow")
+
+        # Footer shortcut legend
+        y_ft = y_st + 1
+        ft_line = Text()
+        ft_line.append("├", style=ed_b_style)
+        legend_txt = " ^G Help | ^O Save | ^R Open | ^W Find | ^K Cut | ^X Exit "
+        leg_part = Text(legend_txt, style=ed_footer_style)
+        if leg_part.cell_len > w - 2:
+            leg_part.truncate(w - 2)
+        leg_pad = max(0, w - 2 - leg_part.cell_len)
+        ft_line.append_text(leg_part)
+        ft_line.append(b_h_bot * leg_pad + "┤", style=ed_b_style)
+        ft_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(ft_line)
+        set_hit_range(y_ft, 0, 1, "color_editor__border")
+        set_hit_range(y_ft, 1, w - 1, "color_editor__footer")
+        set_hit_range(y_ft, w - 1, w, "color_editor__border")
+        set_hit_range(y_ft, w, w + 2, "color_shadow")
+
+        # Bottom border
+        y_bot = y_ft + 1
+        b_line = Text()
+        b_line.append(b_bl + b_h_bot * (w - 2) + b_br, style=ed_b_style)
+        b_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(b_line)
+        set_hit_range(y_bot, 0, w, "color_editor__border")
+        set_hit_range(y_bot, w, w + 2, "color_shadow")
+
+        # Drop shadow below
+        y_sh = y_bot + 1
+        s_line = Text("  " + shadow_ch * w, style=shadow_style)
+        lines.append(s_line)
+        set_hit_range(y_sh, 2, 2 + w, "color_shadow")
 
         return lines
 
@@ -2743,23 +2960,29 @@ class ThemePreviewWidget(Static):
     ) -> list[Text]:
         lines: list[Text] = []
 
+        mod_styles = styles.get("modals", {}) if isinstance(styles.get("modals"), dict) else {}
+        b_style = mod_styles.get("border") or b_style
+        t_style = mod_styles.get("title") or t_style
+        text_style = mod_styles.get("text") or text_style
+        btn_success_style = mod_styles.get("button_confirm") or styles.get("button_success", styles.get("button_primary", Style(color="green", bold=True)))
+        btn_cancel_style = mod_styles.get("button_cancel") or styles.get("button_cancel", Style(color="yellow", bold=True))
+        scrollbar_style = mod_styles.get("scrollbar") or styles.get("scrollbar", Style(color="blue", bold=True))
         close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
-        btn_success_style = styles.get("button_success", styles.get("button_primary", Style(color="green", bold=True)))
-        btn_cancel_style = styles.get("button_cancel", Style(color="yellow", bold=True))
-        scrollbar_style = styles.get("scrollbar", Style(color="blue", bold=True))
+        backdrop_style = mod_styles.get("backdrop") or styles.get("shadow", Style(color="grey23", bgcolor="black"))
 
         modal_w = max(34, min(w - 4, 46))
-        left_margin = max(1, (w - modal_w) // 2)
+        left_margin = max(1, (w - modal_w - 2) // 2)
+        right_pad = max(0, w - (left_margin + modal_w + 2))
 
-        blank_top = Text(" " * w)
+        blank_top = Text(" " * w, style=backdrop_style)
         lines.append(blank_top)
-        set_hit_range(0, 0, w, "color_background")
+        set_hit_range(0, 0, w, "color_modals__backdrop", "color_shadow")
 
         title_str = f"{b_cap_l} Notice Modal {b_cap_r}"
         close_str = f"{b_cap_l}X{b_cap_r}"
         avail_top = max(1, modal_w - len(title_str) - len(close_str) - 6)
 
-        top_line = Text(" " * left_margin)
+        top_line = Text(" " * left_margin, style=backdrop_style)
         top_line.append(b_tl + b_h_top * 2, style=b_style)
         top_line.append(title_str, style=t_style)
         top_line.append(b_h_top * avail_top, style=b_style)
@@ -2767,19 +2990,23 @@ class ThemePreviewWidget(Static):
         rem_top = max(1, modal_w - 3 - len(title_str) - avail_top - len(close_str) - 1)
         top_line.append(b_h_top * rem_top + b_tr, style=b_style)
         top_line.append(shadow_ch * 2, style=shadow_style)
+        if right_pad > 0:
+            top_line.append(" " * right_pad, style=backdrop_style)
         lines.append(top_line)
 
-        set_hit_range(1, 0, left_margin, "color_background")
-        set_hit_range(1, left_margin, left_margin + 3, "color_border", "prop_border_top_left")
+        set_hit_range(1, 0, left_margin, "color_modals__backdrop", "color_shadow")
+        set_hit_range(1, left_margin, left_margin + 3, "color_modals__border", "prop_border_top_left")
         t_start = left_margin + 3
         t_end = t_start + len(title_str)
-        set_hit_range(1, t_start, t_end, "color_title", "title")
+        set_hit_range(1, t_start, t_end, "color_modals__title", "title")
         c_start = t_end + avail_top
         c_end = c_start + len(close_str)
-        set_hit_range(1, t_end, c_start, "color_border", "prop_border_horizontal")
+        set_hit_range(1, t_end, c_start, "color_modals__border", "prop_border_horizontal")
         set_hit_range(1, c_start, c_end, "color_window_close_button", "close_button")
-        set_hit_range(1, c_end, left_margin + modal_w, "color_border", "prop_border_top_right")
+        set_hit_range(1, c_end, left_margin + modal_w, "color_modals__border", "prop_border_top_right")
         set_hit_range(1, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+        if right_pad > 0:
+            set_hit_range(1, left_margin + modal_w + 2, w, "color_modals__backdrop", "color_shadow")
 
         msg_rows = [
             "Are you sure you want to apply these",
@@ -2791,7 +3018,7 @@ class ThemePreviewWidget(Static):
 
         for idx, msg in enumerate(msg_rows):
             y_curr = 2 + idx
-            m_line = Text(" " * left_margin)
+            m_line = Text(" " * left_margin, style=backdrop_style)
             m_line.append(b_v_left + " ", style=b_style)
 
             msg_part = Text(msg, style=text_style)
@@ -2805,27 +3032,35 @@ class ThemePreviewWidget(Static):
             m_line.append(sb_char, style=scrollbar_style)
             m_line.append(" " + b_v_right, style=b_style)
             m_line.append(shadow_ch * 2, style=shadow_style)
+            if right_pad > 0:
+                m_line.append(" " * right_pad, style=backdrop_style)
             lines.append(m_line)
 
-            set_hit_range(y_curr, 0, left_margin, "color_background")
-            set_hit_range(y_curr, left_margin, left_margin + 1, "color_border", "prop_border_vertical")
-            set_hit_range(y_curr, left_margin + 1, left_margin + modal_w - 3, "color_text", "modal_text")
-            set_hit_range(y_curr, left_margin + modal_w - 3, left_margin + modal_w - 2, "color_scrollbar", "scrollbar")
-            set_hit_range(y_curr, left_margin + modal_w - 2, left_margin + modal_w, "color_border", "prop_border_vertical")
+            set_hit_range(y_curr, 0, left_margin, "color_modals__backdrop", "color_shadow")
+            set_hit_range(y_curr, left_margin, left_margin + 1, "color_modals__border", "prop_border_vertical")
+            set_hit_range(y_curr, left_margin + 1, left_margin + modal_w - 3, "color_modals__text", "modal_text")
+            set_hit_range(y_curr, left_margin + modal_w - 3, left_margin + modal_w - 2, "color_modals__scrollbar", "scrollbar")
+            set_hit_range(y_curr, left_margin + modal_w - 2, left_margin + modal_w, "color_modals__border", "prop_border_vertical")
             set_hit_range(y_curr, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+            if right_pad > 0:
+                set_hit_range(y_curr, left_margin + modal_w + 2, w, "color_modals__backdrop", "color_shadow")
 
         y_div = 2 + len(msg_rows)
-        div_line = Text(" " * left_margin)
+        div_line = Text(" " * left_margin, style=backdrop_style)
         div_line.append("├" + b_h_bot * (modal_w - 2) + "┤", style=b_style)
         div_line.append(shadow_ch * 2, style=shadow_style)
+        if right_pad > 0:
+            div_line.append(" " * right_pad, style=backdrop_style)
         lines.append(div_line)
 
-        set_hit_range(y_div, 0, left_margin, "color_background")
-        set_hit_range(y_div, left_margin, left_margin + modal_w, "color_border", "divider")
+        set_hit_range(y_div, 0, left_margin, "color_modals__backdrop", "color_shadow")
+        set_hit_range(y_div, left_margin, left_margin + modal_w, "color_modals__border", "divider")
         set_hit_range(y_div, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+        if right_pad > 0:
+            set_hit_range(y_div, left_margin + modal_w + 2, w, "color_modals__backdrop", "color_shadow")
 
         y_btn = y_div + 1
-        btn_line = Text(" " * left_margin)
+        btn_line = Text(" " * left_margin, style=backdrop_style)
         btn_line.append(b_v_left, style=b_style)
 
         buttons_text = Text()
@@ -2840,6 +3075,8 @@ class ThemePreviewWidget(Static):
         btn_line.append(" " * pad_right)
         btn_line.append(b_v_right, style=b_style)
         btn_line.append(shadow_ch * 2, style=shadow_style)
+        if right_pad > 0:
+            btn_line.append(" " * right_pad, style=backdrop_style)
         lines.append(btn_line)
 
         b1_start = left_margin + 1 + pad_left
@@ -2847,89 +3084,189 @@ class ThemePreviewWidget(Static):
         b2_start = b1_end + 3
         b2_end = b2_start + 12
 
-        set_hit_range(y_btn, 0, left_margin, "color_background")
-        set_hit_range(y_btn, left_margin, left_margin + 1, "color_border", "prop_border_vertical")
-        set_hit_range(y_btn, left_margin + 1, b1_start, "color_background")
-        set_hit_range(y_btn, b1_start, b1_end, "color_button_success", "color_button_primary")
-        set_hit_range(y_btn, b1_end, b2_start, "color_background")
-        set_hit_range(y_btn, b2_start, b2_end, "color_button_cancel", "button_cancel")
-        set_hit_range(y_btn, b2_end, left_margin + modal_w - 1, "color_background")
-        set_hit_range(y_btn, left_margin + modal_w - 1, left_margin + modal_w, "color_border", "prop_border_vertical")
+        set_hit_range(y_btn, 0, left_margin, "color_modals__backdrop", "color_shadow")
+        set_hit_range(y_btn, left_margin, left_margin + 1, "color_modals__border", "prop_border_vertical")
+        set_hit_range(y_btn, left_margin + 1, b1_start, "color_modals__background", "color_background")
+        set_hit_range(y_btn, b1_start, b1_end, "color_modals__button_confirm", "color_button_primary")
+        set_hit_range(y_btn, b1_end, b2_start, "color_modals__background", "color_background")
+        set_hit_range(y_btn, b2_start, b2_end, "color_modals__button_cancel", "button_cancel")
+        set_hit_range(y_btn, b2_end, left_margin + modal_w - 1, "color_modals__background", "color_background")
+        set_hit_range(y_btn, left_margin + modal_w - 1, left_margin + modal_w, "color_modals__border", "prop_border_vertical")
         set_hit_range(y_btn, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+        if right_pad > 0:
+            set_hit_range(y_btn, left_margin + modal_w + 2, w, "color_modals__backdrop", "color_shadow")
 
         y_bot = y_btn + 1
-        bot_line = Text(" " * left_margin)
+        bot_line = Text(" " * left_margin, style=backdrop_style)
         bot_line.append(b_bl + b_h_bot * (modal_w - 2) + b_br, style=b_style)
         bot_line.append(shadow_ch * 2, style=shadow_style)
+        if right_pad > 0:
+            bot_line.append(" " * right_pad, style=backdrop_style)
         lines.append(bot_line)
 
-        set_hit_range(y_bot, 0, left_margin, "color_background")
-        set_hit_range(y_bot, left_margin, left_margin + modal_w, "color_border", "prop_border_bottom")
+        set_hit_range(y_bot, 0, left_margin, "color_modals__backdrop", "color_shadow")
+        set_hit_range(y_bot, left_margin, left_margin + modal_w, "color_modals__border", "prop_border_bottom")
         set_hit_range(y_bot, left_margin + modal_w, left_margin + modal_w + 2, "color_shadow", "prop_shadow_char")
+        if right_pad > 0:
+            set_hit_range(y_bot, left_margin + modal_w + 2, w, "color_modals__backdrop", "color_shadow")
 
         y_sh = y_bot + 1
-        sh_line = Text(" " * (left_margin + 2) + shadow_ch * modal_w, style=shadow_style)
+        sh_line = Text(" " * (left_margin + 2), style=backdrop_style)
+        sh_line.append(shadow_ch * modal_w, style=shadow_style)
+        sh_pad = max(0, w - (left_margin + 2 + modal_w))
+        if sh_pad > 0:
+            sh_line.append(" " * sh_pad, style=backdrop_style)
         lines.append(sh_line)
+        set_hit_range(y_sh, 0, left_margin + 2, "color_modals__backdrop", "color_shadow")
         set_hit_range(y_sh, left_margin + 2, left_margin + 2 + modal_w, "color_shadow", "prop_shadow_char")
+        if sh_pad > 0:
+            set_hit_range(y_sh, left_margin + 2 + modal_w, w, "color_modals__backdrop", "color_shadow")
 
+        while len(lines) < max(num_rows, y_sh + 1):
+            blank_row = Text(" " * w, style=backdrop_style)
+            lines.append(blank_row)
+            set_hit_range(len(lines) - 1, 0, w, "color_modals__backdrop", "color_shadow")
+
+        self._modal_dialog_bounds = (left_margin, 1, left_margin + modal_w + 2, y_sh)
         return lines
 
-    def _finalize_preview_lines(self, lines: list[Text], styles: dict, w: int) -> Text:
+    def _finalize_preview_lines(
+        self,
+        lines: list[Text],
+        styles: dict,
+        w: int,
+        allow_wallpaper: bool = True,
+        dialog_bounds: tuple[int, int, int, int] | None = None,
+    ) -> Text:
         """Apply active flash inversion, composite lines to Text, and apply wallpaper if configured."""
         if getattr(self, "_flash_range", None):
             fy, fx1, fx2 = self._flash_range
             if 0 <= fy < len(lines):
                 lines[fy].stylize(Style(reverse=True), fx1, fx2)
 
-        out = Text()
-        for idx, line in enumerate(lines):
-            out.append_text(line)
-            if idx < len(lines) - 1:
-                out.append("\n")
+        if not allow_wallpaper:
+            out = Text()
+            for idx, line in enumerate(lines):
+                out.append_text(line)
+                if idx < len(lines) - 1:
+                    out.append("\n")
+            return out
 
         bg_spec = styles.get("theme_background")
-        if isinstance(bg_spec, dict) and bg_spec.get("image"):
-            img_path = str(bg_spec.get("image", "")).strip()
-            if img_path:
-                with contextlib.suppress(Exception):
-                    opacity = float(bg_spec.get("opacity", 0.85))
-                    scaling = str(bg_spec.get("scaling", "cover"))
-                    clustering = int(bg_spec.get("clustering", 0) or 0)
-                    quantization = int(bg_spec.get("quantization", 1) or 1)
-                    cached_comp = getattr(self, "_wallpaper_compositor", None)
-                    if (
-                        cached_comp is not None
-                        and getattr(cached_comp, "image_path", None) == img_path
-                        and getattr(cached_comp, "opacity", None) == opacity
-                        and getattr(cached_comp, "scaling", None) == scaling
-                        and getattr(cached_comp, "clustering", None) == clustering
-                        and getattr(cached_comp, "quantization", None) == quantization
-                    ):
-                        compositor = cached_comp
-                    else:
-                        compositor = bashmenu_ui.WallpaperCompositor(
-                            img_path,
-                            opacity=opacity,
-                            scaling=scaling,
-                            base_dir=bashmenu.BASHMENU_DIR,
-                            clustering=clustering,
-                            quantization=quantization,
-                        )
-                        self._wallpaper_compositor = compositor
+        has_bg_image = isinstance(bg_spec, dict) and bool(bg_spec.get("image"))
 
-                    if compositor and compositor._raw_image:
-                        theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
-                        theme_bg_style = styles.get("background")
-                        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
-                        grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
-                        if grid:
-                            out = bashmenu_ui.composite_menu_text(
-                                out,
-                                grid,
-                                w + 3,
-                                len(lines),
-                                theme_default_bg=theme_default_bg,
-                            )
+        if not has_bg_image:
+            out = Text()
+            for idx, line in enumerate(lines):
+                out.append_text(line)
+                if idx < len(lines) - 1:
+                    out.append("\n")
+            return out
+
+        img_path = str(bg_spec.get("image", "")).strip()
+        compositor = None
+        with contextlib.suppress(Exception):
+            opacity = float(bg_spec.get("opacity", 0.85))
+            scaling = str(bg_spec.get("scaling", "cover"))
+            clustering = int(bg_spec.get("clustering", 0) or 0)
+            quantization = int(bg_spec.get("quantization", 1) or 1)
+            cached_comp = getattr(self, "_wallpaper_compositor", None)
+            if (
+                cached_comp is not None
+                and getattr(cached_comp, "image_path", None) == img_path
+                and getattr(cached_comp, "opacity", None) == opacity
+                and getattr(cached_comp, "scaling", None) == scaling
+                and getattr(cached_comp, "clustering", None) == clustering
+                and getattr(cached_comp, "quantization", None) == quantization
+            ):
+                compositor = cached_comp
+            else:
+                compositor = bashmenu_ui.WallpaperCompositor(
+                    img_path,
+                    opacity=opacity,
+                    scaling=scaling,
+                    base_dir=bashmenu.BASHMENU_DIR,
+                    clustering=clustering,
+                    quantization=quantization,
+                )
+                self._wallpaper_compositor = compositor
+
+        if not compositor or not compositor._raw_image:
+            out = Text()
+            for idx, line in enumerate(lines):
+                out.append_text(line)
+                if idx < len(lines) - 1:
+                    out.append("\n")
+            return out
+
+        theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
+        theme_bg_style = styles.get("background")
+        theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
+        grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
+        if not grid:
+            out = Text()
+            for idx, line in enumerate(lines):
+                out.append_text(line)
+                if idx < len(lines) - 1:
+                    out.append("\n")
+            return out
+
+        if dialog_bounds is None:
+            raw_out = Text()
+            for idx, line in enumerate(lines):
+                raw_out.append_text(line)
+                if idx < len(lines) - 1:
+                    raw_out.append("\n")
+            return bashmenu_ui.composite_menu_text(
+                raw_out,
+                grid,
+                w + 3,
+                len(lines),
+                theme_default_bg=theme_default_bg,
+            )
+
+        # Modals with protected dialog_bounds (d_x1, d_y1, d_x2, d_y2)
+        d_x1, d_y1, d_x2, d_y2 = dialog_bounds
+        out = Text()
+        console = bashmenu_ui.get_compositor_console(w + 3, 1)
+
+        for row_idx, line in enumerate(lines):
+            row_cache = grid[row_idx] if row_idx < len(grid) else None
+            if not row_cache:
+                out.append_text(line)
+            elif row_idx < d_y1 or row_idx > d_y2:
+                # Full row outside dialog -> composite wallpaper
+                row_comp = bashmenu_ui.composite_single_row(line, row_cache, console=console, theme_default_bg=theme_default_bg)
+                out.append_text(row_comp)
+            else:
+                # Row intersects modal dialog -> split into left (wallpaper), center (solid), right (wallpaper)
+                line_len = line.cell_len
+                x_split1 = max(0, min(d_x1, line_len))
+                x_split2 = max(x_split1, min(d_x2, line_len))
+
+                left_part = line.copy()
+                left_part.truncate(x_split1)
+                left_cache = row_cache[:x_split1]
+                left_comp = bashmenu_ui.composite_single_row(left_part, left_cache, console=console, theme_default_bg=theme_default_bg) if left_cache else left_part
+
+                center_part = line.copy()
+                if x_split2 < line_len:
+                    center_part.truncate(x_split2)
+                if x_split1 > 0:
+                    center_part = center_part[x_split1:]
+
+                right_part = line.copy()
+                if x_split2 > 0:
+                    right_part = right_part[x_split2:]
+                right_cache = row_cache[x_split2:] if x_split2 < len(row_cache) else None
+                right_comp = bashmenu_ui.composite_single_row(right_part, right_cache, console=console, theme_default_bg=theme_default_bg) if right_cache else right_part
+
+                row_assembled = Text.assemble(left_comp, center_part, right_comp)
+                out.append_text(row_assembled)
+
+            if row_idx < len(lines) - 1:
+                out.append("\n")
+
         return out
 
     def render(self) -> Text:
@@ -3052,7 +3389,7 @@ class ThemePreviewWidget(Static):
             div_char = _resolve_border_char(divider_def, "─")
             div_len = "{window_width}"
 
-        if self.preview_mode == "editor":
+        if self.preview_mode in ("menu_editor", "menuedit", "editor"):
             lines = self._render_menu_editor(
                 w,
                 num_rows,
@@ -3078,7 +3415,34 @@ class ThemePreviewWidget(Static):
                 gutter_style,
                 help_style,
             )
-            return self._finalize_preview_lines(lines, styles, w)
+            return self._finalize_preview_lines(lines, styles, w, allow_wallpaper=False)
+        if self.preview_mode in ("text_editor", "textedit"):
+            lines = self._render_text_editor(
+                w,
+                num_rows,
+                styles,
+                borders,
+                shadow_ch,
+                shadow_style,
+                set_hit_range,
+                b_tl,
+                b_tr,
+                b_bl,
+                b_br,
+                b_h_top,
+                b_h_bot,
+                b_v_left,
+                b_v_right,
+                b_cap_l,
+                b_cap_r,
+                b_style,
+                t_style,
+                text_style,
+                sel_style,
+                gutter_style,
+                help_style,
+            )
+            return self._finalize_preview_lines(lines, styles, w, allow_wallpaper=False)
         if self.preview_mode == "modals":
             lines = self._render_modals(
                 w,
@@ -3102,7 +3466,13 @@ class ThemePreviewWidget(Static):
                 t_style,
                 text_style,
             )
-            return self._finalize_preview_lines(lines, styles, w)
+            return self._finalize_preview_lines(
+                lines,
+                styles,
+                w,
+                allow_wallpaper=True,
+                dialog_bounds=getattr(self, "_modal_dialog_bounds", None),
+            )
 
         # Row 0: Top Window Border with Title
         title_text = f" {b_cap_l} Bash Menu {b_cap_r} "
@@ -3575,6 +3945,42 @@ class ThemeEditScreen(Screen):
         "button_success",
     ]
 
+    MENU_EDITOR_TOKENS: ClassVar[list[str]] = [
+        "background",
+        "header",
+        "border",
+        "text",
+        "selection",
+        "button_save",
+        "button_delete",
+        "footer",
+    ]
+
+    EDITOR_TOKENS: ClassVar[list[str]] = [
+        "background",
+        "header",
+        "tab_active",
+        "tab_inactive",
+        "gutter",
+        "text",
+        "selection",
+        "whitespace",
+        "status",
+        "footer",
+    ]
+
+    MODALS_TOKENS: ClassVar[list[str]] = [
+        "backdrop",
+        "background",
+        "border",
+        "title",
+        "text",
+        "button_confirm",
+        "button_cancel",
+        "button_danger",
+        "scrollbar",
+    ]
+
     BORDER_PROPERTIES: ClassVar[list[tuple[str, str]]] = [
         ("border_horizontal", "Horiz Border"),
         ("border_vertical", "Vert Border"),
@@ -3902,6 +4308,7 @@ class ThemeEditScreen(Screen):
                 yield Tabs(
                     Tab("Mock Menu", id="tab_mock_menu"),
                     Tab("Menu Editor", id="tab_menu_editor"),
+                    Tab("Text Editor", id="tab_text_editor"),
                     Tab("Modals & Popups", id="tab_modals"),
                     id="preview_tabs",
                 )
@@ -4008,6 +4415,54 @@ class ThemeEditScreen(Screen):
                             yield Label(f"{tok}:", classes="prop_label")
                             yield Input(value=val_str, id=f"color_{tok}", classes="prop_input")
                             yield Button("Color", classes="btn_prop_action", id=f"btn_color_{tok}")
+
+                yield Label("▶ Menu Editor Colors", classes="section_header", id="hdr_colors_menuedit")
+                me_pal = pal_256.get("menu_editor", {}) if isinstance(pal_256.get("menu_editor"), dict) else {}
+                with Vertical(id="sec_colors_menuedit", classes="section_body collapsed"):
+                    for tok in self.MENU_EDITOR_TOKENS:
+                        tok_val = me_pal.get(tok, "")
+                        val_str = str(tok_val) if tok_val != "" else ""
+                        with Horizontal(classes="prop_row"):
+                            yield Label(f"{tok}:", classes="prop_label")
+                            yield Input(
+                                value=val_str,
+                                placeholder="(inherits default)",
+                                id=f"color_menu_editor__{tok}",
+                                classes="prop_input",
+                            )
+                            yield Button("Color", classes="btn_prop_action", id=f"btn_color_menu_editor__{tok}")
+
+                yield Label("▶ Text Editor Colors", classes="section_header", id="hdr_colors_editor")
+                ed_pal = pal_256.get("editor", {}) if isinstance(pal_256.get("editor"), dict) else {}
+                with Vertical(id="sec_colors_editor", classes="section_body collapsed"):
+                    for tok in self.EDITOR_TOKENS:
+                        tok_val = ed_pal.get(tok, "")
+                        val_str = str(tok_val) if tok_val != "" else ""
+                        with Horizontal(classes="prop_row"):
+                            yield Label(f"{tok}:", classes="prop_label")
+                            yield Input(
+                                value=val_str,
+                                placeholder="(inherits default)",
+                                id=f"color_editor__{tok}",
+                                classes="prop_input",
+                            )
+                            yield Button("Color", classes="btn_prop_action", id=f"btn_color_editor__{tok}")
+
+                yield Label("▶ Modals & Popups Colors", classes="section_header", id="hdr_colors_modals")
+                mod_pal = pal_256.get("modals", {}) if isinstance(pal_256.get("modals"), dict) else {}
+                with Vertical(id="sec_colors_modals", classes="section_body collapsed"):
+                    for tok in self.MODALS_TOKENS:
+                        tok_val = mod_pal.get(tok, "")
+                        val_str = str(tok_val) if tok_val != "" else ""
+                        with Horizontal(classes="prop_row"):
+                            yield Label(f"{tok}:", classes="prop_label")
+                            yield Input(
+                                value=val_str,
+                                placeholder="(inherits default)",
+                                id=f"color_modals__{tok}",
+                                classes="prop_input",
+                            )
+                            yield Button("Color", classes="btn_prop_action", id=f"btn_color_modals__{tok}")
 
         with Vertical(id="footer"):
             with Horizontal(classes="footer_row"):
@@ -4119,12 +4574,14 @@ class ThemeEditScreen(Screen):
 
     @on(Tabs.TabActivated, "#preview_tabs")
     def on_preview_tab_changed(self, event: Tabs.TabActivated) -> None:
-        """Handle preview tab toggle between Mock Menu, Menu Editor, and Modals."""
+        """Handle preview tab toggle between Mock Menu, Menu Editor, Text Editor, and Modals."""
         tab_id = getattr(event.tab, "id", "")
         with contextlib.suppress(Exception):
             preview = self.query_one("#live_preview", ThemePreviewWidget)
             if tab_id == "tab_menu_editor":
-                preview.set_preview_mode("editor")
+                preview.set_preview_mode("menu_editor")
+            elif tab_id == "tab_text_editor":
+                preview.set_preview_mode("text_editor")
             elif tab_id == "tab_modals":
                 preview.set_preview_mode("modals")
             else:
@@ -4201,7 +4658,7 @@ class ThemeEditScreen(Screen):
             inp = self.query_one(f"#{target_id}", Input)
             inp.scroll_visible()
             inp.focus()
-            clean_name = target_id.replace("color_", "Color: ").replace("prop_", "Border: ").replace("_", " ").title()
+            clean_name = target_id.replace("color_", "Color: ").replace("prop_", "Border: ").replace("__", " › ").replace("_", " ").title()
             with contextlib.suppress(Exception):
                 self.notify(f"Inspecting {clean_name}", title="Theme Element", timeout=1.5)
         except Exception:  # noqa: BLE001
@@ -4328,17 +4785,36 @@ class ThemeEditScreen(Screen):
         elif inp_id.startswith("color_"):
             tok = inp_id.replace("color_", "")
             pal = self._get_pal_256()
-            if str(pal.get(tok, "")) == val:
-                return
-            try:
-                # Parse python/yaml lists e.g. [201, -1] or scalar 233
-                candidate = val
-                if candidate.startswith("[") and not candidate.endswith("]"):
-                    candidate = candidate.rstrip(", ") + "]"
-                parsed = yaml.safe_load(candidate)
-                pal[tok] = parsed
-            except Exception:  # noqa: BLE001
-                pal[tok] = val
+            if "__" in tok:
+                sec, sub_tok = tok.split("__", 1)
+                sec_dict = pal.setdefault(sec, {})
+                if str(sec_dict.get(sub_tok, "")) == val:
+                    return
+                if not val:
+                    sec_dict.pop(sub_tok, None)
+                    if not sec_dict:
+                        pal.pop(sec, None)
+                else:
+                    try:
+                        candidate = val
+                        if candidate.startswith("[") and not candidate.endswith("]"):
+                            candidate = candidate.rstrip(", ") + "]"
+                        parsed = yaml.safe_load(candidate)
+                        sec_dict[sub_tok] = parsed
+                    except Exception:  # noqa: BLE001
+                        sec_dict[sub_tok] = val
+            else:
+                if str(pal.get(tok, "")) == val:
+                    return
+                try:
+                    # Parse python/yaml lists e.g. [201, -1] or scalar 233
+                    candidate = val
+                    if candidate.startswith("[") and not candidate.endswith("]"):
+                        candidate = candidate.rstrip(", ") + "]"
+                    parsed = yaml.safe_load(candidate)
+                    pal[tok] = parsed
+                except Exception:  # noqa: BLE001
+                    pal[tok] = val
 
         self._sync_preview()
 
@@ -4393,8 +4869,14 @@ class ThemeEditScreen(Screen):
         elif btn_id.startswith("btn_color_"):
             tok = btn_id.replace("btn_color_", "")
             pal_256 = self._get_pal_256()
-            curr_val = pal_256.get(tok, -1)
-            bg_val = pal_256.get("background", "COLOR_BLACK")
+            if "__" in tok:
+                sec, sub_tok = tok.split("__", 1)
+                sec_dict = pal_256.get(sec, {}) if isinstance(pal_256.get(sec), dict) else {}
+                curr_val = sec_dict.get(sub_tok, -1)
+                bg_val = sec_dict.get("background", pal_256.get("background", "COLOR_BLACK"))
+            else:
+                curr_val = pal_256.get(tok, -1)
+                bg_val = pal_256.get("background", "COLOR_BLACK")
 
             def _on_color_picked(chosen: Any) -> None:
                 if chosen is not None:
@@ -4573,8 +5055,14 @@ class ThemeEditScreen(Screen):
         if focused and isinstance(focused, Input) and focused.id and focused.id.startswith("color_"):
             tok = focused.id.replace("color_", "")
             pal_256 = self._get_pal_256()
-            curr_val = pal_256.get(tok, -1)
-            bg_val = pal_256.get("background", "COLOR_BLACK")
+            if "__" in tok:
+                sec, sub_tok = tok.split("__", 1)
+                sec_dict = pal_256.get(sec, {}) if isinstance(pal_256.get(sec), dict) else {}
+                curr_val = sec_dict.get(sub_tok, -1)
+                bg_val = sec_dict.get("background", pal_256.get("background", "COLOR_BLACK"))
+            else:
+                curr_val = pal_256.get(tok, -1)
+                bg_val = pal_256.get("background", "COLOR_BLACK")
 
             def _cb(c):
                 if c is not None:
@@ -4950,6 +5438,27 @@ class ThemeEditScreen(Screen):
                 for tok in self.COLOR_TOKENS:
                     c_val = str(pal_256.get(tok, -1))
                     self.query_one(f"#color_{tok}", Input).value = c_val
+
+                me_pal = pal_256.get("menu_editor", {}) if isinstance(pal_256.get("menu_editor"), dict) else {}
+                for tok in self.MENU_EDITOR_TOKENS:
+                    val = me_pal.get(tok, "")
+                    val_str = str(val) if val != "" else ""
+                    with contextlib.suppress(Exception):
+                        self.query_one(f"#color_menu_editor__{tok}", Input).value = val_str
+
+                ed_pal = pal_256.get("editor", {}) if isinstance(pal_256.get("editor"), dict) else {}
+                for tok in self.EDITOR_TOKENS:
+                    val = ed_pal.get(tok, "")
+                    val_str = str(val) if val != "" else ""
+                    with contextlib.suppress(Exception):
+                        self.query_one(f"#color_editor__{tok}", Input).value = val_str
+
+                mod_pal = pal_256.get("modals", {}) if isinstance(pal_256.get("modals"), dict) else {}
+                for tok in self.MODALS_TOKENS:
+                    val = mod_pal.get(tok, "")
+                    val_str = str(val) if val != "" else ""
+                    with contextlib.suppress(Exception):
+                        self.query_one(f"#color_modals__{tok}", Input).value = val_str
         finally:
             self._populating_inputs = False
 

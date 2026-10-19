@@ -305,6 +305,13 @@ def validate_depth_section(depth_str: str, keys: Any, base_path: str) -> list[st
         path = f"{base_path}.{depth_str}.{key}"
         if key in VALID_NON_COLOR_KEYS:
             errors.extend(validate_indicator_value(value, path))
+        elif isinstance(value, dict):
+            for sub_key, sub_val in value.items():
+                sub_path = f"{path}.{sub_key}"
+                if sub_key == "background":
+                    errors.extend(validate_color_value(sub_val, depth_str, sub_path))
+                else:
+                    errors.extend(validate_color_pair(sub_val, depth_str, sub_path))
         elif key == "background":
             errors.extend(validate_color_value(value, depth_str, path))
         else:
