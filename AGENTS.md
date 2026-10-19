@@ -14,3 +14,10 @@
 ## 3. Testing & Verification
 - Always execute tests in `.tests/` before committing.
 - In terminal scripts, do not assume `/usr/local/bin` for non-root users; install user CLI tools to `$HOME/.local/bin`.
+
+## 4. Textual UI Performance & Responsiveness Invariants
+- **Avoid Stylesheet Invalidation Cascades:** Never call `remove_class()` / `add_class()` in hot interactive paths or collapsible accordions. In Textual, class mutations trigger `update_styles()` which re-evaluates all DOM nodes against CSS rules. Use direct property manipulation (`widget.display = True/False`) combined with direct class set tracking (`widget._classes.discard(...)` / `widget._classes.add(...)`).
+- **Instant Scrolling & Zero-Delay Focus:** Always pass `animate=False` to `widget.scroll_visible()` when focusing or jumping to elements. Avoid `Widget.focus()` in latency-sensitive paths as it defers via `call_later` and defaults to animated `scroll_to_center`; use `self.set_focus(widget, scroll_visible=False)` with a post-refresh instant scroll instead.
+- **Immediate Mouse Interaction:** Handle `events.MouseDown` directly rather than waiting for `events.Click` (which only fires after `MouseUp` and is suppressed if the cursor shifts slightly during click) so users get instantaneous feedback without perceptible lag.
+- **Batched DOM Updates:** Wrap multi-widget updates, section expansions, and focus shifts in `with self.app.batch_update():` to coalesce layout reflows into a single frame.
+

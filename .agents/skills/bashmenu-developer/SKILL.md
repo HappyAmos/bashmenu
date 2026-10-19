@@ -53,6 +53,21 @@ description: Core developer guidelines for the multi-platform BashMenu
     ```
 - **Sub-Agent Delegation Policy:** Use local `opencode` CLI sparingly and strictly for small, low-risk draft tasks (test case drafts, isolated prototypes). Treat all output as untrusted draft code requiring strict review, linting, and automated test validation.
 - **Branching Discipline:** For structural overhauls (cross-platform compatibility, editor re-architecture, dependency reduction), always branch from git (e.g. `feat/<topic>`) and verify all tests and linters pass before merging.
+- **Textual UI Performance & Responsiveness Invariants:**
+  - **CSS Invalidation Cascades:** Calling `DOMNode.remove_class()` / `add_class()` triggers `update_nodes()` across the entire DOM tree, causing up to 100ms+ synchronous lag on large forms. For collapsible sections or dynamic visibility, toggle `widget.display = True/False` directly and update `widget._classes` without invoking Textual's CSS recalculation engine.
+  - **Scroll Visibility Animation & Focus Queuing:** `scroll_visible()` defaults to `animate=True` (200ms timer animation), and `Widget.focus()` defers via `call_later` while queuing an animated `scroll_to_center`. In keyboard navigation, focus jumps, and preview element clicks, pass `animate=False` and use `self.set_focus(widget, scroll_visible=False)` with a post-refresh instant scroll to eliminate latency completely.
+  - **Immediate Mouse Interaction:** Handle `events.MouseDown` directly rather than waiting for `events.Click` (which only fires after `MouseUp` and is suppressed if the cursor shifts slightly during click) so users get instantaneous feedback without perceptible lag.
+  - **Compositing & Render Caching:** In live preview widgets (such as `ThemePreviewWidget`), cache base composited lines (`_cached_base_lines`). On click or highlight flash feedback, clone only the affected line (`flashed[y] = flashed[y].copy(); flashed[y].stylize(...)`) rather than re-rendering background wallpapers or full canvas structures.
+  - **Batch Updates:** Wrap compound operations (section expansion + scroll + focus) within `with self.app.batch_update():`.
+- **Inline Macro Parameter Syntax & Help Parity:**
+  - Macro placeholders may accept colon-separated inline configurations (e.g. `{file_picker:path:{bashmenu_dir}/assets/wallpapers}` or `{toast:3:"Message"}`).
+  - When introducing or extending inline placeholder parameters, ensure full documentation parity:
+    1. Update the Placeholders and Macros reference modal in `bashmenu_ui.py`.
+    2. Update the manpage (`bashmenu.1`) and markdown guide (`bashmenu.md`).
+    3. Ensure 6-tier variable interpolation (env, runtime, bashmenu config, system, theme, inline) functions correctly with nested placeholders.
+- **Editor Swap File Placement Invariant:**
+  - Built-in text editors must colocate temporary swap files (`.<filename>.swp`) directly in the exact directory of the file being edited.
+  - Never store editor swap files in `/tmp` or user root; swap files must be cleanly deleted on save or exit, and detected on crash recovery.
 
 ---
 

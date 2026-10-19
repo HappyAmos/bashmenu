@@ -313,3 +313,25 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   - Added `test_theme_editor_preview_selection_responsiveness` in `.tests/test_themeedit.py` validating sub-25ms synchronous focus transfer, base lines caching, and instant element focus without blocking delay.
   - Benchmarked `focus_inspector_target`: synchronous execution time dropped from 84.78ms to 0.49ms (a 173x speedup).
   - Verified all 343 tests in the test suite pass with zero regressions.
+
+---
+
+### 27. Instantaneous Mouse-Down Selection & Elimination of Deferred Focus Animation Lag
+- **Item:** `- [x] RESPONSIVENESS: Theme editor preview item selection lag: significant blocking delay until focus lands on color field in property inspector.`
+- **Root Cause:**
+  1. *Click Event Latency*: `ThemePreviewWidget` only handled `on_click`, which Textual generates strictly after `MouseUp`. Holding the mouse down or slight cursor movement delayed or prevented the click event.
+  2. *Asynchronous Message Bubbling*: `ThemePreviewWidget` communicated hits by posting `ElementClicked` to its own queue, which required 4 message-pump hops (`Vertical(#preview_panel)` -> `Horizontal(#workspace)` -> `ThemeEditScreen`).
+  3. *Deferred Focus & Animated Scrolling*: Textual's `Widget.focus()` defers setting focus via `app.call_later()`. Furthermore, its default `scroll_visible=True` queues an animated `scroll_to_center(animate=True)` over 16 timer frames (200-250ms). Because `inp.region` was initially (0,0,0,0) before the newly expanded section reflowed, this caused stutter, frame queuing, and focus delay.
+- **Fix:**
+  1. *Immediate Mouse-Down Handling*:
+     - Added `on_mouse_down` in `ThemePreviewWidget` and `#preview_panel`, triggering element selection and flash immediately when the mouse button is pressed.
+     - Implemented `_last_mouse_down_time` tracking to prevent duplicate execution when the subsequent `MouseUp`/`Click` event arrives.
+  2. *Direct Synchronous Screen Notification*:
+     - In `_handle_element_selection`, directly invoked `self.screen.focus_inspector_target(hit[0])` synchronously before posting `ElementClicked`, cutting out container message queue hops.
+  3. *Zero-Delay Direct Focus & Frame-Synchronized Scrolling*:
+     - Replaced `inp.focus()` with `self.set_focus(inp, scroll_visible=False)` in `focus_inspector_target`, `navigate_inspector_vertical`, and picker callbacks, focusing the target widget synchronously in < 1ms.
+     - Scheduled instant scrolling (`inp.scroll_visible(animate=False)`) via `self.call_after_refresh(...)`, aligning perfectly with Textual's layout reflow without animation timers.
+- **Tests:**
+  - Updated `test_theme_editor_preview_selection_responsiveness` in `.tests/test_themeedit.py` to assert that `app.focused` updates immediately on `MouseDown` and synchronously in `focus_inspector_target`.
+  - All 343 unit tests passed cleanly in `.tests/`.
+

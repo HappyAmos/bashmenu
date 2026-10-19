@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from rich.cells import cell_len
 from rich.style import Style
 from rich.text import Text
+from textual import events
 from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
@@ -1419,6 +1420,8 @@ class TestThemeEditor(unittest.TestCase):
                 # Must execute synchronously in < 25ms (scaled for CI)
                 limit = 0.05 if os.getenv("CI") else 0.025
                 self.assertLess(t_duration, limit, f"focus_inspector_target took too long: {t_duration*1000:.2f}ms")
+                # Focus must settle synchronously without waiting for event loop turns
+                self.assertEqual(app.focused.id, "color_highlight")
 
                 await pilot.pause()
                 self.assertFalse(sec_colors.has_class("collapsed"))
@@ -1429,14 +1432,31 @@ class TestThemeEditor(unittest.TestCase):
                 screen.focus_inspector_target("color_border")
                 t_duration2 = time.perf_counter() - t0
                 self.assertLess(t_duration2, limit)
+                self.assertEqual(app.focused.id, "color_border")
 
                 await pilot.pause()
                 self.assertEqual(app.focused.id, "color_border")
 
-                # Test preview click hit and focus transfer
+                # Test preview mouse down immediate synchronous focus transfer
                 pos = next(iter(preview._hit_map.keys()))
                 hit = preview._hit_map[pos]
-                await pilot.click(preview, offset=pos)
+                ev_down = events.MouseDown(
+                    preview,
+                    x=pos[0],
+                    y=pos[1],
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                    screen_x=pos[0],
+                    screen_y=pos[1],
+                )
+                preview.on_mouse_down(ev_down)
+                # Verify focused synchronously on mouse down
+                self.assertEqual(app.focused.id, hit[0])
+
                 await pilot.pause()
                 self.assertEqual(app.focused.id, hit[0])
 

@@ -14,6 +14,7 @@ import contextlib
 import copy
 import os
 import re
+import time
 from typing import Any, ClassVar
 
 import yaml
@@ -2539,12 +2540,8 @@ class ThemePreviewWidget(Static):
         self._flash_timer = None
         self.refresh()
 
-    def on_click(self, event: events.Click) -> None:
-        """Handle mouse click on preview element, flash clicked item, and emit ElementClicked message."""
-        gutter_l = getattr(getattr(self, "gutter", None), "left", 0)
-        gutter_t = getattr(getattr(self, "gutter", None), "top", 0)
-        cx = event.x - gutter_l
-        cy = event.y - gutter_t
+    def _handle_element_selection(self, cx: int, cy: int) -> bool:
+        """Handle coordinate selection on preview element, flash clicked item, and emit ElementClicked."""
         pos = (cx, cy)
         hit = self._hit_map.get(pos)
         if not hit and (
@@ -2569,7 +2566,35 @@ class ThemePreviewWidget(Static):
             self._flash_timer = self.set_timer(0.08, self._clear_flash)
             self.refresh()
 
+            with contextlib.suppress(Exception):
+                scr = self.screen
+                if hasattr(scr, "focus_inspector_target"):
+                    scr.focus_inspector_target(hit[0])
+
             self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1]))
+            return True
+        return False
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        """Handle mouse button down immediately for instant zero-delay selection."""
+        gutter_l = getattr(getattr(self, "gutter", None), "left", 0)
+        gutter_t = getattr(getattr(self, "gutter", None), "top", 0)
+        cx = event.x - gutter_l
+        cy = event.y - gutter_t
+        if self._handle_element_selection(cx, cy):
+            self._last_mouse_down_time = time.monotonic()
+
+    def on_click(self, event: events.Click) -> None:
+        """Handle mouse click on preview element (fallback or when mouse_down was not caught)."""
+        last_t = getattr(self, "_last_mouse_down_time", 0.0)
+        if last_t and (time.monotonic() - last_t < 0.4):
+            return
+        gutter_l = getattr(getattr(self, "gutter", None), "left", 0)
+        gutter_t = getattr(getattr(self, "gutter", None), "top", 0)
+        cx = event.x - gutter_l
+        cy = event.y - gutter_t
+        self._handle_element_selection(cx, cy)
+
 
     def set_preview_mode(self, mode: str) -> None:
         """Switch preview pane mode between 'menu', 'editor', and 'modals'."""
@@ -4636,11 +4661,24 @@ class ThemeEditScreen(Screen):
     @on(ThemePreviewWidget.ElementClicked)
     def on_preview_element_clicked(self, message: ThemePreviewWidget.ElementClicked) -> None:
         """Handle element click from live preview canvas and focus corresponding inspector property."""
+        inp = self._get_prop_input(message.primary)
+        if inp and self.focused is inp:
+            return
         self.focus_inspector_target(message.primary)
+
+    @on(events.MouseDown, "#preview_panel")
+    def on_preview_panel_mouse_down(self, event: events.MouseDown) -> None:
+        """Handle mouse down in preview panel margin area and select background color immediately."""
+        if event.widget and getattr(event.widget, "id", None) == "preview_panel":
+            self._panel_mouse_down_time = time.monotonic()
+            self.focus_inspector_target("color_background")
 
     @on(events.Click, "#preview_panel")
     def on_preview_panel_clicked(self, event: events.Click) -> None:
         """Handle click in preview panel margin area and select background color."""
+        last_t = getattr(self, "_panel_mouse_down_time", 0.0)
+        if last_t and (time.monotonic() - last_t < 0.4):
+            return
         if event.widget and getattr(event.widget, "id", None) == "preview_panel":
             self.focus_inspector_target("color_background")
 
@@ -4800,8 +4838,9 @@ class ThemeEditScreen(Screen):
                 except Exception:  # noqa: BLE001
                     inp = self.query_one(f"#{target_id}")
             if inp:
+                self.set_focus(inp, scroll_visible=False)
                 inp.scroll_visible(animate=False)
-                inp.focus()
+                self.call_after_refresh(lambda: inp.scroll_visible(animate=False))
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""
@@ -5139,7 +5178,8 @@ class ThemeEditScreen(Screen):
         target_idx = max(0, min(len(items) - 1, target_idx))
         target = items[target_idx]
         target.scroll_visible(animate=False)
-        target.focus()
+        self.set_focus(target, scroll_visible=False)
+        self.call_after_refresh(lambda: target.scroll_visible(animate=False))
         return True
 
     def on_key(self, event: events.Key) -> None:
@@ -5223,7 +5263,7 @@ class ThemeEditScreen(Screen):
         # Default fallback to color_background
         with contextlib.suppress(Exception):
             inp = self.query_one("#color_background", Input)
-            inp.focus()
+            self.set_focus(inp, scroll_visible=False)
             tok = "background"
             pal_256 = self._get_pal_256()
             curr_val = pal_256.get(tok, -1)
@@ -5264,7 +5304,7 @@ class ThemeEditScreen(Screen):
         # Default fallback to prop_border_top_left
         with contextlib.suppress(Exception):
             inp = self.query_one("#prop_border_top_left", Input)
-            inp.focus()
+            self.set_focus(inp, scroll_visible=False)
             prop_k = "border_top_left"
             curr_val = inp.value
 

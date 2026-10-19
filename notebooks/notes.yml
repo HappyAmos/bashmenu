@@ -48,4 +48,16 @@ notebook:
           \ does not display or is cut off. The background buttons for Menu Editor\
           \ Colors, and Text Editor Colors and Modals & Popup Colors are putting color\
           \ pairs in the text widget, even though it requires a single color value.\n\
-          - [x] RESPONSIVENESS: Theme editor preview item selection lag: significant blocking delay until focus lands on color field in property inspector.\n"
+          - [x] RESPONSIVENESS: Theme editor preview item selection lag: significant\
+          \ blocking delay until focus lands on color field in property inspector.\n\
+          - [ ] FEATURE: Add the option to rename a \"note\" in a notebook."
+    - 'Project TODO (no agent):':
+        type: note
+        format: markdown
+        content: There is a new python test script in the root, called testcolor.py
+          that runs the gammut of 512 colors. Reason being, this terminal supports
+          24 bit true color. This can be tested for/against and used. I propose enabling
+          truecolor support for bashmenu, to extend the possible colors that can be
+          used in the themes. Perhaps it's overkill, but there are a few shades 255
+          just can't reach. I'm not sure how color selection would work, perhaps some
+          kind of color wheel, or multitab color gradiant selector?
