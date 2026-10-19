@@ -5232,3 +5232,228 @@ redgyle:
   divider:
     char: "\u2500"
     length: '{window_width}'
+alaska-mountain_pixel:
+  marquee:
+    char: "\u2022"
+    gap: 5
+  indicator: "{nf:@:\uEE90:}"
+  window:
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
+  256:
+    background: 235
+    title:
+    - 252
+    - -1
+    border:
+    - 239
+    - -1
+    text:
+    - 255
+    - -1
+    highlight:
+    - 16
+    - 252
+    accent:
+    - 145
+    - -1
+    footer:
+    - 239
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 66
+    - -1
+    selection:
+    - 16
+    - 252
+    shortcut_key:
+    - 145
+    - -1
+    divider:
+    - 239
+    - -1
+    button_primary:
+    - 16
+    - 252
+    button_error:
+    - 255
+    - 196
+    button_cancel:
+    - 255
+    - 236
+    button_success:
+    - 255
+    - 40
+    help_text:
+    - 68
+    - -1
+    plugin:
+    - 145
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 252
+    - 236
+    whitespace:
+    - 236
+    - -1
+  16:
+    background: COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_GREY
+    - -1
+    text:
+    - COLOR_BRIGHT_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_GREY
+    - -1
+    shadow:
+    - COLOR_GREY
+    - COLOR_BLACK
+    gutter:
+    - COLOR_GREY
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_GREY
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREY
+    button_success:
+    - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_BRIGHT_RED
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_GREY
+    whitespace:
+    - COLOR_GREY
+    - -1
+  8:
+    background: COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_YELLOW
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_YELLOW
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_BLACK
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_YELLOW
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_RED
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_WHITE
+    - COLOR_GREEN
+    help_text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_YELLOW
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_BLACK
+    - -1
+  background:
+    image: assets/wallpapers/alaska-mountain.pixel.png
+    opacity: 0.5
+    scaling: stretch
+    mode: halfblock
+    clustering: 10
+  divider:
+    char: "\u2500"
+    length: '{window_width}'

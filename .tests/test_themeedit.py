@@ -1716,7 +1716,7 @@ class TestThemeEditor(unittest.TestCase):
                     await pilot.pause()
 
                 # Dismiss saved message modal if present
-                if isinstance(app.screen, bashmenu_ui.MessageModalScreen):
+                while isinstance(app.screen, bashmenu_ui.MessageModalScreen):
                     app.screen.dismiss()
                     await pilot.pause()
 
@@ -1730,9 +1730,14 @@ class TestThemeEditor(unittest.TestCase):
 
                 screen.action_open_theme()
                 await pilot.pause()
+                if not isinstance(app.screen, bashmenu_ui.ThemePickerModalScreen):
+                    await pilot.pause()
                 picker = app.screen
+                self.assertIsInstance(picker, bashmenu_ui.ThemePickerModalScreen)
                 picker.dismiss("dracula")
                 await pilot.pause()
+                if not isinstance(app.screen, bashmenu_ui.ConfirmModalScreen):
+                    await pilot.pause()
 
                 confirm = app.screen
                 self.assertIsInstance(confirm, bashmenu_ui.ConfirmModalScreen)

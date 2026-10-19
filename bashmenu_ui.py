@@ -4868,6 +4868,9 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "close_modal", "Close"),
         Binding("enter", "close_modal", "Close"),
+        Binding("h", "toggle_completed", "Toggle Completed"),
+        Binding("H", "toggle_completed", "Toggle Completed", show=False),
+        Binding("ctrl+h", "toggle_completed", "Toggle Completed", show=False),
         Binding("c", "copy_note", "Copy"),
         Binding("ctrl+c", "copy_note", "Copy", show=False),
         Binding("ctrl+shift+c", "copy_note", "Copy", show=False),
@@ -4884,6 +4887,7 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         filepath: str = "",
         note_title: str = "",
         on_content_change: Callable[[str], None] | None = None,
+        show_completed: bool = False,
     ):
         super().__init__()
         self.modal_title = title
@@ -4893,7 +4897,15 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         self.theme = theme or {}
         self.filepath = filepath
         self.on_content_change = on_content_change
+        self.show_completed = show_completed
         self.lines: list[str] = self.content.split("\n")
+
+    def _get_footer_text(self, has_checkboxes: bool) -> str:
+        """Return the footer help gutter text reflecting current checkbox toggle state."""
+        if has_checkboxes:
+            toggle_action = "Hide Done" if self.show_completed else "Show Done"
+            return f"[SPACE] Toggle | [H] {toggle_action} | [C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close"
+        return "[C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close"
 
     def _parse_blocks(self) -> list[tuple[str, Any]]:
         """Parse note content lines into alternating markdown blocks and interactive checkbox items."""
@@ -4966,16 +4978,15 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
                                 classes="markdown_checkbox",
                                 id=f"cb_{line_idx}",
                             )
+                            if is_checked and not self.show_completed:
+                                cb.display = False
                             yield cb
             with Horizontal(id="buttons"):
                 yield Button("Copy [C]", variant="default", id="btn_copy")
                 yield Button("Edit [E]", variant="primary", id="btn_edit")
                 yield Button("Delete [D]", variant="error", id="btn_delete")
                 yield Button("Close [ESC]", variant="default", id="btn_close")
-            if has_checkboxes:
-                yield Label("[SPACE] Toggle | [C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
-            else:
-                yield Label("[C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close", id="footer", markup=False)
+            yield Label(self._get_footer_text(has_checkboxes), id="footer", markup=False)
 
         with ModalFrame(id="modal_frame"):
             with Horizontal(id="dialog_hrow"):
@@ -4992,13 +5003,16 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
             apply_button_theme(self.query_one("#btn_delete", Button), theme=self.theme, button_type="button_danger")
             apply_button_theme(self.query_one("#btn_close", Button), theme=self.theme, button_type="button_default")
 
-        cbs = self.query(Checkbox)
-        if cbs:
-            cbs.first().focus()
+        visible_cbs = [cb for cb in self.query(Checkbox) if cb.display]
+        if visible_cbs:
+            visible_cbs[0].focus()
+        else:
+            with contextlib.suppress(Exception):
+                self.query_one("#btn_close", Button).focus()
 
     def on_key(self, event: events.Key) -> None:
         if isinstance(self.focused, Checkbox):
-            cbs = list(self.query(Checkbox))
+            cbs = [cb for cb in self.query(Checkbox) if cb.display]
             if self.focused in cbs:
                 idx = cbs.index(self.focused)
                 if event.key in ("down", "j") and idx < len(cbs) - 1:
@@ -5030,6 +5044,34 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
                 if self.on_content_change:
                     with contextlib.suppress(Exception):
                         self.on_content_change(self.content)
+
+    def action_toggle_completed(self) -> None:
+        """Toggle visibility of completed checkboxes in view mode."""
+        blocks = self._parse_blocks() if self.note_format == "markdown" else []
+        has_checkboxes = any(b[0] == "checkbox" for b in blocks)
+        if not has_checkboxes:
+            return
+
+        self.show_completed = not self.show_completed
+        for cb in self.query(MarkdownCheckbox):
+            if cb.value:
+                cb.display = self.show_completed
+
+        with contextlib.suppress(Exception):
+            footer = self.query_one("#footer", Label)
+            footer.update(self._get_footer_text(has_checkboxes=True))
+
+        visible_cbs = [cb for cb in self.query(Checkbox) if cb.display]
+        if self.focused not in visible_cbs:
+            if visible_cbs:
+                visible_cbs[0].focus()
+            else:
+                with contextlib.suppress(Exception):
+                    self.query_one("#btn_close", Button).focus()
+
+        msg = "Showing completed tasks" if self.show_completed else "Hiding completed tasks"
+        with contextlib.suppress(Exception):
+            self.notify(msg, timeout=1.5)
 
     def action_copy_note(self) -> None:
         """Copy raw note markdown text to system clipboard and shared cutbuffer."""

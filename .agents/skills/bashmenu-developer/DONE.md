@@ -179,3 +179,19 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   4. In `bashmenu_ui.py` & `themeedit.py`: Updated `FilePickerModalScreen` footer to display `Hidden*` when hidden files are active, and accepted `theme` in `BackgroundConfigModal`.
 - **Tests:** Added `test_wallpaper_strip_navigation_latency` in `.tests/test_performance.py` verifying navigation latency < 2.0ms. Verified all 335 tests in `.tests/` pass.
 
+---
+
+### 21. Notebook Completed Checkboxes Default Hidden with Toggle Shortcut
+- **Item:** `- [x] FEATURE: Add a keyboard shortcut toggle in the notebooks to show or hide completed checkboxes (view mode only). Default state should be hidden for completed items. The shortcut should be displayed in the help gutter of the view-mode editor.` (from `notebooks/notes.yml`)
+- **Implementation:**
+  1. In `bashmenu_ui.py::NoteViewerModalScreen`:
+     - Added `show_completed: bool = False` property defaulting to False.
+     - In `compose()`: For completed markdown checkboxes (`b[4] is True`), set `cb.display = False` when `not self.show_completed`.
+     - In `BINDINGS`: Added bindings for `h`, `H`, and `ctrl+h` mapped to action `toggle_completed`.
+     - In `_get_footer_text()`: Added dynamic state indicator in help gutter (`[H] Show Done` when completed tasks are hidden, `[H] Hide Done` when shown).
+     - In `action_toggle_completed()`: Toggles `self.show_completed`, updates all `MarkdownCheckbox` widgets with `cb.display = self.show_completed` for completed items, refreshes footer help text, maintains focus on visible checkboxes or falls back to close button, and issues a brief toast notification.
+     - In `on_mount()` and `on_key()`: Filtered navigation and initial focus to visible checkboxes only (`[cb for cb in self.query(Checkbox) if cb.display]`).
+- **Tests:**
+  - Added `test_note_viewer_toggle_completed_checkboxes_h_key` in `.tests/test_notebook.py`.
+  - Updated `test_note_viewer_interactive_checkboxes_space_and_click` and `test_note_viewer_text_wrapping_for_checkboxes` to verify default hidden state and toggle behavior.
+

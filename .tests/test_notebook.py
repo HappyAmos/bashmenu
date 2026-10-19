@@ -366,6 +366,12 @@ class TestNotebookFeature(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(cbs[0].value)
             self.assertIn("- [x] Task 1", screen.content)
 
+            # Completed checkbox is hidden by default; press 'h' to show it
+            self.assertFalse(cbs[1].display)
+            await pilot.press("h")
+            await pilot.pause()
+            self.assertTrue(cbs[1].display)
+
             # Test mouse click toggle
             await pilot.click(cbs[1])
             await pilot.pause()
@@ -778,7 +784,7 @@ Detailed section content here.
 
         app = ViewerApp()
         async with app.run_test() as pilot:
-            screen = bashmenu_ui.NoteViewerModalScreen("Test", content)
+            screen = bashmenu_ui.NoteViewerModalScreen("Test", content, show_completed=True)
             app.push_screen(screen)
             await pilot.pause()
 
@@ -848,6 +854,63 @@ Detailed section content here.
             self.assertFalse(screen._is_covered())
             self.assertTrue(screen._refresh_timer._active.is_set())
             self.assertTrue(screen.menu_view._marquee_timer._active.is_set())
+
+    async def test_note_viewer_toggle_completed_checkboxes_h_key(self):
+        """Verify completed checkboxes default to hidden and toggle visibility with 'h' and 'ctrl+h'."""
+        from textual.app import App
+        from textual.widgets import Checkbox, Label
+
+        content = "## Checklist\n- [ ] Pending Item\n- [x] Completed Item\n- [ ] Another Pending"
+
+        class ViewerApp(App):
+            pass
+
+        app = ViewerApp()
+        async with app.run_test() as pilot:
+            screen = bashmenu_ui.NoteViewerModalScreen("Test", content)
+            app.push_screen(screen)
+            await pilot.pause()
+
+            cbs = list(screen.query(Checkbox))
+            self.assertEqual(len(cbs), 3)
+
+            # Default state: completed item is hidden
+            self.assertFalse(screen.show_completed)
+            self.assertTrue(cbs[0].display)
+            self.assertFalse(cbs[1].display)
+            self.assertTrue(cbs[2].display)
+
+            # Footer displays help text showing '[H] Show Done'
+            footer = screen.query_one("#footer", Label)
+            self.assertIn("[H] Show Done", str(footer.render()))
+
+            # Press 'h' to show completed items
+            await pilot.press("h")
+            await pilot.pause()
+
+            self.assertTrue(screen.show_completed)
+            self.assertTrue(cbs[0].display)
+            self.assertTrue(cbs[1].display)
+            self.assertTrue(cbs[2].display)
+            self.assertIn("[H] Hide Done", str(footer.render()))
+
+            # Press 'h' again to hide completed items
+            await pilot.press("h")
+            await pilot.pause()
+
+            self.assertFalse(screen.show_completed)
+            self.assertTrue(cbs[0].display)
+            self.assertFalse(cbs[1].display)
+            self.assertTrue(cbs[2].display)
+            self.assertIn("[H] Show Done", str(footer.render()))
+
+            # Press 'ctrl+h' to toggle again
+            await pilot.press("ctrl+h")
+            await pilot.pause()
+
+            self.assertTrue(screen.show_completed)
+            self.assertTrue(cbs[1].display)
+            self.assertIn("[H] Hide Done", str(footer.render()))
 
 
 if __name__ == "__main__":

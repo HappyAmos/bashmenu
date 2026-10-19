@@ -10,8 +10,8 @@ items:
           - Convert Image To BM Wallpaper:
               type: command
               icon: '{nf::#f11e7}'
-              command: convert "{file_picker}" -resize 80x48\! -blur 0x0.5 +dither
-                -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
+              command: convert "{file_picker:{bashmenu_dir}/assets/wallpapers}" -resize
+                80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
               prompt: 'Convert image to BM friendly wallpaper:'
               start_dir: ~/Pictures
               interactive: true

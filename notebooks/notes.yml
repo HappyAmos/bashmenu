@@ -2,17 +2,35 @@ notebook:
   title: Notes
   format: markdown
   notes:
-    - TODO:
-        type: note
-        format: markdown
-        content: |-
-          ## TODO List (Shared With Agent).
-
-          - [x] Edit file/directory pickers to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden files. (Fixed parameter passing in theme editor wallpaper dialog, added dynamic footer state indicator, and verified).
-          - [x] BUG: Mark items you are currently working on in the TODO as "PENDING" after the check box.
-          - [x] UI: When in view mode of notebook notes (not edit mode) wrap text as necessary.
-          - [x] RESPONSIVENESS: notebook UI, particularily in edit mode has become very sluggish. This needs an immediate fix as it's so sluggish it's almost unusable. When any window is currently over the main menu UI (i.e., help modal, reference modals, selection popups, etc, notebook notes) background ticks should ALL pause until the window is closed.
-          - [x] BUG: Open dialogs, such as the one to choose a background wallpaper in the theme editor, or the open dialog to select a file in the text editor, do not include the <ctl> + <h> functionality to toggle hidden files displayed/hidden.
-          - [x] RESPONSIVENESS: Investigate ways to prevent sluggish menu navigation when backgrounds are enabled. Implemented zero-degradation Strip caching on PrebakedWallpaperCanvas and MainMenuView render_line fast-path, reducing navigation latency from 58ms to 0.36ms.
-          - [ ] FEATURE: Add a keyboard shortcut toggle in the notebooks to show or hide completed checkboxes (view mode only). Default state should be hidden for completed items.
-          - [ ] Update the dialogs for choosing a background wallpaper in the theme editor, and the open files dialog for the text editor to display help text to display hidden files.
+  - TODO:
+      type: note
+      format: markdown
+      content: "## TODO List (Shared With Agent).\n\n- [x] Edit file/directory pickers\
+        \ to include a keyboard shortcut ```<ctl> + <h>``` to toggle show/hide hidden\
+        \ files. (Fixed parameter passing in theme editor wallpaper dialog, added\
+        \ dynamic footer state indicator, and verified).\n- [x] BUG: Mark items you\
+        \ are currently working on in the TODO as \"PENDING\" after the check box.\n\
+        - [x] UI: When in view mode of notebook notes (not edit mode) wrap text as\
+        \ necessary.\n- [x] RESPONSIVENESS: notebook UI, particularily in edit mode\
+        \ has become very sluggish. This needs an immediate fix as it's so sluggish\
+        \ it's almost unusable. When any window is currently over the main menu UI\
+        \ (i.e., help modal, reference modals, selection popups, etc, notebook notes)\
+        \ background ticks should ALL pause until the window is closed.\n- [x] BUG:\
+        \ Open dialogs, such as the one to choose a background wallpaper in the theme\
+        \ editor, or the open dialog to select a file in the text editor, do not include\
+        \ the <ctl> + <h> functionality to toggle hidden files displayed/hidden.\n\
+        - [x] RESPONSIVENESS: Investigate ways to prevent sluggish menu navigation\
+        \ when backgrounds are enabled. Implemented zero-degradation Strip caching\
+        \ on PrebakedWallpaperCanvas and MainMenuView render_line fast-path, reducing\
+        \ navigation latency from 58ms to 0.36ms.\n- [x] FEATURE: Add a keyboard\
+        \ shortcut toggle in the notebooks to show or hide completed checkboxes (view\
+        \ mode only). Default state should be hidden for completed items. The shortcut\
+        \ should be displayed in the help gutter of the view-mode editor.\n- [ ] PENDING: UI:\
+        \ Theme editor: the backgrounds of the Menu Editor tab, and the Modals & Popups\
+        \ tab do not reflect reality. Further, I would like an additional tab \"Editor\"\
+        \ to display a mock version of the built-in text editor. I am going to be\
+        \ requesting items in these tabs to have their own color settings, preferably\
+        \ in their own drop down section in the property inspector. Items such as\
+        \ buttons, borders, background color, text color, etc.  The Derive 16/8 function,\
+        \ and the From Image function should both populate the values of the newly\
+        \ created color options. Do some research, and present me with a plan. "
