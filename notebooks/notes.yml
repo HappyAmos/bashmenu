@@ -54,10 +54,9 @@ notebook:
     - 'Project TODO (no agent):':
         type: note
         format: markdown
-        content: There is a new python test script in the root, called testcolor.py
-          that runs the gammut of 512 colors. Reason being, this terminal supports
-          24 bit true color. This can be tested for/against and used. I propose enabling
-          truecolor support for bashmenu, to extend the possible colors that can be
-          used in the themes. Perhaps it's overkill, but there are a few shades 255
-          just can't reach. I'm not sure how color selection would work, perhaps some
-          kind of color wheel, or multitab color gradiant selector?
+        content: |-
+          There is a new python test script in the root, called testcolor.py that runs the gammut of 512 colors. Reason being, this terminal supports 24 bit true color. This can be tested for/against and used. I propose enabling truecolor support for bashmenu, to extend the possible colors that can be used in the themes. Perhaps it's overkill, but there are a few shades 255 just can't reach. I'm not sure how color selection would work, perhaps some kind of color wheel, or multitab color gradiant selector?
+
+          The installation script (.sh and the built-in install checker/script) needs an indicator that someting is happening.
+
+          The ping utility fails to identify halftop as up on the inspiron laptop, but pings fine on the netbook mini.

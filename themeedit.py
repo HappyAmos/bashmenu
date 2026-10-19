@@ -2582,12 +2582,12 @@ class ThemePreviewWidget(Static):
         cx = event.x - gutter_l
         cy = event.y - gutter_t
         if self._handle_element_selection(cx, cy):
-            self._last_mouse_down_time = time.monotonic()
+            self._mouse_down_handled = True
 
     def on_click(self, event: events.Click) -> None:
         """Handle mouse click on preview element (fallback or when mouse_down was not caught)."""
-        last_t = getattr(self, "_last_mouse_down_time", 0.0)
-        if last_t and (time.monotonic() - last_t < 0.4):
+        if getattr(self, "_mouse_down_handled", False):
+            self._mouse_down_handled = False
             return
         gutter_l = getattr(getattr(self, "gutter", None), "left", 0)
         gutter_t = getattr(getattr(self, "gutter", None), "top", 0)
@@ -4670,14 +4670,14 @@ class ThemeEditScreen(Screen):
     def on_preview_panel_mouse_down(self, event: events.MouseDown) -> None:
         """Handle mouse down in preview panel margin area and select background color immediately."""
         if event.widget and getattr(event.widget, "id", None) == "preview_panel":
-            self._panel_mouse_down_time = time.monotonic()
+            self._panel_mouse_down_handled = True
             self.focus_inspector_target("color_background")
 
     @on(events.Click, "#preview_panel")
     def on_preview_panel_clicked(self, event: events.Click) -> None:
         """Handle click in preview panel margin area and select background color."""
-        last_t = getattr(self, "_panel_mouse_down_time", 0.0)
-        if last_t and (time.monotonic() - last_t < 0.4):
+        if getattr(self, "_panel_mouse_down_handled", False):
+            self._panel_mouse_down_handled = False
             return
         if event.widget and getattr(event.widget, "id", None) == "preview_panel":
             self.focus_inspector_target("color_background")
