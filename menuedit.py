@@ -1914,7 +1914,8 @@ class MenuEditScreen(Screen):
             t_name = self.theme_styles.get("theme_name") if isinstance(self.theme_styles, dict) else self.raw_theme
             if t_name:
                 bashmenu_ui.apply_theme_to_textual_borders(t_name)
-            bg_style = self.theme_styles.get("background")
+            me_styles = self.theme_styles.get("menu_editor", {}) if isinstance(self.theme_styles.get("menu_editor"), dict) else {}
+            bg_style = me_styles.get("background") or self.theme_styles.get("background")
             if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
                 css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
                 if css_bg:
@@ -1922,7 +1923,7 @@ class MenuEditScreen(Screen):
                         with contextlib.suppress(Exception):
                             self.query_one(wid).styles.background = css_bg
 
-            hdr_style = self.theme_styles.get("header") or self.theme_styles.get("title")
+            hdr_style = me_styles.get("header") or self.theme_styles.get("header") or self.theme_styles.get("title")
             if hdr_style:
                 if hdr_style.bgcolor and hdr_style.bgcolor.name:
                     css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
@@ -1946,7 +1947,7 @@ class MenuEditScreen(Screen):
                 btn_close = self.query_one("#btn_close_x", Label)
                 btn_close.update(bashmenu_ui.format_close_button_label(self.theme_styles))
 
-            border_style = self.theme_styles.get("border") or self.theme_styles.get("accent")
+            border_style = me_styles.get("border") or self.theme_styles.get("border") or self.theme_styles.get("accent")
             if border_style and border_style.color and border_style.color.name:
                 css_border = bashmenu_ui.parse_css_color(border_style.color.name)
                 if css_border:
@@ -1961,7 +1962,7 @@ class MenuEditScreen(Screen):
                     with contextlib.suppress(Exception):
                         self.query_one("#inspector_title", Label).styles.color = css_title
 
-            text_style = self.theme_styles.get("text")
+            text_style = me_styles.get("text") or self.theme_styles.get("text")
             if text_style and text_style.color and text_style.color.name:
                 css_text = bashmenu_ui.parse_css_color(text_style.color.name)
                 if css_text:
@@ -1969,7 +1970,7 @@ class MenuEditScreen(Screen):
                         with contextlib.suppress(Exception):
                             self.query_one(wid).styles.color = css_text
 
-            footer_style = self.theme_styles.get("footer") or self.theme_styles.get("background")
+            footer_style = me_styles.get("footer") or self.theme_styles.get("footer") or self.theme_styles.get("background")
             if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
                 css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
                 if css_ftr_bg:
@@ -1995,12 +1996,13 @@ class MenuEditScreen(Screen):
 
             # Apply theme highlight & guide colors to the hierarchy tree
             highlight_style = (
-                self.theme_styles.get("highlight")
+                me_styles.get("selection")
+                or self.theme_styles.get("highlight")
                 or self.theme_styles.get("selection")
                 or accent_style
             )
             if highlight_style:
-                guide_style = self.theme_styles.get("gutter") or border_style
+                guide_style = me_styles.get("tree_guide") or me_styles.get("border") or self.theme_styles.get("gutter") or border_style
                 with contextlib.suppress(Exception):
                     tree = self.query_one("#tree", MenuEditTree)
                     tree.custom_cursor_style = Style(
@@ -2015,8 +2017,40 @@ class MenuEditScreen(Screen):
                         tree._clear_line_cache()
                     tree.refresh()
 
+            # Dynamic styling for inspector labels, inputs, and action buttons
+            label_style = me_styles.get("label") or accent_style
+            if label_style and label_style.color and label_style.color.name:
+                css_lbl = bashmenu_ui.parse_css_color(label_style.color.name)
+                if css_lbl:
+                    with contextlib.suppress(Exception):
+                        for lbl in self.query(".prop_label, .section_header"):
+                            lbl.styles.color = css_lbl
+
+            input_style = me_styles.get("input") or text_style
+            if input_style:
+                css_inp_fg = bashmenu_ui.parse_css_color(input_style.color.name) if input_style.color and input_style.color.name else None
+                css_inp_bg = bashmenu_ui.parse_css_color(input_style.bgcolor.name) if input_style.bgcolor and input_style.bgcolor.name else None
+                with contextlib.suppress(Exception):
+                    for inp in self.query(Input):
+                        if css_inp_fg:
+                            inp.styles.color = css_inp_fg
+                        if css_inp_bg:
+                            inp.styles.background = css_inp_bg
+
+            btn_save_style = me_styles.get("button_save") or self.theme_styles.get("button_primary") or self.theme_styles.get("button_success")
+            if btn_save_style:
+                with contextlib.suppress(Exception):
+                    btn = self.query_one("#btn_save", Button)
+                    bashmenu_ui.apply_button_theme(btn, self.theme_styles, button_type="button_save")
+
+            btn_del_style = me_styles.get("button_delete") or self.theme_styles.get("button_error")
+            if btn_del_style:
+                with contextlib.suppress(Exception):
+                    btn = self.query_one("#btn_delete", Button)
+                    bashmenu_ui.apply_button_theme(btn, self.theme_styles, button_type="button_delete")
+
             # Apply scrollbar theme colors to screen and scrollable panels
-            sb_style = self.theme_styles.get("scrollbar") or border_style or accent_style
+            sb_style = me_styles.get("scrollbar") or self.theme_styles.get("scrollbar") or border_style or accent_style
             if sb_style:
                 css_sb_fg = (
                     bashmenu_ui.parse_css_color(sb_style.color.name)

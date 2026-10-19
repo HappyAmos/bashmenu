@@ -1483,7 +1483,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
         or theme_def.get("16")
         or theme_def.get(8)
         or theme_def.get("8")
-        or {}
+        or (theme_def if any(k in theme_def for k in ("background", "title", "border", "text")) else {})
     )
     raw_ind = theme_def.get("indicator", ">")
     if isinstance(raw_ind, str) and "{" in raw_ind:
@@ -1517,17 +1517,20 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
                         continue
                     if isinstance(s_v, list) and len(s_v) >= 2:
                         s_fg = parse_color_val(s_v[0])
-                        s_bg = parse_color_val(s_v[1]) if s_v[1] != -1 and str(s_v[1]).strip() not in ("-1", "None", "transparent") else sub_bg
+                        s_bg = parse_color_val(s_v[1]) if s_v[1] != -1 and str(s_v[1]).strip() not in ("-1", "None", "transparent") else None
                         sub_styles[s_k] = Style(color=s_fg, bgcolor=s_bg)
                     elif isinstance(s_v, (str, int)):
-                        sub_styles[s_k] = Style(color=parse_color_val(s_v), bgcolor=sub_bg)
+                        if s_k in ("tab_bar", "background") or s_k.endswith(("_background", "_tab_bar")):
+                            sub_styles[s_k] = Style(bgcolor=parse_color_val(s_v))
+                        else:
+                            sub_styles[s_k] = Style(color=parse_color_val(s_v), bgcolor=None)
                 styles[key] = sub_styles
             elif isinstance(spec, list) and len(spec) >= 2:
                 fg = parse_color_val(spec[0])
-                if key == "plugin" and (spec[1] == -1 or str(spec[1]).strip() in ("-1", "inherit", "transparent", "None")):
+                if spec[1] == -1 or str(spec[1]).strip() in ("-1", "inherit", "transparent", "None"):
                     bg = None
                 else:
-                    bg = parse_color_val(spec[1]) or bg_color
+                    bg = parse_color_val(spec[1])
                 styles[key] = Style(color=fg, bgcolor=bg)
             elif isinstance(spec, (str, int)):
                 bg = None if key == "plugin" else bg_color
@@ -1583,6 +1586,63 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles["theme_name"] = theme_name
     styles["window_borders"] = borders
     styles["marquee"] = get_theme_marquee_config(theme_name, raw_theme_data=raw_theme_data)
+
+    # Populate sub-palette dictionaries with inheritance fallbacks
+    ed_styles = styles.setdefault("editor", {})
+    if not isinstance(ed_styles, dict):
+        ed_styles = {}
+        styles["editor"] = ed_styles
+    ed_bg = ed_styles.get("background") or styles.get("background")
+    ed_styles.setdefault("background", ed_bg)
+    ed_styles.setdefault("header", styles.get("header") or styles.get("title"))
+    ed_styles.setdefault("tab_bar", ed_bg)
+    ed_styles.setdefault("tab_active", styles.get("selection") or styles.get("highlight"))
+    ed_styles.setdefault("tab_inactive", styles.get("text"))
+    ed_styles.setdefault("tab_close", styles.get("window_close_button") or styles.get("button_error"))
+    ed_styles.setdefault("tab_add", styles.get("accent") or styles.get("button_primary"))
+    ed_styles.setdefault("line_number", styles.get("gutter"))
+    ed_styles.setdefault("gutter", styles.get("gutter"))
+    ed_styles.setdefault("eof_tilde", styles.get("gutter"))
+    ed_styles.setdefault("text", styles.get("text"))
+    ed_styles.setdefault("selection", styles.get("selection"))
+    ed_styles.setdefault("whitespace", styles.get("whitespace"))
+    ed_styles.setdefault("status", ed_styles.get("header") or styles.get("footer"))
+    ed_styles.setdefault("footer", styles.get("footer"))
+    ed_styles.setdefault("border", styles.get("border"))
+
+    me_styles = styles.setdefault("menu_editor", {})
+    if not isinstance(me_styles, dict):
+        me_styles = {}
+        styles["menu_editor"] = me_styles
+    me_bg = me_styles.get("background") or styles.get("background")
+    me_styles.setdefault("background", me_bg)
+    me_styles.setdefault("header", styles.get("header") or styles.get("title"))
+    me_styles.setdefault("border", styles.get("border"))
+    me_styles.setdefault("text", styles.get("text"))
+    me_styles.setdefault("selection", styles.get("selection") or styles.get("highlight"))
+    me_styles.setdefault("tree_guide", styles.get("gutter") or styles.get("border"))
+    me_styles.setdefault("label", styles.get("accent") or styles.get("help_text"))
+    me_styles.setdefault("input", styles.get("text"))
+    me_styles.setdefault("button_save", styles.get("button_primary") or styles.get("button_success"))
+    me_styles.setdefault("button_delete", styles.get("button_error"))
+    me_styles.setdefault("footer", styles.get("footer"))
+
+    mod_styles = styles.setdefault("modals", {})
+    if not isinstance(mod_styles, dict):
+        mod_styles = {}
+        styles["modals"] = mod_styles
+    mod_bg = mod_styles.get("background") or styles.get("background")
+    mod_styles.setdefault("backdrop", styles.get("shadow"))
+    mod_styles.setdefault("background", mod_bg)
+    mod_styles.setdefault("border", styles.get("border") or styles.get("accent"))
+    mod_styles.setdefault("title", styles.get("title") or styles.get("accent"))
+    mod_styles.setdefault("text", styles.get("text"))
+    mod_styles.setdefault("input", styles.get("text"))
+    mod_styles.setdefault("button_confirm", styles.get("button_success") or styles.get("button_primary"))
+    mod_styles.setdefault("button_cancel", styles.get("button_cancel"))
+    mod_styles.setdefault("button_danger", styles.get("button_error"))
+    mod_styles.setdefault("scrollbar", styles.get("scrollbar"))
+    mod_styles.setdefault("footer", styles.get("footer"))
 
     if use_cache:
         _theme_styles_cache[cache_key] = styles
@@ -2379,19 +2439,21 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
         mf = screen.query_one("#modal_frame")
         if hasattr(mf, "sync_shadows"):
             mf.sync_shadows()
+    mod_styles = theme_dict.get("modals", {}) if isinstance(theme_dict.get("modals"), dict) else {}
+
     with contextlib.suppress(Exception):
         dialog = screen.query_one("#dialog")
-        border_style = theme_dict.get("border") or theme_dict.get("accent")
+        border_style = mod_styles.get("border") or theme_dict.get("border") or theme_dict.get("accent")
         if border_style and border_style.color and border_style.color.name:
             css_border = parse_css_color(border_style.color.name)
             if css_border:
                 dialog.styles.border = ("thick", css_border)
-        bg_style = theme_dict.get("background")
+        bg_style = mod_styles.get("background") or theme_dict.get("background")
         if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
             css_bg = parse_css_color(bg_style.bgcolor.name)
             if css_bg:
                 dialog.styles.background = css_bg
-        text_style = theme_dict.get("text")
+        text_style = mod_styles.get("text") or theme_dict.get("text")
         if text_style and text_style.color and text_style.color.name:
             css_text = parse_css_color(text_style.color.name)
             if css_text:
@@ -2399,7 +2461,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
 
     with contextlib.suppress(Exception):
         title = screen.query_one("#title", Label)
-        title_style = theme_dict.get("title") or theme_dict.get("accent")
+        title_style = mod_styles.get("title") or theme_dict.get("title") or theme_dict.get("accent")
         if title_style and title_style.color and title_style.color.name:
             css_title = parse_css_color(title_style.color.name)
             if css_title:
@@ -2413,7 +2475,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
             title.update(f"{l_cap} {raw_text.strip()} {r_cap}")
 
     with contextlib.suppress(Exception):
-        msg_style = theme_dict.get("text")
+        msg_style = mod_styles.get("text") or theme_dict.get("text")
         if msg_style and msg_style.color and msg_style.color.name:
             css_msg = parse_css_color(msg_style.color.name)
             if css_msg:
@@ -2423,7 +2485,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
 
     with contextlib.suppress(Exception):
         prompt = screen.query_one("#prompt", Static)
-        prompt_style = theme_dict.get("text") or theme_dict.get("accent")
+        prompt_style = mod_styles.get("text") or theme_dict.get("text") or theme_dict.get("accent")
         if prompt_style and prompt_style.color and prompt_style.color.name:
             css_prompt = parse_css_color(prompt_style.color.name)
             if css_prompt:
@@ -2431,7 +2493,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
                 prompt.styles.auto_color = False
 
     with contextlib.suppress(Exception):
-        footer_style = theme_dict.get("footer") or theme_dict.get("help_text") or theme_dict.get("text")
+        footer_style = mod_styles.get("footer") or theme_dict.get("footer") or theme_dict.get("help_text") or theme_dict.get("text")
         if footer_style and footer_style.color and footer_style.color.name:
             css_footer = parse_css_color(footer_style.color.name)
             if css_footer:
@@ -2442,13 +2504,24 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
                     fi.styles.color = css_footer
                     fi.styles.auto_color = False
 
-        sep_style = theme_dict.get("border") or theme_dict.get("divider")
+        sep_style = mod_styles.get("border") or theme_dict.get("border") or theme_dict.get("divider")
         if sep_style and sep_style.color and sep_style.color.name:
             css_sep = parse_css_color(sep_style.color.name)
             if css_sep:
                 for fs in screen.query(".footer_sep"):
                     fs.styles.color = css_sep
                     fs.styles.auto_color = False
+
+    with contextlib.suppress(Exception):
+        inp_style = mod_styles.get("input") or mod_styles.get("text") or theme_dict.get("text")
+        if inp_style:
+            css_inp_fg = parse_css_color(inp_style.color.name) if inp_style.color and inp_style.color.name else None
+            css_inp_bg = parse_css_color(inp_style.bgcolor.name) if inp_style.bgcolor and inp_style.bgcolor.name else None
+            for inp in screen.query(Input):
+                if css_inp_fg:
+                    inp.styles.color = css_inp_fg
+                if css_inp_bg:
+                    inp.styles.background = css_inp_bg
 
     with contextlib.suppress(Exception):
         path_lbl = screen.query_one("#path_label", Label)
@@ -2462,7 +2535,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
     for opt_id in ["#options_list", "#option_list"]:
         with contextlib.suppress(Exception):
             opt_list = screen.query_one(opt_id, OptionList)
-            border_style = theme_dict.get("border") or theme_dict.get("accent")
+            border_style = mod_styles.get("border") or theme_dict.get("border") or theme_dict.get("accent")
             if border_style and border_style.color and border_style.color.name:
                 css_b = parse_css_color(border_style.color.name)
                 if css_b:
@@ -2482,7 +2555,7 @@ def apply_modal_theme(screen: ModalScreen, theme=None) -> None:
         btn_close.update(format_close_button_label(theme_dict))
 
     with contextlib.suppress(Exception):
-        sb_style = theme_dict.get("scrollbar") or theme_dict.get("border")
+        sb_style = mod_styles.get("scrollbar") or theme_dict.get("scrollbar") or theme_dict.get("border")
         if sb_style:
             css_sb_fg = parse_css_color(sb_style.color.name) if sb_style.color and sb_style.color.name else None
             css_sb_bg = parse_css_color(sb_style.bgcolor.name) if sb_style.bgcolor and sb_style.bgcolor.name else None
@@ -2503,12 +2576,15 @@ def apply_button_theme(button: Button, theme=None, button_type: str = "button_pr
     theme_dict = resolve_theme_dict(theme, app)
     if not theme_dict:
         return
-    style = theme_dict.get(button_type)
+    mod_styles = theme_dict.get("modals", {}) if isinstance(theme_dict.get("modals"), dict) else {}
+    style = mod_styles.get(button_type) or theme_dict.get(button_type)
     if not style:
-        if button_type in ("button_danger", "button_error"):
-            style = theme_dict.get("button_error") or theme_dict.get("button_danger")
+        if button_type in ("button_confirm", "button_save"):
+            style = mod_styles.get("button_confirm") or theme_dict.get("button_success") or theme_dict.get("button_primary")
+        elif button_type in ("button_danger", "button_error", "button_delete"):
+            style = mod_styles.get("button_danger") or theme_dict.get("button_error") or theme_dict.get("button_danger")
         elif button_type in ("button_default", "button_cancel"):
-            style = theme_dict.get("button_cancel") or theme_dict.get("button_default")
+            style = mod_styles.get("button_cancel") or theme_dict.get("button_cancel") or theme_dict.get("button_default")
         elif button_type == "button_success":
             style = theme_dict.get("button_success")
     if not style:

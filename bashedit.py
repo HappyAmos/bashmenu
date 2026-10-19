@@ -350,8 +350,21 @@ class EditorWidget(Widget):
         lineno_width = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
         theme_dict = self.theme if isinstance(self.theme, dict) else {}
         ed_dict = theme_dict.get("editor") if isinstance(theme_dict.get("editor"), dict) else {}
-        gutter_style = ed_dict.get("gutter") or theme_dict.get("gutter") or theme_dict.get("help_text") or "dim cyan"
-        lineno_style = ed_dict.get("gutter") or theme_dict.get("gutter") or ed_dict.get("text") or theme_dict.get("text") or "dim white"
+        lineno_style = (
+            ed_dict.get("line_number")
+            or ed_dict.get("gutter")
+            or theme_dict.get("gutter")
+            or ed_dict.get("text")
+            or theme_dict.get("text")
+            or "dim white"
+        )
+        eof_style = (
+            ed_dict.get("eof_tilde")
+            or ed_dict.get("gutter")
+            or theme_dict.get("gutter")
+            or theme_dict.get("help_text")
+            or "dim cyan"
+        )
         sel_style = ed_dict.get("selection") or theme_dict.get("selection") or "reverse bold magenta"
         ws_style = (
             ed_dict.get("whitespace")
@@ -377,7 +390,7 @@ class EditorWidget(Widget):
             for row_idx in range(height):
                 line_idx = self.top_line + row_idx
                 if line_idx >= len(rendered_lines):
-                    out.append("~\n", style=gutter_style)
+                    out.append("~\n", style=eof_style)
                     continue
                 line_segs = rendered_lines[line_idx]
                 line_rich = Text.assemble(*[(seg.text, seg.style) for seg in line_segs])
@@ -388,7 +401,7 @@ class EditorWidget(Widget):
         for row_idx in range(height):
             line_num = self.top_line + row_idx
             if line_num >= len(self.lines):
-                out.append("~\n", style=gutter_style)
+                out.append("~\n", style=eof_style)
                 continue
 
             line_text = self.lines[line_num]
@@ -1811,6 +1824,55 @@ class BashEditScreen(Screen):
         except Exception:  # noqa: BLE001, S110
             pass
 
+    def _apply_tab_styles(self) -> None:
+        """Apply dynamic colors to tab bar, active/inactive tabs, close button, and add tab button."""
+        with contextlib.suppress(Exception):
+            ed_styles = self.theme_styles.get("editor") if isinstance(self.theme_styles.get("editor"), dict) else {}
+            tab_bar_style = ed_styles.get("tab_bar") or ed_styles.get("background") or self.theme_styles.get("background")
+            if tab_bar_style and tab_bar_style.bgcolor and tab_bar_style.bgcolor.name:
+                css_tb_bg = bashmenu_ui.parse_css_color(tab_bar_style.bgcolor.name)
+                if css_tb_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_tab_bar").styles.background = css_tb_bg
+
+            tab_act_style = ed_styles.get("tab_active") or self.theme_styles.get("selection") or self.theme_styles.get("highlight")
+            if tab_act_style:
+                css_act_fg = bashmenu_ui.parse_css_color(tab_act_style.color.name) if tab_act_style.color and tab_act_style.color.name else None
+                css_act_bg = bashmenu_ui.parse_css_color(tab_act_style.bgcolor.name) if tab_act_style.bgcolor and tab_act_style.bgcolor.name else None
+                with contextlib.suppress(Exception):
+                    for lbl in self.query(".editor_tab_active"):
+                        if css_act_fg:
+                            lbl.styles.color = css_act_fg
+                        if css_act_bg:
+                            lbl.styles.background = css_act_bg
+
+            tab_inact_style = ed_styles.get("tab_inactive") or ed_styles.get("text") or self.theme_styles.get("text")
+            if tab_inact_style:
+                css_inact_fg = bashmenu_ui.parse_css_color(tab_inact_style.color.name) if tab_inact_style.color and tab_inact_style.color.name else None
+                css_inact_bg = bashmenu_ui.parse_css_color(tab_inact_style.bgcolor.name) if tab_inact_style.bgcolor and tab_inact_style.bgcolor.name else None
+                with contextlib.suppress(Exception):
+                    for lbl in self.query(".editor_tab"):
+                        if css_inact_fg:
+                            lbl.styles.color = css_inact_fg
+                        if css_inact_bg:
+                            lbl.styles.background = css_inact_bg
+
+            tab_close_style = ed_styles.get("tab_close") or self.theme_styles.get("window_close_button") or self.theme_styles.get("button_error")
+            if tab_close_style and tab_close_style.color and tab_close_style.color.name:
+                css_tc_fg = bashmenu_ui.parse_css_color(tab_close_style.color.name)
+                if css_tc_fg:
+                    with contextlib.suppress(Exception):
+                        for tc in self.query(".editor_tab_close"):
+                            tc.styles.color = css_tc_fg
+
+            tab_add_style = ed_styles.get("tab_add") or self.theme_styles.get("accent") or self.theme_styles.get("button_primary")
+            if tab_add_style and tab_add_style.color and tab_add_style.color.name:
+                css_ta_fg = bashmenu_ui.parse_css_color(tab_add_style.color.name)
+                if css_ta_fg:
+                    with contextlib.suppress(Exception):
+                        for ta in self.query(".editor_tab_add"):
+                            ta.styles.color = css_ta_fg
+
     def refresh_tab_bar(self) -> None:
         try:
             tab_bar = self.query_one("#editor_tab_bar", Horizontal)
@@ -1825,6 +1887,7 @@ class BashEditScreen(Screen):
                     is_active = (idx == self.active_tab_idx)
                     lbl.set_class(is_active, "editor_tab_active")
                     lbl.set_class(not is_active, "editor_tab")
+                self._apply_tab_styles()
                 return
 
             for c in list(tab_bar.children):
@@ -1842,6 +1905,7 @@ class BashEditScreen(Screen):
 
             widgets.append(Label(" [ + ] ", classes="editor_tab_add tab_add_new"))
             tab_bar.mount(*widgets)
+            self._apply_tab_styles()
         except Exception:  # noqa: BLE001, S110
             pass
 
@@ -2030,6 +2094,8 @@ class BashEditScreen(Screen):
                         for sep in self.query(".footer_sep"):
                             sep.styles.color = css_sep
                             sep.styles.auto_color = False
+
+            self._apply_tab_styles()
 
             with contextlib.suppress(Exception):
                 ed = self.query_one("#editor_widget", EditorWidget)
