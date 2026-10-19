@@ -69,3 +69,143 @@
 - [x] BUG: Vertical borders in the preview pane of the theme editor are no longer clickable (outside/window borders).
 - [x] REQUEST: Start referencing {bashmenu_dir}/notebook/notes.yml -> notebook -> notes -> TODO update SKILL.md to add this to your workflow after completing tasks. Mark done items in this list as done, and continue writing completion summaries to DONE.md . You will still reference this file (TODO.md) after completing tasks as well.
 - [x] BUG: Theme editor -> `<f2>` to Configure Background Wallpaper: "Scaling Mode" has several  options to choose from, but I think only two options are actually implemented (cover, stretch). Please finish implementing the other methods.
+- [x] CRITICAL BUG: Theme editor, not sure what exactly caused this crash, but here is the output:
+````
+[andrew@andrew-Inspiron-3537:~/github/bashmenu$ bm
+╭───────────────────────────────────────────────────────────────── Traceback (most recent call last) ─────────────────────────────────────────────────────────────────╮
+│ /home/andrew/github/bashmenu/themeedit.py:4890 in on_button_pressed                                                                                                 │
+│                                                                                                                                                                     │
+│   4887 │   │   │                                                                                ╭──────────────────── locals ────────────────────╮                  │
+│   4888 │   │   │   self.app.push_screen(                                                        │   bg_val = 235                                 │                  │
+│   4889 │   │   │   │   ColorPickerModal(                                                        │   btn_id = 'btn_color_editor__tab_active'      │                  │
+│ ❱ 4890 │   │   │   │   │   tok,                                                                 │ curr_val = [234, -1]                           │                  │
+│   4891 │   │   │   │   │   curr_val,                                                            │    event = Pressed()                           │                  │
+│   4892 │   │   │   │   │   bg_color_val=bg_val,                                                 │  pal_256 = {                                   │                  │
+│   4893 │   │   │   │   │   theme_styles=self.configured_theme_styles,                           │            │   'background': 235,              │                  │
+│                                                                                                 │            │   'title': [252, -1],             │                  │
+│                                                                                                 │            │   'border': [239, -1],            │                  │
+│                                                                                                 │            │   'text': [255, -1],              │                  │
+│                                                                                                 │            │   'highlight': [16, 252],         │                  │
+│                                                                                                 │            │   'accent': [145, -1],            │                  │
+│                                                                                                 │            │   'footer': [239, -1],            │                  │
+│                                                                                                 │            │   'shadow': [                     │                  │
+│                                                                                                 │            │   │   236,                        │                  │
+│                                                                                                 │            │   │   'COLOR_BLACK'               │                  │
+│                                                                                                 │            │   ],                              │                  │
+│                                                                                                 │            │   'gutter': [66, -1],             │                  │
+│                                                                                                 │            │   'selection': [16, 252],         │                  │
+│                                                                                                 │            │   ... +12                         │                  │
+│                                                                                                 │            }                                   │                  │
+│                                                                                                 │      sec = 'editor'                            │                  │
+│                                                                                                 │ sec_dict = {'tab_active': [234, -1]}           │                  │
+│                                                                                                 │     self = ThemeEditScreen()                   │                  │
+│                                                                                                 │  sub_tok = 'tab_active'                        │                  │
+│                                                                                                 │      tok = 'editor__tab_active'                │                  │
+│                                                                                                 ╰────────────────────────────────────────────────╯                  │
+│                                                                                                                                                                     │
+│ /home/andrew/github/bashmenu/themeedit.py:570 in __init__                                                                                                           │
+│                                                                                                                                                                     │
+│    567 │   │                                                                                                                                                        │
+│    568 │   │   self.active_tab = "fg"                                                                                                                               │
+│    569 │   │   self.view_mode = "grid"                                                                                                                              │
+│ ❱  570 │   │   self.theme_colors_list = self._extract_theme_colors()                                                                                                │
+│    571 │                                                                                                                                                            │
+│    572 │   def _extract_theme_colors(self) -> list[tuple[Any, list[str]]]:                                                                                          │
+│    573 │   │   """Extract and group all unique non-inherit colors currently defined in theme pa                                                                     │
+│                                                                                                                                                                     │
+│ ╭──────────────────────────────────────────────────────────────────────────── locals ─────────────────────────────────────────────────────────────────────────────╮ │
+│ │  bg_color_val = 235                                                                                                                                             │ │
+│ │   current_val = [234, -1]                                                                                                                                       │ │
+│ │          self = ColorPickerModal()                                                                                                                              │ │
+│ │ theme_palette = {                                                                                                                                               │ │
+│ │                 │   'background': 235,                                                                                                                          │ │
+│ │                 │   'title': [252, -1],                                                                                                                         │ │
+│ │                 │   'border': [239, -1],                                                                                                                        │ │
+│ │                 │   'text': [255, -1],                                                                                                                          │ │
+│ │                 │   'highlight': [16, 252],                                                                                                                     │ │
+│ │                 │   'accent': [145, -1],                                                                                                                        │ │
+│ │                 │   'footer': [239, -1],                                                                                                                        │ │
+│ │                 │   'shadow': [236, 'COLOR_BLACK'],                                                                                                             │ │
+│ │                 │   'gutter': [66, -1],                                                                                                                         │ │
+│ │                 │   'selection': [16, 252],                                                                                                                     │ │
+│ │                 │   ... +12                                                                                                                                     │ │
+│ │                 }                                                                                                                                               │ │
+│ │  theme_styles = {                                                                                                                                               │ │
+│ │                 │   'background': Style(bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),                                                          │ │
+│ │                 │   'title': Style(color=Color('color(252)', ColorType.EIGHT_BIT, number=252), bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),   │ │
+│ │                 │   'border': Style(color=Color('color(239)', ColorType.EIGHT_BIT, number=239), bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),  │ │
+│ │                 │   'text': Style(color=Color('color(255)', ColorType.EIGHT_BIT, number=255), bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),    │ │
+│ │                 │   'highlight': Style(                                                                                                                         │ │
+│ │                 │   │   color=Color('color(16)', ColorType.EIGHT_BIT, number=16),                                                                               │ │
+│ │                 │   │   bgcolor=Color('color(252)', ColorType.EIGHT_BIT, number=252)                                                                            │ │
+│ │                 │   ),                                                                                                                                          │ │
+│ │                 │   'accent': Style(color=Color('color(145)', ColorType.EIGHT_BIT, number=145), bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),  │ │
+│ │                 │   'footer': Style(color=Color('color(239)', ColorType.EIGHT_BIT, number=239), bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),  │ │
+│ │                 │   'shadow': Style(                                                                                                                            │ │
+│ │                 │   │   color=Color('color(236)', ColorType.EIGHT_BIT, number=236),                                                                             │ │
+│ │                 │   │   bgcolor=Color('#000000', ColorType.TRUECOLOR, triplet=ColorTriplet(red=0, green=0, blue=0))                                             │ │
+│ │                 │   ),                                                                                                                                          │ │
+│ │                 │   'gutter': Style(color=Color('color(66)', ColorType.EIGHT_BIT, number=66), bgcolor=Color('color(235)', ColorType.EIGHT_BIT, number=235)),    │ │
+│ │                 │   'selection': Style(                                                                                                                         │ │
+│ │                 │   │   color=Color('color(16)', ColorType.EIGHT_BIT, number=16),                                                                               │ │
+│ │                 │   │   bgcolor=Color('color(252)', ColorType.EIGHT_BIT, number=252)                                                                            │ │
+│ │                 │   ),                                                                                                                                          │ │
+│ │                 │   ... +18                                                                                                                                     │ │
+│ │                 }                                                                                                                                               │ │
+│ │    token_name = 'editor__tab_active'                                                                                                                            │ │
+│ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                                                                                     │
+│ /home/andrew/github/bashmenu/themeedit.py:597 in _extract_theme_colors                                                                                              │
+│                                                                                                                                                                     │
+│    594 │   │   │   │   if c in (-1, "-1", None, ""):                                                                                                                │
+│    595 │   │   │   │   │   continue                                                                                                                                 │
+│    596 │   │   │   │   tag = token if len(vals) == 1 else (f"{token}(fg)" if idx == 0 else f"{t                                                                     │
+│ ❱  597 │   │   │   │   color_usage.setdefault(c, []).append(tag)                                                                                                    │
+│    598 │   │   return list(color_usage.items())                                                                                                                     │
+│    599 │                                                                                                                                                            │
+│    600 │   def _build_palette_option(self, color_val: Any, tokens: list[str]) -> Text:                                                                              │
+│                                                                                                                                                                     │
+│ ╭──────────────────────────────────────────────────── locals ────────────────────────────────────────────────────╮                                                  │
+│ │           c = {'tab_active': [234, -1]}                                                                        │                                                  │
+│ │ color_usage = {                                                                                                │                                                  │
+│ │               │   235: ['background'],                                                                         │                                                  │
+│ │               │   252: [                                                                                       │                                                  │
+│ │               │   │   'title(fg)',                                                                             │                                                  │
+│ │               │   │   'highlight(bg)',                                                                         │                                                  │
+│ │               │   │   'selection(bg)',                                                                         │                                                  │
+│ │               │   │   'button_primary(bg)',                                                                    │                                                  │
+│ │               │   │   'scrollbar(fg)'                                                                          │                                                  │
+│ │               │   ],                                                                                           │                                                  │
+│ │               │   239: ['border(fg)', 'footer(fg)', 'divider(fg)'],                                            │                                                  │
+│ │               │   255: ['text(fg)', 'button_error(fg)', 'button_cancel(fg)', 'button_success(fg)'],            │                                                  │
+│ │               │   16: ['highlight(fg)', 'selection(fg)', 'button_primary(fg)'],                                │                                                  │
+│ │               │   145: ['accent(fg)', 'shortcut_key(fg)', 'plugin(fg)'],                                       │                                                  │
+│ │               │   236: ['shadow(fg)', 'button_cancel(bg)', 'scrollbar(bg)', 'whitespace(fg)'],                 │                                                  │
+│ │               │   'COLOR_BLACK': ['shadow(bg)'],                                                               │                                                  │
+│ │               │   66: ['gutter(fg)'],                                                                          │                                                  │
+│ │               │   196: ['button_error(bg)'],                                                                   │                                                  │
+│ │               │   ... +3                                                                                       │                                                  │
+│ │               }                                                                                                │                                                  │
+│ │         idx = 0                                                                                                │                                                  │
+│ │        self = ColorPickerModal()                                                                               │                                                  │
+│ │      source = {                                                                                                │                                                  │
+│ │               │   'background': 235,                                                                           │                                                  │
+│ │               │   'title': [252, -1],                                                                          │                                                  │
+│ │               │   'border': [239, -1],                                                                         │                                                  │
+│ │               │   'text': [255, -1],                                                                           │                                                  │
+│ │               │   'highlight': [16, 252],                                                                      │                                                  │
+│ │               │   'accent': [145, -1],                                                                         │                                                  │
+│ │               │   'footer': [239, -1],                                                                         │                                                  │
+│ │               │   'shadow': [236, 'COLOR_BLACK'],                                                              │                                                  │
+│ │               │   'gutter': [66, -1],                                                                          │                                                  │
+│ │               │   'selection': [16, 252],                                                                      │                                                  │
+│ │               │   ... +12                                                                                      │                                                  │
+│ │               }                                                                                                │                                                  │
+│ │         tag = 'editor'                                                                                         │                                                  │
+│ │       token = 'editor'                                                                                         │                                                  │
+│ │         val = {'tab_active': [234, -1]}                                                                        │                                                  │
+│ │        vals = [{'tab_active': [234, -1]}]                                                                      │                                                  │
+│ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯                                                  │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+TypeError: unhashable type: 'dict'
+````

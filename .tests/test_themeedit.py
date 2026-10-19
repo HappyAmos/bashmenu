@@ -1998,6 +1998,46 @@ class TestThemeEditor(unittest.TestCase):
         self.assertIn("COLOR_", str(pal_8["editor"]["tab_active"][1]))
         self.assertIn("COLOR_", str(pal_8["modals"]["button_confirm"][1]))
 
+    def test_color_picker_modal_with_nested_palette_dictionaries(self):
+        """Verify ColorPickerModal initializes without TypeError when palette contains nested dicts."""
+        pal_256 = {
+            "background": 235,
+            "title": [252, -1],
+            "border": [239, -1],
+            "text": [255, -1],
+            "highlight": [16, 252],
+            "accent": [145, -1],
+            "footer": [239, -1],
+            "shadow": [236, "COLOR_BLACK"],
+            "gutter": [66, -1],
+            "selection": [16, 252],
+            "editor": {
+                "tab_active": [234, -1],
+                "gutter": [66, -1],
+            },
+            "menu_editor": {
+                "header": [252, -1],
+                "border": [239, -1],
+            },
+            "modals": {
+                "backdrop": [236, "COLOR_BLACK"],
+                "button_confirm": [255, 40],
+            },
+        }
+
+        # Must not raise TypeError: unhashable type: 'dict'
+        modal = themeedit.ColorPickerModal(
+            "editor__tab_active",
+            [234, -1],
+            bg_color_val=235,
+            theme_palette=pal_256,
+        )
+        self.assertIsInstance(modal.theme_colors_list, list)
+        # Verify nested token tags are extracted
+        extracted_tags = [tag for _, tags in modal.theme_colors_list for tag in tags]
+        self.assertIn("editor.tab_active(fg)", extracted_tags)
+        self.assertIn("menu_editor.header(fg)", extracted_tags)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -581,20 +581,40 @@ class ColorPickerModal(ModalScreen[Any]):
                     bg = st.bgcolor.name if st.bgcolor else None
                     if fg or bg:
                         extracted[tok] = [fg, bg]
+                elif isinstance(st, dict):
+                    extracted[tok] = st
             source = extracted
+
+        def _process_item(tok_name: str, item_val: Any) -> None:
+            if isinstance(item_val, dict):
+                for sub_k, sub_v in item_val.items():
+                    _process_item(f"{tok_name}.{sub_k}", sub_v)
+                return
+            if isinstance(item_val, Style):
+                fg = item_val.color.name if item_val.color else None
+                bg = item_val.bgcolor.name if item_val.bgcolor else None
+                if fg:
+                    color_usage.setdefault(fg, []).append(f"{tok_name}(fg)")
+                if bg:
+                    color_usage.setdefault(bg, []).append(f"{tok_name}(bg)")
+                return
+            vals = item_val if isinstance(item_val, (list, tuple)) else [item_val]
+            for idx, c in enumerate(vals):
+                if c in (-1, "-1", None, ""):
+                    continue
+                if not isinstance(c, (int, str)):
+                    continue
+                tag = tok_name if len(vals) == 1 else (f"{tok_name}(fg)" if idx == 0 else f"{tok_name}(bg)")
+                color_usage.setdefault(c, []).append(tag)
 
         for token, val in source.items():
             if token in (
                 "marquee", "window", "indicator", "theme_name",
                 "window_borders", "divider", "wallpaper", "theme_background",
-            ) and not isinstance(val, (int, str, list, tuple)):
+            ) and not isinstance(val, (int, str, list, tuple, dict)):
                 continue
-            vals = val if isinstance(val, (list, tuple)) else [val]
-            for idx, c in enumerate(vals):
-                if c in (-1, "-1", None, ""):
-                    continue
-                tag = token if len(vals) == 1 else (f"{token}(fg)" if idx == 0 else f"{token}(bg)")
-                color_usage.setdefault(c, []).append(tag)
+            _process_item(token, val)
+
         return list(color_usage.items())
 
     def _build_palette_option(self, color_val: Any, tokens: list[str]) -> Text:

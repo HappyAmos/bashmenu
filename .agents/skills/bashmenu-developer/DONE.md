@@ -224,4 +224,19 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   - Updated `test_theme_preview_tabs_border_alignment` to verify alignment across Menu Editor, Text Editor, and Modals tabs.
   - Verified full test suite (337 tests) passes cleanly.
 
+---
+
+### 23. Fix ColorPickerModal Crash with Nested Theme Palette Dictionaries
+- **Item:** `- [x] CRITICAL BUG: Theme editor, not sure what exactly caused this crash, but here is the output: TypeError: unhashable type: 'dict'` (from `TODO.md`)
+- **Root Cause:** When opening `ColorPickerModal`, `_extract_theme_colors()` iterated over `self.theme_palette.items()` assuming all values were integers, strings, or flat lists/tuples. With the introduction of nested dictionaries (`editor`, `menu_editor`, `modals`), `val` was a dictionary (e.g. `{'tab_active': [234, -1]}`). Attempting `color_usage.setdefault(c, []).append(tag)` raised `TypeError: unhashable type: 'dict'`.
+- **Fix:** In `themeedit.py::ColorPickerModal._extract_theme_colors`:
+  1. Defined recursive helper `_process_item(tok_name: str, item_val: Any)`.
+  2. When `item_val` is a dictionary, recurses through `_process_item(f"{tok_name}.{sub_k}", sub_v)`.
+  3. Formats token tags with nested scope (e.g. `editor.tab_active(fg)`).
+  4. Explicitly verified `isinstance(c, (int, str))` before dictionary indexing to guarantee unhashable types are never passed as keys.
+- **Tests:**
+  - Added `test_color_picker_modal_with_nested_palette_dictionaries` in `.tests/test_themeedit.py`.
+  - Verified all 338 tests pass.
+
+
 
