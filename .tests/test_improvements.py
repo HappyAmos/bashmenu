@@ -4090,6 +4090,81 @@ G
             bashmenu.process_item_action(mock_screen, item_embedded, config)
             mock_toast.assert_called_with("Embedded Msg", timeout=1.5)
 
+    def test_picker_inline_starting_directory_and_modifiers(self):
+        """Verify inline picker path configurations, preceding paths, and modifier evaluation."""
+        config = bashmenu.load_config()[0]
+
+        # 1. parse_picker_macro tests
+        p1 = bashmenu.parse_picker_macro("file_picker", None)
+        self.assertEqual(p1["macro_type"], "file_picker")
+        self.assertFalse(p1["is_new"])
+        self.assertIsNone(p1["modifier"])
+        self.assertIsNone(p1["start_dir"])
+
+        p2 = bashmenu.parse_picker_macro("file_picker_new", "stem")
+        self.assertTrue(p2["is_new"])
+        self.assertEqual(p2["modifier"], "stem")
+
+        p3 = bashmenu.parse_picker_macro("file_picker", "new:path:/tmp:stem")
+        self.assertTrue(p3["is_new"])
+        self.assertEqual(p3["start_dir"], "/tmp")
+        self.assertEqual(p3["modifier"], "stem")
+
+        p4 = bashmenu.parse_picker_macro("file_picker", "path:{bashmenu_dir}/assets/wallpapers", config=config)
+        self.assertEqual(p4["start_dir"], f"{bashmenu.BASHMENU_DIR}/assets/wallpapers")
+        self.assertIsNone(p4["modifier"])
+
+        p5 = bashmenu.parse_picker_macro("dir_picker", "/tmp:name")
+        self.assertEqual(p5["start_dir"], "/tmp")
+        self.assertEqual(p5["modifier"], "name")
+
+        # 2. _extract_picker_spec priority hierarchy
+        # A. Inline path overrides default_start_dir
+        cmd_inline = r'convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}" -resize 80x48\! "{file_picker:stem}.pixel.png"'
+        spec_inline = bashmenu._extract_picker_spec(cmd_inline, config=config, default_start_dir="~/Pictures")
+        self.assertEqual(spec_inline["start_dir"], os.path.expanduser(f"{bashmenu.BASHMENU_DIR}/assets/wallpapers"))
+
+        # B. Preceding folder path overrides default_start_dir when valid
+        cmd_prec = 'cat "/etc/{file_picker}"'
+        spec_prec = bashmenu._extract_picker_spec(cmd_prec, config=config, default_start_dir="~/Pictures")
+        self.assertEqual(spec_prec["start_dir"], "/etc")
+
+        # C. Default start_dir used when no inline or preceding path
+        cmd_plain = 'convert "{file_picker}" "{file_picker:stem}.png"'
+        spec_plain = bashmenu._extract_picker_spec(cmd_plain, config=config, default_start_dir="/var/tmp")
+        self.assertEqual(spec_plain["start_dir"], "/var/tmp")
+
+        # D. Macro filter targeting file vs dir
+        cmd_mixed = 'cmd "{dir_picker:path:/var}" "{file_picker:path:/opt}"'
+        spec_file = bashmenu._extract_picker_spec(cmd_mixed, config=config, target_macro="file_picker")
+        self.assertEqual(spec_file["start_dir"], "/opt")
+        spec_dir = bashmenu._extract_picker_spec(cmd_mixed, config=config, target_macro="dir_picker")
+        self.assertEqual(spec_dir["start_dir"], "/var")
+
+        # 3. _apply_file_picker_macros
+        cmd_tmpl = r'convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}" -resize 80x48\! "{file_picker:stem}.pixel.png"'
+        resolved_cmd = bashmenu._apply_file_picker_macros(cmd_tmpl, "/tmp/assets/pic.png", config=config)
+        self.assertEqual(resolved_cmd, r'convert "/tmp/assets/pic.png" -resize 80x48\! "/tmp/assets/pic.pixel.png"')
+
+        # Double-prefix avoidance with preceding path
+        prec_tmpl = 'cat "/tmp/assets/{file_picker}"'
+        self.assertEqual(
+            bashmenu._apply_file_picker_macros(prec_tmpl, "/tmp/assets/pic.png", config=config),
+            'cat "/tmp/assets/pic.png"',
+        )
+
+        # 4. _apply_dir_picker_macros
+        dir_tmpl = 'tar -czf backup.tar.gz -C "{dir_picker:path:/var}" "{dir_picker:name}"'
+        resolved_dir = bashmenu._apply_dir_picker_macros(dir_tmpl, "/var/log", config=config)
+        self.assertEqual(resolved_dir, 'tar -czf backup.tar.gz -C "/var/log" "log"')
+
+        # Double-prefix avoidance for dir picker
+        dir_prec = 'ls "/var/{dir_picker}"'
+        self.assertEqual(
+            bashmenu._apply_dir_picker_macros(dir_prec, "/var/log", config=config),
+            'ls "/var/log"',
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

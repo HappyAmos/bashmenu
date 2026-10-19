@@ -238,5 +238,29 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   - Added `test_color_picker_modal_with_nested_palette_dictionaries` in `.tests/test_themeedit.py`.
   - Verified all 338 tests pass.
 
+---
+
+### 24. Picker Starting Directory Resolution & Inline Path Specification
+- **Item:** `- [x] BUG/FEATURE: file locations preceding {file_picker} or {dir_picker} should set the starting folder of the picker to the location preceding the placeholder. An example is already configured in the menu -> BM Developer Shortcuts -> Convert Image To BM Wallpaper. Unfortuneatly this is not working properly, but I suggest a fix. Edit the {file_picker} and {dir_picker} including {file_picker_new} and {dir_picker_new} to include an inline config option, like {file_picker:path:{bashmenu_dir}/assets/wallpapers} so that the dialog knows which folder to open to as default.` (from `notebooks/notes.yml`)
+- **Root Cause:**
+  1. `process_item_action` and `resolve_and_run` only read `item.get("start_dir", "~")` and completely ignored preceding directory paths as well as inline macro options.
+  2. `_apply_file_picker_macros` and `_apply_dir_picker_macros` used static string replacements targeting only predefined modifier suffixes (e.g. `{file_picker:stem}`); any macro with an inline directory specifier (e.g. `:{bashmenu_dir}/assets/wallpapers`) was left raw and unreplaced.
+  3. Preceding paths in commands/scripts (e.g. `"/path/to/{file_picker}"`) caused double-prefixing if the chosen file path was full/absolute.
+- **Fix:**
+  1. In `bashmenu.py`:
+     - Added `parse_picker_macro(macro_type, spec, config=None)` parsing colon-delimited specifications for `:path:<dir>` (or `:<dir>`), `:new`, and modifiers (`stem`, `name`, `base`, `dir`, `ext`, `parent`) with variable interpolation.
+     - Added `_extract_picker_spec(action_str, config=None, default_start_dir=None, target_macro=None)` implementing the priority hierarchy: inline path -> preceding folder path -> item `start_dir` -> fallback `"~"`.
+     - Refactored `_apply_file_picker_macros` and `_apply_dir_picker_macros` using regex substitution supporting all modifier and inline path variants, plus intelligent preceding path prefix deduplication.
+     - Updated `process_item_action` (editor item type) and `resolve_and_run` (command, script, action types) to use `_extract_picker_spec` and pass config to `_apply_file_picker_macros` / `_apply_dir_picker_macros`.
+  2. In `bashmenu_ui.py`:
+     - Added `{file_picker:path:<dir>}` and `{dir_picker:path:<dir>}` to `PLACEHOLDER_SECTIONS`.
+  3. In `bashmenu.mnu`:
+     - Updated `Convert Image To BM Wallpaper` command to use `{file_picker:path:{bashmenu_dir}/assets/wallpapers}`.
+  4. In `bashmenu.md` and `bashmenu.1`:
+     - Documented inline path options `{file_picker:path:<dir>}` and `{dir_picker:path:<dir>}`, updated Section 6.1 and man page, and clarified auto-starting folder mechanisms.
+- **Tests:**
+  - Added `test_picker_inline_starting_directory_and_modifiers` in `.tests/test_improvements.py` testing `parse_picker_macro`, `_extract_picker_spec` priority resolution, macro replacement, and double-prefix avoidance.
+  - Verified `test_placeholder_documentation_parity` and the full test suite (339 tests) pass cleanly.
+
 
 

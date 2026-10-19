@@ -475,11 +475,17 @@ Prompts for a single-line text value using a modal input box. Supports
 .B {file_picker}
 Launches a visual file chooser dialog box.
 .TP
+.B {file_picker:path:<dir>}
+Launches a visual file chooser dialog box defaulting to the specified directory.
+.TP
 .B {file_picker_new}, {file_picker:new}
 Launches a visual file chooser dialog box allowing creation of new files.
 .TP
 .B {dir_picker}
 Launches a visual directory chooser dialog box.
+.TP
+.B {dir_picker:path:<dir>}
+Launches a visual directory chooser dialog box defaulting to the specified directory.
 .TP
 .B {dir_picker_new}, {dir_picker:new}
 Launches a visual directory chooser dialog box allowing creation of new folders.
@@ -507,9 +513,11 @@ Folder name without parent path.
 .B {dir_picker:dir}
 Parent directory path of the chosen directory.
 .SS Picker Auto-Starting Folders
-Preceding file/directory pickers with a folder path (e.g.
-"{templates_dir}/{file_picker}" or "~/projects/{dir_picker}") causes the engine
-to automatically launch the visual chooser inside that directory.
+Default starting folders can be configured inline using \fB:path:<dir>\fR (e.g.
+"{file_picker:path:{bashmenu_dir}/assets/wallpapers}"), or by preceding
+the placeholder with a folder path (e.g. "{templates_dir}/{file_picker}" or
+"~/projects/{dir_picker}"). Both methods set the visual chooser's start
+folder and avoid double-prefixing.
 .SS System Placeholders
 The following placeholders are auto-interpolated inside actions or templates:
 .TP

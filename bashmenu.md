@@ -712,15 +712,18 @@ substituting the placeholder in the action string prior to execution:
 | :--- | :--- | :--- |
 | `{param}` | Prompts for a single-line parameter value using a text modal. | `title` (modal header), `prompt` (body text), `masked` (mask input with asterisks) |
 | `{file_picker}` | Launches a visual file chooser dialog. | `title`, `start_dir` |
+| `{file_picker:path:<dir>}` | Launches file chooser defaulting to specified starting directory. | `title`, `start_dir` |
 | `{file_picker_new}` / `{file_picker:new}` | Launches a visual file chooser dialog that permits creating **new files** (by pressing `n` or `N`). | `title`, `start_dir` |
 | `{dir_picker}` | Launches a visual directory chooser dialog. | `title`, `start_dir` |
+| `{dir_picker:path:<dir>}` | Launches directory chooser defaulting to specified starting directory. | `title`, `start_dir` |
 | `{dir_picker_new}` / `{dir_picker:new}` | Launches a visual directory chooser dialog that permits creating **new folders** (by pressing `n` or `N`). | `title`, `start_dir` |
 
 #### Picker Auto-Starting Folders (Pro Tip):
-If you precede `{file_picker}` or `{dir_picker}` with a valid folder path in
-the action (e.g., `"{templates_dir}/{file_picker}"` or `"/var/log/{file_picker}"`),
-the engine parses the prefix, validates it, and **automatically launches the
-visual chooser inside that directory**, completely avoiding double-prefixing.
+You can specify the default starting folder for file and directory pickers in two convenient ways:
+1. **Inline starting path syntax**: Embed `:path:<dir>` (or simply `:<dir>`) directly into the picker directive, such as `{file_picker:path:{bashmenu_dir}/assets/wallpapers}` or `{dir_picker:~/Projects}`. This inline option takes highest precedence over the item's generic `start_dir` property.
+2. **Preceding path syntax**: Precede `{file_picker}` or `{dir_picker}` with a valid folder path in the action string (e.g., `"{templates_dir}/{file_picker}"` or `"/var/log/{file_picker}"`). The engine automatically parses the prefix, validates it, and launches the visual chooser inside that directory, completely avoiding double-prefixing.
+
+Both starting path styles function seamlessly when combined with path decomposition modifiers and file/folder creation modes (e.g. `{file_picker:path:~/Pictures:stem}` or `{file_picker_new:path:~/notes}`).
 
 #### 6.1.1 Path Decomposition Modifiers for Pickers
 
@@ -729,11 +732,13 @@ When passing selected files or folders to commands, you often need to alter the 
 | Modifier | Target Macro | Description & Example (Selected: `/home/user/Pictures/wallpaper.png`) |
 | :--- | :--- | :--- |
 | **`{file_picker}`** | File | Full absolute path (`/home/user/Pictures/wallpaper.png`) |
+| **`{file_picker:path:<dir>}`** | File | Full path, opening picker inside `<dir>` |
 | **`{file_picker:stem}`** | File | Full path without file extension (`/home/user/Pictures/wallpaper`) |
 | **`{file_picker:name}`** | File | Filename only with extension (`wallpaper.png`) |
 | **`{file_picker:base}`** | File | Filename only without extension (`wallpaper`) |
 | **`{file_picker:dir}`** | File | Parent directory path (`/home/user/Pictures`) |
 | **`{file_picker:ext}`** | File | File extension with leading dot (`.png`, or empty if none) |
+| **`{dir_picker:path:<dir>}`** | Dir | Full folder path, opening picker inside `<dir>` |
 | **`{dir_picker:name}`** | Dir | Folder name only without parent path (`Pictures`) |
 | **`{dir_picker:dir}`** | Dir | Parent directory of the chosen folder (`/home/user`) |
 
@@ -744,7 +749,7 @@ When passing selected files or folders to commands, you often need to alter the 
 - Convert Image To BM Wallpaper:
     type: command
     start_dir: '~/Pictures'
-    command: 'convert "{file_picker}" -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"'
+    command: 'convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}" -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"'
 ```
 If the user selects `/home/user/Pictures/twilight.jpg`, `{file_picker:stem}.pixel.png` seamlessly resolves to `/home/user/Pictures/twilight.pixel.png`.
 

@@ -26,7 +26,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import yaml
 from rich.style import Style
@@ -3211,8 +3211,109 @@ def _get_active_title_chain(screen) -> list[str]:
     return chain
 
 
-def _apply_file_picker_macros(template_str: str, fpath: str) -> str:
-    """Substitute {file_picker} and its path modifiers (:stem, :name, :base, :dir, :ext)."""
+FILE_PICKER_MACRO_RE = re.compile(
+    r"\{(file_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}"
+)
+DIR_PICKER_MACRO_RE = re.compile(
+    r"\{(dir_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}"
+)
+PICKER_MACRO_RE = re.compile(
+    r"\{(file_picker(?:_new)?|dir_picker(?:_new)?)(?::((?:[^{}]|\{[^{}]*\})+))?\}"
+)
+
+
+def parse_picker_macro(macro_type: str, spec: str | None, config: dict | None = None) -> dict[str, Any]:
+    """Parse macro type and colon-delimited spec into structured parameters."""
+    is_new = macro_type.endswith("_new")
+    modifier = None
+    start_dir = None
+
+    if spec:
+        # Interpolate nested variables if present and config supplied
+        if config and "{" in spec:
+            spec = interpolate_placeholders(spec, config)
+
+        tokens = spec.split(":")
+        if "new" in tokens:
+            is_new = True
+            tokens.remove("new")
+
+        if tokens and tokens[-1] in ("stem", "name", "base", "dir", "ext", "parent"):
+            modifier = tokens.pop()
+
+        if tokens:
+            if tokens[0] == "path":
+                tokens.pop(0)
+            if tokens:
+                start_dir = ":".join(tokens)
+
+    return {
+        "macro_type": macro_type,
+        "is_new": is_new,
+        "modifier": modifier,
+        "start_dir": start_dir,
+    }
+
+
+def _extract_picker_spec(
+    action_str: str,
+    config: dict | None = None,
+    default_start_dir: str | None = None,
+    target_macro: str | None = None,
+) -> dict[str, Any]:
+    """Extract start_dir, is_new flag, and macro type from action string."""
+    regex = (
+        FILE_PICKER_MACRO_RE
+        if target_macro in ("file", "file_picker")
+        else DIR_PICKER_MACRO_RE
+        if target_macro in ("dir", "dir_picker")
+        else PICKER_MACRO_RE
+    )
+    m = regex.search(action_str)
+    if not m:
+        start_dir = default_start_dir or "~"
+        if config and "{" in start_dir:
+            start_dir = interpolate_placeholders(start_dir, config)
+        return {
+            "macro_type": "file_picker" if target_macro in ("file", "file_picker", None) else "dir_picker",
+            "is_new": False,
+            "modifier": None,
+            "start_dir": os.path.expanduser(start_dir),
+        }
+
+    macro_type = m.group(1)
+    spec_str = m.group(2)
+    parsed = parse_picker_macro(macro_type, spec_str, config=config)
+
+    start_dir = parsed.get("start_dir")
+    if start_dir:
+        if config and "{" in start_dir:
+            start_dir = interpolate_placeholders(start_dir, config)
+    else:
+        # Check if preceding path exists before placeholder, e.g. "/path/to/folder/{file_picker}"
+        preceding = action_str[: m.start()]
+        if config and "{" in preceding:
+            preceding = interpolate_placeholders(preceding, config)
+        match_dir = re.search(r'["\'`]([^"\'`]+)/$', preceding)
+        if not match_dir:
+            match_dir = re.search(r'(?:^|[\s=])(\S+)/$', preceding)
+        if match_dir:
+            cand = match_dir.group(1)
+            cand_expanded = os.path.expanduser(cand)
+            if os.path.isdir(cand_expanded) or not default_start_dir:
+                start_dir = cand
+
+    if not start_dir:
+        start_dir = default_start_dir or "~"
+        if config and "{" in start_dir:
+            start_dir = interpolate_placeholders(start_dir, config)
+
+    parsed["start_dir"] = os.path.expanduser(start_dir)
+    return parsed
+
+
+def _apply_file_picker_macros(template_str: str, fpath: str, config: dict | None = None) -> str:
+    """Substitute {file_picker} and its path modifiers (:stem, :name, :base, :dir, :ext, :path:)."""
     p = Path(fpath)
     p_stem = str(p.parent / p.stem) if str(p.parent) != "." else p.stem
     p_name = p.name
@@ -3220,40 +3321,92 @@ def _apply_file_picker_macros(template_str: str, fpath: str) -> str:
     p_dir = str(p.parent)
     p_ext = p.suffix
 
+    def _replace_macro(match: re.Match) -> str:
+        macro_type = match.group(1)
+        if not macro_type.startswith("file_picker"):
+            return match.group(0)
+        spec_str = match.group(2)
+        parsed = parse_picker_macro(macro_type, spec_str, config=config)
+        mod = parsed["modifier"]
+        if mod == "stem":
+            return p_stem
+        if mod == "name":
+            return p_name
+        if mod == "base":
+            return p_base
+        if mod == "dir":
+            return p_dir
+        if mod == "ext":
+            return p_ext
+        return fpath
+
     res = template_str
-    for prefix in ("{file_picker_new:", "{file_picker:new:", "{file_picker:"):
-        res = (
-            res.replace(f"{prefix}stem}}", p_stem)
-            .replace(f"{prefix}name}}", p_name)
-            .replace(f"{prefix}base}}", p_base)
-            .replace(f"{prefix}dir}}", p_dir)
-            .replace(f"{prefix}ext}}", p_ext)
-        )
-    return (
-        res.replace("{file_picker}", fpath)
-        .replace("{file_picker_new}", fpath)
-        .replace("{file_picker:new}", fpath)
-    )
+
+    # Handle preceding directory prefix avoidance if macro had no modifier
+    for m in list(FILE_PICKER_MACRO_RE.finditer(res)):
+        macro_type = m.group(1)
+        parsed = parse_picker_macro(macro_type, m.group(2), config=config)
+        if parsed["modifier"] is None:
+            preceding = res[: m.start()]
+            match_dir = re.search(r'["\'`]([^"\'`]+)/$', preceding)
+            if not match_dir:
+                match_dir = re.search(r'(?:^|[\s=])(\S+)/$', preceding)
+            if match_dir:
+                cand = match_dir.group(1)
+                cand_resolved = cand
+                if config and "{" in cand_resolved:
+                    cand_resolved = interpolate_placeholders(cand_resolved, config)
+                cand_norm = os.path.normpath(os.path.expanduser(cand_resolved))
+                parent_norm = os.path.normpath(str(p.parent))
+                if cand_norm == parent_norm or os.path.isdir(cand_norm):
+                    res = res[: match_dir.start(1)] + fpath + res[m.end() :]
+                    break
+
+    return FILE_PICKER_MACRO_RE.sub(_replace_macro, res)
 
 
-def _apply_dir_picker_macros(template_str: str, dpath: str) -> str:
-    """Substitute {dir_picker} and its path modifiers (:name, :dir, :parent)."""
+def _apply_dir_picker_macros(template_str: str, dpath: str, config: dict | None = None) -> str:
+    """Substitute {dir_picker} and its path modifiers (:name, :dir, :parent, :path:)."""
     p = Path(dpath)
     p_name = p.name
     p_dir = str(p.parent)
 
+    def _replace_macro(match: re.Match) -> str:
+        macro_type = match.group(1)
+        if not macro_type.startswith("dir_picker"):
+            return match.group(0)
+        spec_str = match.group(2)
+        parsed = parse_picker_macro(macro_type, spec_str, config=config)
+        mod = parsed["modifier"]
+        if mod == "name":
+            return p_name
+        if mod in ("dir", "parent"):
+            return p_dir
+        return dpath
+
     res = template_str
-    for prefix in ("{dir_picker_new:", "{dir_picker:new:", "{dir_picker:"):
-        res = (
-            res.replace(f"{prefix}name}}", p_name)
-            .replace(f"{prefix}dir}}", p_dir)
-            .replace(f"{prefix}parent}}", p_dir)
-        )
-    return (
-        res.replace("{dir_picker}", dpath)
-        .replace("{dir_picker_new}", dpath)
-        .replace("{dir_picker:new}", dpath)
-    )
+
+    # Preceding directory prefix avoidance
+    for m in list(DIR_PICKER_MACRO_RE.finditer(res)):
+        macro_type = m.group(1)
+        parsed = parse_picker_macro(macro_type, m.group(2), config=config)
+        if parsed["modifier"] is None:
+            preceding = res[: m.start()]
+            match_dir = re.search(r'["\'`]([^"\'`]+)/$', preceding)
+            if not match_dir:
+                match_dir = re.search(r'(?:^|[\s=])(\S+)/$', preceding)
+            if match_dir:
+                cand = match_dir.group(1)
+                cand_resolved = cand
+                if config and "{" in cand_resolved:
+                    cand_resolved = interpolate_placeholders(cand_resolved, config)
+                cand_norm = os.path.normpath(os.path.expanduser(cand_resolved))
+                parent_norm = os.path.normpath(str(p.parent))
+                if cand_norm == parent_norm or os.path.isdir(cand_norm):
+                    res = res[: match_dir.start(1)] + dpath + res[m.end() :]
+                    break
+
+    return DIR_PICKER_MACRO_RE.sub(_replace_macro, res)
 
 
 def process_item_action(screen, item, config):
@@ -3452,12 +3605,18 @@ def process_item_action(screen, item, config):
             )
 
         if resolved_file and "{file_picker" in resolved_file:
-            is_new = "{file_picker_new}" in resolved_file or "{file_picker:new}" in resolved_file or "{file_picker_new:" in resolved_file or "{file_picker:new:" in resolved_file
-            start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+            picker_spec = _extract_picker_spec(
+                resolved_file,
+                config=config,
+                default_start_dir=item.get("start_dir"),
+                target_macro="file_picker",
+            )
+            is_new = picker_spec["is_new"]
+            start_dir = picker_spec["start_dir"]
 
             def fp_cb(chosen_file):
                 if chosen_file:
-                    launch_editor(_apply_file_picker_macros(resolved_file, chosen_file))
+                    launch_editor(_apply_file_picker_macros(resolved_file, chosen_file, config=config))
 
             screen.app.push_screen(
                 bashmenu_ui.FilePickerModalScreen(
@@ -3605,13 +3764,19 @@ def process_item_action(screen, item, config):
 
             # 2. Resolve interactive file picker macro ({file_picker})
             if "{file_picker" in curr_action:
-                is_new = "{file_picker_new}" in curr_action or "{file_picker:new}" in curr_action or "{file_picker_new:" in curr_action or "{file_picker:new:" in curr_action
+                picker_spec = _extract_picker_spec(
+                    curr_action,
+                    config=config,
+                    default_start_dir=item.get("start_dir"),
+                    target_macro="file_picker",
+                )
+                is_new = picker_spec["is_new"]
                 title = item.get("title", "Select File" if not is_new else "Select or Create File")
-                start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+                start_dir = picker_spec["start_dir"]
 
                 def f_cb(fpath):
                     if fpath is not None:
-                        res = _apply_file_picker_macros(curr_action, fpath)
+                        res = _apply_file_picker_macros(curr_action, fpath, config=config)
                         resolve_and_run(res)
 
                 screen.app.push_screen(
@@ -3628,13 +3793,19 @@ def process_item_action(screen, item, config):
 
             # 3. Resolve interactive directory picker macro ({dir_picker})
             if "{dir_picker" in curr_action:
-                is_new = "{dir_picker_new}" in curr_action or "{dir_picker:new}" in curr_action or "{dir_picker_new:" in curr_action or "{dir_picker:new:" in curr_action
+                picker_spec = _extract_picker_spec(
+                    curr_action,
+                    config=config,
+                    default_start_dir=item.get("start_dir"),
+                    target_macro="dir_picker",
+                )
+                is_new = picker_spec["is_new"]
                 title = item.get("title", "Select Directory" if not is_new else "Select or Create Directory")
-                start_dir = interpolate_placeholders(item.get("start_dir", "~"), config)
+                start_dir = picker_spec["start_dir"]
 
                 def d_cb(dpath):
                     if dpath is not None:
-                        res = _apply_dir_picker_macros(curr_action, dpath)
+                        res = _apply_dir_picker_macros(curr_action, dpath, config=config)
                         resolve_and_run(res)
 
                 screen.app.push_screen(

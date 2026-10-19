@@ -122,6 +122,7 @@ PLACEHOLDER_SECTIONS = [
         [
             ("{param}", "Prompts for text input modal (masked=true supported)"),
             ("{file_picker}", "Launches visual file chooser dialog"),
+            ("{file_picker:path:<dir>}", "File chooser opening in specified default directory"),
             ("{file_picker:stem}", "Path without file extension (/path/to/img)"),
             ("{file_picker:name}", "Filename with extension (img.png)"),
             ("{file_picker:base}", "Filename without extension (img)"),
@@ -129,6 +130,7 @@ PLACEHOLDER_SECTIONS = [
             ("{file_picker:ext}", "File extension with leading dot (.png)"),
             ("{file_picker_new}", "File chooser allowing creation of new files ('n')"),
             ("{dir_picker}", "Launches visual directory chooser dialog"),
+            ("{dir_picker:path:<dir>}", "Directory chooser opening in specified default directory"),
             ("{dir_picker:name}", "Folder name without parent path"),
             ("{dir_picker:dir}", "Parent directory path of chosen folder"),
             ("{dir_picker_new}", "Directory chooser allowing creation of new folders ('n')"),
