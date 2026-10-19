@@ -42,4 +42,9 @@ notebook:
           \ I suggest a fix. Edit the {file_picker} and {dir_picker} including {file_picker_new}\
           \ and {dir_picker_new} to include an inline config option, like {file_picker:path:{bashmenu_dir}/assets/wallpapers}\
           \ so that the dialog knows which folder to open to as default. Tell me your\
-          \ thoughts, and give me a plan.\n- [ ] "
+          \ thoughts, and give me a plan.\n- [x] BUG: The theme editor: the text editor\
+          \ preview panel: the title bar colors, line numbers are not matching the\
+          \ configured color schemes. The help gutter of the text editor preview pane\
+          \ does not display or is cut off. The background buttons for Menu Editor\
+          \ Colors, and Text Editor Colors and Modals & Popup Colors are putting color\
+          \ pairs in the text widget, even though it requires a single color value.\n"

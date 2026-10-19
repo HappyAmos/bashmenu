@@ -349,11 +349,13 @@ class EditorWidget(Widget):
 
         lineno_width = len(str(len(self.lines))) + 2 if self.show_line_numbers else 0
         theme_dict = self.theme if isinstance(self.theme, dict) else {}
-        gutter_style = theme_dict.get("gutter") or theme_dict.get("help_text") or "dim cyan"
-        lineno_style = theme_dict.get("gutter") or theme_dict.get("text") or "dim white"
-        sel_style = theme_dict.get("selection") or "reverse bold magenta"
+        ed_dict = theme_dict.get("editor") if isinstance(theme_dict.get("editor"), dict) else {}
+        gutter_style = ed_dict.get("gutter") or theme_dict.get("gutter") or theme_dict.get("help_text") or "dim cyan"
+        lineno_style = ed_dict.get("gutter") or theme_dict.get("gutter") or ed_dict.get("text") or theme_dict.get("text") or "dim white"
+        sel_style = ed_dict.get("selection") or theme_dict.get("selection") or "reverse bold magenta"
         ws_style = (
-            theme_dict.get("whitespace")
+            ed_dict.get("whitespace")
+            or theme_dict.get("whitespace")
             or theme_dict.get("whitespace_color")
             or "dim white"
         )
@@ -1933,7 +1935,8 @@ class BashEditScreen(Screen):
             if t_name:
                 self.theme_name = t_name
                 bashmenu_ui.apply_theme_to_textual_borders(t_name)
-            bg_style = self.theme_styles.get("background")
+            ed_styles = self.theme_styles.get("editor") if isinstance(self.theme_styles.get("editor"), dict) else {}
+            bg_style = ed_styles.get("background") or self.theme_styles.get("background")
             if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
                 css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
                 if css_bg:
@@ -1942,14 +1945,14 @@ class BashEditScreen(Screen):
                     with contextlib.suppress(Exception):
                         self.query_one("#editor_widget", EditorWidget).styles.background = css_bg
 
-            text_style = self.theme_styles.get("text")
+            text_style = ed_styles.get("text") or self.theme_styles.get("text")
             if text_style and text_style.color and text_style.color.name:
                 css_text = bashmenu_ui.parse_css_color(text_style.color.name)
                 if css_text:
                     with contextlib.suppress(Exception):
                         self.query_one("#editor_widget", EditorWidget).styles.color = css_text
 
-            hdr_style = self.theme_styles.get("header") or self.theme_styles.get("title")
+            hdr_style = ed_styles.get("header") or self.theme_styles.get("header") or self.theme_styles.get("title")
             if hdr_style:
                 if hdr_style.bgcolor and hdr_style.bgcolor.name:
                     css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
@@ -1991,7 +1994,7 @@ class BashEditScreen(Screen):
                     with contextlib.suppress(Exception):
                         self.query_one("#editor_divider", Label).styles.color = css_div
 
-            status_style = self.theme_styles.get("status") or self.theme_styles.get("footer") or self.theme_styles.get("header")
+            status_style = ed_styles.get("status") or self.theme_styles.get("status") or self.theme_styles.get("footer") or self.theme_styles.get("header")
             if status_style:
                 if status_style.bgcolor and status_style.bgcolor.name:
                     css_st_bg = bashmenu_ui.parse_css_color(status_style.bgcolor.name)
@@ -2004,7 +2007,7 @@ class BashEditScreen(Screen):
                         with contextlib.suppress(Exception):
                             self.query_one("#editor_status", Label).styles.color = css_st_fg
 
-            footer_style = self.theme_styles.get("footer") or self.theme_styles.get("background")
+            footer_style = ed_styles.get("footer") or self.theme_styles.get("footer") or self.theme_styles.get("background")
             if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
                 css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
                 if css_ftr_bg:

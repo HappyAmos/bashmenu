@@ -1460,11 +1460,12 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     borders = get_theme_window_borders(theme_name, raw_theme_data=raw_theme_data)
     apply_theme_to_textual_borders(theme_name, raw_theme_data=raw_theme_data)
 
+    use_cache = raw_theme_data is None
     if not raw_theme_data:
         raw_theme_data = load_themes_file()
 
     cache_key = (theme_name, id(raw_theme_data))
-    if cache_key in _theme_styles_cache:
+    if use_cache and cache_key in _theme_styles_cache:
         cached = _theme_styles_cache[cache_key]
         cached["theme_name"] = theme_name
         cached["window_borders"] = borders
@@ -1475,7 +1476,15 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     if not theme_def and raw_theme_data:
         theme_def = next(iter(raw_theme_data.values()), {})
 
-    palette = theme_def.get(256, theme_def.get(16, theme_def.get(8, {})))
+    palette = (
+        theme_def.get(256)
+        or theme_def.get("256")
+        or theme_def.get(16)
+        or theme_def.get("16")
+        or theme_def.get(8)
+        or theme_def.get("8")
+        or {}
+    )
     raw_ind = theme_def.get("indicator", ">")
     if isinstance(raw_ind, str) and "{" in raw_ind:
         import bashmenu
@@ -1575,7 +1584,8 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     styles["window_borders"] = borders
     styles["marquee"] = get_theme_marquee_config(theme_name, raw_theme_data=raw_theme_data)
 
-    _theme_styles_cache[cache_key] = styles
+    if use_cache:
+        _theme_styles_cache[cache_key] = styles
     return styles
 
 

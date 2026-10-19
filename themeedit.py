@@ -540,9 +540,18 @@ class ColorPickerModal(ModalScreen[Any]):
         self.theme_styles = theme_styles or {}
         self.theme_palette = theme_palette or {}
 
-        if token_name == "background":
+        is_bg = token_name == "background" or token_name.endswith(("__background", ".background"))
+        if is_bg:
             self.is_pair = False
-            self.fg_val = current_val
+            val = current_val
+            if isinstance(val, (list, tuple)):
+                val = val[0] if len(val) > 0 else -1
+            elif isinstance(val, str) and val.strip().startswith("[") and val.strip().endswith("]"):
+                with contextlib.suppress(Exception):
+                    parsed_val = yaml.safe_load(val)
+                    if isinstance(parsed_val, (list, tuple)):
+                        val = parsed_val[0] if len(parsed_val) > 0 else -1
+            self.fg_val = val
             self.bg_val = -1
         else:
             self.is_pair = True
@@ -883,7 +892,7 @@ class ColorPickerModal(ModalScreen[Any]):
         const_str = f" ({const_name})" if const_name else ""
 
         txt = Text()
-        if self.token_name == "background":
+        if not self.is_pair:
             bg_only = bashmenu_ui.parse_color_val(self.fg_val) or "color(233)"
             txt.append(" Sample Text ", style=Style(color="white", bgcolor=bg_only, bold=True))
             txt.append(f"  Selected: {self.fg_val}{const_str} (Parsed: {bg_only})")
@@ -2789,24 +2798,25 @@ class ThemePreviewWidget(Static):
         close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
 
         # Row 0: Top window border / header bar with title and close button
-        title_str = f"{b_cap_l} BashEdit - notes.md {b_cap_r}"
-        close_str = f"{b_cap_l}X{b_cap_r}"
-        avail_top = max(1, w - len(title_str) - len(close_str) - 6)
+        title_content = f"  {b_cap_l} BashEdit - notes.md {b_cap_r}  "
+        close_content = f" {b_cap_l}X{b_cap_r} "
+        inner_w = w - 2
+        pad_hdr = max(0, inner_w - len(title_content) - len(close_content))
+
         top_line = Text()
-        top_line.append(b_tl + b_h_top * 2, style=ed_b_style)
-        top_line.append(title_str, style=ed_hdr_style)
-        top_line.append(b_h_top * avail_top, style=ed_b_style)
-        top_line.append(close_str, style=close_btn_style)
-        rem_top = max(1, w - 3 - len(title_str) - avail_top - len(close_str) - 1)
-        top_line.append(b_h_top * rem_top + b_tr, style=ed_b_style)
+        top_line.append(b_tl, style=ed_b_style)
+        top_line.append(title_content, style=ed_hdr_style)
+        top_line.append(" " * pad_hdr, style=ed_hdr_style)
+        close_fg = close_btn_style.color or "red"
+        top_line.append(close_content, style=Style(color=close_fg, bgcolor=ed_hdr_style.bgcolor, bold=True))
+        top_line.append(b_tr, style=ed_b_style)
         top_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(top_line)
 
-        set_hit_range(0, 0, 3, "color_editor__header", "prop_border_top_left")
-        set_hit_range(0, 3, 3 + len(title_str), "color_editor__header", "title")
-        set_hit_range(0, 3 + len(title_str), 3 + len(title_str) + avail_top, "color_editor__border", "prop_border_horizontal")
-        set_hit_range(0, 3 + len(title_str) + avail_top, 3 + len(title_str) + avail_top + len(close_str), "color_window_close_button", "close_button")
-        set_hit_range(0, 3 + len(title_str) + avail_top + len(close_str), w, "color_editor__border", "prop_border_top_right")
+        set_hit_range(0, 0, 1, "color_border", "prop_border_top_left")
+        set_hit_range(0, 1, 1 + len(title_content) + pad_hdr, "color_editor__header", "title")
+        set_hit_range(0, 1 + len(title_content) + pad_hdr, w - 1, "color_window_close_button", "close_button")
+        set_hit_range(0, w - 1, w, "color_border", "prop_border_top_right")
         set_hit_range(0, w, w + 2, "color_shadow", "prop_shadow_char")
 
         # Row 1: Editor tab bar
@@ -2827,11 +2837,11 @@ class ThemePreviewWidget(Static):
         tab_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(tab_line)
 
-        set_hit_range(1, 0, 1, "color_editor__border")
+        set_hit_range(1, 0, 1, "color_border")
         set_hit_range(1, 1, 1 + len(t_active) + len(t_close), "color_editor__tab_active")
         set_hit_range(1, 1 + len(t_active) + len(t_close), 1 + used_tab, "color_editor__tab_inactive")
         set_hit_range(1, 1 + used_tab, w - 1, "color_editor__background", "color_background")
-        set_hit_range(1, w - 1, w, "color_editor__border")
+        set_hit_range(1, w - 1, w, "color_border")
         set_hit_range(1, w, w + 2, "color_shadow")
 
         # Row 2: Divider below tab bar
@@ -2839,30 +2849,37 @@ class ThemePreviewWidget(Static):
         tdiv_line.append("├" + b_h_top * (w - 2) + "┤", style=ed_b_style)
         tdiv_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(tdiv_line)
-        set_hit_range(2, 0, w, "color_editor__border")
+        set_hit_range(2, 0, w, "color_border")
         set_hit_range(2, w, w + 2, "color_shadow")
 
         # Body rows (code / text buffer)
-        body_rows = max(4, num_rows - 5)
+        body_rows = max(2, num_rows - 8)
         mock_code = [
-            (" 1 │ ", "# Project Checklist & Tasks"),
-            (" 2 │ ", "- [x] Setup architecture review"),
-            (" 3 │ ", "- [ ] Deploy release to cluster█"),
-            (" 4 │ ", "      port: 8080"),
-            (" 5 │ ", "      workers: 4"),
-            (" ~ │ ", ""),
-            (" ~ │ ", ""),
+            "# Project Checklist & Tasks",
+            "- [x] Setup architecture review",
+            "- [ ] Deploy release to cluster█",
+            "      port: 8080",
+            "      workers: 4",
         ]
-        while len(mock_code) < body_rows:
-            mock_code.append((" ~ │ ", ""))
 
-        for r_i, (gutter_str, code_str) in enumerate(mock_code[:body_rows]):
+        for r_i in range(body_rows):
             y_r = 3 + r_i
             c_line = Text()
             c_line.append(b_v_left, style=ed_b_style)
-            c_line.append(gutter_str, style=ed_gutter_style)
 
-            inner_code_w = max(4, w - 2 - len(gutter_str))
+            if r_i < len(mock_code):
+                num_str = f" {r_i + 1:>2} "
+                code_str = mock_code[r_i]
+            else:
+                num_str = "  ~ "
+                code_str = ""
+
+            sep_str = "│ "
+            c_line.append(num_str, style=ed_gutter_style)
+            c_line.append(sep_str, style=ed_b_style)
+
+            gutter_w = len(num_str) + len(sep_str)
+            inner_code_w = max(4, w - 2 - gutter_w)
             code_text = Text()
             if r_i == 1:
                 # Highlight "Setup architecture review" as selection
@@ -2878,19 +2895,20 @@ class ThemePreviewWidget(Static):
             if code_text.cell_len > inner_code_w:
                 code_text.truncate(inner_code_w)
             c_pad = max(0, inner_code_w - code_text.cell_len)
-            code_text.append(" " * c_pad)
+            code_text.append(" " * c_pad, style=ed_text_style)
             c_line.append_text(code_text)
             c_line.append(b_v_right, style=ed_b_style)
             c_line.append(shadow_ch * 2, style=shadow_style)
             lines.append(c_line)
 
-            set_hit_range(y_r, 0, 1, "color_editor__border")
-            set_hit_range(y_r, 1, 1 + len(gutter_str), "color_editor__gutter")
+            set_hit_range(y_r, 0, 1, "color_border")
+            set_hit_range(y_r, 1, 1 + len(num_str), "color_editor__gutter")
+            set_hit_range(y_r, 1 + len(num_str), 1 + gutter_w, "color_border")
             if r_i == 1:
-                set_hit_range(y_r, 1 + len(gutter_str) + 6, w - 2, "color_editor__selection")
+                set_hit_range(y_r, 1 + gutter_w + 6, w - 2, "color_editor__selection")
             else:
-                set_hit_range(y_r, 1 + len(gutter_str), w - 2, "color_editor__text")
-            set_hit_range(y_r, w - 1, w, "color_editor__border")
+                set_hit_range(y_r, 1 + gutter_w, w - 2, "color_editor__text")
+            set_hit_range(y_r, w - 1, w, "color_border")
             set_hit_range(y_r, w, w + 2, "color_shadow")
 
         # Divider above status
@@ -2899,7 +2917,7 @@ class ThemePreviewWidget(Static):
         d_line2.append("├" + b_h_bot * (w - 2) + "┤", style=ed_b_style)
         d_line2.append(shadow_ch * 2, style=shadow_style)
         lines.append(d_line2)
-        set_hit_range(y_div2, 0, w, "color_editor__border")
+        set_hit_range(y_div2, 0, w, "color_border")
         set_hit_range(y_div2, w, w + 2, "color_shadow")
 
         # Status row
@@ -2915,9 +2933,9 @@ class ThemePreviewWidget(Static):
         st_line.append(b_v_right, style=ed_b_style)
         st_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(st_line)
-        set_hit_range(y_st, 0, 1, "color_editor__border")
+        set_hit_range(y_st, 0, 1, "color_border")
         set_hit_range(y_st, 1, w - 1, "color_editor__status")
-        set_hit_range(y_st, w - 1, w, "color_editor__border")
+        set_hit_range(y_st, w - 1, w, "color_border")
         set_hit_range(y_st, w, w + 2, "color_shadow")
 
         # Footer shortcut legend
@@ -2933,9 +2951,9 @@ class ThemePreviewWidget(Static):
         ft_line.append(b_h_bot * leg_pad + "┤", style=ed_b_style)
         ft_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(ft_line)
-        set_hit_range(y_ft, 0, 1, "color_editor__border")
+        set_hit_range(y_ft, 0, 1, "color_border")
         set_hit_range(y_ft, 1, w - 1, "color_editor__footer")
-        set_hit_range(y_ft, w - 1, w, "color_editor__border")
+        set_hit_range(y_ft, w - 1, w, "color_border")
         set_hit_range(y_ft, w, w + 2, "color_shadow")
 
         # Bottom border
@@ -2944,7 +2962,7 @@ class ThemePreviewWidget(Static):
         b_line.append(b_bl + b_h_bot * (w - 2) + b_br, style=ed_b_style)
         b_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(b_line)
-        set_hit_range(y_bot, 0, w, "color_editor__border")
+        set_hit_range(y_bot, 0, w, "color_border")
         set_hit_range(y_bot, w, w + 2, "color_shadow")
 
         # Drop shadow below
@@ -4820,6 +4838,8 @@ class ThemeEditScreen(Screen):
                         if candidate.startswith("[") and not candidate.endswith("]"):
                             candidate = candidate.rstrip(", ") + "]"
                         parsed = yaml.safe_load(candidate)
+                        if sub_tok == "background" and isinstance(parsed, (list, tuple)):
+                            parsed = parsed[0] if len(parsed) > 0 else -1
                         sec_dict[sub_tok] = parsed
                     except Exception:  # noqa: BLE001
                         sec_dict[sub_tok] = val
@@ -4832,6 +4852,8 @@ class ThemeEditScreen(Screen):
                     if candidate.startswith("[") and not candidate.endswith("]"):
                         candidate = candidate.rstrip(", ") + "]"
                     parsed = yaml.safe_load(candidate)
+                    if tok == "background" and isinstance(parsed, (list, tuple)):
+                        parsed = parsed[0] if len(parsed) > 0 else -1
                     pal[tok] = parsed
                 except Exception:  # noqa: BLE001
                     pal[tok] = val

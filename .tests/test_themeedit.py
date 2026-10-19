@@ -131,8 +131,8 @@ class TestThemeEditor(unittest.TestCase):
         widget_ed = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="menu_editor")
         rendered_ed = widget_ed.render()
         lines_ed = rendered_ed.plain.split("\n")
-        window_rows_ed = [l for l in lines_ed if "░" in l and not l.strip().startswith("░")]
-        widths_ed = [cell_len(l) for l in window_rows_ed]
+        window_rows_ed = [line for line in lines_ed if "░" in line and not line.strip().startswith("░")]
+        widths_ed = [cell_len(line) for line in window_rows_ed]
         self.assertTrue(len(widths_ed) > 3)
         self.assertEqual(len(set(widths_ed)), 1, f"Menu editor rows width mismatch: {widths_ed}")
 
@@ -140,8 +140,8 @@ class TestThemeEditor(unittest.TestCase):
         widget_text = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="text_editor")
         rendered_text = widget_text.render()
         lines_text = rendered_text.plain.split("\n")
-        window_rows_text = [l for l in lines_text if "░" in l and not l.strip().startswith("░")]
-        widths_text = [cell_len(l) for l in window_rows_text]
+        window_rows_text = [line for line in lines_text if "░" in line and not line.strip().startswith("░")]
+        widths_text = [cell_len(line) for line in window_rows_text]
         self.assertTrue(len(widths_text) > 3)
         self.assertEqual(len(set(widths_text)), 1, f"Text editor rows width mismatch: {widths_text}")
 
@@ -149,8 +149,8 @@ class TestThemeEditor(unittest.TestCase):
         widget_modal = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_theme", preview_mode="modals")
         rendered_modal = widget_modal.render()
         lines_modal = rendered_modal.plain.split("\n")
-        window_rows_modal = [l for l in lines_modal if "░" in l and not l.strip().startswith("░")]
-        widths_modal = [cell_len(l) for l in window_rows_modal]
+        window_rows_modal = [line for line in lines_modal if "░" in line and not line.strip().startswith("░")]
+        widths_modal = [cell_len(line) for line in window_rows_modal]
         self.assertTrue(len(widths_modal) > 3)
         self.assertEqual(len(set(widths_modal)), 1, f"Modals rows width mismatch: {widths_modal}")
 
@@ -2037,6 +2037,140 @@ class TestThemeEditor(unittest.TestCase):
         extracted_tags = [tag for _, tags in modal.theme_colors_list for tag in tags]
         self.assertIn("editor.tab_active(fg)", extracted_tags)
         self.assertIn("menu_editor.header(fg)", extracted_tags)
+
+    def test_background_tokens_single_scalar_mode(self):
+        """Verify ColorPickerModal treats all background tokens as single-color scalar values."""
+        bg_tokens = [
+            "background",
+            "menu_editor__background",
+            "editor__background",
+            "modals__background",
+        ]
+        pal_256 = {
+            "background": 234,
+            "menu_editor": {"background": 235},
+            "editor": {"background": 236},
+            "modals": {"background": "COLOR_BLACK"},
+        }
+
+        for tok in bg_tokens:
+            modal = themeedit.ColorPickerModal(
+                tok,
+                current_val=[200, -1],  # Even if passed as a list/pair
+                theme_palette=pal_256,
+            )
+            self.assertFalse(modal.is_pair, f"{tok} should have is_pair=False")
+            self.assertEqual(modal.selected_color, 200, f"{tok} should unwrap list to scalar")
+
+            # Setting single color must remain a scalar
+            modal.selected_color = 210
+            self.assertEqual(modal.selected_color, 210)
+
+    def test_text_editor_preview_rendering_and_gutter(self):
+        """Verify _render_text_editor outputs expected line count, title bar styles, and visible help gutter."""
+        sample_theme = {
+            "256": {
+                "background": -1,
+                "title": [201, -1],
+                "border": [61, -1],
+                "text": [255, -1],
+                "shadow": [236, "COLOR_BLACK"],
+                "gutter": [239, -1],
+                "help_text": [117, -1],
+                "editor": {
+                    "header": [45, 235],
+                    "tab_active": [255, 61],
+                    "tab_inactive": [245, -1],
+                    "gutter": [141, -1],
+                    "text": [255, -1],
+                    "status": [45, 235],
+                    "footer": [117, -1],
+                    "background": -1,
+                },
+            },
+        }
+
+        widget = themeedit.ThemePreviewWidget(sample_theme, theme_name="test_ed_theme")
+        widget.preview_mode = "text_editor"
+
+        # Simulate rendering with num_rows = 12
+        hit_map = {}
+        def set_hit(y, x1, x2, p, s=""):
+            for x in range(x1, x2):
+                hit_map[(x, y)] = (p, s or p)
+
+        styles = bashmenu_ui.init_theme_colors("test_ed_theme", raw_theme_data={"test_ed_theme": sample_theme})
+        lines = widget._render_text_editor(
+            w=56,
+            num_rows=12,
+            styles=styles,
+            borders={},
+            shadow_ch="░",
+            shadow_style=Style(),
+            set_hit_range=set_hit,
+            b_tl="┌",
+            b_tr="┐",
+            b_bl="└",
+            b_br="┘",
+            b_h_top="─",
+            b_h_bot="─",
+            b_v_left="│",
+            b_v_right="│",
+            b_cap_l="[",
+            b_cap_r="]",
+            b_style=Style(color="blue"),
+            t_style=Style(color="magenta"),
+            text_style=Style(color="white"),
+            sel_style=Style(color="white", bgcolor="blue"),
+            gutter_style=Style(color="cyan"),
+            help_style=Style(color="green"),
+        )
+
+        # Total lines rendered must equal num_rows (12)
+        self.assertEqual(len(lines), 12)
+
+        # Line 0 is the title bar spanning the width with header styling
+        hdr_line_str = lines[0].plain
+        self.assertIn("BashEdit - notes.md", hdr_line_str)
+
+        # Line 9 is the footer shortcut legend (help gutter)
+        ft_line_str = lines[9].plain
+        self.assertIn("^G Help", ft_line_str)
+        self.assertIn("^O Save", ft_line_str)
+
+        # Line 10 is bottom border, Line 11 is shadow
+        self.assertIn("└", lines[10].plain)
+        self.assertIn("░", lines[11].plain)
+
+        # Check line number styling in body rows (lines 3 to 6)
+        # Line 3 contains row 1 line number
+        self.assertIn("1", lines[3].plain)
+        self.assertIn("│", lines[3].plain)
+
+    def test_init_theme_colors_bypasses_cache_for_dynamic_data(self):
+        """Verify init_theme_colors recomputes styles when raw_theme_data is explicitly provided."""
+        theme_a = {
+            "test_dyn": {
+                "256": {
+                    "background": -1,
+                    "title": [196, -1],
+                }
+            }
+        }
+        theme_b = {
+            "test_dyn": {
+                "256": {
+                    "background": -1,
+                    "title": [46, -1],
+                }
+            }
+        }
+
+        styles_a = bashmenu_ui.init_theme_colors("test_dyn", raw_theme_data=theme_a)
+        styles_b = bashmenu_ui.init_theme_colors("test_dyn", raw_theme_data=theme_b)
+
+        self.assertEqual(styles_a["title"].color.name, "color(196)")
+        self.assertEqual(styles_b["title"].color.name, "color(46)")
 
 
 if __name__ == "__main__":

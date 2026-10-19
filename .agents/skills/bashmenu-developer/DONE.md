@@ -262,5 +262,25 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   - Added `test_picker_inline_starting_directory_and_modifiers` in `.tests/test_improvements.py` testing `parse_picker_macro`, `_extract_picker_spec` priority resolution, macro replacement, and double-prefix avoidance.
   - Verified `test_placeholder_documentation_parity` and the full test suite (339 tests) pass cleanly.
 
+---
 
-
+### 25. Theme Editor Text Editor Preview Colors, Help Gutter Cutoff, and Single-Color Background Modals
+- **Item:** The theme editor: the text editor preview panel: the title bar colors, line numbers are not matching the configured color schemes. The help gutter of the text editor preview pane does not display or is cut off. The background buttons for Menu Editor Colors, and Text Editor Colors and Modals & Popup Colors are putting color pairs in the text widget, even though it requires a single color value.
+- **Root Cause:**
+  1. *Background Buttons Pair Mode*: In `themeedit.py::ColorPickerModal.__init__`, single-color mode checked only `token_name == "background"`. Nested background tokens (`menu_editor__background`, `editor__background`, `modals__background`) were treated as color pairs, causing `selected_color` to return a 2-element list `[fg, bg]` into the input field rather than a single scalar.
+  2. *Help Gutter Cutoff*: In `_render_text_editor`, `body_rows = max(4, num_rows - 5)` resulted in 15 rendered lines for a 12-row preview container (`8` fixed header/footer/border lines + 7 body rows). Under Textual `overflow: hidden`, the bottom 3 rows (footer shortcut legend/help gutter, bottom border, and drop shadow) were pushed off-screen and clipped.
+  3. *Title Bar and Line Numbers Mismatches*: In `_render_text_editor`, Row 0 was rendered as individual dashed border segments in border style rather than a solid header bar reflecting `ed_hdr_style` across the bar; border hit tests targeted nonexistent `color_editor__border`; and in `bashmenu_ui.init_theme_colors`, `_theme_styles_cache` cached by `(theme_name, id(raw_theme_data))`, which collided on 99% of render updates because Python recycled the memory address of ephemeral dictionary arguments, returning stale styles. In addition, palette depth string keys (`"256"`, `"16"`, `"8"`) were not resolved.
+- **Fix:**
+  1. *ColorPickerModal & Input Normalization*:
+     - Updated `ColorPickerModal.__init__` to check `is_bg = token_name == "background" or token_name.endswith(("__background", ".background"))`, setting `is_pair = False` and unpacking initial list values to a scalar.
+     - Updated preview and input change listeners in `themeedit.py` to ensure background values are stored as single scalars.
+  2. *Help Gutter Sizing*:
+     - Changed `body_rows` calculation in `_render_text_editor` to `max(2, num_rows - 8)`. For `num_rows = 12`, `body_rows = 4`, yielding exactly 12 total lines and guaranteeing the footer shortcut legend (row 9), bottom border (row 10), and drop shadow (row 11) display fully without being cut off.
+  3. *Title Bar, Line Numbers & Cache Invalidation*:
+     - Rendered Row 0 in `_render_text_editor` as a solid header bar spanning between corner brackets with `ed_hdr_style` across the inner width and appropriate close button coloring.
+     - Mapped editor borders and separators to `color_border`, and line numbers to `color_editor__gutter`.
+     - In `bashmenu_ui.init_theme_colors`, only cache in `_theme_styles_cache` when `raw_theme_data is None` (the global themes file load), ensuring dynamic and preview calls always compute fresh styles without stale cache collisions. Supported string depth keys (`"256"`, `"16"`, `"8"`).
+     - In `bashedit.py`, updated `apply_theme` and `EditorWidget.render` to respect nested `editor:` palette settings for `header`, `background`, `gutter`, `text`, `status`, and `footer`.
+- **Tests:**
+  - Added `test_background_tokens_single_scalar_mode`, `test_text_editor_preview_rendering_and_gutter`, and `test_init_theme_colors_bypasses_cache_for_dynamic_data` in `.tests/test_themeedit.py`.
+  - Verified full test suite passes (342 tests) with zero failures and verified flake8/ruff lint compliance.
