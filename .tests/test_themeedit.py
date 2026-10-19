@@ -12,6 +12,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -1391,6 +1392,53 @@ class TestThemeEditor(unittest.TestCase):
                 await pilot.pause()
                 self.assertFalse(sec_general.has_class("collapsed"))
                 self.assertIn("▼", str(hdr_general.render()))
+
+        asyncio.run(_run())
+
+    def test_theme_editor_preview_selection_responsiveness(self):
+        """Verify selecting elements in preview pane immediately focuses the inspector input without blocking lag."""
+        app = themeedit.ThemeEditApp()
+
+        async def _run():
+            async with app.run_test() as pilot:
+                screen = app.screen
+                preview = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+                await pilot.pause()
+
+                # Verify preview base line cache initialized
+                self.assertIsNotNone(preview._cached_base_lines)
+
+                # Focus inspector target from collapsed state (color_highlight -> sec_colors)
+                sec_colors = screen.query_one("#sec_colors")
+                self.assertTrue(sec_colors.has_class("collapsed"))
+
+                t0 = time.perf_counter()
+                screen.focus_inspector_target("color_highlight")
+                t_duration = time.perf_counter() - t0
+
+                # Must execute synchronously in < 25ms (scaled for CI)
+                limit = 0.05 if os.getenv("CI") else 0.025
+                self.assertLess(t_duration, limit, f"focus_inspector_target took too long: {t_duration*1000:.2f}ms")
+
+                await pilot.pause()
+                self.assertFalse(sec_colors.has_class("collapsed"))
+                self.assertEqual(app.focused.id, "color_highlight")
+
+                # Focus another element in the same section
+                t0 = time.perf_counter()
+                screen.focus_inspector_target("color_border")
+                t_duration2 = time.perf_counter() - t0
+                self.assertLess(t_duration2, limit)
+
+                await pilot.pause()
+                self.assertEqual(app.focused.id, "color_border")
+
+                # Test preview click hit and focus transfer
+                pos = next(iter(preview._hit_map.keys()))
+                hit = preview._hit_map[pos]
+                await pilot.click(preview, offset=pos)
+                await pilot.pause()
+                self.assertEqual(app.focused.id, hit[0])
 
         asyncio.run(_run())
 

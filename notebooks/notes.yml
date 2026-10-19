@@ -47,4 +47,5 @@ notebook:
           \ configured color schemes. The help gutter of the text editor preview pane\
           \ does not display or is cut off. The background buttons for Menu Editor\
           \ Colors, and Text Editor Colors and Modals & Popup Colors are putting color\
-          \ pairs in the text widget, even though it requires a single color value.\n"
+          \ pairs in the text widget, even though it requires a single color value.\n\
+          - [x] RESPONSIVENESS: Theme editor preview item selection lag: significant blocking delay until focus lands on color field in property inspector.\n"

@@ -1,4 +1,5 @@
 
+- [x] RESPONSIVENESS: Theme editor preview item selection lag: significant blocking delay until focus lands on color field in property inspector.
 - [x] BUG: border misalignment in theme editor 'menu editor' tab:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐

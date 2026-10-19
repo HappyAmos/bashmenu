@@ -2531,6 +2531,7 @@ class ThemePreviewWidget(Static):
         self._last_h = 12
         self._flash_range: tuple[int, int, int] | None = None
         self._flash_timer = None
+        self._cached_base_lines: list[Text] | None = None
 
     def _clear_flash(self) -> None:
         """Clear active flash inversion and restore normal appearance."""
@@ -2565,7 +2566,7 @@ class ThemePreviewWidget(Static):
             if getattr(self, "_flash_timer", None) is not None:
                 with contextlib.suppress(Exception):
                     self._flash_timer.stop()
-            self._flash_timer = self.set_timer(0.15, self._clear_flash)
+            self._flash_timer = self.set_timer(0.08, self._clear_flash)
             self.refresh()
 
             self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1]))
@@ -2574,6 +2575,7 @@ class ThemePreviewWidget(Static):
         """Switch preview pane mode between 'menu', 'editor', and 'modals'."""
         self.preview_mode = mode
         self._flash_range = None
+        self._cached_base_lines = None
         self.refresh()
 
     def update_theme(self, theme_dict: dict, theme_name: str = "custom") -> None:
@@ -2581,6 +2583,7 @@ class ThemePreviewWidget(Static):
         self.theme_dict = theme_dict
         self.theme_name = theme_name
         self._flash_range = None
+        self._cached_base_lines = None
         self.refresh()
 
     def _render_menu_editor(
@@ -3176,11 +3179,18 @@ class ThemePreviewWidget(Static):
         allow_wallpaper: bool = True,
         dialog_bounds: tuple[int, int, int, int] | None = None,
     ) -> Text:
-        """Apply active flash inversion, composite lines to Text, and apply wallpaper if configured."""
-        if getattr(self, "_flash_range", None):
-            fy, fx1, fx2 = self._flash_range
-            if 0 <= fy < len(lines):
-                lines[fy].stylize(Style(reverse=True), fx1, fx2)
+        """Composite lines to Text, apply wallpaper if configured, and cache base lines for instantaneous click feedback."""
+        def _finish(res_text: Text) -> Text:
+            base_lines = res_text.split("\n")
+            self._cached_base_lines = base_lines
+            if getattr(self, "_flash_range", None):
+                fy, fx1, fx2 = self._flash_range
+                if 0 <= fy < len(base_lines):
+                    flashed = list(base_lines)
+                    flashed[fy] = flashed[fy].copy()
+                    flashed[fy].stylize(Style(reverse=True), fx1, fx2)
+                    return Text("\n").join(flashed)
+            return res_text
 
         if not allow_wallpaper:
             out = Text()
@@ -3188,7 +3198,7 @@ class ThemePreviewWidget(Static):
                 out.append_text(line)
                 if idx < len(lines) - 1:
                     out.append("\n")
-            return out
+            return _finish(out)
 
         bg_spec = styles.get("theme_background")
         has_bg_image = isinstance(bg_spec, dict) and bool(bg_spec.get("image"))
@@ -3199,7 +3209,7 @@ class ThemePreviewWidget(Static):
                 out.append_text(line)
                 if idx < len(lines) - 1:
                     out.append("\n")
-            return out
+            return _finish(out)
 
         img_path = str(bg_spec.get("image", "")).strip()
         compositor = None
@@ -3235,7 +3245,7 @@ class ThemePreviewWidget(Static):
                 out.append_text(line)
                 if idx < len(lines) - 1:
                     out.append("\n")
-            return out
+            return _finish(out)
 
         theme_bg_rgb = bashmenu_ui.get_theme_bg_rgb(styles)
         theme_bg_style = styles.get("background")
@@ -3247,7 +3257,7 @@ class ThemePreviewWidget(Static):
                 out.append_text(line)
                 if idx < len(lines) - 1:
                     out.append("\n")
-            return out
+            return _finish(out)
 
         if dialog_bounds is None:
             raw_out = Text()
@@ -3255,12 +3265,14 @@ class ThemePreviewWidget(Static):
                 raw_out.append_text(line)
                 if idx < len(lines) - 1:
                     raw_out.append("\n")
-            return bashmenu_ui.composite_menu_text(
-                raw_out,
-                grid,
-                w + 3,
-                len(lines),
-                theme_default_bg=theme_default_bg,
+            return _finish(
+                bashmenu_ui.composite_menu_text(
+                    raw_out,
+                    grid,
+                    w + 3,
+                    len(lines),
+                    theme_default_bg=theme_default_bg,
+                )
             )
 
         # Modals with protected dialog_bounds (d_x1, d_y1, d_x2, d_y2)
@@ -3305,7 +3317,7 @@ class ThemePreviewWidget(Static):
             if row_idx < len(lines) - 1:
                 out.append("\n")
 
-        return out
+        return _finish(out)
 
     def render(self) -> Text:
         """Render complete simulated BashMenu frame with active borders and styles."""
@@ -3318,6 +3330,19 @@ class ThemePreviewWidget(Static):
         else:
             w = 56
             num_rows = 12
+
+        if w != getattr(self, "_last_w", None) or num_rows != getattr(self, "_last_h", None):
+            self._cached_base_lines = None
+
+        if self._cached_base_lines is not None:
+            if getattr(self, "_flash_range", None):
+                fy, fx1, fx2 = self._flash_range
+                if 0 <= fy < len(self._cached_base_lines):
+                    flashed = list(self._cached_base_lines)
+                    flashed[fy] = flashed[fy].copy()
+                    flashed[fy].stylize(Style(reverse=True), fx1, fx2)
+                    return Text("\n").join(flashed)
+            return Text("\n").join(self._cached_base_lines)
 
         self._hit_map.clear()
         self._last_w = w
@@ -4103,6 +4128,10 @@ class ThemeEditScreen(Screen):
         self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
         self._initial_theme_name = "" if is_new else self.theme_name
         self._force_dirty = is_new
+        self._sec_bodies: dict[str, Widget] | None = None
+        self._sec_headers: dict[str, Label] | None = None
+        self._lbl_expand_all: Label | None = None
+        self._prop_inputs: dict[str, Widget] | None = None
 
     @property
     def is_dirty(self) -> bool:
@@ -4185,6 +4214,11 @@ class ThemeEditScreen(Screen):
         self.apply_theme()
         self._sync_preview()
         self.update_footer_layout()
+        self._sec_bodies = {b.id: b for b in self.query(".section_body") if getattr(b, "id", None)}
+        self._sec_headers = {h.id: h for h in self.query(".section_header") if getattr(h, "id", None)}
+        with contextlib.suppress(Exception):
+            self._lbl_expand_all = self.query_one("#lbl_expand_all", Label)
+        self._prop_inputs = {inp.id: inp for inp in self.query(".prop_input") if getattr(inp, "id", None)}
         self._mounted_ready = True
         self._initial_theme_snapshot = copy.deepcopy(self.current_theme)
         self._initial_theme_name = "" if getattr(self, "is_new", False) else self.theme_name
@@ -4625,8 +4659,66 @@ class ThemeEditScreen(Screen):
             else:
                 preview.set_preview_mode("menu")
 
+    SECTION_TITLES: ClassVar[dict[str, str]] = {
+        "hdr_general": "General & Identity",
+        "hdr_marquee": "Marquee Settings",
+        "hdr_borders": "Window & Gutter Borders",
+        "hdr_divider": "Divider Settings",
+        "hdr_wallpaper": "Wallpaper & Background",
+        "hdr_colors": "256-Color Palette Tokens",
+        "hdr_colors_menuedit": "Menu Editor Colors",
+        "hdr_colors_editor": "Text Editor Colors",
+        "hdr_colors_modals": "Modals & Popups Colors",
+    }
+
+    SECTION_TARGET_MAP: ClassVar[dict[str, tuple[str, str]]] = {
+        "prop_theme_name": ("sec_general", "hdr_general"),
+        "prop_indicator": ("sec_general", "hdr_general"),
+        "prop_shadow_char": ("sec_general", "hdr_general"),
+        "prop_marquee_char": ("sec_marquee", "hdr_marquee"),
+        "prop_marquee_gap": ("sec_marquee", "hdr_marquee"),
+        "prop_divider_char": ("sec_divider", "hdr_divider"),
+        "prop_divider_length": ("sec_divider", "hdr_divider"),
+        "prop_wallpaper_image": ("sec_wallpaper", "hdr_wallpaper"),
+    }
+
+    def _get_sec_body(self, sec_id: str) -> Widget | None:
+        if getattr(self, "_sec_bodies", None) is None:
+            self._sec_bodies = {b.id: b for b in self.query(".section_body") if getattr(b, "id", None)}
+        return self._sec_bodies.get(sec_id)
+
+    def _get_sec_header(self, hdr_id: str) -> Label | None:
+        if getattr(self, "_sec_headers", None) is None:
+            self._sec_headers = {h.id: h for h in self.query(".section_header") if getattr(h, "id", None)}
+        return self._sec_headers.get(hdr_id)
+
+    def _get_prop_input(self, target_id: str) -> Widget | None:
+        if getattr(self, "_prop_inputs", None) is None:
+            self._prop_inputs = {inp.id: inp for inp in self.query(".prop_input") if getattr(inp, "id", None)}
+        return self._prop_inputs.get(target_id)
+
+    def _resolve_target_section(self, target_id: str) -> tuple[str | None, str | None]:
+        """Resolve section ID and header ID for a target element in O(1) time."""
+        if target_id in self.SECTION_TARGET_MAP:
+            return self.SECTION_TARGET_MAP[target_id]
+        if target_id.startswith("color_menu_editor__"):
+            return ("sec_colors_menuedit", "hdr_colors_menuedit")
+        if target_id.startswith("color_editor__"):
+            return ("sec_colors_editor", "hdr_colors_editor")
+        if target_id.startswith("color_modals__"):
+            return ("sec_colors_modals", "hdr_colors_modals")
+        if target_id.startswith("color_"):
+            return ("sec_colors", "hdr_colors")
+        if (
+            target_id.startswith(("prop_border_", "prop_gutter_"))
+            or "tee" in target_id
+            or "cap" in target_id
+        ):
+            return ("sec_borders", "hdr_borders")
+        return (None, None)
+
     def toggle_inspector_section(self, header: Label | str, expand: bool | None = None) -> bool:
-        """Toggle or set the collapsed state of an inspector section.
+        """Toggle or set the collapsed state of an inspector section with minimal layout churn.
 
         Args:
             header: The section header Label widget or its ID (e.g. 'hdr_general').
@@ -4637,73 +4729,79 @@ class ThemeEditScreen(Screen):
         """
         if isinstance(header, str):
             hdr_id = header if header.startswith("hdr_") else f"hdr_{header}"
-            try:
-                hdr_widget = self.query_one(f"#{hdr_id}", Label)
-            except Exception:  # noqa: BLE001
-                return False
+            hdr_widget = self._get_sec_header(hdr_id)
+            if not hdr_widget:
+                try:
+                    hdr_widget = self.query_one(f"#{hdr_id}", Label)
+                except Exception:  # noqa: BLE001
+                    return False
         else:
             hdr_widget = header
             hdr_id = getattr(hdr_widget, "id", "") or ""
 
         sec_id = hdr_id.replace("hdr_", "sec_")
-        try:
-            body = self.query_one(f"#{sec_id}")
-        except Exception:  # noqa: BLE001
-            return False
+        body = self._get_sec_body(sec_id)
+        if not body:
+            try:
+                body = self.query_one(f"#{sec_id}")
+            except Exception:  # noqa: BLE001
+                return False
 
-        is_collapsed = body.has_class("collapsed")
+        is_collapsed = "collapsed" in getattr(body, "_classes", set())
         should_expand = is_collapsed if expand is None else expand
         if should_expand == (not is_collapsed):
             return not is_collapsed
 
-        curr_text = str(hdr_widget.render()) if hasattr(hdr_widget, "render") else str(getattr(hdr_widget, "text", ""))
-        ret = False
+        title = self.SECTION_TITLES.get(hdr_id)
         if should_expand:
-            body.remove_class("collapsed")
-            new_text = curr_text.replace("▶", "▼")
-            hdr_widget.update(new_text)
+            body.display = True
+            body._classes.discard("collapsed")
+            hdr_widget.update(f"▼ {title}" if title else str(hdr_widget.render()).replace("▶", "▼"))
             ret = True
         else:
-            body.add_class("collapsed")
-            new_text = curr_text.replace("▼", "▶")
-            hdr_widget.update(new_text)
+            body.display = False
+            body._classes.add("collapsed")
+            hdr_widget.update(f"▶ {title}" if title else str(hdr_widget.render()).replace("▼", "▶"))
             ret = False
 
         with contextlib.suppress(Exception):
-            lbl = self.query_one("#lbl_expand_all", Label)
-            all_expanded = not any(b.has_class("collapsed") for b in self.query(".section_body"))
+            lbl = getattr(self, "_lbl_expand_all", None)
+            if not lbl:
+                lbl = self.query_one("#lbl_expand_all", Label)
+                self._lbl_expand_all = lbl
+            bodies = self._sec_bodies.values() if getattr(self, "_sec_bodies", None) else self.query(".section_body")
+            all_expanded = not any("collapsed" in getattr(b, "_classes", set()) for b in bodies)
             lbl.update("[F8] Collapse All" if all_expanded else "[F8] Expand All")
 
         return ret
 
     def focus_inspector_target(self, target_id: str) -> None:
         """Scroll to and focus an inspector input widget by element ID, expanding its section if collapsed."""
-        with contextlib.suppress(Exception):
-            target_widget = self.query_one(f"#{target_id}")
-            parent = getattr(target_widget, "parent", None)
-            while parent and parent != self:
-                if "section_body" in getattr(parent, "classes", []):
-                    sec_id = getattr(parent, "id", "") or ""
-                    if sec_id.startswith("sec_"):
-                        hdr_id = sec_id.replace("sec_", "hdr_")
-                        with contextlib.suppress(Exception):
-                            hdr = self.query_one(f"#{hdr_id}", Label)
-                            self.toggle_inspector_section(hdr, expand=True)
-                    break
-                parent = getattr(parent, "parent", None)
+        _sec_id, hdr_id = self._resolve_target_section(target_id)
+        with contextlib.suppress(Exception), self.app.batch_update():
+            if hdr_id:
+                self.toggle_inspector_section(hdr_id, expand=True)
+            else:
+                # Fallback to parent chain search if not in static map
+                target_widget = self._get_prop_input(target_id) or self.query_one(f"#{target_id}")
+                parent = getattr(target_widget, "parent", None)
+                while parent and parent != self:
+                    if "section_body" in getattr(parent, "classes", []):
+                        sec = getattr(parent, "id", "") or ""
+                        if sec.startswith("sec_"):
+                            self.toggle_inspector_section(sec.replace("sec_", "hdr_"), expand=True)
+                        break
+                    parent = getattr(parent, "parent", None)
 
-        try:
-            inp = self.query_one(f"#{target_id}", Input)
-            inp.scroll_visible()
-            inp.focus()
-            clean_name = target_id.replace("color_", "Color: ").replace("prop_", "Border: ").replace("__", " › ").replace("_", " ").title()
-            with contextlib.suppress(Exception):
-                self.notify(f"Inspecting {clean_name}", title="Theme Element", timeout=1.5)
-        except Exception:  # noqa: BLE001
-            with contextlib.suppress(Exception):
-                elem = self.query_one(f"#{target_id}")
-                elem.scroll_visible()
-                elem.focus()
+            inp = self._get_prop_input(target_id)
+            if not inp:
+                try:
+                    inp = self.query_one(f"#{target_id}", Input)
+                except Exception:  # noqa: BLE001
+                    inp = self.query_one(f"#{target_id}")
+            if inp:
+                inp.scroll_visible(animate=False)
+                inp.focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle live input changes and synchronize preview instantly."""
@@ -5040,7 +5138,7 @@ class ThemeEditScreen(Screen):
 
         target_idx = max(0, min(len(items) - 1, target_idx))
         target = items[target_idx]
-        target.scroll_visible()
+        target.scroll_visible(animate=False)
         target.focus()
         return True
 
@@ -5546,20 +5644,22 @@ class ThemeEditScreen(Screen):
 
     def action_toggle_expand_all(self) -> None:
         """Toggle all inspector property sections between collapsed and expanded states."""
-        bodies = list(self.query(".section_body"))
+        bodies = list(self._sec_bodies.values()) if getattr(self, "_sec_bodies", None) else list(self.query(".section_body"))
         if not bodies:
             return
         # If any section is currently collapsed, expand all; otherwise collapse all
-        target_expand = any(b.has_class("collapsed") for b in bodies)
+        target_expand = any("collapsed" in getattr(b, "_classes", set()) for b in bodies)
 
-        for hdr in self.query(".section_header"):
-            if isinstance(hdr, Label):
-                self.toggle_inspector_section(hdr, expand=target_expand)
+        headers = list(self._sec_headers.values()) if getattr(self, "_sec_headers", None) else list(self.query(".section_header"))
+        with self.app.batch_update():
+            for hdr in headers:
+                if isinstance(hdr, Label):
+                    self.toggle_inspector_section(hdr, expand=target_expand)
 
-        with contextlib.suppress(Exception):
-            lbl = self.query_one("#lbl_expand_all", Label)
-            lbl.update("[F8] Collapse All" if target_expand else "[F8] Expand All")
-            self.update_footer_layout()
+            with contextlib.suppress(Exception):
+                lbl = getattr(self, "_lbl_expand_all", None) or self.query_one("#lbl_expand_all", Label)
+                lbl.update("[F8] Collapse All" if target_expand else "[F8] Expand All")
+                self.update_footer_layout()
 
         status_msg = "Expanded all inspector sections" if target_expand else "Collapsed all inspector sections"
         with contextlib.suppress(Exception):
