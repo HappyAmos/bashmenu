@@ -1619,7 +1619,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     me_styles.setdefault("header", styles.get("header") or styles.get("title"))
     me_styles.setdefault("border", styles.get("border"))
     me_styles.setdefault("text", styles.get("text"))
-    me_styles.setdefault("selection", styles.get("selection") or styles.get("highlight"))
+    me_styles.setdefault("selection", styles.get("highlight") or styles.get("selection"))
     me_styles.setdefault("tree_guide", styles.get("gutter") or styles.get("border"))
     me_styles.setdefault("label", styles.get("accent") or styles.get("help_text"))
     me_styles.setdefault("input", styles.get("text"))
