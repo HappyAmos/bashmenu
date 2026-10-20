@@ -5232,12 +5232,9 @@ redgyle:
     length: '{window_width}'
 lighthouse:
   marquee:
-    char: ' '
-    gap: 4
-  indicator: '{nf:>:#eee9:}'
-  divider:
-    char: "\u2500"
-    length: '{window_width}'
+    char: "\u2022"
+    gap: 5
+  indicator: "{nf:@:\uEE90:}"
   window:
     border_horizontal: "\u2500"
     border_vertical: "\u2502"
@@ -5257,140 +5254,201 @@ lighthouse:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
-    border_tee_left: "\u251C"
-    border_tee_right: "\u2524"
-    border_tee_top: "\u252C"
-    border_tee_bottom: "\u2534"
-    border_cross: "\u253C"
-    shadow_char: "\u2591"
   256:
-    background: 0
+    background: COLOR_BLACK
     title:
-    - 17
+    - 152
     - -1
     border:
-    - 17
-    - -1
-    text:
-    - 252
-    - -1
-    highlight:
-    - 7
-    - 110
-    accent:
-    - 248
-    - -1
-    footer:
-    - 245
-    - -1
-    shadow:
-    - 235
-    - COLOR_BLACK
-    gutter:
-    - 232
-    - -1
-    selection:
-    - 232
-    - 250
-    shortcut_key:
-    - 255
-    - -1
-    divider:
-    - COLOR_WHITE
-    - -1
-    button_primary:
-    - COLOR_BLACK
-    - 255
-    button_error:
-    - 255
-    - 240
-    button_cancel:
-    - 255
-    - 240
-    button_success:
-    - COLOR_BLACK
-    - 255
-    help_text:
-    - 15
-    - -1
-    plugin:
-    - 17
-    - -1
-    window_close_button:
-    - 255
-    - -1
-    scrollbar:
-    - 250
-    - 238
-    whitespace:
     - 239
     - -1
-    editor:
-      background: -1
+    text:
+    - 255
+    - -1
+    highlight:
+    - 16
+    - 152
+    accent:
+    - 68
+    - -1
+    footer:
+    - 239
+    - -1
+    shadow:
+    - 236
+    - COLOR_BLACK
+    gutter:
+    - 237
+    - -1
+    selection:
+    - 16
+    - 152
+    shortcut_key:
+    - 68
+    - -1
+    divider:
+    - 239
+    - -1
+    button_primary:
+    - 16
+    - 152
+    button_error:
+    - 255
+    - 196
+    button_cancel:
+    - 255
+    - 237
+    button_success:
+    - 255
+    - 40
+    help_text:
+    - 68
+    - -1
+    plugin:
+    - 68
+    - -1
+    window_close_button:
+    - 203
+    - -1
+    scrollbar:
+    - 152
+    - 236
+    whitespace:
+    - 237
+    - -1
+    menu_editor:
+      background: COLOR_BLACK
       header:
+      - 152
       - -1
-      - 17
-      tab_inactive:
-      - -1
+      border:
+      - 239
       - -1
       text:
+      - 255
       - -1
+      selection:
       - 16
+      - 152
+      button_save:
+      - 16
+      - 152
+      button_delete:
+      - 255
+      - 196
+      footer:
+      - 239
+      - -1
+    editor:
+      background: COLOR_BLACK
+      header:
+      - 152
+      - -1
+      tab_active:
+      - 16
+      - 152
+      tab_inactive:
+      - 255
+      - -1
+      gutter:
+      - 237
+      - -1
+      text:
+      - 255
+      - -1
+      selection:
+      - 16
+      - 152
+      whitespace:
+      - 237
+      - -1
+      status:
+      - 239
+      - -1
+      footer:
+      - 239
+      - -1
+    modals:
+      backdrop:
+      - 236
+      - COLOR_BLACK
+      background: COLOR_BLACK
+      border:
+      - 239
+      - -1
+      title:
+      - 152
+      - -1
+      text:
+      - 255
+      - -1
+      button_confirm:
+      - 255
+      - 40
+      button_cancel:
+      - 255
+      - 237
+      button_danger:
+      - 255
+      - 196
+      scrollbar:
+      - 152
+      - 236
   16:
     background: COLOR_BLACK
     title:
-    - COLOR_BLACK
+    - COLOR_WHITE
     - -1
     border:
-    - COLOR_BLACK
+    - COLOR_GREY
     - -1
     text:
-    - COLOR_WHITE
+    - COLOR_BRIGHT_WHITE
     - -1
     highlight:
-    - COLOR_WHITE
+    - COLOR_BLACK
     - COLOR_WHITE
     accent:
-    - COLOR_WHITE
+    - COLOR_BRIGHT_BLUE
     - -1
     footer:
-    - COLOR_WHITE
+    - COLOR_GREY
     - -1
     shadow:
-    - COLOR_BLACK
+    - COLOR_GREY
     - COLOR_BLACK
     gutter:
-    - COLOR_BLACK
+    - COLOR_GREY
     - -1
     selection:
     - COLOR_BLACK
     - COLOR_WHITE
     shortcut_key:
-    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_BLUE
     - -1
     divider:
-    - COLOR_WHITE
+    - COLOR_GREY
     - -1
     button_primary:
     - COLOR_BLACK
-    - COLOR_BRIGHT_WHITE
+    - COLOR_WHITE
     button_error:
     - COLOR_BRIGHT_WHITE
-    - COLOR_GREY
+    - COLOR_RED
     button_cancel:
     - COLOR_BRIGHT_WHITE
     - COLOR_GREY
     button_success:
-    - COLOR_BLACK
     - COLOR_BRIGHT_WHITE
+    - COLOR_GREEN
     help_text:
-    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_BLUE
     - -1
     plugin:
-    - COLOR_BLACK
+    - COLOR_BRIGHT_BLUE
     - -1
     window_close_button:
-    - COLOR_BRIGHT_WHITE
+    - COLOR_BRIGHT_RED
     - -1
     scrollbar:
     - COLOR_WHITE
@@ -5398,25 +5456,103 @@ lighthouse:
     whitespace:
     - COLOR_GREY
     - -1
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      border:
+      - COLOR_GREY
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_save:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_delete:
+      - COLOR_BRIGHT_WHITE
+      - COLOR_RED
+      footer:
+      - COLOR_GREY
+      - -1
+    editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      tab_active:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      tab_inactive:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      gutter:
+      - COLOR_GREY
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      whitespace:
+      - COLOR_GREY
+      - -1
+      status:
+      - COLOR_GREY
+      - -1
+      footer:
+      - COLOR_GREY
+      - -1
+    modals:
+      backdrop:
+      - COLOR_GREY
+      - COLOR_BLACK
+      background: COLOR_BLACK
+      border:
+      - COLOR_GREY
+      - -1
+      title:
+      - COLOR_WHITE
+      - -1
+      text:
+      - COLOR_BRIGHT_WHITE
+      - -1
+      button_confirm:
+      - COLOR_BRIGHT_WHITE
+      - COLOR_GREEN
+      button_cancel:
+      - COLOR_BRIGHT_WHITE
+      - COLOR_GREY
+      button_danger:
+      - COLOR_BRIGHT_WHITE
+      - COLOR_RED
+      scrollbar:
+      - COLOR_WHITE
+      - COLOR_GREY
   8:
     background: COLOR_BLACK
     title:
-    - COLOR_BLACK
+    - COLOR_WHITE
     - -1
     border:
-    - COLOR_BLACK
+    - COLOR_YELLOW
     - -1
     text:
     - COLOR_WHITE
     - -1
     highlight:
-    - COLOR_WHITE
+    - COLOR_BLACK
     - COLOR_WHITE
     accent:
-    - COLOR_WHITE
+    - COLOR_CYAN
     - -1
     footer:
-    - COLOR_WHITE
+    - COLOR_YELLOW
     - -1
     shadow:
     - COLOR_BLACK
@@ -5428,43 +5564,123 @@ lighthouse:
     - COLOR_BLACK
     - COLOR_WHITE
     shortcut_key:
-    - COLOR_WHITE
+    - COLOR_CYAN
     - -1
     divider:
-    - COLOR_WHITE
+    - COLOR_YELLOW
     - -1
     button_primary:
     - COLOR_BLACK
     - COLOR_WHITE
     button_error:
     - COLOR_WHITE
-    - COLOR_YELLOW
+    - COLOR_RED
     button_cancel:
     - COLOR_WHITE
-    - COLOR_YELLOW
-    button_success:
     - COLOR_BLACK
+    button_success:
     - COLOR_WHITE
+    - COLOR_GREEN
     help_text:
-    - COLOR_WHITE
+    - COLOR_CYAN
     - -1
     plugin:
-    - COLOR_BLACK
+    - COLOR_CYAN
     - -1
     window_close_button:
-    - COLOR_WHITE
+    - COLOR_YELLOW
     - -1
     scrollbar:
     - COLOR_WHITE
     - COLOR_BLACK
     whitespace:
-    - COLOR_YELLOW
+    - COLOR_BLACK
     - -1
+    menu_editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      border:
+      - COLOR_YELLOW
+      - -1
+      text:
+      - COLOR_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_save:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      button_delete:
+      - COLOR_WHITE
+      - COLOR_RED
+      footer:
+      - COLOR_YELLOW
+      - -1
+    editor:
+      background: COLOR_BLACK
+      header:
+      - COLOR_WHITE
+      - -1
+      tab_active:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      tab_inactive:
+      - COLOR_WHITE
+      - -1
+      gutter:
+      - COLOR_BLACK
+      - -1
+      text:
+      - COLOR_WHITE
+      - -1
+      selection:
+      - COLOR_BLACK
+      - COLOR_WHITE
+      whitespace:
+      - COLOR_BLACK
+      - -1
+      status:
+      - COLOR_YELLOW
+      - -1
+      footer:
+      - COLOR_YELLOW
+      - -1
+    modals:
+      backdrop:
+      - COLOR_BLACK
+      - COLOR_BLACK
+      background: COLOR_BLACK
+      border:
+      - COLOR_YELLOW
+      - -1
+      title:
+      - COLOR_WHITE
+      - -1
+      text:
+      - COLOR_WHITE
+      - -1
+      button_confirm:
+      - COLOR_WHITE
+      - COLOR_GREEN
+      button_cancel:
+      - COLOR_WHITE
+      - COLOR_BLACK
+      button_danger:
+      - COLOR_WHITE
+      - COLOR_RED
+      scrollbar:
+      - COLOR_WHITE
+      - COLOR_BLACK
   background:
-    image: assets/wallpapers/lighthouse.pixel.png
+    image: assets/wallpapers/lighthouse.jpg
     opacity: 1.0
     scaling: stretch
     mode: quarterblock
+    clustering: 0
+    quantization: 1
 skagway:
   marquee:
     char: "\u2022"

@@ -1758,6 +1758,10 @@ def get_theme_bg_rgb(theme_styles: dict | None) -> tuple[int, int, int]:
     return (15, 20, 32)
 
 
+_wallpaper_image_cache: dict[tuple[str, float], Any] = {}
+_wallpaper_grid_cache: dict[tuple, list[list[tuple[Style, str]]]] = {}
+
+
 class WallpaperCompositor:
     """Manages loading, downsampling, caching, and half-block compositing of background wallpaper."""
 
@@ -1795,12 +1799,21 @@ class WallpaperCompositor:
                 elif os.path.exists(cand2):
                     expanded = cand2
             if os.path.exists(expanded) and os.path.isfile(expanded):
-                img = Image.open(expanded).convert("RGB")
+                can_path = os.path.realpath(expanded)
+                mtime = os.path.getmtime(can_path)
+                cached = _wallpaper_image_cache.get((can_path, mtime))
+                if cached is not None:
+                    self._raw_image = cached
+                    return
+                img = Image.open(can_path).convert("RGB")
                 # Downscale excessively large images (e.g. 4K/8K) to 1920x1080 bounding box
-                # using LANCZOS to conserve memory while retaining full photographic fidelity.
+                # using BILINEAR for fast loading while retaining photographic fidelity.
                 max_w, max_h = 1920, 1080
                 if img.width > max_w or img.height > max_h:
-                    img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+                    img.thumbnail((max_w, max_h), Image.Resampling.BILINEAR)
+                if len(_wallpaper_image_cache) > 16:
+                    _wallpaper_image_cache.clear()
+                _wallpaper_image_cache[(can_path, mtime)] = img
                 self._raw_image = img
             else:
                 self._raw_image = None
@@ -1815,6 +1828,7 @@ class WallpaperCompositor:
             return None
 
         cache_key = (
+            self.image_path,
             width,
             height,
             theme_bg_rgb,
@@ -1824,6 +1838,10 @@ class WallpaperCompositor:
             self.quantization,
         )
         if self._cached_key == cache_key and self._cached_grid is not None:
+            return self._cached_grid
+        if cache_key in _wallpaper_grid_cache:
+            self._cached_key = cache_key
+            self._cached_grid = _wallpaper_grid_cache[cache_key]
             return self._cached_grid
 
         pixel_w = width
@@ -1841,7 +1859,7 @@ class WallpaperCompositor:
                 new_h = max(1, int(img.width / target_ratio))
                 top = (img.height - new_h) // 2
                 cropped = img.crop((0, top, img.width, top + new_h))
-            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
+            resized = cropped.resize((pixel_w, pixel_h), Image.Resampling.BOX)
         elif self.scaling == "fit":
             img_ratio = img.width / max(1, img.height)
             target_ratio = pixel_w / max(1, pixel_h)
@@ -1851,7 +1869,7 @@ class WallpaperCompositor:
             else:
                 fitted_h = pixel_h
                 fitted_w = max(1, int(pixel_h * img_ratio))
-            scaled = img.resize((fitted_w, fitted_h), Image.Resampling.LANCZOS)
+            scaled = img.resize((fitted_w, fitted_h), Image.Resampling.BOX)
             canvas = Image.new("RGB", (pixel_w, pixel_h), color=theme_bg_rgb)
             canvas.paste(scaled, ((pixel_w - fitted_w) // 2, (pixel_h - fitted_h) // 2))
             resized = canvas
@@ -1875,7 +1893,7 @@ class WallpaperCompositor:
                     canvas.paste(img, (x, y))
             resized = canvas
         else:  # "stretch" (default / fallback)
-            resized = img.resize((pixel_w, pixel_h), Image.Resampling.LANCZOS)
+            resized = img.resize((pixel_w, pixel_h), Image.Resampling.BOX)
 
         pixels = resized.load()
         grid = []
@@ -1948,6 +1966,9 @@ class WallpaperCompositor:
                 row_cache.append(cached)
             grid.append(row_cache)
 
+        if len(_wallpaper_grid_cache) > 64:
+            _wallpaper_grid_cache.clear()
+        _wallpaper_grid_cache[cache_key] = grid
         self._cached_key = cache_key
         self._cached_grid = grid
         return grid

@@ -25,6 +25,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
+from textual.strip import Strip
 from textual.widget import Widget
 from textual.widgets import (
     Button,
@@ -2537,6 +2538,7 @@ class ThemePreviewWidget(Static):
         self._flash_range: tuple[int, int, int] | None = None
         self._flash_timer = None
         self._cached_base_lines: list[Text] | None = None
+        self._cached_strips: list[Strip] | None = None
 
     def _clear_flash(self) -> None:
         """Clear active flash inversion and restore normal appearance."""
@@ -2605,6 +2607,7 @@ class ThemePreviewWidget(Static):
         self.preview_mode = mode
         self._flash_range = None
         self._cached_base_lines = None
+        self._cached_strips = None
         self.refresh()
 
     def update_theme(self, theme_dict: dict, theme_name: str = "custom") -> None:
@@ -2613,6 +2616,7 @@ class ThemePreviewWidget(Static):
         self.theme_name = theme_name
         self._flash_range = None
         self._cached_base_lines = None
+        self._cached_strips = None
         self.refresh()
 
     def _render_menu_editor(
@@ -3256,6 +3260,8 @@ class ThemePreviewWidget(Static):
         def _finish(res_text: Text) -> Text:
             base_lines = res_text.split("\n")
             self._cached_base_lines = base_lines
+            console = bashmenu_ui.get_compositor_console(w + 3, len(base_lines))
+            self._cached_strips = [bashmenu_ui.text_to_strip(line, console) for line in base_lines]
             if getattr(self, "_flash_range", None):
                 fy, fx1, fx2 = self._flash_range
                 if 0 <= fy < len(base_lines):
@@ -3406,6 +3412,7 @@ class ThemePreviewWidget(Static):
 
         if w != getattr(self, "_last_w", None) or num_rows != getattr(self, "_last_h", None):
             self._cached_base_lines = None
+            self._cached_strips = None
 
         if self._cached_base_lines is not None:
             if getattr(self, "_flash_range", None):
@@ -3898,6 +3905,24 @@ class ThemePreviewWidget(Static):
 
         return self._finalize_preview_lines(lines, styles, w)
 
+    def render_line(self, y: int) -> Strip:
+        """Render a single line of simulated preview directly as a Strip, bypassing Textual Rich-to-Content overhead."""
+        if self._cached_strips is None:
+            self.render()
+
+        if getattr(self, "_flash_range", None):
+            fy, fx1, fx2 = self._flash_range
+            if y == fy and self._cached_base_lines and 0 <= fy < len(self._cached_base_lines):
+                flashed_line = self._cached_base_lines[fy].copy()
+                flashed_line.stylize(Style(reverse=True), fx1, fx2)
+                console = bashmenu_ui.get_compositor_console(getattr(self, "_last_w", 56) + 3, 1)
+                return bashmenu_ui.text_to_strip(flashed_line, console)
+
+        if self._cached_strips and 0 <= y < len(self._cached_strips):
+            return self._cached_strips[y]
+        w_size = getattr(getattr(self, "size", None), "width", 0) or getattr(self, "_last_w", 56)
+        return Strip.blank(max(1, w_size))
+
 
 # ==============================================================================
 # MAIN THEME EDITOR SCREEN
@@ -4309,7 +4334,7 @@ class ThemeEditScreen(Screen):
 
     def apply_theme(self) -> None:
         """Apply configured theme styles to ThemeEditScreen and its subwidgets."""
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(Exception), self.app.batch_update():
             self.configured_theme_styles = bashmenu_ui.resolve_theme_dict(
                 getattr(self, "configured_theme_styles", None) or getattr(self.app, "theme_styles", None), self.app
             )
@@ -4722,6 +4747,8 @@ class ThemeEditScreen(Screen):
         inp = self._get_prop_input(message.primary)
         if inp and self.focused is inp:
             return
+        if getattr(self, "_last_focused_target", None) == message.primary:
+            return
         self.focus_inspector_target(message.primary)
 
     @on(events.MouseDown, "#preview_panel")
@@ -4873,6 +4900,7 @@ class ThemeEditScreen(Screen):
 
     def focus_inspector_target(self, target_id: str) -> None:
         """Scroll to and focus an inspector input widget by element ID, expanding its section if collapsed."""
+        self._last_focused_target = target_id
         _sec_id, hdr_id = self._resolve_target_section(target_id)
         with contextlib.suppress(Exception), self.app.batch_update():
             if hdr_id:
