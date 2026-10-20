@@ -2240,6 +2240,63 @@ class TestThemeEditor(unittest.TestCase):
         self.assertEqual(styles_a["title"].color.name, "color(196)")
         self.assertEqual(styles_b["title"].color.name, "color(46)")
 
+    def test_rgb_to_ansi256_and_ansi256_to_hex(self):
+        """Verify color conversion utilities between RGB and ANSI 256."""
+        self.assertIn(bashmenu_ui.rgb_to_ansi256(255, 255, 255), (15, 231))
+        self.assertIn(bashmenu_ui.rgb_to_ansi256(0, 0, 0), (0, 16))
+        self.assertIn(bashmenu_ui.rgb_to_ansi256(255, 0, 0), (9, 196))
+
+        hex_white = bashmenu_ui.ansi256_to_hex(15)
+        self.assertEqual(hex_white.lower(), "#ffffff")
+        hex_black = bashmenu_ui.ansi256_to_hex(0)
+        self.assertEqual(hex_black.lower(), "#000000")
+        self.assertEqual(bashmenu_ui.ansi256_to_hex(-1), "")
+        self.assertEqual(bashmenu_ui.ansi256_to_hex(999), "")
+
+    def test_theme_preview_sample_color_at(self):
+        """Verify ThemePreviewWidget.sample_color_at extracts token and color metadata."""
+        theme_dict = {
+            "window": {},
+            "256": {
+                "background": 0,
+                "text": 255,
+                "selection": [16, 152],
+            },
+        }
+        preview = themeedit.ThemePreviewWidget(theme_dict, theme_name="test_sample")
+        preview._last_w = 56
+        preview._last_h = 12
+        preview.render()
+
+        sample = preview.sample_color_at(12, 4)
+        self.assertIn("token", sample)
+        self.assertEqual(sample["cx"], 12)
+        self.assertEqual(sample["cy"], 4)
+
+    def test_preview_status_bar_dropper_updates_on_click(self):
+        """Verify clicking preview pane updates preview_status_bar with element color codes."""
+        async def run_checks():
+            app = themeedit.ThemeEditApp(theme_name="lighthouse")
+            async with app.run_test(size=(120, 40)) as pilot:
+                screen = app.screen
+                bar = screen.query_one("#preview_status_bar", themeedit.Static)
+                self.assertIn("Dropper", str(bar.render()))
+
+                # Click on option in preview
+                await pilot.click("#live_preview", offset=(12, 4))
+                rendered_opt = str(bar.render())
+                self.assertIn("💧", rendered_opt)
+                self.assertIn("text", rendered_opt)
+                self.assertIn("FG: 255", rendered_opt)
+
+                # Click on background in preview
+                await pilot.click("#live_preview", offset=(45, 10))
+                rendered_bg = str(bar.render())
+                self.assertIn("💧", rendered_bg)
+                self.assertIn("background", rendered_bg)
+
+        asyncio.run(run_checks())
+
 
 if __name__ == "__main__":
     unittest.main()

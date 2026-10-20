@@ -1693,6 +1693,23 @@ def parse_css_color(val) -> str | None:
     return None
 
 
+def rgb_to_ansi256(r: int, g: int, b: int) -> int:
+    """Find the nearest ANSI 256 color code for given RGB values."""
+    from rich.color_triplet import ColorTriplet
+
+    return EIGHT_BIT_PALETTE.match(
+        ColorTriplet(max(0, min(255, int(r))), max(0, min(255, int(g))), max(0, min(255, int(b))))
+    )
+
+
+def ansi256_to_hex(code: int) -> str:
+    """Return hex string '#rrggbb' for an ANSI 256 color code."""
+    if isinstance(code, int) and 0 <= code < 256:
+        trip = EIGHT_BIT_PALETTE[code]
+        return f"#{trip.red:02x}{trip.green:02x}{trip.blue:02x}"
+    return ""
+
+
 def resolve_theme_dict(theme_val=None, app=None) -> dict:
     """Resolve theme value (dict, string name, or app attribute) into a complete theme dictionary."""
     if isinstance(theme_val, dict) and theme_val:

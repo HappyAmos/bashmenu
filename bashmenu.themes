@@ -4548,7 +4548,8 @@ pinetree:
     image: assets/wallpapers/pinetree.png
     opacity: 0.5
     scaling: stretch
-    mode: quarterblock
+    mode: halfblock
+    clustering: 32
     quantization: 16
   divider:
     char: "\u2500"
@@ -4774,6 +4775,7 @@ moonrise:
     opacity: 0.5
     scaling: stretch
     mode: halfblock
+    clustering: 64
     quantization: 16
   divider:
     char: "\u2500"
@@ -5254,6 +5256,12 @@ lighthouse:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: COLOR_BLACK
     title:
@@ -5278,7 +5286,7 @@ lighthouse:
     - 236
     - COLOR_BLACK
     gutter:
-    - 237
+    - 0
     - -1
     selection:
     - 16
@@ -5302,10 +5310,10 @@ lighthouse:
     - 255
     - 40
     help_text:
-    - 68
+    - 45
     - -1
     plugin:
-    - 68
+    - 226
     - -1
     window_close_button:
     - 203
@@ -5681,6 +5689,9 @@ lighthouse:
     mode: quarterblock
     clustering: 0
     quantization: 1
+  divider:
+    char: "\u2500"
+    length: '{window_width}'
 skagway:
   marquee:
     char: "\u2022"
@@ -6814,3 +6825,227 @@ alaska-mountain:
   divider:
     char: "\u2500"
     length: '{window_width}'
+alaska-train:
+  marquee:
+    char: ' '
+    gap: 4
+  indicator: '{nf:>:#eee9:}'
+  divider:
+    char: "\u2500"
+    length: '{window_width}'
+  window:
+    border_horizontal: "\u2500"
+    border_vertical: "\u2502"
+    border_top_left: "\u250C"
+    border_top_right: "\u2510"
+    border_bottom_left: "\u2514"
+    border_bottom_right: "\u2518"
+    left_tee: "\u251C"
+    right_tee: "\u2524"
+    top_tee: "\u252C"
+    bottom_tee: "\u2534"
+    title_left_cap: '['
+    title_right_cap: ']'
+    gutter_border: "\u2500"
+    gutter_separator: "\u2502"
+    gutter_left_tee: "\u251C"
+    gutter_right_tee: "\u2524"
+    gutter_top_tee: "\u252C"
+    gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
+  256:
+    background: COLOR_BLACK
+    title:
+    - 255
+    - -1
+    border:
+    - 245
+    - -1
+    text:
+    - 252
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - 255
+    accent:
+    - 248
+    - -1
+    footer:
+    - 245
+    - -1
+    shadow:
+    - 235
+    - COLOR_BLACK
+    gutter:
+    - 239
+    - -1
+    selection:
+    - 232
+    - 250
+    shortcut_key:
+    - 255
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - 255
+    button_error:
+    - 255
+    - 240
+    button_cancel:
+    - 255
+    - 240
+    button_success:
+    - COLOR_BLACK
+    - 255
+    help_text:
+    - 250
+    - -1
+    plugin:
+    - 245
+    - -1
+    window_close_button:
+    - 255
+    - -1
+    scrollbar:
+    - 250
+    - 238
+    whitespace:
+    - 239
+    - -1
+  16:
+    background: COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - 8
+    - COLOR_BLACK
+    gutter:
+    - 8
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    help_text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - 8
+    - -1
+  8:
+    background: COLOR_BLACK
+    title:
+    - COLOR_WHITE
+    - -1
+    border:
+    - COLOR_WHITE
+    - -1
+    text:
+    - COLOR_WHITE
+    - -1
+    highlight:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    accent:
+    - COLOR_WHITE
+    - -1
+    footer:
+    - COLOR_WHITE
+    - -1
+    shadow:
+    - COLOR_BLACK
+    - COLOR_BLACK
+    gutter:
+    - COLOR_WHITE
+    - -1
+    selection:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    shortcut_key:
+    - COLOR_WHITE
+    - -1
+    divider:
+    - COLOR_WHITE
+    - -1
+    button_primary:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    button_error:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_cancel:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    button_success:
+    - COLOR_BLACK
+    - COLOR_WHITE
+    help_text:
+    - COLOR_WHITE
+    - -1
+    plugin:
+    - COLOR_WHITE
+    - -1
+    window_close_button:
+    - COLOR_WHITE
+    - -1
+    scrollbar:
+    - COLOR_WHITE
+    - COLOR_BLACK
+    whitespace:
+    - COLOR_WHITE
+    - -1
+  background:
+    image: assets/wallpapers/alaska-train.jpg
+    opacity: 0.5
+    scaling: stretch
+    mode: quarterblock

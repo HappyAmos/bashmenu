@@ -2522,10 +2522,11 @@ class ThemePreviewWidget(Static):
     class ElementClicked(Message):
         """Emitted when an interface element in the preview is clicked."""
 
-        def __init__(self, primary: str, secondary: str = "") -> None:
+        def __init__(self, primary: str, secondary: str = "", sample_info: dict | None = None) -> None:
             super().__init__()
             self.primary = primary
             self.secondary = secondary
+            self.sample_info = sample_info or {}
 
     def __init__(self, theme_dict: dict, theme_name: str = "custom", preview_mode: str = "menu", **kwargs):
         super().__init__(**kwargs)
@@ -2546,6 +2547,85 @@ class ThemePreviewWidget(Static):
         self._flash_timer = None
         self.refresh()
 
+    def sample_color_at(self, cx: int, cy: int) -> dict:
+        """Extract color details (token, style, hex, RGB, nearest ANSI 256, wallpaper pixels) at (cx, cy)."""
+        pos = (cx, cy)
+        hit = self._hit_map.get(pos)
+        if not hit and (
+            0 <= cx < getattr(self, "_last_w", 56) + 3 and 0 <= cy <= getattr(self, "_last_h", 12) + 5
+        ):
+            hit = ("color_background", "color_background")
+        if not hit:
+            hit = ("color_background", "color_background")
+
+        primary_key = hit[0]
+        token_name = primary_key.replace("color_", "")
+
+        # 1. Resolve configured value for this token from theme_dict
+        pal_256 = self.theme_dict.get(256) or self.theme_dict.get("256") or {}
+        raw_val = None
+        if isinstance(pal_256, dict):
+            if "__" in token_name:
+                sec, sub = token_name.split("__", 1)
+                sec_dict = pal_256.get(sec, {})
+                if isinstance(sec_dict, dict):
+                    raw_val = sec_dict.get(sub)
+            else:
+                raw_val = pal_256.get(token_name)
+
+        # 2. Extract character from _cached_base_lines
+        ch = " "
+        if self._cached_base_lines and 0 <= cy < len(self._cached_base_lines):
+            line = self._cached_base_lines[cy]
+            if 0 <= cx < len(line.plain):
+                ch = line.plain[cx]
+
+        # 3. Extract wallpaper pixel information if active
+        wp_top = None
+        wp_bot = None
+        wp_avg = None
+        grid = getattr(self, "_wallpaper_grid", None)
+        if grid and 0 <= cy < len(grid):
+            row_cache = grid[cy]
+            if 0 <= cx < len(row_cache):
+                half_style, bg_color_str = row_cache[cx]
+                if half_style and hasattr(half_style.color, "triplet") and half_style.color.triplet:
+                    t_top = half_style.color.triplet
+                    ansi_top = bashmenu_ui.rgb_to_ansi256(t_top.red, t_top.green, t_top.blue)
+                    wp_top = {
+                        "rgb": (t_top.red, t_top.green, t_top.blue),
+                        "hex": f"#{t_top.red:02x}{t_top.green:02x}{t_top.blue:02x}",
+                        "ansi": ansi_top,
+                    }
+                if half_style and hasattr(half_style.bgcolor, "triplet") and half_style.bgcolor.triplet:
+                    t_bot = half_style.bgcolor.triplet
+                    ansi_bot = bashmenu_ui.rgb_to_ansi256(t_bot.red, t_bot.green, t_bot.blue)
+                    wp_bot = {
+                        "rgb": (t_bot.red, t_bot.green, t_bot.blue),
+                        "hex": f"#{t_bot.red:02x}{t_bot.green:02x}{t_bot.blue:02x}",
+                        "ansi": ansi_bot,
+                    }
+                if bg_color_str and "rgb(" in bg_color_str:
+                    m = re.search(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", bg_color_str)
+                    if m:
+                        ar, ag, ab = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                        wp_avg = {
+                            "rgb": (ar, ag, ab),
+                            "hex": f"#{ar:02x}{ag:02x}{ab:02x}",
+                            "ansi": bashmenu_ui.rgb_to_ansi256(ar, ag, ab),
+                        }
+
+        return {
+            "token": token_name,
+            "raw_val": raw_val,
+            "char": ch,
+            "cx": cx,
+            "cy": cy,
+            "wp_top": wp_top,
+            "wp_bot": wp_bot,
+            "wp_avg": wp_avg,
+        }
+
     def _handle_element_selection(self, cx: int, cy: int) -> bool:
         """Handle coordinate selection on preview element, flash clicked item, and emit ElementClicked."""
         pos = (cx, cy)
@@ -2555,6 +2635,7 @@ class ThemePreviewWidget(Static):
         ):
             hit = ("color_background", "color_background")
         if hit:
+            sample_info = self.sample_color_at(cx, cy)
             # Determine contiguous element range on this row for haptic visual feedback
             target_key = hit[0]
             ey = cy
@@ -2574,10 +2655,12 @@ class ThemePreviewWidget(Static):
 
             with contextlib.suppress(Exception):
                 scr = self.screen
+                if hasattr(scr, "update_dropper_status"):
+                    scr.update_dropper_status(sample_info)
                 if hasattr(scr, "focus_inspector_target"):
                     scr.focus_inspector_target(hit[0])
 
-            self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1]))
+            self.post_message(self.ElementClicked(primary=hit[0], secondary=hit[1], sample_info=sample_info))
             return True
         return False
 
@@ -3272,6 +3355,7 @@ class ThemePreviewWidget(Static):
             return res_text
 
         if not allow_wallpaper:
+            self._wallpaper_grid = None
             out = Text()
             for idx, line in enumerate(lines):
                 out.append_text(line)
@@ -3283,6 +3367,7 @@ class ThemePreviewWidget(Static):
         has_bg_image = isinstance(bg_spec, dict) and bool(bg_spec.get("image"))
 
         if not has_bg_image:
+            self._wallpaper_grid = None
             out = Text()
             for idx, line in enumerate(lines):
                 out.append_text(line)
@@ -3319,6 +3404,7 @@ class ThemePreviewWidget(Static):
                 self._wallpaper_compositor = compositor
 
         if not compositor or not compositor._raw_image:
+            self._wallpaper_grid = None
             out = Text()
             for idx, line in enumerate(lines):
                 out.append_text(line)
@@ -3331,12 +3417,15 @@ class ThemePreviewWidget(Static):
         theme_default_bg = theme_bg_style.bgcolor if theme_bg_style else None
         grid = compositor.get_grid(w + 3, len(lines), theme_bg_rgb=theme_bg_rgb)
         if not grid:
+            self._wallpaper_grid = None
             out = Text()
             for idx, line in enumerate(lines):
                 out.append_text(line)
                 if idx < len(lines) - 1:
                     out.append("\n")
             return _finish(out)
+
+        self._wallpaper_grid = grid
 
         if dialog_bounds is None:
             raw_out = Text()
@@ -3986,6 +4075,15 @@ class ThemeEditScreen(Screen):
         padding: 0;
         align: left middle;
     }
+    #preview_status_bar {
+        dock: bottom;
+        height: 1;
+        width: 100%;
+        background: #1e1e24;
+        color: #8be9fd;
+        padding: 0 1;
+        text-style: bold;
+    }
     #inspector_panel {
         width: 1fr;
         height: 100%;
@@ -4462,6 +4560,17 @@ class ThemeEditScreen(Screen):
                             w.styles.scrollbar_background = css_sb_bg
 
             with contextlib.suppress(Exception):
+                sb = self.query_one("#preview_status_bar", Static)
+                if accent_style and accent_style.color and accent_style.color.name:
+                    css_sb_color = bashmenu_ui.parse_css_color(accent_style.color.name)
+                    if css_sb_color:
+                        sb.styles.color = css_sb_color
+                if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
+                    css_sb_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                    if css_sb_bg:
+                        sb.styles.background = css_sb_bg
+
+            with contextlib.suppress(Exception):
                 for sh in self.query(".section_header"):
                     sh.can_focus = True
 
@@ -4494,6 +4603,11 @@ class ThemeEditScreen(Screen):
                 )
                 yield ThemePreviewWidget(
                     self.current_theme, theme_name=self.theme_name, id="live_preview"
+                )
+                yield Static(
+                    "💧 [Dropper] Click preview elements or wallpaper to sample colors",
+                    id="preview_status_bar",
+                    markup=False,
                 )
 
             with VerticalScroll(id="inspector_panel"):
@@ -4741,9 +4855,63 @@ class ThemeEditScreen(Screen):
             w = event.size.width
         self.update_footer_layout(width=w)
 
+    def update_dropper_status(self, sample_info: dict) -> None:
+        """Update the preview panel dropper status bar with extracted color codes and element details."""
+        if not sample_info:
+            return
+        try:
+            bar = self.query_one("#preview_status_bar", Static)
+        except Exception:  # noqa: BLE001
+            return
+
+        token = sample_info.get("token", "unknown")
+        raw_val = sample_info.get("raw_val")
+        cx = sample_info.get("cx", 0)
+        cy = sample_info.get("cy", 0)
+        wp_top = sample_info.get("wp_top")
+        wp_bot = sample_info.get("wp_bot")
+        wp_avg = sample_info.get("wp_avg")
+        char = sample_info.get("char", " ")
+
+        parts = [f"💧 [{token}]"]
+
+        # Format token value
+        if raw_val is not None:
+            if isinstance(raw_val, list):
+                fg_v = raw_val[0] if len(raw_val) > 0 else -1
+                bg_v = raw_val[1] if len(raw_val) > 1 else -1
+                fg_hex = bashmenu_ui.ansi256_to_hex(fg_v) if isinstance(fg_v, int) else ""
+                bg_hex = bashmenu_ui.ansi256_to_hex(bg_v) if isinstance(bg_v, int) else ""
+                fg_disp = f"{fg_v} ({fg_hex})" if fg_hex else str(fg_v)
+                bg_disp = f"{bg_v} ({bg_hex})" if bg_hex else str(bg_v)
+                parts.append(f"FG: {fg_disp} | BG: {bg_disp}")
+            elif isinstance(raw_val, int):
+                val_hex = bashmenu_ui.ansi256_to_hex(raw_val)
+                parts.append(f"Color: {raw_val} ({val_hex})" if val_hex else f"Color: {raw_val}")
+            else:
+                parts.append(f"Val: {raw_val}")
+
+        # If wallpaper block was sampled
+        if wp_avg or wp_top or wp_bot:
+            if wp_top and wp_bot and char == "▀":
+                t_hex = wp_top["hex"]
+                t_ansi = wp_top["ansi"]
+                b_hex = wp_bot["hex"]
+                b_ansi = wp_bot["ansi"]
+                parts.append(f"WP Top: [{t_ansi}] {t_hex} | WP Bot: [{b_ansi}] {b_hex}")
+            elif wp_avg:
+                avg_hex = wp_avg["hex"]
+                avg_ansi = wp_avg["ansi"]
+                parts.append(f"WP Cell: [{avg_ansi}] {avg_hex}")
+
+        parts.append(f"({cx},{cy})")
+        bar.update(" | ".join(parts))
+
     @on(ThemePreviewWidget.ElementClicked)
     def on_preview_element_clicked(self, message: ThemePreviewWidget.ElementClicked) -> None:
         """Handle element click from live preview canvas and focus corresponding inspector property."""
+        if getattr(message, "sample_info", None):
+            self.update_dropper_status(message.sample_info)
         inp = self._get_prop_input(message.primary)
         if inp and self.focused is inp:
             return
@@ -4756,6 +4924,9 @@ class ThemeEditScreen(Screen):
         """Handle mouse down in preview panel margin area and select background color immediately."""
         if event.widget and getattr(event.widget, "id", None) == "preview_panel":
             self._panel_mouse_down_handled = True
+            with contextlib.suppress(Exception):
+                preview = self.query_one("#live_preview", ThemePreviewWidget)
+                self.update_dropper_status(preview.sample_color_at(0, 0))
             self.focus_inspector_target("color_background")
 
     @on(events.Click, "#preview_panel")
