@@ -62,7 +62,7 @@ HA Bash Menu is comprised of modular scripts and configuration files:
 
 | File | Description |
 | :--- | :--- |
-| `bashmenu.1` | Exhaustive terminal manual page for HA Bash Menu. |
+| `bashmenu.1` | Terminal manual page for HA Bash Menu. |
 
 ---
 
