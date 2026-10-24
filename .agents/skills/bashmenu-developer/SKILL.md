@@ -198,7 +198,7 @@ description: Core developer guidelines for the multi-platform BashMenu
   - Centralized Dump: Use `bashmenu.dump_menu_yaml()` with 2-space indented sequences.
 - **Visual Menu Editor (`menuedit.py`):**
   - Property Inspector: Full schema support (`alt_buffer`, `no_formatting`, `start_dir`, `picker`, `on_yes`/`on_no`, flags, extra properties). Uses scrollable `#inspector_panel` (`overflow-y: auto;`) and `#inspector_content` (`height: auto;`).
-  - Type Mutation (`Ctrl+T` / `[t]`): Reconfigure item types post-creation. Migrate payloads to target canonical keys (`command`, `script`, `editor` -> `file`, `config`/`toggle` -> `key`, `python`) and prune obsolete keys. Submenu transitions handle container initialization and tree refresh.
+  - Type Mutation (`Ctrl+T` / `[t]`): Reconfigure item types post-creation. Migrate payloads to target canonical keys (`command`, `script`, `editor` -> `file`, `config`/`toggle`/`radio` -> `key`, `python`) and prune obsolete keys. Submenu transitions handle container initialization and tree refresh.
   - Help Bar Footer: 2-line vertical container with two 1-line centered horizontal rows:
     - Row 1: `[a] Add`, `[e/ENTER] Edit`, `[t] Type`, `[SPACE] Toggle`, `[d] Delete`, `[m] Move Dn`, `[M] Move Up`.
     - Row 2: `[>] Indent`, `[<] Outdent`, `[CTRL+A] ASCII`, `[CTRL+P] Placeholders`, `[s] Save`, `[ESC/q] Exit`.

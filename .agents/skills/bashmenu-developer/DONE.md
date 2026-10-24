@@ -359,19 +359,37 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 
 ---
 
-### 30. Pager Binary Choice Editor: Default System $EDITOR vs BM Built-in Editor
-- **Item:** `- [x] FEATURE: Pager: add binary choice option to use "default" system $EDITOR or BM's built-in editor.`
+
+---
+
+### 31. Dynamic Placeholder Option Refresh on Menu Selection
+- **Item:** `- [x] BUG: Changing a value of the bashmenu.yml config file does not update a menu item that relies on it's value. Initiate line refresh across all placeholder-bearing menu items in the current menu after item action completes.`
+- **Root Cause:** In `MainMenuView`, frames are pre-baked onto an in-memory `PrebakedWallpaperCanvas` using static lines and pre-baked option lines. The cache key `canvas_key` did not incorporate a config version hash to maintain sub-millisecond arrow navigation. When modal dialogs or config callbacks updated `bashmenu.yml`, the canvas was not refreshed, leaving options containing placeholders (such as `{settings.pager_editor}`) displaying stale values.
+- **Fix:**
+  1. In `PrebakedWallpaperCanvas` (`bashmenu_ui.py`): Implemented `invalidate_option(opt_idx)` to evict raw unselected/selected option lines and cached composited Strips for a specific option index.
+  2. In `MainMenuView` (`bashmenu.py`): Implemented `refresh_menu_placeholders()`. Scans current menu items for `"{"` in their `label`, `title`, or `icon` (and `curr_menu["title"]`), evicts `_parsed_cache`, invalidates affected option rows on the canvas, re-renders raw lines using updated `self.config`, re-prebakes visible slots, and triggers widget refresh without full canvas teardown.
+  3. In `process_item_action` and `BashMenuScreen`: Dispatched `refresh_menu_placeholders()` on modal dismissal (`toggle_cb`, `radio_cb`, `input_cb`, `picker_cb`) and after synchronous action execution.
+- **Tests:** Added `test_refresh_menu_placeholders_updates_canvas` in `.tests/test_radio_and_placeholders.py`.
+
+---
+
+### 32. Radio Menu Item Type & Visual Menu Editor Integration
+- **Item:** `- [x] CRITICAL BUG: Replace 'choice' menu item type completely with 'radio'. Implement true radio-button interface (vertical list, (•)/( ) indicators, standard Select/Cancel buttons, keyboard/mouse nav). Update schema, eliminate 'choice' completely, integrate 'radio' type with full options configuration and badges into menuedit.py, update documentation, and update tests.`
 - **Design & Architecture:**
-  1. In `bashmenu.yml`: Added `settings.pager_editor: default` (`default` or `builtin`).
-  2. In `bashmenu.mnu`: Added interactive choice menu item under `Options & Settings -> Bashmenu Settings` displaying `Pager Text Editor [{settings.pager_editor}]`.
-  3. In `bashmenu_ui.py`: Implemented `ChoiceModalScreen(ModalScreen[str | None])` providing unified option selection with hotkeys (`1`, `2`, `d`, `b`, `ESC`) and styled buttons.
-  4. In `bashmenu.py`: Added `item_type in ["choice", "config_choice"]` handler in `process_item_action` persisting selection via `bashmenu.save_config`.
-  5. In `ymlcheck.py`: Added `"choice"` and `"config_choice"` to `VALID_OPTION_TYPES`.
-  6. In `scripts/pager.sh`:
-     - Added `--editor=default|builtin`, `--editor MODE`, `--builtin-editor`, and `--default-editor` CLI options.
-     - Added environment variable support (`BMPAGER_EDITOR` and `PAGER_EDITOR`).
-     - Added `get_configured_pager_editor()` which falls back to parsing `settings.pager_editor` from `bashmenu.yml`.
-     - In `open_in_editor()`: if mode is `builtin`, launches `"${PYTHON_BIN}" "${PROJECT_ROOT}/bashedit.py" "+${TOP_LINE}" "${target_file}"`; if `default`, launches `$VISUAL` / `$EDITOR` system fallbacks.
-  7. In `bashedit.py`: Added CLI support for `+<LINE>` argument and `line_number` in `BashEditApp` / `BashEditScreen` so launching from `pager.sh` at line N positions the cursor at line N.
-- **Tests:** Added `test_pager_binary_choice_editor_builtin` and `test_choice_modal_screen_dispatch` in `.tests/test_pager.py`. Verified `shellcheck scripts/pager.sh` passes with zero warnings.
+  1. *Schema Overhaul*: Eliminated `"choice"` and `"config_choice"` completely across the codebase. Replaced with canonical `"radio"` and `"config_radio"` in `ymlcheck.py`, `bashmenu.mnu`, `bashmenu.py`, `menuedit.py`, and documentation.
+  2. *Schema Validation (`ymlcheck.py`)*: Added validation rules ensuring `radio` items declare a valid `key` (or `action`) property and a non-empty `options` list.
+  3. *Radio Selection Dialog (`RadioModalScreen` in `bashmenu_ui.py`)*:
+     - Replaced button-bar layout with a clean vertical `RadioSet` containing `RadioButton` options.
+     - Pre-selects the option matching `current_value` in `bashmenu.yml`.
+     - Standardized bottom action buttons: `[ Select ]` (variant primary) and `[ Cancel ]` (variant default).
+     - Full keyboard navigation: Up/Down to navigate, Space to toggle, direct numeric hotkeys `1`–`9`, Enter to select and submit, Escape to cancel.
+  4. *Visual Menu Editor Integration (`menuedit.py`)*:
+     - Registered `[RAD]` badge in `TYPE_BADGES` and `radio` in `ITEM_TYPES`.
+     - Added `"radio": "key"` mapping in `action_type_map` and configured `get_action_label_text`.
+     - Added dedicated `container_radio_options` with `TextArea` in `ItemEditModal` that serializes options as `Label = Value` per line, parsing lines back into `options: [{"label": ..., "value": ...}]` on save.
+     - Updated Property Inspector (`update_inspector`) to display radio option summaries.
+     - Documented `radio` in `ITEM_EDIT_HELP_TEXT`.
+  5. *Documentation*: Documented `radio` in `bashmenu.1` man page and `SKILL.md`.
+- **Tests:** Added `test_radio_modal_preselects_current_value`, `test_radio_modal_number_shortcut_and_submit`, `test_radio_modal_cancel_returns_none`, `test_radio_badge_and_type_detection`, `test_radio_options_parsing_in_save`, `test_choice_is_invalid`, `test_radio_is_valid_type`, and `test_radio_missing_options_or_key_reports_error` in `.tests/test_radio_and_placeholders.py`. Updated `test_radio_modal_screen_dispatch` in `.tests/test_pager.py`.
+
 

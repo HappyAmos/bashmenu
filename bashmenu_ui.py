@@ -45,6 +45,8 @@ from textual.widgets import (
     Input,
     Label,
     OptionList,
+    RadioButton,
+    RadioSet,
     RichLog,
     Static,
     TextArea,
@@ -2222,6 +2224,17 @@ class PrebakedWallpaperCanvas:
         self._cached_gutter_lines.clear()
         self._cached_gutter_strips.clear()
 
+    def invalidate_option(self, opt_idx: int) -> None:
+        """Invalidate cached pre-baked raw lines and composited Strips for a specific option index."""
+        self._raw_option_lines.pop((opt_idx, False), None)
+        self._raw_option_lines.pop((opt_idx, True), None)
+        for k in list(self._option_line_cache.keys()):
+            if k[1] == opt_idx:
+                self._option_line_cache.pop(k, None)
+        for k in list(self._option_strip_cache.keys()):
+            if k[1] == opt_idx:
+                self._option_strip_cache.pop(k, None)
+
     def set_grid(
         self,
         grid: list[list[tuple[Style, str]]] | None,
@@ -3486,17 +3499,18 @@ class ToggleModalScreen(ModalScreen[str]):
         self.dismiss(None)
 
 
-class ChoiceModalScreen(ModalScreen[str | None]):
-    """Modal screen for binary or multiple option selection."""
+class RadioModalScreen(ModalScreen[str | None]):
+    """Modal screen presenting options with a radio-button selection interface."""
 
     DEFAULT_CSS = """
-    ChoiceModalScreen {
+    RadioModalScreen {
         align: center middle;
         background: rgba(0, 0, 0, 0.6);
     }
     #dialog {
-        width: 68;
+        width: 70;
         height: auto;
+        max-height: 28;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -3532,6 +3546,28 @@ class ChoiceModalScreen(ModalScreen[str | None]):
         text-align: center;
         margin-bottom: 1;
     }
+    #radio_scroll {
+        width: 100%;
+        height: auto;
+        max-height: 12;
+        margin-bottom: 1;
+        border: none;
+        background: transparent;
+    }
+    RadioSet {
+        width: 100%;
+        height: auto;
+        background: transparent;
+        border: none;
+        padding: 0;
+    }
+    RadioButton {
+        width: 100%;
+        height: auto;
+        background: transparent;
+        padding: 0 1;
+        margin: 0;
+    }
     #buttons {
         align: center middle;
         height: auto;
@@ -3549,11 +3585,15 @@ class ChoiceModalScreen(ModalScreen[str | None]):
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("escape", "cancel", "Cancel"),
         Binding("c", "cancel", "Cancel", show=False),
-        Binding("1", "select_opt_0", "Option 1", show=False),
-        Binding("2", "select_opt_1", "Option 2", show=False),
-        Binding("3", "select_opt_2", "Option 3", show=False),
-        Binding("d", "select_default", "Default", show=False),
-        Binding("b", "select_builtin", "Built-in", show=False),
+        Binding("1", "select_opt_1", "Option 1", show=False),
+        Binding("2", "select_opt_2", "Option 2", show=False),
+        Binding("3", "select_opt_3", "Option 3", show=False),
+        Binding("4", "select_opt_4", "Option 4", show=False),
+        Binding("5", "select_opt_5", "Option 5", show=False),
+        Binding("6", "select_opt_6", "Option 6", show=False),
+        Binding("7", "select_opt_7", "Option 7", show=False),
+        Binding("8", "select_opt_8", "Option 8", show=False),
+        Binding("9", "select_opt_9", "Option 9", show=False),
     ]
 
     def __init__(
@@ -3561,12 +3601,14 @@ class ChoiceModalScreen(ModalScreen[str | None]):
         title: str,
         message: str,
         choices: list[tuple[str, str]] | None = None,
+        current_value: str | None = None,
         theme: dict | None = None,
     ):
         super().__init__()
         self.modal_title = title
         self.message = message
         self.choices = choices or [("default", "Default ($EDITOR)"), ("builtin", "Built-in (BashEdit)")]
+        self.current_value = current_value
         self.theme = theme or {}
 
     def compose(self) -> ComposeResult:
@@ -3582,24 +3624,25 @@ class ChoiceModalScreen(ModalScreen[str | None]):
                         else formatting_to_rich_text(str(self.message), theme=self.theme)
                     )
                     yield Static(content, id="message")
-                    with Horizontal(id="buttons"):
+                    with VerticalScroll(id="radio_scroll"), RadioSet(id="radio_group"):
+                        has_match = any(val == self.current_value for val, _ in self.choices)
                         for idx, (val, lbl) in enumerate(self.choices):
-                            variant = "primary" if idx == 0 else ("success" if idx == 1 else "default")
-                            yield Button(f"[{idx+1}] {lbl}", variant=variant, id=f"btn_choice_{idx}")
+                            is_sel = (val == self.current_value) if has_match else (idx == 0)
+                            yield RadioButton(f"[{idx+1}] {lbl}", value=is_sel, id=f"rb_{idx}")
+                    with Horizontal(id="buttons"):
+                        yield Button("Select [ENTER]", variant="primary", id="btn_select")
                         yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
-                    footer_items = [f"[{idx+1}] {lbl}" for idx, (_, lbl) in enumerate(self.choices)]
-                    footer_items.append("[ESC] Cancel")
-                    yield Label(" | ".join(footer_items), id="footer", markup=False)
+                    yield Label("[UP/DN]: Navigate | [SPACE]: Toggle | [1-9]: Direct | [ENTER]: Select | [ESC]: Cancel", id="footer", markup=False)
                 yield ShadowWidget(id="shadow_right")
             yield ShadowWidget(id="shadow_bottom")
 
     def on_mount(self) -> None:
         apply_modal_theme(self, self.theme)
         with contextlib.suppress(Exception):
-            for idx in range(len(self.choices)):
-                b_type = "button_primary" if idx == 0 else ("button_success" if idx == 1 else "button_default")
-                apply_button_theme(self.query_one(f"#btn_choice_{idx}", Button), self.theme, b_type)
+            apply_button_theme(self.query_one("#btn_select", Button), self.theme, "button_primary")
             apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+            rg = self.query_one("#radio_group", RadioSet)
+            rg.focus()
 
     def on_click(self, event) -> None:
         widget = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -3607,43 +3650,68 @@ class ChoiceModalScreen(ModalScreen[str | None]):
             self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        btn_id = event.button.id or ""
-        if btn_id.startswith("btn_choice_"):
-            try:
-                idx = int(btn_id.split("_")[-1])
-                if 0 <= idx < len(self.choices):
-                    self.dismiss(self.choices[idx][0])
-                    return
-            except (ValueError, IndexError):
-                pass
+        if event.button.id == "btn_select":
+            self.action_submit()
+        else:
+            self.dismiss(None)
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            cancel_btn = self.query_one("#btn_cancel", Button)
+            if cancel_btn.has_focus:
+                self.dismiss(None)
+                event.prevent_default()
+                event.stop()
+                return
+            self.action_submit()
+            event.prevent_default()
+            event.stop()
+
+    def action_submit(self) -> None:
+        with contextlib.suppress(Exception):
+            rg = self.query_one("#radio_group", RadioSet)
+            idx = rg.pressed_index
+            if 0 <= idx < len(self.choices):
+                self.dismiss(self.choices[idx][0])
+                return
         self.dismiss(None)
 
     def action_cancel(self) -> None:
         self.dismiss(None)
 
-    def action_select_opt_0(self) -> None:
-        if len(self.choices) > 0:
-            self.dismiss(self.choices[0][0])
+    def _select_index(self, idx: int) -> None:
+        if 0 <= idx < len(self.choices):
+            with contextlib.suppress(Exception):
+                rb = self.query_one(f"#rb_{idx}", RadioButton)
+                rb.value = True
+                self.set_focus(rb, scroll_visible=False)
 
     def action_select_opt_1(self) -> None:
-        if len(self.choices) > 1:
-            self.dismiss(self.choices[1][0])
+        self._select_index(0)
 
     def action_select_opt_2(self) -> None:
-        if len(self.choices) > 2:
-            self.dismiss(self.choices[2][0])
+        self._select_index(1)
 
-    def action_select_default(self) -> None:
-        for val, _ in self.choices:
-            if val == "default":
-                self.dismiss("default")
-                return
+    def action_select_opt_3(self) -> None:
+        self._select_index(2)
 
-    def action_select_builtin(self) -> None:
-        for val, _ in self.choices:
-            if val in ("builtin", "bm", "bashedit"):
-                self.dismiss(val)
-                return
+    def action_select_opt_4(self) -> None:
+        self._select_index(3)
+
+    def action_select_opt_5(self) -> None:
+        self._select_index(4)
+
+    def action_select_opt_6(self) -> None:
+        self._select_index(5)
+
+    def action_select_opt_7(self) -> None:
+        self._select_index(6)
+
+    def action_select_opt_8(self) -> None:
+        self._select_index(7)
+
+    def action_select_opt_9(self) -> None:
+        self._select_index(8)
 
 
 class InputModalScreen(ModalScreen[str]):

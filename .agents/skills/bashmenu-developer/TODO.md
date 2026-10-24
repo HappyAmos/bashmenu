@@ -1,4 +1,6 @@
 
+- [x] BUG: Changing a value of the bashmenu.yml config file does not update a menu item that relies on it's value. Initiate line refresh across all placeholder-bearing menu items in the current menu after item action completes.
+- [x] CRITICAL BUG: Replace "choice" menu item type completely with "radio" type. Implement true radio-button interface (vertical list, (•)/( ) indicators, standard Select/Cancel buttons, keyboard/mouse nav). Update schema, eliminate "choice" completely, integrate "radio" type with full options configuration and badges into menuedit.py, update documentation, and update tests.
 - [x] BUG: When cursor is at the last character at the bottom of the text area editing a "note", particularly when an autocomplete "- [ ]" is created, the window doesn't automatically adjust to the newly added line, forcing the user to arrow down to the next line.
 - [x] FEATURE: Add the option to rename a "note" in a notebook. Rename with the keyboard shortcut <m>.
 - [x] FEATURE: Pager: add binary choice option to use "default" system $EDITOR or BM's built-in editor.

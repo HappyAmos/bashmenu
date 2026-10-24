@@ -4768,9 +4768,9 @@ moonrise:
     image: assets/wallpapers/moonrise.png
     opacity: 0.8
     scaling: stretch
-    mode: halfblock
-    clustering: 64
-    quantization: 8
+    mode: quarterblock
+    clustering: 128
+    quantization: 16
   divider:
     char: "\u2500"
     length: '{window_width}'

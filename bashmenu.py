@@ -2739,6 +2739,92 @@ class MainMenuView(Widget):
 
         canvas._canvas_key = canvas_key
 
+    def refresh_menu_placeholders(self) -> None:
+        """Re-evaluate all placeholders in the current menu's options and title,
+        updating pre-baked canvas lines without a full layout reflow.
+        """
+        canvas = getattr(self, "_canvas", None)
+        if canvas is None:
+            return
+
+        curr_menu = self.current_menu()
+        options = curr_menu.get("items", curr_menu.get("options", []))
+        if not options:
+            return
+
+        w = max(40, self.size.width or 80)
+        h = max(10, self.size.height or 24)
+        theme_name = self.config.get("theme", "dracula")
+        theme_styles = getattr(self, "theme_styles", None) or bashmenu_ui.init_theme_colors(theme_name)
+        borders = bashmenu_ui.get_theme_window_borders(theme_name, config=self.config)
+        div_cfg = get_effective_divider_config(self.config)
+        length_val = div_cfg.get("length", "{window_width}")
+        is_screen = any("screen_width" in str(k) for k in length_val) if isinstance(length_val, dict) else "screen_width" in str(length_val)
+
+        avail_w = max(20, w - 6)
+        screen_div_w = max(20, w - 2)
+        visible_option_rows = getattr(self, "visible_option_rows", max(1, h - 5 - 1))
+        extra_vars = {"window_width": avail_w, "screen_width": screen_div_w, "window_height": visible_option_rows}
+
+        # 1. Update menu title if it contains placeholders
+        raw_menu_title = curr_menu.get("title", "HA Bash Menu")
+        if "{" in str(raw_menu_title):
+            border_style = theme_styles.get("border", Style(color="blue"))
+            title_style = theme_styles.get("title", Style(color="magenta", bold=True))
+            cap_style = theme_styles.get("title_cap") or theme_styles.get("title") or title_style
+            b_tl = borders.get("border_top_left", "┌")
+            b_tr = borders.get("border_top_right", "┐")
+            b_h_top = borders.get("border_horizontal_top", borders.get("border_horizontal", "─"))
+            title_l_cap = borders.get("title_left_cap", " ") or " "
+            title_r_cap = borders.get("title_right_cap", " ") or " "
+
+            title_raw = interpolate_placeholders(raw_menu_title, self.config, extra_vars=extra_vars, trigger_toasts=False)
+            title_body = f" {title_raw} "
+            title_full = f"{title_l_cap}{title_body}{title_r_cap}"
+            title_len = get_visible_len(title_full, self.config)
+            left_b = max(2, (w - title_len) // 2)
+            right_b = max(2, w - left_b - title_len)
+
+            top_bar = Text(b_tl + b_h_top * max(0, left_b - 1), style=border_style)
+            top_bar.append(title_l_cap, style=cap_style)
+            top_bar.append_text(bashmenu_ui.formatting_to_rich_text(title_body, default_style=title_style, theme=theme_styles))
+            top_bar.append(title_r_cap, style=cap_style)
+            top_bar.append(b_h_top * max(0, right_b - 1) + b_tr, style=border_style)
+            canvas.set_static_line(0, top_bar)
+
+        # 2. Update placeholder-bearing options
+        indicator_symbol = resolve_glyph(interpolate_placeholders(theme_styles.get("indicator", ">"), self.config, trigger_toasts=False), self.config)
+        shortcut_map = getattr(self, "_shortcut_map", {})
+        scroll_start = self.current_scroll_offset()
+
+        updated_any = False
+        for idx, opt in enumerate(options):
+            if is_divider(opt):
+                continue
+            lbl = opt.get("label") or opt.get("title") or ""
+            icon_raw = opt.get("icon") or opt.get("glyph") or ""
+            if "{" in str(lbl) or "{" in str(icon_raw) or opt.get("set_theme"):
+                opt.pop("_parsed_cache", None)
+                canvas.invalidate_option(idx)
+                sc_char = shortcut_map.get(idx, "")
+                line_unsel = self._render_raw_option_line(
+                    idx, opt, False, sc_char, avail_w, screen_div_w, extra_vars, theme_styles, borders, div_cfg, is_screen, indicator_symbol
+                )
+                canvas.set_raw_option_line(idx, False, line_unsel)
+                line_sel = self._render_raw_option_line(
+                    idx, opt, True, sc_char, avail_w, screen_div_w, extra_vars, theme_styles, borders, div_cfg, is_screen, indicator_symbol
+                )
+                canvas.set_raw_option_line(idx, True, line_sel)
+
+                if scroll_start <= idx < scroll_start + visible_option_rows:
+                    y = 3 + (idx - scroll_start)
+                    canvas.prebake_option(y, idx, False)
+                    canvas.prebake_option(y, idx, True)
+                updated_any = True
+
+        if updated_any or "{" in str(raw_menu_title):
+            self.refresh()
+
     def _render_raw_gutter_lines(
         self,
         help_lines: list[str],
@@ -3484,6 +3570,7 @@ def process_item_action(screen, item, config):
         screen.menu_view.theme_styles = new_styles
         if hasattr(screen, "app") and screen.app:
             screen.app.theme_styles = new_styles
+        screen.menu_view.refresh_menu_placeholders()
         screen.menu_view.refresh()
         if hasattr(screen, "_update_plugin_buffer_geometry"):
             screen._update_plugin_buffer_geometry()
@@ -3529,11 +3616,12 @@ def process_item_action(screen, item, config):
                     set_config_value(config, key_path, res == "true")
                     save_config(config)
                     screen.menu_view.config = config
+                    screen.menu_view.refresh_menu_placeholders()
                     screen.menu_view.refresh()
 
             screen.app.push_screen(bashmenu_ui.ToggleModalScreen(title, msg), toggle_cb)
 
-    elif item_type in ["choice", "config_choice"]:
+    elif item_type in ["radio", "config_radio"]:
         key_path = item.get("key", "")
         if key_path:
             title = item.get("title", item.get("label", "Choose Setting"))
@@ -3551,15 +3639,21 @@ def process_item_action(screen, item, config):
                 else:
                     choices_list.append((str(c), str(c)))
 
-            def choice_cb(res):
+            current_val = str(get_config_value(config, key_path, ""))
+
+            def radio_cb(res):
                 if res is not None:
                     set_config_value(config, key_path, res)
                     save_config(config)
                     screen.menu_view.config = config
+                    screen.menu_view.refresh_menu_placeholders()
                     screen.menu_view.refresh()
 
             theme = getattr(screen.app, "theme_styles", getattr(screen, "theme_styles", None))
-            screen.app.push_screen(bashmenu_ui.ChoiceModalScreen(title, msg, choices=choices_list, theme=theme), choice_cb)
+            screen.app.push_screen(
+                bashmenu_ui.RadioModalScreen(title, msg, choices=choices_list, current_value=current_val, theme=theme),
+                radio_cb,
+            )
 
     elif item_type == "config":
         key_path = item.get("key", "")
@@ -3576,6 +3670,7 @@ def process_item_action(screen, item, config):
                         set_config_value(config, key_path, chosen_path)
                         save_config(config)
                         screen.menu_view.config = config
+                        screen.menu_view.refresh_menu_placeholders()
                         screen.menu_view.refresh()
 
                 screen.app.push_screen(
@@ -3603,6 +3698,7 @@ def process_item_action(screen, item, config):
                         set_config_value(config, key_path, parsed)
                         save_config(config)
                         screen.menu_view.config = config
+                        screen.menu_view.refresh_menu_placeholders()
                         screen.menu_view.refresh()
 
                 screen.app.push_screen(
@@ -4187,6 +4283,9 @@ class BashMenuScreen(Screen):
             mv.set_current_row(target_idx)
             item = opts[target_idx]
             process_item_action(self, item, mv.config)
+            t = item.get("type", "command")
+            if t not in ("submenu", "notebook", "exit", "back"):
+                mv.refresh_menu_placeholders()
 
     def on_mouse_scroll_down(self, event) -> None:
         mv = getattr(self, "menu_view", None)
@@ -4247,6 +4346,9 @@ class BashMenuScreen(Screen):
         if 0 <= curr_row < len(opts):
             item = opts[curr_row]
             process_item_action(self, item, mv.config)
+            t = item.get("type", "command")
+            if t not in ("submenu", "notebook", "exit", "back"):
+                mv.refresh_menu_placeholders()
 
     def action_go_back(self) -> None:
         mv = self.menu_view

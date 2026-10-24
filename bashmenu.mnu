@@ -10,8 +10,8 @@ items:
           - Convert Image To BM Wallpaper:
               type: command
               icon: '{nf::#f11e7}'
-              command: convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}" -resize
-                80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
+              command: convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}"
+                -resize 80x48\! -blur 0x0.5 +dither -colors 16 -scale 480x360\! "{file_picker:stem}.pixel.png"
               prompt: 'Convert image to BM friendly wallpaper:'
               start_dir: ~/Pictures
               interactive: true
@@ -51,7 +51,7 @@ items:
               alt_buffer: true
           - Toast Test:
               type: script
-              script: '{toast:2:"Hello, world. {date_time_24_short}"}'
+              script: '{toast:2:"Hello, world. {date_time_24_short} Using theme: {theme}"}'
               interactive: true
               quiet: false
               alt_buffer: true
@@ -543,14 +543,6 @@ items:
                       title: Toggle Auto Update
                       message: Enable automatic updates?
                       icon: '{nf::#ea77}'
-                  - Enable Backgrounds [{settings.background.enabled}]:
-                      type: toggle
-                      key: '{settings.background.enabled}'
-                      prompt: Enable backgrounds?
-                      interactive: true
-                      quiet: false
-                      alt_buffer: true
-                      icon: '{nf::#f0e09}'
                   - Enable Nerd Fonts [{settings.use_nerd_fonts}]:
                       type: toggle
                       key: settings.use_nerd_fonts
@@ -576,9 +568,9 @@ items:
                       prompt: 'Enter tabstop distance (spaces per TAB press):'
                       icon: '{nf::#ee10}'
                   - Pager Text Editor [{settings.pager_editor}]:
-                      type: choice
+                      type: radio
                       key: settings.pager_editor
-                      title: Configure Pager Text Editor
+                      title: Pager Text Editor [{settings.pager_editor}]
                       prompt: 'Select editor launched when pressing [e] in pager:'
                       options:
                         - label: Default System Editor ($EDITOR)
@@ -586,6 +578,10 @@ items:
                         - label: Built-in Editor (BashEdit)
                           value: builtin
                       icon: '{nf::#f044}'
+                      action: settings.pager_editor
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
                   - Configure Status Gutter [{settings.status_gutter}]:
                       type: config
                       key: settings.status_gutter

@@ -118,7 +118,7 @@ VALID_WINDOW_BORDER_KEYS = {
 
 # Permitted option types in bashmenu.mnu
 VALID_OPTION_TYPES = {
-    "command", "script", "submenu", "config", "toggle", "editor", "choice", "config_choice",
+    "command", "script", "submenu", "config", "toggle", "editor", "radio", "config_radio",
     "confirm", "message", "popup", "info", "python", "inject_block",
     "theme_selector", "notebook", "{divider}", "back", "exit", "action"
 }
@@ -503,6 +503,13 @@ def _validate_menu_items(items: list[Any], path: str, errors: list[str]) -> None
             if not is_div and item_type not in VALID_OPTION_TYPES and "submenu" not in props:
                 errors.append(f"'{item_path}.{label}': Unknown item type '{item_type}'.")
 
+            if item_type in ("radio", "config_radio"):
+                if "key" not in props and "action" not in props:
+                    errors.append(f"'{item_path}.{label}': Radio item requires a 'key' property.")
+                options = props.get("options")
+                if not options or not isinstance(options, list):
+                    errors.append(f"'{item_path}.{label}': Radio item requires a non-empty 'options' list.")
+
             if item_type == "submenu" or "submenu" in props:
                 sub = props.get("submenu")
                 if isinstance(sub, dict):
@@ -515,6 +522,13 @@ def _validate_menu_items(items: list[Any], path: str, errors: list[str]) -> None
             is_div = opt_type == "{divider}" or (isinstance(opt_type, dict) and "divider" in opt_type)
             if not is_div and opt_type not in VALID_OPTION_TYPES and "submenu" not in raw:
                 errors.append(f"'{item_path}': Unknown option type '{opt_type}'.")
+
+            if opt_type in ("radio", "config_radio"):
+                if "key" not in raw and "action" not in raw:
+                    errors.append(f"'{item_path}': Radio item requires a 'key' property.")
+                options = raw.get("options")
+                if not options or not isinstance(options, list):
+                    errors.append(f"'{item_path}': Radio item requires a non-empty 'options' list.")
 
             if opt_type == "submenu" or "submenu" in raw:
                 sub = raw.get("submenu")

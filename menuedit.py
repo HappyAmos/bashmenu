@@ -25,7 +25,16 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.screen import ModalScreen, Screen
 from textual.timer import Timer
-from textual.widgets import Button, Checkbox, Input, Label, OptionList, Static, Tree
+from textual.widgets import (
+    Button,
+    Checkbox,
+    Input,
+    Label,
+    OptionList,
+    Static,
+    TextArea,
+    Tree,
+)
 from textual.widgets.option_list import Option
 
 import bashmenu
@@ -45,6 +54,7 @@ TYPE_BADGES = {
     "script": "[SCR]",
     "config": "[CFG]",
     "toggle": "[TGL]",
+    "radio": "[RAD]",
     "editor": "[EDT]",
     "confirm": "[CNF]",
     "message": "[MSG]",
@@ -63,6 +73,7 @@ ITEM_TYPES = [
     ("script", "Script File (runs script from app folder)"),
     ("config", "Config Setting (edits bashmenu.yml value)"),
     ("toggle", "Settings Toggle (True/False/Cancel toggle modal)"),
+    ("radio", "Radio Setting (select option from radio modal)"),
     ("editor", "File Editor (opens file in built-in editor)"),
     ("notebook", "Notebook Menu (notes collection file)"),
     ("confirm", "Confirm Dialog (Yes/No/Cancel dialog)"),
@@ -118,6 +129,14 @@ ITEM_EDIT_HELP_TEXT = """\
            before an input/confirm step or {param} modal.
   Usage:   message/info/popup store as message; others as prompt.
   Example: prompt: "Enter hostname or IP to test:"
+
+[bold cyan]Radio Options[/bold cyan]  (options)  [radio]
+  Purpose: Selectable choices presented in a radio dialog modal.
+  Usage:   Configured as 'Label = value' per line (or just 'value').
+           Persists the chosen value to the setting key in bashmenu.yml.
+  Example:
+           Default System Editor ($EDITOR) = default
+           Built-in Editor (BashEdit) = builtin
 
 [bold cyan]Template Path[/bold cyan]  (template)  [inject_block]
   Purpose: Source file whose contents are injected.
@@ -755,11 +774,17 @@ class ItemEditModal(ModalScreen[dict]):
         color: $text;
         text-style: bold;
     }
-    #container_divider, #container_standard {
+    #container_divider, #container_standard, #container_radio_options {
         height: auto;
         padding: 0;
         margin: 0;
         margin-right: 1;
+    }
+    .radio_options_text {
+        height: 6;
+        min-height: 4;
+        max-height: 8;
+        margin-bottom: 1;
     }
     Input {
         height: auto;
@@ -854,6 +879,8 @@ class ItemEditModal(ModalScreen[dict]):
             return t
         if "submenu" in item:
             return "submenu"
+        if "options" in item and ("key" in item or "action" in item):
+            return "radio"
         if "command" in item:
             return "command"
         if "script" in item:
@@ -881,6 +908,7 @@ class ItemEditModal(ModalScreen[dict]):
             "editor": "File to Edit (file):",
             "config": "Configuration Key (key):",
             "toggle": "Configuration Key (key):",
+            "radio": "Configuration Key (key):",
             "python": "Python Expression / Routine (python):",
             "submenu": "Submenu Action / Submenu Title:",
         }
@@ -906,6 +934,19 @@ class ItemEditModal(ModalScreen[dict]):
         block_id_val = self.item.get("block_id", "")
         start_dir_val = self.item.get("start_dir", "")
         tabstop_val = str(self.item.get("tabstop", 4))
+
+        raw_opts = self.item.get("options") or []
+        opt_lines = []
+        for opt in raw_opts:
+            if isinstance(opt, dict):
+                lbl = opt.get("label", opt.get("value", ""))
+                val = opt.get("value", "")
+                opt_lines.append(f"{lbl} = {val}" if lbl != val else str(val))
+            elif isinstance(opt, (list, tuple)) and len(opt) >= 2:
+                opt_lines.append(f"{opt[1]} = {opt[0]}")
+            else:
+                opt_lines.append(str(opt))
+        radio_text = "\n".join(opt_lines)
         if self.item.get("stream"):
             initial_mode_idx = 0
         elif self.item.get("quiet"):
@@ -948,6 +989,10 @@ class ItemEditModal(ModalScreen[dict]):
 
                             yield Label("Message / Prompt Text:", classes="field_label")
                             yield Input(value=str(prompt_val), id="inp_prompt")
+
+                            with Vertical(id="container_radio_options"):
+                                yield Label("Radio Options (one per line, e.g. 'Label = value' or 'value'):", classes="field_label", id="lbl_radio_options")
+                                yield TextArea(radio_text, id="inp_radio_options", classes="radio_options_text")
 
                             yield Label("Template Path (inject_block):", classes="field_label")
                             with Horizontal(classes="field_row"):
@@ -1021,9 +1066,11 @@ class ItemEditModal(ModalScreen[dict]):
 
     def update_type_visibility(self) -> None:
         is_div = self.current_type in ("divider", "{divider}")
+        is_radio = self.current_type in ("radio", "config_radio")
         with contextlib.suppress(Exception):
             self.query_one("#container_divider", Vertical).display = is_div
             self.query_one("#container_standard", Vertical).display = not is_div
+            self.query_one("#container_radio_options", Vertical).display = is_radio
         if is_div:
             self.update_divider_preview()
         else:
@@ -1199,6 +1246,7 @@ class ItemEditModal(ModalScreen[dict]):
             "script": "script",
             "editor": "file",
             "toggle": "key",
+            "radio": "key",
             "config": "key",
             "python": "python",
         }
@@ -1270,6 +1318,26 @@ class ItemEditModal(ModalScreen[dict]):
             self.item["tabstop"] = int(new_tabstop)
         elif not new_tabstop:
             self.item.pop("tabstop", None)
+
+        if item_type in ("radio", "config_radio"):
+            with contextlib.suppress(Exception):
+                raw_lines = self.query_one("#inp_radio_options", TextArea).text.splitlines()
+                parsed_opts = []
+                for line in raw_lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if "=" in line:
+                        lbl, val = line.split("=", 1)
+                        parsed_opts.append({"label": lbl.strip(), "value": val.strip()})
+                    elif ":" in line:
+                        lbl, val = line.split(":", 1)
+                        parsed_opts.append({"label": lbl.strip(), "value": val.strip()})
+                    else:
+                        parsed_opts.append({"label": line, "value": line})
+                self.item["options"] = parsed_opts
+        elif "options" in self.item and item_type not in ("submenu",):
+            self.item.pop("options", None)
 
         mode_container = self.query_one("#exec_mode_container", ExecModeContainer)
         if mode_container.selected_mode_idx == 0:  # Streaming
@@ -2389,6 +2457,17 @@ class MenuEditScreen(Screen):
             if "submenu" in item:
                 sub_opts = item.get("submenu", {}).get("items", item.get("submenu", {}).get("options", []))
                 lines.append(f"[bold magenta]Submenu Items:[/bold magenta] {len(sub_opts)} items")
+
+            if "options" in item and item_type in ("radio", "config_radio"):
+                opts = item["options"]
+                if isinstance(opts, list):
+                    opt_summaries = []
+                    for o in opts:
+                        if isinstance(o, dict):
+                            opt_summaries.append(f"{o.get('label', o.get('value'))} ({o.get('value')})")
+                        else:
+                            opt_summaries.append(str(o))
+                    lines.append(f"[bold magenta]Radio Options:[/bold magenta] {', '.join(opt_summaries)}")
 
             known_keys = {
                 "type",

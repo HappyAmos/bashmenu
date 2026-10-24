@@ -1011,28 +1011,31 @@ class TestPagerScript(unittest.IsolatedAsyncioTestCase):
             if os.path.exists(mock_py):
                 os.remove(mock_py)
 
-    async def test_choice_modal_screen_dispatch(self):
-        """Verify ChoiceModalScreen renders options and dismisses with the selected choice."""
+    async def test_radio_modal_screen_dispatch(self):
+        """Verify RadioModalScreen renders options and dismisses with the selected choice."""
         from textual.app import App
 
         import bashmenu_ui
 
         results = []
 
-        class ChoiceApp(App):
+        class RadioApp(App):
             def on_mount(self):
-                screen = bashmenu_ui.ChoiceModalScreen(
+                screen = bashmenu_ui.RadioModalScreen(
                     "Pager Editor",
                     "Choose editor mode:",
                     choices=[("default", "Default ($EDITOR)"), ("builtin", "Built-in (BashEdit)")],
+                    current_value="default",
                 )
                 self.push_screen(screen, lambda res: results.append(res))
 
-        app = ChoiceApp()
+        app = RadioApp()
         async with app.run_test() as pilot:
             await pilot.pause()
-            # Press '2' to select builtin
+            # Press '2' to select builtin, then Enter to submit
             await pilot.press("2")
+            await pilot.pause()
+            await pilot.press("enter")
             await pilot.pause()
             self.assertEqual(results, ["builtin"])
 
