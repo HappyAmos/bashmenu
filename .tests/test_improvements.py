@@ -1074,6 +1074,45 @@ class TestImprovements(unittest.TestCase):
         self.assertIn("Title / Label", menuedit.ITEM_EDIT_HELP_TEXT)
         self.assertIn("alt_buffer", menuedit.ITEM_EDIT_HELP_TEXT)
 
+    def test_menuedit_item_edit_modal_footer_layout_fits_and_spaces_equally(self):
+        """Verify ItemEditModal two-line footer fits all badges without overflowing and spaces them equally."""
+        import asyncio
+
+        import menuedit
+
+        async def run_check():
+            app = menuedit.MenuEditApp("bashmenu.yml")
+            async with app.run_test(size=(100, 30)) as pilot:
+                await pilot.pause()
+                modal = menuedit.ItemEditModal({"type": "command", "title": "Test", "command": "ls"})
+                app.push_screen(modal)
+                await pilot.pause()
+
+                footer = modal.query_one("#footer")
+                rows = list(footer.query(".footer_row"))
+                self.assertEqual(len(rows), 2)
+
+                row0_items = [str(w.render()) for w in rows[0].query(".footer_item")]
+                row1_items = [str(w.render()) for w in rows[1].query(".footer_item")]
+                self.assertEqual(
+                    row0_items,
+                    ["[F1] Help", "[CTRL+S / F2] Save", "[CTRL+T] Type", "[CTRL+A / F3] ASCII"],
+                )
+                self.assertEqual(
+                    row1_items,
+                    ["[CTRL+N / F4] Glyphs", "[CTRL+P / F5] Placeholders", "[ESC / C] Cancel"],
+                )
+
+                for row in rows:
+                    children = list(row.children)
+                    self.assertEqual(children[0].region.x, row.region.x)
+                    self.assertLessEqual(children[-1].region.right, row.region.right)
+                    self.assertEqual(children[-1].region.right, row.region.right)
+                    for item in list(row.query(".footer_item"))[:-1]:
+                        self.assertGreater(item.styles.margin.right, 0)
+
+        asyncio.run(run_check())
+
 
     def test_editor_theme_background_color_inversion_and_contrast(self):
         """Test editor color pair inversion and neutral contrast against theme background."""

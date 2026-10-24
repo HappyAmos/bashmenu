@@ -832,16 +832,16 @@ class ItemEditModal(ModalScreen[dict]):
     #footer {
         height: 2;
         width: 100%;
-        align: center middle;
+        align: left middle;
         margin-top: 1;
     }
     .footer_row {
         height: 1;
         width: 100%;
-        align: center middle;
+        align: left middle;
     }
     .footer_item {
-        padding: 0 1;
+        padding: 0 0;
         color: $accent;
     }
     .footer_item:hover {
@@ -849,6 +849,7 @@ class ItemEditModal(ModalScreen[dict]):
         color: $text;
     }
     .footer_sep {
+        padding: 0 0;
         color: $text-muted;
     }
     """
@@ -1045,9 +1046,9 @@ class ItemEditModal(ModalScreen[dict]):
                             yield Label("[CTRL+S / F2] Save", id="lbl_modal_save", classes="footer_item", markup=False)
                             yield Label("|", classes="footer_sep", markup=False)
                             yield Label("[CTRL+T] Type", id="lbl_modal_type", classes="footer_item", markup=False)
-                        with Horizontal(classes="footer_row"):
-                            yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
                             yield Label("|", classes="footer_sep", markup=False)
+                            yield Label("[CTRL+A / F3] ASCII", id="lbl_modal_ascii", classes="footer_item", markup=False)
+                        with Horizontal(classes="footer_row"):
                             yield Label("[CTRL+N / F4] Glyphs", id="lbl_modal_glyphs", classes="footer_item", markup=False)
                             yield Label("|", classes="footer_sep", markup=False)
                             yield Label("[CTRL+P / F5] Placeholders", id="lbl_modal_placeholders", classes="footer_item", markup=False)
@@ -1056,6 +1057,64 @@ class ItemEditModal(ModalScreen[dict]):
                 yield bashmenu_ui.ShadowWidget(id="shadow_right")
             yield bashmenu_ui.ShadowWidget(id="shadow_bottom")
 
+    def update_footer_layout(self, width: int | None = None) -> None:
+        """Distribute modal footer keyboard shortcut labels and pipe separators equally across both footer rows."""
+        with contextlib.suppress(Exception):
+            footer = self.query_one("#footer")
+            w = width
+            if w is None or w <= 0:
+                if hasattr(footer, "size") and footer.size and footer.size.width > 0:
+                    w = footer.size.width
+                else:
+                    term_w = 0
+                    if hasattr(self, "size") and self.size and self.size.width > 0:
+                        term_w = self.size.width
+                    elif hasattr(self, "app") and self.app and hasattr(self.app, "size") and self.app.size and self.app.size.width > 0:
+                        term_w = self.app.size.width
+                    if term_w > 0:
+                        dialog_w = min(86, int(term_w * 0.95))
+                        w = max(40, dialog_w - 6)
+                    else:
+                        w = 80
+
+            rows = list(footer.query(".footer_row"))
+            for row in rows:
+                items = list(row.query(".footer_item"))
+                seps = list(row.query(".footer_sep"))
+                if not items:
+                    continue
+                num_items = len(items)
+                if num_items == 1:
+                    items[0].styles.margin = (0, 0, 0, 0)
+                    continue
+
+                item_lens = []
+                for it in items:
+                    t = str(it.renderable) if hasattr(it, "renderable") else ""
+                    item_lens.append(len(t) if t else len(getattr(it, "content", "")))
+
+                tot_text = sum(item_lens) + len(seps)
+                num_gaps = num_items - 1
+                rem = max(0, w - tot_text)
+                base_gap = rem // num_gaps
+                extra = rem % num_gaps
+
+                for i, it in enumerate(items):
+                    if i < num_gaps:
+                        total_gap = base_gap + (1 if i < extra else 0)
+                        left_gap = total_gap // 2
+                        right_gap = total_gap - left_gap
+                        it.styles.margin = (0, left_gap, 0, 0)
+                        if i < len(seps):
+                            seps[i].styles.margin = (0, right_gap, 0, 0)
+                    else:
+                        it.styles.margin = (0, 0, 0, 0)
+
+    def on_resize(self, event=None) -> None:
+        """Adjust modal footer keyboard shortcut spacing responsively on terminal resize."""
+        self.update_footer_layout()
+        self.call_after_refresh(self.update_footer_layout)
+
     def on_mount(self) -> None:
         bashmenu_ui.apply_modal_theme(self, self.theme)
         with contextlib.suppress(Exception):
@@ -1063,6 +1122,8 @@ class ItemEditModal(ModalScreen[dict]):
             bashmenu_ui.apply_button_theme(self.query_one("#btn_cancel", Button), theme=self.theme, button_type="button_cancel")
             bashmenu_ui.apply_button_theme(self.query_one("#btn_change_type", Button), theme=self.theme, button_type="button_primary")
         self.update_type_visibility()
+        self.update_footer_layout()
+        self.call_after_refresh(self.update_footer_layout)
 
     def update_type_visibility(self) -> None:
         is_div = self.current_type in ("divider", "{divider}")
