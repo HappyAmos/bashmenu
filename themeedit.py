@@ -73,6 +73,32 @@ ANSI_16_RGB = {
     15: ("COLOR_BRIGHT_WHITE", (255, 255, 255)),
 }
 
+ANSI_NAME_TO_IDX: dict[str, int] = {name: idx for idx, (name, _) in ANSI_16_RGB.items()}
+
+
+def color_val_to_256_code(val: Any) -> int | str:
+    """Convert any theme color value (int, numeric str, or ANSI constant) to its 256-color integer code (or -1)."""
+    if val is None:
+        return -1
+    if isinstance(val, int):
+        return val
+    s = str(val).strip()
+    if s in ("-1", "inherit", "transparent", "None", ""):
+        return -1
+    if s.lstrip("-").isdigit():
+        return int(s)
+    s_upper = s.upper()
+    if s_upper in ANSI_NAME_TO_IDX:
+        return ANSI_NAME_TO_IDX[s_upper]
+    c_obj = bashmenu_ui.parse_color_val(s)
+    if c_obj is not None:
+        if getattr(c_obj, "number", None) is not None:
+            return int(c_obj.number)
+        if getattr(c_obj, "triplet", None) is not None:
+            t = c_obj.triplet
+            return bashmenu_ui.rgb_to_ansi256(t.red, t.green, t.blue)
+    return s
+
 # CP437 mapping for decoding extended ASCII codes in bashmenu
 UNICODE_TO_CP437: dict[str, int] = {}
 for _b in range(256):
@@ -2573,12 +2599,53 @@ class ThemePreviewWidget(Static):
             else:
                 raw_val = pal_256.get(token_name)
 
-        # 2. Extract character from _cached_base_lines
+        # 2. Extract character and rendered style from _cached_base_lines
         ch = " "
+        cell_fg = None
+        cell_bg = None
         if self._cached_base_lines and 0 <= cy < len(self._cached_base_lines):
             line = self._cached_base_lines[cy]
             if 0 <= cx < len(line.plain):
                 ch = line.plain[cx]
+            with contextlib.suppress(Exception):
+                console = bashmenu_ui.get_compositor_console(
+                    getattr(self, "_last_w", 56) + 3, len(self._cached_base_lines)
+                )
+                c_style = line.get_style_at_offset(console, cx)
+                if c_style:
+                    cell_fg = c_style.color
+                    cell_bg = c_style.bgcolor
+
+        # Resolve fallback background and foreground colors if None
+        if cell_bg is None or cell_fg is None:
+            bg_raw = None
+            fg_raw = None
+            if isinstance(pal_256, dict):
+                if self.preview_mode == "menu_editor" and isinstance(pal_256.get("menu_editor"), dict):
+                    bg_raw = pal_256["menu_editor"].get("background")
+                    fg_raw = pal_256["menu_editor"].get("text")
+                elif self.preview_mode == "text_editor" and isinstance(pal_256.get("editor"), dict):
+                    bg_raw = pal_256["editor"].get("background")
+                    fg_raw = pal_256["editor"].get("text")
+                elif self.preview_mode == "modals" and isinstance(pal_256.get("modals"), dict):
+                    bg_raw = pal_256["modals"].get("background")
+                    fg_raw = pal_256["modals"].get("text")
+                if bg_raw is None:
+                    bg_raw = pal_256.get("background")
+                if fg_raw is None:
+                    fg_raw = pal_256.get("text")
+            if cell_bg is None:
+                if isinstance(bg_raw, list) and len(bg_raw) >= 2:
+                    bg_raw = bg_raw[1] if bg_raw[1] != -1 else bg_raw[0]
+                cell_bg = bashmenu_ui.parse_color_val(bg_raw) if bg_raw not in (None, -1, "-1") else None
+                if cell_bg is None:
+                    cell_bg = "black"
+            if cell_fg is None:
+                if isinstance(fg_raw, list) and len(fg_raw) >= 1:
+                    fg_raw = fg_raw[0]
+                cell_fg = bashmenu_ui.parse_color_val(fg_raw) if fg_raw not in (None, -1, "-1") else None
+                if cell_fg is None:
+                    cell_fg = "white"
 
         # 3. Extract wallpaper pixel information if active
         wp_top = None
@@ -2594,7 +2661,6 @@ class ThemePreviewWidget(Static):
                     ansi_top = bashmenu_ui.rgb_to_ansi256(t_top.red, t_top.green, t_top.blue)
                     wp_top = {
                         "rgb": (t_top.red, t_top.green, t_top.blue),
-                        "hex": f"#{t_top.red:02x}{t_top.green:02x}{t_top.blue:02x}",
                         "ansi": ansi_top,
                     }
                 if half_style and hasattr(half_style.bgcolor, "triplet") and half_style.bgcolor.triplet:
@@ -2602,7 +2668,6 @@ class ThemePreviewWidget(Static):
                     ansi_bot = bashmenu_ui.rgb_to_ansi256(t_bot.red, t_bot.green, t_bot.blue)
                     wp_bot = {
                         "rgb": (t_bot.red, t_bot.green, t_bot.blue),
-                        "hex": f"#{t_bot.red:02x}{t_bot.green:02x}{t_bot.blue:02x}",
                         "ansi": ansi_bot,
                     }
                 if bg_color_str and "rgb(" in bg_color_str:
@@ -2611,7 +2676,6 @@ class ThemePreviewWidget(Static):
                         ar, ag, ab = int(m.group(1)), int(m.group(2)), int(m.group(3))
                         wp_avg = {
                             "rgb": (ar, ag, ab),
-                            "hex": f"#{ar:02x}{ag:02x}{ab:02x}",
                             "ansi": bashmenu_ui.rgb_to_ansi256(ar, ag, ab),
                         }
 
@@ -2621,6 +2685,8 @@ class ThemePreviewWidget(Static):
             "char": ch,
             "cx": cx,
             "cy": cy,
+            "cell_fg": cell_fg,
+            "cell_bg": cell_bg,
             "wp_top": wp_top,
             "wp_bot": wp_bot,
             "wp_avg": wp_avg,
@@ -4123,7 +4189,7 @@ class ThemeEditScreen(Screen):
     }
     #preview_status_bar {
         dock: bottom;
-        height: 1;
+        height: 2;
         width: 100%;
         background: #1e1e24;
         color: #8be9fd;
@@ -4907,11 +4973,14 @@ class ThemeEditScreen(Screen):
         if event is not None and hasattr(event, "size") and event.size:
             w = event.size.width
         self.update_footer_layout(width=w)
+        if getattr(self, "_last_dropper_sample", None):
+            self.update_dropper_status(self._last_dropper_sample)
 
     def update_dropper_status(self, sample_info: dict) -> None:
-        """Update the preview panel dropper status bar with extracted color codes and element details."""
+        """Update the 2-line preview panel dropper status bar with equally distributed 256-color badges and swatches."""
         if not sample_info:
             return
+        self._last_dropper_sample = sample_info
         try:
             bar = self.query_one("#preview_status_bar", Static)
         except Exception:  # noqa: BLE001
@@ -4925,40 +4994,88 @@ class ThemeEditScreen(Screen):
         wp_bot = sample_info.get("wp_bot")
         wp_avg = sample_info.get("wp_avg")
         char = sample_info.get("char", " ")
+        cell_fg = sample_info.get("cell_fg")
+        cell_bg = sample_info.get("cell_bg")
 
-        parts = [f"💧 [{token}]"]
+        badges: list[Text] = [Text(f"💧 [{token}]")]
 
-        # Format token value
+        # Format token value using only 256-color codes
         if raw_val is not None:
             if isinstance(raw_val, list):
-                fg_v = raw_val[0] if len(raw_val) > 0 else -1
-                bg_v = raw_val[1] if len(raw_val) > 1 else -1
-                fg_hex = bashmenu_ui.ansi256_to_hex(fg_v) if isinstance(fg_v, int) else ""
-                bg_hex = bashmenu_ui.ansi256_to_hex(bg_v) if isinstance(bg_v, int) else ""
-                fg_disp = f"{fg_v} ({fg_hex})" if fg_hex else str(fg_v)
-                bg_disp = f"{bg_v} ({bg_hex})" if bg_hex else str(bg_v)
-                parts.append(f"FG: {fg_disp} | BG: {bg_disp}")
-            elif isinstance(raw_val, int):
-                val_hex = bashmenu_ui.ansi256_to_hex(raw_val)
-                parts.append(f"Color: {raw_val} ({val_hex})" if val_hex else f"Color: {raw_val}")
+                fg_v = color_val_to_256_code(raw_val[0]) if len(raw_val) > 0 else -1
+                bg_v = color_val_to_256_code(raw_val[1]) if len(raw_val) > 1 else -1
+                badges.append(Text(f"FG: {fg_v}"))
+                badges.append(Text(f"BG: {bg_v}"))
             else:
-                parts.append(f"Val: {raw_val}")
+                c_v = color_val_to_256_code(raw_val)
+                badges.append(Text(f"Color: {c_v}"))
 
-        # If wallpaper block was sampled
+        # If wallpaper block was sampled, show only 256-color codes
         if wp_avg or wp_top or wp_bot:
             if wp_top and wp_bot and char == "▀":
-                t_hex = wp_top["hex"]
                 t_ansi = wp_top["ansi"]
-                b_hex = wp_bot["hex"]
                 b_ansi = wp_bot["ansi"]
-                parts.append(f"WP Top: [{t_ansi}] {t_hex} | WP Bot: [{b_ansi}] {b_hex}")
+                badges.append(Text(f"WP Top: {t_ansi}"))
+                badges.append(Text(f"WP Bot: {b_ansi}"))
             elif wp_avg:
-                avg_hex = wp_avg["hex"]
                 avg_ansi = wp_avg["ansi"]
-                parts.append(f"WP Cell: [{avg_ansi}] {avg_hex}")
+                badges.append(Text(f"WP Cell: {avg_ansi}"))
 
-        parts.append(f"({cx},{cy})")
-        bar.update(" | ".join(parts))
+        # Live [Top: Dropper] and [Bot: Dropper] color swatches
+        top_swatch_style = Style(color=cell_fg, bgcolor=cell_bg) if (cell_fg or cell_bg) else Style()
+        bot_swatch_style = Style(color=cell_bg, bgcolor=cell_fg) if (cell_fg or cell_bg) else Style()
+
+        top_badge = Text("[Top: ")
+        top_badge.append("Dropper", style=top_swatch_style)
+        top_badge.append("]")
+        badges.append(top_badge)
+
+        bot_badge = Text("[Bot: ")
+        bot_badge.append("Dropper", style=bot_swatch_style)
+        bot_badge.append("]")
+        badges.append(bot_badge)
+
+        badges.append(Text(f"({cx},{cy})"))
+
+        # Determine available inner width of the status bar (accounting for horizontal padding 0 1)
+        bar_w = bar.size.width if (getattr(bar, "size", None) and bar.size.width > 0) else 0
+        if bar_w <= 0:
+            with contextlib.suppress(Exception):
+                panel_w = self.query_one("#preview_panel").size.width
+                if panel_w > 0:
+                    bar_w = panel_w - 2
+        if bar_w <= 0:
+            scr_w = self.size.width if (getattr(self, "size", None) and self.size.width > 0) else 120
+            bar_w = (scr_w // 2) - 2
+        avail_w = max(20, bar_w - 2)
+
+        def _format_row(row_badges: list[Text]) -> Text:
+            line = Text()
+            n = len(row_badges)
+            if n == 0:
+                return line
+            if n == 1:
+                line.append_text(row_badges[0])
+                return line
+            num_gaps = n - 1
+            tot_text = sum(b.cell_len for b in row_badges) + num_gaps
+            rem = max(num_gaps * 2, avail_w - tot_text)
+            base_gap = rem // num_gaps
+            extra = rem % num_gaps
+            for i, b in enumerate(row_badges):
+                line.append_text(b)
+                if i < num_gaps:
+                    total_gap = base_gap + (1 if i < extra else 0)
+                    left_gap = max(1, total_gap // 2)
+                    right_gap = max(1, total_gap - left_gap)
+                    line.append(" " * left_gap + "|" + " " * right_gap)
+            return line
+
+        mid = (len(badges) + 1) // 2
+        row1 = _format_row(badges[:mid])
+        row2 = _format_row(badges[mid:])
+        status_text = Text.assemble(row1, "\n", row2)
+        bar.update(status_text)
 
     @on(ThemePreviewWidget.ElementClicked)
     def on_preview_element_clicked(self, message: ThemePreviewWidget.ElementClicked) -> None:

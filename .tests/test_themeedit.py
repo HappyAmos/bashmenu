@@ -2254,11 +2254,11 @@ class TestThemeEditor(unittest.TestCase):
         self.assertEqual(bashmenu_ui.ansi256_to_hex(999), "")
 
     def test_theme_preview_sample_color_at(self):
-        """Verify ThemePreviewWidget.sample_color_at extracts token and color metadata."""
+        """Verify ThemePreviewWidget.sample_color_at extracts token, cell_fg, cell_bg, and color metadata."""
         theme_dict = {
             "window": {},
             "256": {
-                "background": 0,
+                "background": "COLOR_BLACK",
                 "text": 255,
                 "selection": [16, 152],
             },
@@ -2272,28 +2272,49 @@ class TestThemeEditor(unittest.TestCase):
         self.assertIn("token", sample)
         self.assertEqual(sample["cx"], 12)
         self.assertEqual(sample["cy"], 4)
+        self.assertIsNotNone(sample.get("cell_fg"))
+        self.assertIsNotNone(sample.get("cell_bg"))
+        # Verify color_val_to_256_code resolves named ANSI constants and integers
+        self.assertEqual(themeedit.color_val_to_256_code("COLOR_BLACK"), 0)
+        self.assertEqual(themeedit.color_val_to_256_code("COLOR_BRIGHT_WHITE"), 15)
+        self.assertEqual(themeedit.color_val_to_256_code(255), 255)
+        self.assertEqual(themeedit.color_val_to_256_code(-1), -1)
 
     def test_preview_status_bar_dropper_updates_on_click(self):
-        """Verify clicking preview pane updates preview_status_bar with element color codes."""
+        """Verify clicking preview pane updates 2-line preview_status_bar with 256-color codes and [Top: Dropper] / [Bot: Dropper] swatches."""
         async def run_checks():
             app = themeedit.ThemeEditApp(theme_name="lighthouse")
             async with app.run_test(size=(120, 40)) as pilot:
                 screen = app.screen
                 bar = screen.query_one("#preview_status_bar", themeedit.Static)
+                self.assertEqual(bar.styles.height.value, 2)
                 self.assertIn("Dropper", str(bar.render()))
 
                 # Click on option in preview
                 await pilot.click("#live_preview", offset=(12, 4))
-                rendered_opt = str(bar.render())
-                self.assertIn("💧", rendered_opt)
-                self.assertIn("text", rendered_opt)
-                self.assertIn("FG: 255", rendered_opt)
+                bar_renderable = bar.render()
+                rendered_opt = str(bar_renderable)
+                opt_lines = rendered_opt.splitlines()
+                self.assertEqual(len(opt_lines), 2)
+                self.assertIn("💧 [text]", opt_lines[0])
+                self.assertIn("FG: 255", opt_lines[0])
+                self.assertIn("BG: -1", opt_lines[0])
+                self.assertNotIn("#", rendered_opt)
+                self.assertIn("[Top: Dropper]", opt_lines[1])
+                self.assertIn("[Bot: Dropper]", opt_lines[1])
+                # Verify styled spans exist on the Rich Text status bar for "Dropper"
+                if hasattr(bar_renderable, "spans"):
+                    self.assertGreaterEqual(len(bar_renderable.spans), 2)
 
                 # Click on background in preview
                 await pilot.click("#live_preview", offset=(45, 10))
                 rendered_bg = str(bar.render())
-                self.assertIn("💧", rendered_bg)
-                self.assertIn("background", rendered_bg)
+                bg_lines = rendered_bg.splitlines()
+                self.assertEqual(len(bg_lines), 2)
+                self.assertIn("💧 [background]", bg_lines[0])
+                self.assertNotIn("#", rendered_bg)
+                self.assertIn("[Top: Dropper]", rendered_bg)
+                self.assertIn("[Bot: Dropper]", rendered_bg)
 
         asyncio.run(run_checks())
 

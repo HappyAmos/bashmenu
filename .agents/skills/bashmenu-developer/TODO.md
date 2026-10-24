@@ -1,4 +1,5 @@
 
+- [x] FEATURE/UI: Theme editor dropper status bar: display only 256-color codes (no hex/ANSI names) and add live "[Top: Dropper]" and "[Bot: Dropper]" swatches styled with the clicked character cell's foreground and background colors.
 - [x] BUG: Synchronize Menu Editor, Text Editor, and Modals theme colors with Theme Editor mock previews (fix orange $accent header bar / $panel status bar / footer background leak when token bgcolor is -1, and inherit section backgrounds in mock previews).
 - [x] BUG: Marquee not working when hovering over overflowing menu items (e.g. "Configure Status Gutter"). Fix screen stack depth check in _tick_marquee and MarqueeLabel._on_tick.
 - [x] BUG: Changing a value of the bashmenu.yml config file does not update a menu item that relies on it's value. Initiate line refresh across all placeholder-bearing menu items in the current menu after item action completes.
