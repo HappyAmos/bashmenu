@@ -50,17 +50,13 @@ notebook:
           \ pairs in the text widget, even though it requires a single color value.\n\
           - [x] RESPONSIVENESS: Theme editor preview item selection lag: significant\
           \ blocking delay until focus lands on color field in property inspector.\n\
-          - [ ] FEATURE: Add the option to rename a \"note\" in a notebook. Rename\
-          \ with the keyboard shortcut <m>.\n- [ ] FEATURE: Add an option to auto-change\
-          \ themes, based on timed delay.\n- [ ] FEATURE: Create photo-scroll screen\
-          \ saver.\n- [ ] FEATURE: Pager: add binary choice option to use \"default\"\
-          \ editor or BM's built-in editor.\n- [ ] FEATURE: Scrolling todo notes is\
-          \ really slow.\n- [ ] FEATURE: Launching the theme editor has a delay before\
-          \ it actually opens, investigate a fix.\n- [ ] BUG: When cursor is at the\
-          \ last character at the bottom of the text area editing a \"note\", particularly\
-          \ when an autocomplete \"- [ ]\" is created, the window doesn't automatically\
-          \ adjust to the newly added line, forcing the user to arrow down to the\
-          \ next line."
+          - [x] FEATURE: Add the option to rename a \"note\" in a notebook. Rename\
+          \ with the keyboard shortcut <m>.\n- [x] FEATURE: Pager: add binary choice\
+          \ option to use \"default\" system $EDITOR or BM's built-in editor.\n- [\
+          x] BUG: When cursor is at the last character at the bottom of the text area\
+          \ editing a \"note\", particularly when an autocomplete \"- [ ]\" is created,\
+          \ the window doesn't automatically adjust to the newly added line, forcing\
+          \ the user to arrow down to the next line."
     - 'Project TODO (no agent):':
         type: note
         format: markdown

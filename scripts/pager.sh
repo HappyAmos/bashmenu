@@ -33,6 +33,7 @@ STRIP_COLORS=0
 SHOW_HELP=1
 ALLOW_FILE=1
 HAVE_FILES=0
+PAGER_EDITOR_MODE=""
 START_LINE=""
 START_PATTERN=""
 SPOOL=""
@@ -67,13 +68,15 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Detect Python interpreter (virtualenv, project .venv, or system)
-PYTHON_BIN=""
-if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python3" ]; then
-    PYTHON_BIN="${VIRTUAL_ENV}/bin/python3"
-elif [ -x "${PROJECT_ROOT}/.venv/bin/python3" ]; then
-    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
-elif command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN="$(command -v python3)"
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [ -z "${PYTHON_BIN}" ]; then
+    if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "${VIRTUAL_ENV}/bin/python3" ]; then
+        PYTHON_BIN="${VIRTUAL_ENV}/bin/python3"
+    elif [ -x "${PROJECT_ROOT}/.venv/bin/python3" ]; then
+        PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
+    elif command -v python3 >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python3)"
+    fi
 fi
 
 # ------------------------------------------------------------------ utilities
@@ -102,6 +105,7 @@ Options:
   -c, --no-color    Discard ANSI escape sequences instead of rendering them.
   --no-help         Omit the shortcut hints from the command bar.
   --no-file         Do not show filename badge or allow editing current file.
+  --editor=MODE     Editor mode: 'default' (\$EDITOR) or 'builtin' (BashEdit).
   --max-lines=N     Store at most N input lines (default ${MAX_LINES}).
   --file=PATH       Associated file path to open when editing piped streams.
   --reload-cmd=CMD  Command to refresh spool after editing piped streams.
@@ -564,8 +568,36 @@ get_editor() {
     fi
 }
 
+get_configured_pager_editor() {
+    # 1. Explicit CLI argument override if set
+    if [ -n "${PAGER_EDITOR_MODE:-}" ]; then
+        printf '%s' "${PAGER_EDITOR_MODE}"
+        return 0
+    fi
+    # 2. Environment variable overrides
+    if [ -n "${BMPAGER_EDITOR:-}" ]; then
+        printf '%s' "${BMPAGER_EDITOR}"
+        return 0
+    fi
+    if [ -n "${PAGER_EDITOR:-}" ]; then
+        printf '%s' "${PAGER_EDITOR}"
+        return 0
+    fi
+    # 3. Read settings.pager_editor from bashmenu.yml if present
+    local conf="${PROJECT_ROOT}/bashmenu.yml"
+    if [ -f "${conf}" ]; then
+        local val
+        val="$(awk -F: '/^[[:space:]]*pager_editor:[[:space:]]*/ {gsub(/[[:space:]"\x27]/, "", \$2); print \$2; exit}' "${conf}" 2>/dev/null || true)"
+        if [ -n "${val}" ]; then
+            printf '%s' "${val}"
+            return 0
+        fi
+    fi
+    printf 'default'
+}
+
 open_in_editor() {
-    # Launch the user's default text editor on the current file, positioned at TOP_LINE.
+    # Launch the user's default text editor or BM built-in editor on current file, positioned at TOP_LINE.
     if [ "${ALLOW_FILE}" != "1" ]; then
         MESSAGE="editing disabled"
         return 0
@@ -581,12 +613,8 @@ open_in_editor() {
         return 0
     fi
 
-    local editor=""
-    editor="$(get_editor)"
-    if [ -z "${editor}" ]; then
-        MESSAGE="no editor found (set \$EDITOR or \$VISUAL)"
-        return 0
-    fi
+    local choice
+    choice="$(get_configured_pager_editor)"
 
     # Temporarily restore the terminal for interactive editor execution.
     printf '%s' "${ESC}[0m"
@@ -595,10 +623,27 @@ open_in_editor() {
     tput rmcup 2>/dev/null || printf '%s' "${ESC}[?1049l"
     stty "${STTY_ORIG}" < /dev/tty 2>/dev/null
 
-    if [ "${HAVE_FILES}" -gt 1 ]; then
-        ${editor} "${FILES[@]}" < /dev/tty > /dev/tty 2>&1 || :
+    if [ "${choice}" = "builtin" ] || [ "${choice}" = "bm" ] || [ "${choice}" = "bashedit" ]; then
+        local py_bin="${PYTHON_BIN:-python3}"
+        local editor_script="${PROJECT_ROOT}/bashedit.py"
+        if [ -f "${editor_script}" ]; then
+            "${py_bin}" "${editor_script}" "+${TOP_LINE}" "${target_file}" < /dev/tty > /dev/tty 2>&1 || :
+        else
+            MESSAGE="built-in editor not found: ${editor_script}"
+        fi
     else
-        ${editor} "+${TOP_LINE}" "${target_file}" < /dev/tty > /dev/tty 2>&1 || :
+        local editor=""
+        editor="$(get_editor)"
+        if [ -z "${editor}" ]; then
+            MESSAGE="no editor found (set \$EDITOR or \$VISUAL)"
+            term_setup
+            return 0
+        fi
+        if [ "${HAVE_FILES}" -gt 1 ]; then
+            ${editor} "${FILES[@]}" < /dev/tty > /dev/tty 2>&1 || :
+        else
+            ${editor} "+${TOP_LINE}" "${target_file}" < /dev/tty > /dev/tty 2>&1 || :
+        fi
     fi
 
     # Re-initialize the alternate screen and raw input mode for the pager.
@@ -1011,8 +1056,8 @@ show_help_modal() {
         "                     - Internal section anchors (#anchor)"
         ""
         "  Editor Integration"
-        "    e, E             Open file in \$EDITOR or \$VISUAL (nano, vim, vi)"
-        "                     positioned at current line; reloads automatically"
+        "    e, E             Open file in editor (default system \$EDITOR or"
+        "                     BM built-in editor); reloads automatically"
         ""
         "  Help & Exit"
         "    h, ?, F1         Open / close this scrolling help modal"
@@ -1026,6 +1071,7 @@ show_help_modal() {
         "  -c, --no-color     Strip all ANSI escape codes from display"
         "  --no-help          Omit shortcut hints from the command bar"
         "  --no-file          Disable editor launch and filename badge"
+        "  --editor=MODE      Editor: 'default' (\$EDITOR) or 'builtin' (BashEdit)"
         "  --max-lines=N      Maximum lines to buffer (default: 1,000,000)"
         "  --file=PATH        Target file to associate with piped input"
         "  --reload-cmd=CMD   Command to refresh spool after editing"
@@ -1219,6 +1265,11 @@ parse_args() {
             -c|--no-color|--no-colour) STRIP_COLORS=1 ;;
             --no-file|--no-edit|--view-only) ALLOW_FILE=0 ;;
             --no-help) SHOW_HELP=0 ;;
+            --editor=*) PAGER_EDITOR_MODE="${arg#*=}" ;;
+            --editor) [ "$#" -ge 2 ] || die "--editor needs a value"
+                      PAGER_EDITOR_MODE="$2"; shift ;;
+            --builtin-editor|--bm-editor) PAGER_EDITOR_MODE="builtin" ;;
+            --system-editor|--default-editor) PAGER_EDITOR_MODE="default" ;;
             --max-lines=*) MAX_LINES="${arg#*=}" ;;
             --max-lines) [ "$#" -ge 2 ] || die "--max-lines needs a value"
                          MAX_LINES="$2"; shift ;;

@@ -118,7 +118,7 @@ VALID_WINDOW_BORDER_KEYS = {
 
 # Permitted option types in bashmenu.mnu
 VALID_OPTION_TYPES = {
-    "command", "script", "submenu", "config", "toggle", "editor",
+    "command", "script", "submenu", "config", "toggle", "editor", "choice", "config_choice",
     "confirm", "message", "popup", "info", "python", "inject_block",
     "theme_selector", "notebook", "{divider}", "back", "exit", "action"
 }

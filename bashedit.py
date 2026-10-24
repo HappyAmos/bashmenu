@@ -1525,6 +1525,7 @@ class BashEditScreen(Screen):
     def __init__(
         self,
         file_path: str | None = None,
+        line_number: int = 1,
         theme: dict | None = None,
         show_whitespace: bool = False,
         tab_to_spaces: bool = True,
@@ -1534,6 +1535,7 @@ class BashEditScreen(Screen):
     ):
         super().__init__(**kwargs)
         self.file_path = file_path
+        self.line_number = line_number
         self.show_whitespace = show_whitespace
         self.tab_to_spaces = tab_to_spaces
         self.tabstop = tabstop
@@ -2164,6 +2166,12 @@ class BashEditScreen(Screen):
         self.query_one("#editor_widget", EditorWidget).focus()
         self.apply_theme()
         self.update_legend_layout()
+        if getattr(self, "line_number", 1) > 1:
+            with contextlib.suppress(Exception):
+                ed = self.query_one("#editor_widget", EditorWidget)
+                ed.cursor_y = max(0, min(self.line_number - 1, len(ed.lines) - 1))
+                ed._ensure_cursor_visible()
+                self.update_status()
         self.set_interval(3.0, self.flush_dirty_swaps)
         if getattr(self, "_pending_swap_check", None):
             self._handle_pending_swap()
@@ -3282,9 +3290,17 @@ class BashEditApp(App):
 
     ENABLE_COMMAND_PALETTE = False
 
-    def __init__(self, file_path: str | None = None, display_theme_colors: bool = False, theme=None, **kwargs):
+    def __init__(
+        self,
+        file_path: str | None = None,
+        line_number: int = 1,
+        display_theme_colors: bool = False,
+        theme=None,
+        **kwargs,
+    ):
         super().__init__()
         self.file_path = file_path
+        self.line_number = line_number
         self.display_theme_colors = display_theme_colors
         self.editor_theme = theme
         self.kwargs = kwargs
@@ -3309,6 +3325,7 @@ class BashEditApp(App):
         self.push_screen(
             BashEditScreen(
                 file_path=self.file_path,
+                line_number=self.line_number,
                 display_theme_colors=self.display_theme_colors,
                 theme=self.theme_styles,
                 **self.kwargs,
@@ -3324,10 +3341,12 @@ def run_curses_editor(
     tab_to_spaces=True,
     tabstop=8,
     display_theme_colors=False,
+    line_number=1,
 ):
     """Compatibility runner for launching BashEdit in Textual."""
     app = BashEditApp(
         file_path=file_path,
+        line_number=line_number,
         theme=theme,
         show_whitespace=show_whitespace,
         tab_to_spaces=tab_to_spaces,
@@ -3339,18 +3358,37 @@ def run_curses_editor(
 
 if __name__ == "__main__":
     import argparse
+    import sys
+
+    raw_args = sys.argv[1:]
+    line_number = 1
+    cleaned_args = []
+    for arg in raw_args:
+        if arg.startswith("+") and arg[1:].isdigit():
+            line_number = int(arg[1:])
+        else:
+            cleaned_args.append(arg)
 
     parser = argparse.ArgumentParser(description="BashEdit - Nano-style text editor")
     parser.add_argument("file_path", nargs="?", default=None, help="File path to edit")
+    parser.add_argument(
+        "--line",
+        type=int,
+        default=None,
+        help="Line number to jump to",
+    )
     parser.add_argument(
         "--display-theme-colors",
         action="store_true",
         help="Display theme color codes in their assigned colors",
     )
-    args, _ = parser.parse_known_args()
+    args, _ = parser.parse_known_args(cleaned_args)
+    if args.line is not None:
+        line_number = args.line
 
     app = BashEditApp(
         file_path=args.file_path,
+        line_number=line_number,
         display_theme_colors=args.display_theme_colors,
     )
     app.run()

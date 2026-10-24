@@ -663,24 +663,35 @@ class TestPluginSystem(unittest.TestCase):
                 "time": time.time(),
             }
 
-        theme_styles = bashmenu.bashmenu_ui.init_theme_colors("mountain")
-        expected_bg = theme_styles["plugin"].bgcolor
+        mock_raw_themes = {
+            "mountain": {
+                "256": {
+                    "background": 235,
+                    "plugin": [245, 22],
+                    "divider": [250, -1],
+                }
+            }
+        }
+        with unittest.mock.patch("bashmenu.bashmenu_ui.load_themes_file", return_value=mock_raw_themes):
+            bashmenu.bashmenu_ui._theme_styles_cache.clear()
+            theme_styles = bashmenu.bashmenu_ui.init_theme_colors("mountain")
+            expected_bg = theme_styles["plugin"].bgcolor
 
-        items = bashmenu.get_plugin_display_items(config, avail_w=74, screen_div_w=78, has_screen_divider=False)
-        self.assertGreaterEqual(len(items), 2)
+            items = bashmenu.get_plugin_display_items(config, avail_w=74, screen_div_w=78, has_screen_divider=False)
+            self.assertGreaterEqual(len(items), 2)
 
-        # Row 0: In-plugin divider should have expected plugin background
-        div_row = items[0][2]
-        self.assertEqual(div_row.cell_len, 74)
-        div_spans_with_bg = [s for s in div_row.spans if s.style and s.style.bgcolor == expected_bg]
-        self.assertTrue(len(div_spans_with_bg) > 0)
+            # Row 0: In-plugin divider should have expected plugin background
+            div_row = items[0][2]
+            self.assertEqual(div_row.cell_len, 74)
+            div_spans_with_bg = [s for s in div_row.spans if s.style and s.style.bgcolor == expected_bg]
+            self.assertTrue(len(div_spans_with_bg) > 0)
 
-        # Row 1: Content row with ANSI text and padding
-        content_row = items[1][2]
-        self.assertEqual(content_row.cell_len, 74)
-        # Trailing padding spaces must take expected_bg
-        pad_spans = [s for s in content_row.spans if s.style and s.style.bgcolor == expected_bg and s.end == 74]
-        self.assertTrue(len(pad_spans) > 0)
+            # Row 1: Content row with ANSI text and padding
+            content_row = items[1][2]
+            self.assertEqual(content_row.cell_len, 74)
+            # Trailing padding spaces must take expected_bg
+            pad_spans = [s for s in content_row.spans if s.style and s.style.bgcolor == expected_bg and s.end == 74]
+            self.assertTrue(len(pad_spans) > 0)
 
         # MainMenuView top plugin divider line should also take expected_bg
         mv = bashmenu.MainMenuView()

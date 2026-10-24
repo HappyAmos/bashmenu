@@ -17,7 +17,7 @@ sys.path.insert(0, PROJECT_ROOT)
 PAGER_SCRIPT = os.path.join(PROJECT_ROOT, "scripts", "pager.sh")
 
 
-class TestPagerScript(unittest.TestCase):
+class TestPagerScript(unittest.IsolatedAsyncioTestCase):
     """Test suite verifying scripts/pager.sh performance, flags, and TUI."""
 
     def test_help_and_version(self):
@@ -958,6 +958,83 @@ class TestPagerScript(unittest.TestCase):
             os.close(master)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+    def test_pager_binary_choice_editor_builtin(self):
+        """Verify pager uses BM's built-in editor when --editor=builtin is passed."""
+        master, slave = pty.openpty()
+
+        def preexec():
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+            tf.write("Initial line 1\nInitial line 2\n")
+            temp_path = tf.name
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as ef:
+            ef.write('#!/bin/sh\nfor arg in "$@"; do :; done\n[ -f "$arg" ] && echo "Appended by mock builtin" >> "$arg"\n')
+            mock_py = ef.name
+        os.chmod(mock_py, 0o755)
+
+        env = os.environ.copy()
+        # Point PYTHON_BIN to mock script which writes to the target file
+        env["PYTHON_BIN"] = mock_py
+
+        try:
+            proc = subprocess.Popen(
+                ["bash", PAGER_SCRIPT, "--editor=builtin", temp_path],
+                stdin=slave,
+                stdout=slave,
+                stderr=slave,
+                env=env,
+                preexec_fn=preexec,  # noqa: PLW1509
+                close_fds=False,
+                cwd=PROJECT_ROOT,
+            )
+            os.close(slave)
+
+            time.sleep(0.15)
+            os.write(master, b"e")
+            time.sleep(0.2)
+            os.write(master, b"q")
+
+            proc.wait(timeout=3)
+            self.assertEqual(proc.returncode, 0)
+
+            with open(temp_path, "r") as f:
+                content = f.read()
+            self.assertIn("Appended by mock builtin", content)
+        finally:
+            os.close(master)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(mock_py):
+                os.remove(mock_py)
+
+    async def test_choice_modal_screen_dispatch(self):
+        """Verify ChoiceModalScreen renders options and dismisses with the selected choice."""
+        from textual.app import App
+
+        import bashmenu_ui
+
+        results = []
+
+        class ChoiceApp(App):
+            def on_mount(self):
+                screen = bashmenu_ui.ChoiceModalScreen(
+                    "Pager Editor",
+                    "Choose editor mode:",
+                    choices=[("default", "Default ($EDITOR)"), ("builtin", "Built-in (BashEdit)")],
+                )
+                self.push_screen(screen, lambda res: results.append(res))
+
+        app = ChoiceApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Press '2' to select builtin
+            await pilot.press("2")
+            await pilot.pause()
+            self.assertEqual(results, ["builtin"])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 
-- [ ] FEATURE: Add the option to rename a "note" in a notebook.
+- [x] BUG: When cursor is at the last character at the bottom of the text area editing a "note", particularly when an autocomplete "- [ ]" is created, the window doesn't automatically adjust to the newly added line, forcing the user to arrow down to the next line.
+- [x] FEATURE: Add the option to rename a "note" in a notebook. Rename with the keyboard shortcut <m>.
+- [x] FEATURE: Pager: add binary choice option to use "default" system $EDITOR or BM's built-in editor.
 - [x] RESPONSIVENESS: Theme editor preview item selection lag: significant blocking delay until focus lands on color field in property inspector.
 - [x] BUG: border misalignment in theme editor 'menu editor' tab:
 ```

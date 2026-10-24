@@ -2323,8 +2323,8 @@ class MainMenuView(Widget):
         else:
             if is_nb:
                 full_help_str = (
-                    "[UP/DN]: Nav | [ENTER]: Read | [N]: New Note | [D]: Delete | "
-                    "[F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
+                    "[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete | "
+                    "[UP/DN]: Nav | [F1]: Help | [F2]: Themes | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
                 )
             elif self.show_shortcuts:
                 full_help_str = "[UP/DN]: Nav | [0-9/a-z]: Direct | [F1]: Help | [F2]: Themes | [F3]: Editor | [F4]: Edit | [F5]: Refresh | [F6]: Keys | [F7]: Gutter | [F8]: ThemeEdit | [ESC]: Back"
@@ -3163,6 +3163,8 @@ class MainMenuView(Widget):
                         scr.action_quit()
                 elif ("new note" in item_lower or item_lower.startswith("[n]") or item_lower == "n") and hasattr(scr, "action_new_note"):
                     scr.action_new_note()
+                elif ("rename" in item_lower or item_lower.startswith("[m]") or item_lower == "m") and hasattr(scr, "action_rename_note"):
+                    scr.action_rename_note()
                 elif ("delete" in item_lower or item_lower.startswith("[d]") or item_lower == "d") and hasattr(scr, "action_delete_note"):
                     scr.action_delete_note()
                 elif ("select" in item_lower or "read" in item_lower or "enter" in item_lower) and hasattr(scr, "action_select_option"):
@@ -3530,6 +3532,34 @@ def process_item_action(screen, item, config):
                     screen.menu_view.refresh()
 
             screen.app.push_screen(bashmenu_ui.ToggleModalScreen(title, msg), toggle_cb)
+
+    elif item_type in ["choice", "config_choice"]:
+        key_path = item.get("key", "")
+        if key_path:
+            title = item.get("title", item.get("label", "Choose Setting"))
+            msg = interpolate_placeholders(item.get("message", item.get("prompt", f"Configure option {key_path}:")), config)
+            raw_choices = item.get("options", [
+                {"value": "default", "label": "Default ($EDITOR)"},
+                {"value": "builtin", "label": "Built-in (BashEdit)"},
+            ])
+            choices_list = []
+            for c in raw_choices:
+                if isinstance(c, dict):
+                    choices_list.append((str(c.get("value", "")), str(c.get("label", c.get("value", "")))))
+                elif isinstance(c, (list, tuple)) and len(c) >= 2:
+                    choices_list.append((str(c[0]), str(c[1])))
+                else:
+                    choices_list.append((str(c), str(c)))
+
+            def choice_cb(res):
+                if res is not None:
+                    set_config_value(config, key_path, res)
+                    save_config(config)
+                    screen.menu_view.config = config
+                    screen.menu_view.refresh()
+
+            theme = getattr(screen.app, "theme_styles", getattr(screen, "theme_styles", None))
+            screen.app.push_screen(bashmenu_ui.ChoiceModalScreen(title, msg, choices=choices_list, theme=theme), choice_cb)
 
     elif item_type == "config":
         key_path = item.get("key", "")
@@ -4131,6 +4161,11 @@ class BashMenuScreen(Screen):
                 event.stop()
                 event.prevent_default()
                 return
+            if event.key in ("m", "M") or getattr(event, "character", None) in ("m", "M"):
+                self.action_rename_note()
+                event.stop()
+                event.prevent_default()
+                return
             if event.key in ("d", "D") or getattr(event, "character", None) in ("d", "D"):
                 self.action_delete_note()
                 event.stop()
@@ -4371,6 +4406,53 @@ class BashMenuScreen(Screen):
             on_title_entered,
         )
 
+    def action_rename_note(self, specific_title: str | None = None, from_viewer: bool = False) -> None:
+        """Prompt to rename the currently selected (or specified) notebook note."""
+        curr_m = self.menu_view.current_menu()
+        if not curr_m.get("_is_notebook"):
+            return
+        filepath = curr_m.get("_notebook_file")
+        if not filepath:
+            return
+
+        note_title = specific_title
+        if not note_title:
+            opts = curr_m.get("items", curr_m.get("options", []))
+            curr_row = self.menu_view.current_row()
+            if 0 <= curr_row < len(opts):
+                item = opts[curr_row]
+                if item.get("type") == "notebook_note":
+                    note_title = item.get("_note_title") or item.get("title")
+
+        if not note_title:
+            return
+
+        theme = getattr(self.app, "theme_styles", getattr(self, "theme_styles", None))
+
+        def on_rename_entered(new_title: str | None) -> None:
+            if not new_title or not new_title.strip():
+                if from_viewer:
+                    self.open_note_viewer(filepath, note_title)
+                return
+            clean_new_title = new_title.strip()
+            if clean_new_title == note_title:
+                if from_viewer:
+                    self.open_note_viewer(filepath, note_title)
+                return
+            nb_data = bashmenu_ui.load_notebook(filepath)
+            if bashmenu_ui.rename_note(nb_data, note_title, clean_new_title):
+                bashmenu_ui.save_notebook(filepath, nb_data)
+                self.refresh_current_notebook(filepath, select_title=clean_new_title)
+                if from_viewer:
+                    self.open_note_viewer(filepath, clean_new_title)
+            elif from_viewer:
+                self.open_note_viewer(filepath, note_title)
+
+        self.app.push_screen(
+            bashmenu_ui.InputModalScreen("Rename Note", "Enter new note title:", default_text=note_title, theme=theme),
+            on_rename_entered,
+        )
+
     def action_delete_note(self) -> None:
         """Prompts to delete the currently selected notebook note."""
         curr_m = self.menu_view.current_menu()
@@ -4405,6 +4487,8 @@ class BashMenuScreen(Screen):
                 reloaded_note = bashmenu_ui.get_note_by_title(reloaded_nb, note_title)
                 curr_content = reloaded_note.get("content", content) if reloaded_note else content
                 self.open_note_editor(filepath, note_title, initial_content=curr_content, is_new=False)
+            elif action == "rename":
+                self.action_rename_note(specific_title=note_title, from_viewer=True)
             elif action == "delete":
                 self.confirm_delete_note(filepath, note_title)
 

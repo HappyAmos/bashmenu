@@ -575,6 +575,17 @@ items:
                       title: Configure Tabstop Distance
                       prompt: 'Enter tabstop distance (spaces per TAB press):'
                       icon: '{nf::#ee10}'
+                  - Pager Text Editor [{settings.pager_editor}]:
+                      type: choice
+                      key: settings.pager_editor
+                      title: Configure Pager Text Editor
+                      prompt: 'Select editor launched when pressing [e] in pager:'
+                      options:
+                        - label: Default System Editor ($EDITOR)
+                          value: default
+                        - label: Built-in Editor (BashEdit)
+                          value: builtin
+                      icon: '{nf::#f044}'
                   - Configure Status Gutter [{settings.status_gutter}]:
                       type: config
                       key: settings.status_gutter

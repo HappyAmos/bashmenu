@@ -189,6 +189,7 @@ class TestNotebookFeature(unittest.IsolatedAsyncioTestCase):
         out_text = out.plain if hasattr(out, "plain") else str(out)
         self.assertIn("New Note", out_text)
         self.assertIn("Read", out_text)
+        self.assertIn("Rename", out_text)
         self.assertIn("Delete", out_text)
 
         # Non-notebook mode must not contain Delete shortcut in gutter
@@ -218,6 +219,23 @@ class TestNotebookFeature(unittest.IsolatedAsyncioTestCase):
             event.character = "n"
             screen.on_key(event)
             screen.action_new_note.assert_called_once()
+
+    def test_on_key_notebook_renames_selected_note(self):
+        """Verify pressing 'm' when active menu is notebook calls action_rename_note."""
+        screen = bashmenu.BashMenuScreen(config=bashmenu.load_config()[0])
+        screen.action_rename_note = MagicMock()
+        sub = bashmenu.build_dynamic_notebook_submenu(self.notebook_path)
+
+        mock_mv = MagicMock()
+        mock_mv.current_menu.return_value = sub
+        mock_mv.show_shortcuts = False
+
+        with unittest.mock.patch.object(bashmenu.BashMenuScreen, "menu_view", new_callable=lambda: mock_mv):
+            event = MagicMock()
+            event.key = "m"
+            event.character = "m"
+            screen.on_key(event)
+            screen.action_rename_note.assert_called_once()
 
     def test_on_key_notebook_deletes_selected_note(self):
         """Verify pressing 'd' when active menu is notebook calls action_delete_note."""
@@ -766,6 +784,41 @@ Detailed section content here.
             self.assertEqual(ed.text, "")
             self.assertEqual(bashedit.get_system_clipboard(), "Copied from bashedit editor")
 
+    async def test_notebook_editor_autoscrolls_new_line_on_autocomplete_enter(self):
+        """Verify that pressing Enter on a task list at the bottom of the viewport automatically scrolls
+        the window to display the newly added line without requiring manual arrow navigation."""
+        from textual.app import App
+
+        class NoteApp(App):
+            def on_mount(self):
+                content = "\n".join([f"- [ ] Item {i}" for i in range(1, 40)])
+                self.push_screen(bashmenu_ui.NoteEditorModalScreen("Notes", content=content))
+
+        app = NoteApp()
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            modal = app.screen
+            ed = modal.query_one("#text_editor", bashmenu_ui.NotebookTextArea)
+            last_row = ed.document.line_count - 1
+            last_col = len(ed.document.get_line(last_row))
+            ed.move_cursor((last_row, last_col))
+            await pilot.pause()
+            self.assertEqual(ed.cursor_location, (last_row, last_col))
+
+            initial_scroll_y = ed.scroll_y
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # The new line should have been added with auto-completed checkbox
+            new_row, _new_col = ed.cursor_location
+            self.assertEqual(new_row, last_row + 1)
+            self.assertTrue(ed.document.get_line(new_row).startswith("- [ ] "))
+
+            # The viewport scroll must have automatically adjusted downward to keep the new line visible
+            self.assertGreater(ed.scroll_y, initial_scroll_y)
+            window_height = ed.scrollable_content_region.height
+            self.assertTrue(ed.scroll_y <= new_row < ed.scroll_y + window_height)
+
     async def test_note_viewer_text_wrapping_for_checkboxes(self):
         """Verify NoteViewerModalScreen uses MarkdownCheckbox to wrap multi-line task text without truncation."""
         from textual.app import App
@@ -911,6 +964,46 @@ Detailed section content here.
             self.assertTrue(screen.show_completed)
             self.assertTrue(cbs[1].display)
             self.assertIn("[H] Hide Done", str(footer.render()))
+
+    def test_notebook_rename_note(self):
+        """Verify rename_note function preserves note contents, format, and position."""
+        data = {
+            "notebook": {
+                "title": "Notes",
+                "notes": [
+                    {"First Note": {"type": "note", "format": "markdown", "content": "Content 1"}},
+                    {"Second Note": {"type": "note", "format": "markdown", "content": "Content 2"}},
+                ],
+            }
+        }
+        res = bashmenu_ui.rename_note(data, "First Note", "Renamed First Note")
+        self.assertTrue(res)
+        notes = bashmenu_ui.get_notebook_notes(data)
+        self.assertEqual(notes[0][0], "Renamed First Note")
+        self.assertEqual(notes[0][1]["content"], "Content 1")
+        self.assertEqual(notes[1][0], "Second Note")
+
+        # Nonexistent note returns False
+        self.assertFalse(bashmenu_ui.rename_note(data, "Nonexistent", "New Name"))
+
+    async def test_note_viewer_rename_shortcut_and_button(self):
+        """Verify pressing 'm' or clicking Rename button dismisses NoteViewerModalScreen with 'rename'."""
+        from textual.app import App
+
+        dismiss_results = []
+
+        class TestModalApp(App):
+            def on_mount(self):
+                screen = bashmenu_ui.NoteViewerModalScreen("Test", "Note content")
+                self.push_screen(screen, lambda res: dismiss_results.append(res))
+
+        app = TestModalApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Press 'm' to trigger rename
+            await pilot.press("m")
+            await pilot.pause()
+            self.assertEqual(dismiss_results, ["rename"])
 
 
 if __name__ == "__main__":

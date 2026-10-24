@@ -335,3 +335,43 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   - Updated `test_theme_editor_preview_selection_responsiveness` in `.tests/test_themeedit.py` to assert that `app.focused` updates immediately on `MouseDown` and synchronously in `focus_inspector_target`.
   - All 343 unit tests passed cleanly in `.tests/`.
 
+---
+
+### 28. Notebook Note Editor Autoscroll on Autocomplete Enter
+- **Item:** `- [x] BUG: When cursor is at the last character at the bottom of the text area editing a "note", particularly when an autocomplete "- [ ]" is created, the window doesn't automatically adjust to the newly added line, forcing the user to arrow down to the next line.`
+- **Root Cause:** In Textual's `TextArea.edit()`, `edit.after(self)` updates `self.selection` and triggers `_watch_selection -> scroll_cursor_visible()`. However, `scroll_to_region` computes scroll bounds based on `self.virtual_size`. At the moment `edit.after` executes, `self._refresh_size()` has not yet been called, so `self.virtual_size` and `max_scroll_y` still reflect the old document dimensions. When the edit introduces a new line at the bottom, `scroll_to_region` clamps `delta.y` to 0. Although `_refresh_size()` runs immediately after, `scroll_cursor_visible()` was never invoked again, leaving the cursor hidden below the bottom of the viewport until manual arrow navigation.
+- **Fix:** In `bashmenu_ui.py`, overridden `NotebookTextArea.edit(edit: Edit) -> EditResult` to invoke `self.scroll_cursor_visible(center=False, animate=False)` and `self.call_after_refresh(self.scroll_cursor_visible, center=False, animate=False)` immediately after `super().edit(edit)` updates `virtual_size`.
+- **Tests:** Added `test_notebook_editor_autoscrolls_new_line_on_autocomplete_enter` in `.tests/test_notebook.py` validating that pressing enter at the bottom of the viewport immediately updates `scroll_y` and ensures the newly added task item is visible in the viewport.
+
+---
+
+### 29. Rename Notebook Note with Keyboard Shortcut <m>
+- **Item:** `- [x] FEATURE: Add the option to rename a "note" in a notebook. Rename with the keyboard shortcut <m>.`
+- **Design & Architecture:**
+  1. In `bashmenu_ui.py`, implemented `rename_note(notebook_data, old_title, new_title)` preserving the note's content, format, type, and index in the notebook.
+  2. In `bashmenu_ui.py::NoteViewerModalScreen`: added `<m>` / `<M>` keybinding, `[M] Rename` button, and updated footer help text. Selecting rename dismisses the modal with action `"rename"`.
+  3. In `bashmenu.py::BashMenuScreen`:
+     - Added `action_rename_note(specific_title=None, from_viewer=False)` which opens `InputModalScreen("Rename Note", ...)` pre-filled with the current note title. Upon confirmation, renames the note in the YAML file, saves the notebook, reloads the menu view, selects the renamed note, and returns to viewer if initiated from viewer.
+     - Handled `<m>` / `<M>` in `on_key` when in notebook view.
+     - Added mouse click dispatch for `[M]: Rename` in gutter footer click handler.
+     - Updated notebook help gutter string to display `[N]: New Note | [ENTER]: Read | [M]: Rename | [D]: Delete`.
+- **Tests:** Added `test_notebook_rename_note`, `test_note_viewer_rename_shortcut_and_button`, and `test_on_key_notebook_renames_selected_note` in `.tests/test_notebook.py`. Updated `test_help_gutter_in_notebook_mode` to verify `Rename` gutter badge.
+
+---
+
+### 30. Pager Binary Choice Editor: Default System $EDITOR vs BM Built-in Editor
+- **Item:** `- [x] FEATURE: Pager: add binary choice option to use "default" system $EDITOR or BM's built-in editor.`
+- **Design & Architecture:**
+  1. In `bashmenu.yml`: Added `settings.pager_editor: default` (`default` or `builtin`).
+  2. In `bashmenu.mnu`: Added interactive choice menu item under `Options & Settings -> Bashmenu Settings` displaying `Pager Text Editor [{settings.pager_editor}]`.
+  3. In `bashmenu_ui.py`: Implemented `ChoiceModalScreen(ModalScreen[str | None])` providing unified option selection with hotkeys (`1`, `2`, `d`, `b`, `ESC`) and styled buttons.
+  4. In `bashmenu.py`: Added `item_type in ["choice", "config_choice"]` handler in `process_item_action` persisting selection via `bashmenu.save_config`.
+  5. In `ymlcheck.py`: Added `"choice"` and `"config_choice"` to `VALID_OPTION_TYPES`.
+  6. In `scripts/pager.sh`:
+     - Added `--editor=default|builtin`, `--editor MODE`, `--builtin-editor`, and `--default-editor` CLI options.
+     - Added environment variable support (`BMPAGER_EDITOR` and `PAGER_EDITOR`).
+     - Added `get_configured_pager_editor()` which falls back to parsing `settings.pager_editor` from `bashmenu.yml`.
+     - In `open_in_editor()`: if mode is `builtin`, launches `"${PYTHON_BIN}" "${PROJECT_ROOT}/bashedit.py" "+${TOP_LINE}" "${target_file}"`; if `default`, launches `$VISUAL` / `$EDITOR` system fallbacks.
+  7. In `bashedit.py`: Added CLI support for `+<LINE>` argument and `line_number` in `BashEditApp` / `BashEditScreen` so launching from `pager.sh` at line N positions the cursor at line N.
+- **Tests:** Added `test_pager_binary_choice_editor_builtin` and `test_choice_modal_screen_dispatch` in `.tests/test_pager.py`. Verified `shellcheck scripts/pager.sh` passes with zero warnings.
+

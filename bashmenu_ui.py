@@ -51,6 +51,7 @@ from textual.widgets import (
 )
 from textual.widgets import Markdown as TextualMarkdown
 from textual.widgets.option_list import Option
+from textual.widgets.text_area import Edit, EditResult
 
 
 def safe_curs_set(visibility: int) -> None:
@@ -3485,6 +3486,166 @@ class ToggleModalScreen(ModalScreen[str]):
         self.dismiss(None)
 
 
+class ChoiceModalScreen(ModalScreen[str | None]):
+    """Modal screen for binary or multiple option selection."""
+
+    DEFAULT_CSS = """
+    ChoiceModalScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #dialog {
+        width: 68;
+        height: auto;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #title_bar {
+        height: 1;
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #title {
+        width: 1fr;
+        text-align: center;
+        text-style: bold;
+        color: $accent;
+    }
+    .btn_close_x {
+        dock: right;
+        width: 3;
+        height: 1;
+        border: none;
+        padding: 0;
+        margin: 0;
+        min-width: 3;
+        background: transparent;
+    }
+    .btn_close_x:hover, .btn_close_x:focus {
+        border: none;
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    #message {
+        text-align: center;
+        margin-bottom: 1;
+    }
+    #buttons {
+        align: center middle;
+        height: auto;
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+    Button {
+        margin: 0 1;
+    }
+    #footer {
+        text-align: center;
+    }
+    """
+
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("c", "cancel", "Cancel", show=False),
+        Binding("1", "select_opt_0", "Option 1", show=False),
+        Binding("2", "select_opt_1", "Option 2", show=False),
+        Binding("3", "select_opt_2", "Option 3", show=False),
+        Binding("d", "select_default", "Default", show=False),
+        Binding("b", "select_builtin", "Built-in", show=False),
+    ]
+
+    def __init__(
+        self,
+        title: str,
+        message: str,
+        choices: list[tuple[str, str]] | None = None,
+        theme: dict | None = None,
+    ):
+        super().__init__()
+        self.modal_title = title
+        self.message = message
+        self.choices = choices or [("default", "Default ($EDITOR)"), ("builtin", "Built-in (BashEdit)")]
+        self.theme = theme or {}
+
+    def compose(self) -> ComposeResult:
+        with ModalFrame(id="modal_frame"):
+            with Horizontal(id="dialog_hrow"):
+                with Vertical(id="dialog"):
+                    with Horizontal(id="title_bar"):
+                        yield Label(self.modal_title or "", id="title")
+                        yield Label(format_close_button_label(), id="btn_close_x", classes="btn_close_x")
+                    content = (
+                        self.message
+                        if isinstance(self.message, Text)
+                        else formatting_to_rich_text(str(self.message), theme=self.theme)
+                    )
+                    yield Static(content, id="message")
+                    with Horizontal(id="buttons"):
+                        for idx, (val, lbl) in enumerate(self.choices):
+                            variant = "primary" if idx == 0 else ("success" if idx == 1 else "default")
+                            yield Button(f"[{idx+1}] {lbl}", variant=variant, id=f"btn_choice_{idx}")
+                        yield Button("Cancel [ESC]", variant="default", id="btn_cancel")
+                    footer_items = [f"[{idx+1}] {lbl}" for idx, (_, lbl) in enumerate(self.choices)]
+                    footer_items.append("[ESC] Cancel")
+                    yield Label(" | ".join(footer_items), id="footer", markup=False)
+                yield ShadowWidget(id="shadow_right")
+            yield ShadowWidget(id="shadow_bottom")
+
+    def on_mount(self) -> None:
+        apply_modal_theme(self, self.theme)
+        with contextlib.suppress(Exception):
+            for idx in range(len(self.choices)):
+                b_type = "button_primary" if idx == 0 else ("button_success" if idx == 1 else "button_default")
+                apply_button_theme(self.query_one(f"#btn_choice_{idx}", Button), self.theme, b_type)
+            apply_button_theme(self.query_one("#btn_cancel", Button), self.theme, "button_cancel")
+
+    def on_click(self, event) -> None:
+        widget = getattr(event, "widget", None) or getattr(event, "target", None)
+        if widget and (getattr(widget, "id", None) == "btn_close_x" or "btn_close_x" in getattr(widget, "classes", [])):
+            self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        btn_id = event.button.id or ""
+        if btn_id.startswith("btn_choice_"):
+            try:
+                idx = int(btn_id.split("_")[-1])
+                if 0 <= idx < len(self.choices):
+                    self.dismiss(self.choices[idx][0])
+                    return
+            except (ValueError, IndexError):
+                pass
+        self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_select_opt_0(self) -> None:
+        if len(self.choices) > 0:
+            self.dismiss(self.choices[0][0])
+
+    def action_select_opt_1(self) -> None:
+        if len(self.choices) > 1:
+            self.dismiss(self.choices[1][0])
+
+    def action_select_opt_2(self) -> None:
+        if len(self.choices) > 2:
+            self.dismiss(self.choices[2][0])
+
+    def action_select_default(self) -> None:
+        for val, _ in self.choices:
+            if val == "default":
+                self.dismiss("default")
+                return
+
+    def action_select_builtin(self) -> None:
+        for val, _ in self.choices:
+            if val in ("builtin", "bm", "bashedit"):
+                self.dismiss(val)
+                return
+
+
 class InputModalScreen(ModalScreen[str]):
     """Modal screen for single-line text input."""
 
@@ -4726,6 +4887,29 @@ def add_or_update_note(
         })
 
 
+def rename_note(notebook_data: dict, old_title: str, new_title: str) -> bool:
+    """Rename a note in the notebook data dictionary while preserving its content, format, and position."""
+    if "notebook" not in notebook_data or not isinstance(notebook_data["notebook"], dict):
+        return False
+    notes_list = notebook_data["notebook"].get("notes", [])
+    if not isinstance(notes_list, list):
+        return False
+
+    for idx, item in enumerate(notes_list):
+        if isinstance(item, dict):
+            if len(item) == 1 and "title" not in item:
+                k = next(iter(item.keys()))
+                if k == old_title:
+                    props = item[k]
+                    notes_list[idx] = {new_title: props}
+                    return True
+            elif item.get("title") == old_title:
+                props = {k: v for k, v in item.items() if k != "title"}
+                notes_list[idx] = {new_title: props}
+                return True
+    return False
+
+
 def delete_note(notebook_data: dict, title: str) -> bool:
     """Remove a note by title from notebook data."""
     if "notebook" not in notebook_data or not isinstance(notebook_data["notebook"], dict):
@@ -5016,6 +5200,8 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         Binding("ctrl+c", "copy_note", "Copy", show=False),
         Binding("ctrl+shift+c", "copy_note", "Copy", show=False),
         Binding("e", "edit_note", "Edit"),
+        Binding("m", "rename_note", "Rename"),
+        Binding("M", "rename_note", "Rename", show=False),
         Binding("d", "delete_note", "Delete"),
     ]
 
@@ -5045,8 +5231,8 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         """Return the footer help gutter text reflecting current checkbox toggle state."""
         if has_checkboxes:
             toggle_action = "Hide Done" if self.show_completed else "Show Done"
-            return f"[SPACE] Toggle | [H] {toggle_action} | [C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close"
-        return "[C] Copy | [E] Edit | [D] Delete | [ESC/ENTER] Close"
+            return f"[SPACE] Toggle | [H] {toggle_action} | [C] Copy | [E] Edit | [M] Rename | [D] Delete | [ESC/ENTER] Close"
+        return "[C] Copy | [E] Edit | [M] Rename | [D] Delete | [ESC/ENTER] Close"
 
     def _parse_blocks(self) -> list[tuple[str, Any]]:
         """Parse note content lines into alternating markdown blocks and interactive checkbox items."""
@@ -5125,6 +5311,7 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
             with Horizontal(id="buttons"):
                 yield Button("Copy [C]", variant="default", id="btn_copy")
                 yield Button("Edit [E]", variant="primary", id="btn_edit")
+                yield Button("Rename [M]", variant="default", id="btn_rename")
                 yield Button("Delete [D]", variant="error", id="btn_delete")
                 yield Button("Close [ESC]", variant="default", id="btn_close")
             yield Label(self._get_footer_text(has_checkboxes), id="footer", markup=False)
@@ -5141,6 +5328,7 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
         with contextlib.suppress(Exception):
             apply_button_theme(self.query_one("#btn_copy", Button), theme=self.theme, button_type="button_default")
             apply_button_theme(self.query_one("#btn_edit", Button), theme=self.theme, button_type="button_primary")
+            apply_button_theme(self.query_one("#btn_rename", Button), theme=self.theme, button_type="button_default")
             apply_button_theme(self.query_one("#btn_delete", Button), theme=self.theme, button_type="button_danger")
             apply_button_theme(self.query_one("#btn_close", Button), theme=self.theme, button_type="button_default")
 
@@ -5226,6 +5414,9 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
     def action_edit_note(self) -> None:
         self.dismiss("edit")
 
+    def action_rename_note(self) -> None:
+        self.dismiss("rename")
+
     def action_delete_note(self) -> None:
         self.dismiss("delete")
 
@@ -5237,6 +5428,8 @@ class NoteViewerModalScreen(ModalScreen[str | None]):
             self.action_copy_note()
         elif event.button.id == "btn_edit":
             self.action_edit_note()
+        elif event.button.id == "btn_rename":
+            self.action_rename_note()
         elif event.button.id == "btn_delete":
             self.action_delete_note()
         elif event.button.id in ("btn_close", "btn_close_x"):
@@ -5263,6 +5456,14 @@ class NotebookTextArea(TextArea):
     def __init__(self, *args, auto_format: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self.auto_format = auto_format
+
+    def edit(self, edit: Edit) -> EditResult:
+        """Perform an edit and ensure the cursor is scrolled into view immediately."""
+        result = super().edit(edit)
+        if self.is_mounted:
+            self.scroll_cursor_visible(center=False, animate=False)
+            self.call_after_refresh(self.scroll_cursor_visible, center=False, animate=False)
+        return result
 
     def action_copy(self) -> None:
         """Copy selection (or current line if no selection) to unified clipboard."""
