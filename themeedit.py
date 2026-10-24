@@ -2731,18 +2731,28 @@ class ThemePreviewWidget(Static):
         lines: list[Text] = []
 
         me_styles = styles.get("menu_editor", {}) if isinstance(styles.get("menu_editor"), dict) else {}
-        b_style = me_styles.get("border") or b_style
-        t_style = me_styles.get("header") or t_style
-        text_style = me_styles.get("text") or text_style
-        sel_style = me_styles.get("selection") or sel_style
-        tree_guide_style = me_styles.get("tree_guide") or me_styles.get("border") or gutter_style or b_style
-        label_style = me_styles.get("label") or styles.get("accent", Style(color="cyan"))
-        input_style = me_styles.get("input") or text_style
-        btn_primary_style = me_styles.get("button_save") or styles.get("button_primary", Style(color="green", bold=True))
-        btn_error_style = me_styles.get("button_delete") or styles.get("button_error", Style(color="red", bold=True))
-        help_style = me_styles.get("footer") or help_style
-        scrollbar_style = me_styles.get("scrollbar") or styles.get("scrollbar", Style(color="blue", bold=True))
-        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
+        me_bg_style = me_styles.get("background") or styles.get("background")
+        me_bg_color = me_bg_style.bgcolor if me_bg_style else None
+
+        def _with_me_bg(st: Style | None) -> Style:
+            if not st:
+                return Style(bgcolor=me_bg_color) if me_bg_color else Style()
+            if st.bgcolor is None and me_bg_color is not None:
+                return st + Style(bgcolor=me_bg_color)
+            return st
+
+        b_style = _with_me_bg(me_styles.get("border") or b_style)
+        t_style = _with_me_bg(me_styles.get("header") or t_style)
+        text_style = _with_me_bg(me_styles.get("text") or text_style)
+        sel_style = _with_me_bg(me_styles.get("selection") or sel_style)
+        tree_guide_style = _with_me_bg(me_styles.get("tree_guide") or me_styles.get("border") or gutter_style or b_style)
+        label_style = _with_me_bg(me_styles.get("label") or styles.get("accent", Style(color="cyan")))
+        input_style = _with_me_bg(me_styles.get("input") or text_style)
+        btn_primary_style = _with_me_bg(me_styles.get("button_save") or styles.get("button_primary", Style(color="green", bold=True)))
+        btn_error_style = _with_me_bg(me_styles.get("button_delete") or styles.get("button_error", Style(color="red", bold=True)))
+        help_style = _with_me_bg(me_styles.get("footer") or help_style)
+        scrollbar_style = _with_me_bg(me_styles.get("scrollbar") or styles.get("scrollbar", Style(color="blue", bold=True)))
+        close_btn_style = _with_me_bg(styles.get("window_close_button", Style(color="red", bold=True)))
 
         # Top border with title and close button [X]
         title_str = f"{b_cap_l} Menu Editor {b_cap_r}"
@@ -2801,7 +2811,7 @@ class ThemePreviewWidget(Static):
             if t_text.cell_len > split_x - 1:
                 t_text.truncate(split_x - 1)
             t_pad = max(0, split_x - 1 - t_text.cell_len)
-            t_text.append(" " * t_pad)
+            t_text.append(" " * t_pad, style=text_style)
 
             row_line.append(" ", style=text_style)
             row_line.append_text(t_text)
@@ -2815,7 +2825,8 @@ class ThemePreviewWidget(Static):
 
             if prop_lbl == "[ Save ]":
                 p_text.append(" [ Save ] ", style=btn_primary_style)
-                p_text.append("  [ Delete ]", style=btn_error_style)
+                p_text.append("  ", style=text_style)
+                p_text.append("[ Delete ]", style=btn_error_style)
             elif prop_lbl:
                 p_text.append(f" {prop_lbl}", style=label_style)
                 p_text.append(prop_val, style=input_style)
@@ -2823,7 +2834,7 @@ class ThemePreviewWidget(Static):
             if p_text.cell_len > right_w:
                 p_text.truncate(right_w)
             p_pad = max(0, right_w - p_text.cell_len)
-            p_text.append(" " * p_pad)
+            p_text.append(" " * p_pad, style=text_style)
 
             row_line.append_text(p_text)
             row_line.append(sb_char, style=scrollbar_style)
@@ -2924,21 +2935,38 @@ class ThemePreviewWidget(Static):
 
         ed_styles = styles.get("editor", {}) if isinstance(styles.get("editor"), dict) else {}
         ed_bg_style = ed_styles.get("background") or styles.get("background")
-        ed_b_style = ed_styles.get("border") or b_style
-        ed_hdr_style = ed_styles.get("header") or t_style
-        ed_text_style = ed_styles.get("text") or text_style
-        ed_sel_style = ed_styles.get("selection") or sel_style
-        ed_gutter_style = ed_styles.get("gutter") or gutter_style
-        ed_lineno_style = ed_styles.get("line_number") or ed_gutter_style
-        ed_eof_style = ed_styles.get("eof_tilde") or ed_gutter_style
-        ed_tab_bar_style = ed_styles.get("tab_bar") or ed_bg_style
-        ed_tab_act_style = ed_styles.get("tab_active") or sel_style
-        ed_tab_inact_style = ed_styles.get("tab_inactive") or text_style
-        ed_tab_close_style = ed_styles.get("tab_close") or styles.get("window_close_button", Style(color="red", bold=True))
-        ed_tab_add_style = ed_styles.get("tab_add") or styles.get("accent", Style(color="cyan", bold=True))
-        ed_status_style = ed_styles.get("status") or ed_hdr_style
-        ed_footer_style = ed_styles.get("footer") or help_style
-        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
+        ed_bg_color = ed_bg_style.bgcolor if ed_bg_style else None
+
+        def _with_ed_bg(st: Style | None, fallback_bg: Any = None) -> Style:
+            bg = fallback_bg if fallback_bg is not None else ed_bg_color
+            if not st:
+                return Style(bgcolor=bg) if bg else Style()
+            if st.bgcolor is None and bg is not None:
+                return st + Style(bgcolor=bg)
+            return st
+
+        ed_b_style = _with_ed_bg(ed_styles.get("border") or b_style)
+        ed_hdr_style = _with_ed_bg(ed_styles.get("header") or t_style)
+        ed_text_style = _with_ed_bg(ed_styles.get("text") or text_style)
+        ed_sel_style = _with_ed_bg(ed_styles.get("selection") or sel_style)
+        ed_gutter_style = _with_ed_bg(ed_styles.get("gutter") or gutter_style)
+        ed_lineno_style = _with_ed_bg(ed_styles.get("line_number") or ed_gutter_style)
+        ed_eof_style = _with_ed_bg(ed_styles.get("eof_tilde") or ed_gutter_style)
+        ed_tab_bar_style = _with_ed_bg(ed_styles.get("tab_bar") or ed_bg_style)
+        tb_bg_color = ed_tab_bar_style.bgcolor if ed_tab_bar_style else ed_bg_color
+        ed_tab_act_style = _with_ed_bg(ed_styles.get("tab_active") or sel_style, fallback_bg=tb_bg_color)
+        ed_tab_inact_style = _with_ed_bg(ed_styles.get("tab_inactive") or text_style, fallback_bg=tb_bg_color)
+        ed_tab_close_style = _with_ed_bg(
+            ed_styles.get("tab_close") or styles.get("window_close_button", Style(color="red", bold=True)),
+            fallback_bg=tb_bg_color,
+        )
+        ed_tab_add_style = _with_ed_bg(
+            ed_styles.get("tab_add") or styles.get("accent", Style(color="cyan", bold=True)),
+            fallback_bg=tb_bg_color,
+        )
+        ed_status_style = _with_ed_bg(ed_styles.get("status") or ed_hdr_style)
+        ed_footer_style = _with_ed_bg(ed_styles.get("footer") or help_style)
+        close_btn_style = _with_ed_bg(styles.get("window_close_button", Style(color="red", bold=True)))
 
         # Row 0: Top window border / header bar with title and close button
         title_content = f"  {b_cap_l} BashEdit - notes.md {b_cap_r}  "
@@ -3148,16 +3176,33 @@ class ThemePreviewWidget(Static):
         lines: list[Text] = []
 
         mod_styles = styles.get("modals", {}) if isinstance(styles.get("modals"), dict) else {}
-        b_style = mod_styles.get("border") or b_style
-        t_style = mod_styles.get("title") or t_style
-        text_style = mod_styles.get("text") or text_style
-        btn_success_style = mod_styles.get("button_confirm") or styles.get("button_success", styles.get("button_primary", Style(color="green", bold=True)))
-        btn_cancel_style = mod_styles.get("button_cancel") or styles.get("button_cancel", Style(color="yellow", bold=True))
-        scrollbar_style = mod_styles.get("scrollbar") or styles.get("scrollbar", Style(color="blue", bold=True))
-        close_btn_style = styles.get("window_close_button", Style(color="red", bold=True))
+        mod_bg_style = mod_styles.get("background") or styles.get("background")
+        mod_bg_color = mod_bg_style.bgcolor if mod_bg_style else None
+
+        def _with_mod_bg(st: Style | None) -> Style:
+            if st is None:
+                return Style(bgcolor=mod_bg_color) if mod_bg_color else Style()
+            if st.bgcolor is None and mod_bg_color is not None:
+                return st + Style(bgcolor=mod_bg_color)
+            return st
+
+        b_style = _with_mod_bg(mod_styles.get("border") or b_style)
+        t_style = _with_mod_bg(mod_styles.get("title") or t_style)
+        text_style = _with_mod_bg(mod_styles.get("text") or text_style)
+        btn_success_style = _with_mod_bg(
+            mod_styles.get("button_confirm")
+            or styles.get("button_success", styles.get("button_primary", Style(color="green", bold=True)))
+        )
+        btn_cancel_style = _with_mod_bg(
+            mod_styles.get("button_cancel") or styles.get("button_cancel", Style(color="yellow", bold=True))
+        )
+        scrollbar_style = _with_mod_bg(
+            mod_styles.get("scrollbar") or styles.get("scrollbar", Style(color="blue", bold=True))
+        )
+        close_btn_style = _with_mod_bg(styles.get("window_close_button", Style(color="red", bold=True)))
         backdrop_style = mod_styles.get("backdrop") or styles.get("shadow", Style(color="grey23", bgcolor="black"))
-        input_style = mod_styles.get("input") or text_style
-        footer_style = mod_styles.get("footer") or styles.get("footer", text_style)
+        input_style = _with_mod_bg(mod_styles.get("input") or text_style)
+        footer_style = _with_mod_bg(mod_styles.get("footer") or styles.get("footer", text_style))
 
         modal_w = max(34, min(w - 4, 46))
         left_margin = max(1, (w - modal_w - 2) // 2)
@@ -3222,7 +3267,7 @@ class ThemePreviewWidget(Static):
             if msg_part.cell_len > text_inner_w - 1:
                 msg_part.truncate(text_inner_w - 1)
             pad = max(0, text_inner_w - 1 - msg_part.cell_len)
-            msg_part.append(" " * pad)
+            msg_part.append(" " * pad, style=text_style)
             m_line.append_text(msg_part)
 
             sb_char = "▲" if idx == 0 else ("▼" if idx == len(msg_rows) - 1 else "█")
@@ -3266,14 +3311,15 @@ class ThemePreviewWidget(Static):
 
         buttons_text = Text()
         buttons_text.append(" [ Confirm ] ", style=btn_success_style)
-        buttons_text.append("   [ Cancel ] ", style=btn_cancel_style)
+        buttons_text.append("   ", style=text_style)
+        buttons_text.append("[ Cancel ] ", style=btn_cancel_style)
 
         pad_left = max(1, (modal_w - 2 - buttons_text.cell_len) // 2)
         pad_right = max(1, modal_w - 2 - pad_left - buttons_text.cell_len)
 
-        btn_line.append(" " * pad_left)
+        btn_line.append(" " * pad_left, style=text_style)
         btn_line.append_text(buttons_text)
-        btn_line.append(" " * pad_right)
+        btn_line.append(" " * pad_right, style=text_style)
         btn_line.append(b_v_right, style=b_style)
         btn_line.append(shadow_ch * 2, style=shadow_style)
         if right_pad > 0:
@@ -4447,6 +4493,7 @@ class ThemeEditScreen(Screen):
 
             ts = self.configured_theme_styles
             bg_style = ts.get("background")
+            css_bg = None
             if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
                 css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
                 if css_bg:
@@ -4458,11 +4505,14 @@ class ThemeEditScreen(Screen):
 
             hdr_style = ts.get("header") or ts.get("title")
             if hdr_style:
-                if hdr_style.bgcolor and hdr_style.bgcolor.name:
-                    css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
-                    if css_hdr_bg:
-                        with contextlib.suppress(Exception):
-                            self.query_one("#header").styles.background = css_hdr_bg
+                css_hdr_bg = (
+                    bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
+                    if (hdr_style.bgcolor and hdr_style.bgcolor.name)
+                    else css_bg
+                )
+                if css_hdr_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#header").styles.background = css_hdr_bg
                 if hdr_style.color and hdr_style.color.name:
                     css_hdr_fg = bashmenu_ui.parse_css_color(hdr_style.color.name)
                     if css_hdr_fg:
@@ -4516,13 +4566,16 @@ class ThemeEditScreen(Screen):
                             btn.styles.color = css_btn_fg
 
             footer_style = ts.get("footer") or ts.get("background")
-            if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
-                css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
-                if css_ftr_bg:
-                    with contextlib.suppress(Exception):
-                        self.query_one("#footer").styles.background = css_ftr_bg
+            css_ftr_bg = (
+                bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
+                if (footer_style and footer_style.bgcolor and footer_style.bgcolor.name)
+                else css_bg
+            )
+            if css_ftr_bg:
+                with contextlib.suppress(Exception):
+                    self.query_one("#footer").styles.background = css_ftr_bg
 
-            help_style = ts.get("help_text") or ts.get("shortcut_key") or accent_style
+            help_style = footer_style if (footer_style and footer_style.color and footer_style.color.name) else (ts.get("help_text") or ts.get("shortcut_key") or accent_style)
             if help_style and help_style.color and help_style.color.name:
                 css_help = bashmenu_ui.parse_css_color(help_style.color.name)
                 if css_help:

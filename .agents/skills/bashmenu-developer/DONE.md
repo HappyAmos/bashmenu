@@ -400,4 +400,21 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 - **Fix:** Replaced the faulty `len(screen_stack) > 1` check in `bashmenu.py` and `bashmenu_ui.py` with proper screen visibility checks: verify `scr._is_covered()` if implemented, and verify whether `app.screen is not scr` or `scr` is not the top screen on `screen_stack` (`screen_stack[-1] is not scr`).
 - **Tests:** Added `test_marquee_ticks_in_bashmenu_app_and_modal_pause` in `.tests/test_improvements.py` verifying marquee ticks under `BashMenuApp` with 2 screens, advances offset after 4 pause ticks, pauses when a modal screen is pushed, resumes when popped, and renders scrolled right-bracket text.
 
+---
+
+### 34. Synchronize Menu Editor, Text Editor, and Modals Theme Colors with Mock Previews
+- **Item:** `- [x] BUG: Colors in the menu editor and text editor do not match the colors displayed in the mock menu editor and mock text editor previews in the theme editor (e.g., title bar appears orangish with grey text in real editors vs. black in mock previews).`
+- **Root Cause:**
+  1. `MenuEditScreen.DEFAULT_CSS` (`#header`), `BashEditScreen.DEFAULT_CSS` (`#editor_header_bar`), and `ThemeEditScreen.DEFAULT_CSS` (`#header`) set `background: $accent; color: $text;`, where `$accent` in Textual's default `textual-dark` theme is `#ffa62b` (orange). Similarly, `#footer` / `#editor_legend` and `#editor_status` set `$surface` / `$panel` backgrounds.
+  2. When a theme token specifies `-1` (inherit background) for its background color—such as `header: [251, -1]`, `footer: [245, -1]`, or `status: [250, -1]`—`init_theme_colors()` resolves `bgcolor=None`. `apply_theme()` in `menuedit.py`, `bashedit.py`, and `themeedit.py` checked `if hdr_style.bgcolor and hdr_style.bgcolor.name:` and did nothing when `bgcolor` was `None`, leaving the hardcoded Textual `$accent` (orange) / `$panel` / `$surface` background intact.
+  3. `.footer_item` in `menuedit.py` and `bashedit.py` ignored `footer_style.color` and always used `accent`.
+  4. `init_theme_colors()` in `bashmenu_ui.py` set `ed_styles["line_number"]` and `ed_styles["eof_tilde"]` from top-level `styles.get("gutter")` before `ed_styles.get("gutter")`, shadowing `editor.gutter`.
+  5. `ThemePreviewWidget` (`_render_menu_editor`, `_render_text_editor`, `_render_modals`) in `themeedit.py` did not attach `menu_editor.background`, `editor.background`, or `modals.background` to spans whose token had `bgcolor=None`.
+- **Fix:**
+  1. Updated `MenuEditScreen.apply_theme` (`menuedit.py`), `BashEditScreen.apply_theme` & `_apply_tab_styles` (`bashedit.py`), and `ThemeEditScreen.apply_theme` (`themeedit.py`) to fall back `#header` / `#editor_header_bar`, `#footer` / `#editor_legend`, `#editor_status`, and tab items to `css_bg` (`menu_editor.background` / `editor.background` / `tab_bar` / `background`) whenever token `bgcolor` is `None`, and to respect `footer_style.color` on `.footer_item`.
+  2. Updated `init_theme_colors` (`bashmenu_ui.py`) to resolve `ed_styles["gutter"]` before `line_number` and `eof_tilde` and fall back to `ed_styles.get("gutter") or styles.get("gutter")`.
+  3. Updated `_render_menu_editor`, `_render_text_editor`, and `_render_modals` (`themeedit.py`) to apply section background colors (`me_bg_color`, `ed_bg_color`, `tb_bg_color`, `mod_bg_color`) whenever a token style has `bgcolor=None`.
+- **Tests:** Added `test_init_theme_colors_editor_gutter_fallback`, `test_menuedit_and_bashedit_header_footer_status_background_inheritance`, and `test_preview_widget_menu_and_text_editor_background_inheritance` in `.tests/test_theme_tokens.py`.
+
+
 

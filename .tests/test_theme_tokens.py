@@ -18,6 +18,7 @@ from textual.widgets import Button, Input, Label
 
 import bashedit
 import bashmenu_ui
+import menuedit
 import themeedit
 
 
@@ -308,6 +309,144 @@ class TestThemeTokens(unittest.TestCase):
         self.assertEqual(tab_inactive.styles.color, bashmenu_ui.parse_css_color("color(245)"))
         self.assertEqual(tab_close.styles.color, bashmenu_ui.parse_css_color("color(196)"))
         self.assertEqual(tab_add.styles.color, bashmenu_ui.parse_css_color("color(46)"))
+        # Close and add buttons with bgcolor=None fall back to tab_bar background
+        self.assertEqual(tab_close.styles.background, bashmenu_ui.parse_css_color("color(234)"))
+        self.assertEqual(tab_add.styles.background, bashmenu_ui.parse_css_color("color(234)"))
+
+    def test_init_theme_colors_editor_gutter_fallback(self):
+        """Verify editor.gutter is used as fallback for line_number and eof_tilde before top-level gutter."""
+        raw_theme = {
+            "background": "COLOR_BLACK",
+            "gutter": [238, -1],
+            "editor": {
+                "gutter": [214, 235],
+            },
+        }
+        styles = bashmenu_ui.init_theme_colors("test_ed_gutter", raw_theme_data={"test_ed_gutter": raw_theme})
+        ed_styles = styles["editor"]
+        self.assertEqual(ed_styles["line_number"].color.name, "color(214)")
+        self.assertEqual(ed_styles["line_number"].bgcolor.name, "color(235)")
+        self.assertEqual(ed_styles["eof_tilde"].color.name, "color(214)")
+        self.assertEqual(ed_styles["eof_tilde"].bgcolor.name, "color(235)")
+
+    def test_menuedit_and_bashedit_header_footer_status_background_inheritance(self):
+        """Verify MenuEditScreen and BashEditScreen inherit background when header/footer/status bgcolor is None (-1)."""
+        raw_theme = {
+            "background": 16,
+            "header": [251, -1],
+            "footer": [245, -1],
+            "menu_editor": {
+                "background": 233,
+                "header": [251, -1],
+                "footer": [245, -1],
+            },
+            "editor": {
+                "background": 234,
+                "header": [251, -1],
+                "status": [250, -1],
+                "footer": [245, -1],
+            },
+        }
+        styles = bashmenu_ui.init_theme_colors("test_hdr_bg", raw_theme_data={"test_hdr_bg": raw_theme})
+
+        # 1. Verify MenuEditScreen.apply_theme
+        me_widgets = {
+            "#workspace": mock.MagicMock(),
+            "#tree_panel": mock.MagicMock(),
+            "#inspector_panel": mock.MagicMock(),
+            "#tree": mock.MagicMock(),
+            "#inspector_content": mock.MagicMock(),
+            "#header": mock.MagicMock(),
+            "#header_title": mock.MagicMock(),
+            "#inspector_title": mock.MagicMock(),
+            "#footer": mock.MagicMock(),
+            "#btn_close_x": mock.MagicMock(),
+        }
+        me_footer_item = mock.MagicMock()
+        me_screen = mock.MagicMock()
+        me_screen.app.batch_update.return_value.__enter__ = mock.MagicMock()
+        me_screen.app.batch_update.return_value.__exit__ = mock.MagicMock()
+        me_screen.query_one.side_effect = lambda sel, *a: me_widgets[sel]
+        me_screen.query.side_effect = lambda sel: [me_footer_item] if sel == ".footer_item" else []
+
+        with mock.patch("bashmenu_ui.resolve_theme_dict", return_value=styles), mock.patch(
+            "bashmenu_ui.apply_theme_to_textual_borders"
+        ):
+            menuedit.MenuEditScreen.apply_theme(me_screen)
+
+        expected_me_bg = bashmenu_ui.parse_css_color("color(233)")
+        self.assertEqual(me_widgets["#header"].styles.background, expected_me_bg)
+        self.assertEqual(me_widgets["#footer"].styles.background, expected_me_bg)
+        self.assertEqual(me_widgets["#header_title"].styles.color, bashmenu_ui.parse_css_color("color(251)"))
+        self.assertEqual(me_footer_item.styles.color, bashmenu_ui.parse_css_color("color(245)"))
+
+        # 2. Verify BashEditScreen.apply_theme
+        be_widgets = {
+            "#editor_main": mock.MagicMock(),
+            "#editor_widget": mock.MagicMock(),
+            "#editor_header_bar": mock.MagicMock(),
+            "#editor_header": mock.MagicMock(),
+            "#editor_divider": mock.MagicMock(),
+            "#editor_status": mock.MagicMock(),
+            "#editor_legend": mock.MagicMock(),
+            "#btn_close_x": mock.MagicMock(),
+            "#editor_tab_bar": mock.MagicMock(),
+        }
+        be_footer_item = mock.MagicMock()
+        be_screen = mock.MagicMock()
+        be_screen.app.batch_update.return_value.__enter__ = mock.MagicMock()
+        be_screen.app.batch_update.return_value.__exit__ = mock.MagicMock()
+        be_screen.query_one.side_effect = lambda sel, *a: be_widgets[sel]
+        be_screen.query.side_effect = lambda sel: [be_footer_item] if sel == ".footer_item" else []
+
+        with mock.patch("bashmenu_ui.resolve_theme_dict", return_value=styles), mock.patch(
+            "bashmenu_ui.apply_theme_to_textual_borders"
+        ):
+            bashedit.BashEditScreen.apply_theme(be_screen)
+
+        expected_ed_bg = bashmenu_ui.parse_css_color("color(234)")
+        self.assertEqual(be_widgets["#editor_header_bar"].styles.background, expected_ed_bg)
+        self.assertEqual(be_widgets["#editor_status"].styles.background, expected_ed_bg)
+        self.assertEqual(be_widgets["#editor_legend"].styles.background, expected_ed_bg)
+        self.assertEqual(be_widgets["#editor_header"].styles.color, bashmenu_ui.parse_css_color("color(251)"))
+        self.assertEqual(be_footer_item.styles.color, bashmenu_ui.parse_css_color("color(245)"))
+
+    def test_preview_widget_menu_and_text_editor_background_inheritance(self):
+        """Verify ThemePreviewWidget applies menu_editor.background and editor.background when token bgcolor is None."""
+        raw_theme = {
+            256: {
+                "background": 16,
+                "header": [251, -1],
+                "menu_editor": {
+                    "background": 233,
+                    "header": [251, -1],
+                    "text": [250, -1],
+                },
+                "editor": {
+                    "background": 234,
+                    "header": [251, -1],
+                    "text": [250, -1],
+                },
+            }
+        }
+        preview = themeedit.ThemePreviewWidget(raw_theme, theme_name="custom_bg_test", preview_mode="menu_editor")
+
+        # Render menu_editor preview
+        me_text = preview.render()
+        me_lines = me_text.split("\n")
+        # Line 0 is the header line; verify its spans carry color(233) background
+        self.assertTrue(
+            any(span.style and getattr(span.style.bgcolor, "name", None) == "color(233)" for span in me_lines[0].spans)
+        )
+
+        # Render text_editor preview
+        preview.set_preview_mode("text_editor")
+        ed_text = preview.render()
+        ed_lines = ed_text.split("\n")
+        # Line 0 is the header line; verify its spans carry color(234) background
+        self.assertTrue(
+            any(span.style and getattr(span.style.bgcolor, "name", None) == "color(234)" for span in ed_lines[0].spans)
+        )
 
 
 if __name__ == "__main__":

@@ -35,11 +35,17 @@ Contains a few personal scripts as examples.
   manager abstraction (pkg, apt, dnf, pacman, brew) ensuring seamless execution
   across standard Linux, Termux, WSL, and macOS.
 - **Complete Theme Editor**: Visual theme editor for `bashmenu.themes` (run with
-  `F3`).
+  `F2`).
 - **Built-in Text Editor (`bashedit.py`)**: Built-in terminal text editor, run with
   `F2`.
 - **Built-in Notebook**: Simple Markdown/bbcode notebook. Each notebook is 
   saved as a separate yaml file in bashmenu/notebooks/ (e.g. `bashmenu/notebooks/todo.yml`).
+- **Built-in Pager**: Includes a built-in pager tool (bmpager) to enable scrolling and 
+  editing of files.
+- **Built-in Markdown Renderer**: Utilizes the Python Rich library to render markdown 
+  in the console. 
+- **Built-in Cheatsheet Tool**: Utilizes bmpager and the Rich Markdown renderer to 
+  display markdown formatted cheatsheets in a specified directory.
 
 ---
 

@@ -1,4 +1,5 @@
 
+- [x] BUG: Synchronize Menu Editor, Text Editor, and Modals theme colors with Theme Editor mock previews (fix orange $accent header bar / $panel status bar / footer background leak when token bgcolor is -1, and inherit section backgrounds in mock previews).
 - [x] BUG: Marquee not working when hovering over overflowing menu items (e.g. "Configure Status Gutter"). Fix screen stack depth check in _tick_marquee and MarqueeLabel._on_tick.
 - [x] BUG: Changing a value of the bashmenu.yml config file does not update a menu item that relies on it's value. Initiate line refresh across all placeholder-bearing menu items in the current menu after item action completes.
 - [x] CRITICAL BUG: Replace "choice" menu item type completely with "radio" type. Implement true radio-button interface (vertical list, (•)/( ) indicators, standard Select/Cancel buttons, keyboard/mouse nav). Update schema, eliminate "choice" completely, integrate "radio" type with full options configuration and badges into menuedit.py, update documentation, and update tests.

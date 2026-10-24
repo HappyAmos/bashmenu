@@ -1609,15 +1609,16 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     ed_styles.setdefault("tab_inactive", styles.get("text"))
     ed_styles.setdefault("tab_close", styles.get("window_close_button") or styles.get("button_error"))
     ed_styles.setdefault("tab_add", styles.get("accent") or styles.get("button_primary"))
-    ed_styles.setdefault("line_number", styles.get("gutter"))
     ed_styles.setdefault("gutter", styles.get("gutter"))
-    ed_styles.setdefault("eof_tilde", styles.get("gutter"))
+    ed_styles.setdefault("line_number", ed_styles.get("gutter") or styles.get("gutter"))
+    ed_styles.setdefault("eof_tilde", ed_styles.get("gutter") or styles.get("gutter"))
     ed_styles.setdefault("text", styles.get("text"))
     ed_styles.setdefault("selection", styles.get("selection"))
     ed_styles.setdefault("whitespace", styles.get("whitespace"))
     ed_styles.setdefault("status", ed_styles.get("header") or styles.get("footer"))
     ed_styles.setdefault("footer", styles.get("footer"))
     ed_styles.setdefault("border", styles.get("border"))
+    ed_styles.setdefault("scrollbar", styles.get("scrollbar"))
 
     me_styles = styles.setdefault("menu_editor", {})
     if not isinstance(me_styles, dict):
@@ -1635,6 +1636,7 @@ def init_theme_colors(theme_name: str = "dracula", raw_theme_data: dict | None =
     me_styles.setdefault("button_save", styles.get("button_primary") or styles.get("button_success"))
     me_styles.setdefault("button_delete", styles.get("button_error"))
     me_styles.setdefault("footer", styles.get("footer"))
+    me_styles.setdefault("scrollbar", styles.get("scrollbar"))
 
     mod_styles = styles.setdefault("modals", {})
     if not isinstance(mod_styles, dict):

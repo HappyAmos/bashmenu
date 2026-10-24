@@ -1831,16 +1831,23 @@ class BashEditScreen(Screen):
         with contextlib.suppress(Exception):
             ed_styles = self.theme_styles.get("editor") if isinstance(self.theme_styles.get("editor"), dict) else {}
             tab_bar_style = ed_styles.get("tab_bar") or ed_styles.get("background") or self.theme_styles.get("background")
-            if tab_bar_style and tab_bar_style.bgcolor and tab_bar_style.bgcolor.name:
-                css_tb_bg = bashmenu_ui.parse_css_color(tab_bar_style.bgcolor.name)
-                if css_tb_bg:
-                    with contextlib.suppress(Exception):
-                        self.query_one("#editor_tab_bar").styles.background = css_tb_bg
+            css_tb_bg = (
+                bashmenu_ui.parse_css_color(tab_bar_style.bgcolor.name)
+                if (tab_bar_style and tab_bar_style.bgcolor and tab_bar_style.bgcolor.name)
+                else None
+            )
+            if css_tb_bg:
+                with contextlib.suppress(Exception):
+                    self.query_one("#editor_tab_bar").styles.background = css_tb_bg
 
             tab_act_style = ed_styles.get("tab_active") or self.theme_styles.get("selection") or self.theme_styles.get("highlight")
             if tab_act_style:
                 css_act_fg = bashmenu_ui.parse_css_color(tab_act_style.color.name) if tab_act_style.color and tab_act_style.color.name else None
-                css_act_bg = bashmenu_ui.parse_css_color(tab_act_style.bgcolor.name) if tab_act_style.bgcolor and tab_act_style.bgcolor.name else None
+                css_act_bg = (
+                    bashmenu_ui.parse_css_color(tab_act_style.bgcolor.name)
+                    if (tab_act_style.bgcolor and tab_act_style.bgcolor.name)
+                    else css_tb_bg
+                )
                 with contextlib.suppress(Exception):
                     for lbl in self.query(".editor_tab_active"):
                         if css_act_fg:
@@ -1851,7 +1858,11 @@ class BashEditScreen(Screen):
             tab_inact_style = ed_styles.get("tab_inactive") or ed_styles.get("text") or self.theme_styles.get("text")
             if tab_inact_style:
                 css_inact_fg = bashmenu_ui.parse_css_color(tab_inact_style.color.name) if tab_inact_style.color and tab_inact_style.color.name else None
-                css_inact_bg = bashmenu_ui.parse_css_color(tab_inact_style.bgcolor.name) if tab_inact_style.bgcolor and tab_inact_style.bgcolor.name else None
+                css_inact_bg = (
+                    bashmenu_ui.parse_css_color(tab_inact_style.bgcolor.name)
+                    if (tab_inact_style.bgcolor and tab_inact_style.bgcolor.name)
+                    else css_tb_bg
+                )
                 with contextlib.suppress(Exception):
                     for lbl in self.query(".editor_tab"):
                         if css_inact_fg:
@@ -1860,20 +1871,34 @@ class BashEditScreen(Screen):
                             lbl.styles.background = css_inact_bg
 
             tab_close_style = ed_styles.get("tab_close") or self.theme_styles.get("window_close_button") or self.theme_styles.get("button_error")
-            if tab_close_style and tab_close_style.color and tab_close_style.color.name:
-                css_tc_fg = bashmenu_ui.parse_css_color(tab_close_style.color.name)
-                if css_tc_fg:
-                    with contextlib.suppress(Exception):
-                        for tc in self.query(".editor_tab_close"):
+            if tab_close_style:
+                css_tc_fg = bashmenu_ui.parse_css_color(tab_close_style.color.name) if tab_close_style.color and tab_close_style.color.name else None
+                css_tc_bg = (
+                    bashmenu_ui.parse_css_color(tab_close_style.bgcolor.name)
+                    if (tab_close_style.bgcolor and tab_close_style.bgcolor.name)
+                    else css_tb_bg
+                )
+                with contextlib.suppress(Exception):
+                    for tc in self.query(".editor_tab_close"):
+                        if css_tc_fg:
                             tc.styles.color = css_tc_fg
+                        if css_tc_bg:
+                            tc.styles.background = css_tc_bg
 
             tab_add_style = ed_styles.get("tab_add") or self.theme_styles.get("accent") or self.theme_styles.get("button_primary")
-            if tab_add_style and tab_add_style.color and tab_add_style.color.name:
-                css_ta_fg = bashmenu_ui.parse_css_color(tab_add_style.color.name)
-                if css_ta_fg:
-                    with contextlib.suppress(Exception):
-                        for ta in self.query(".editor_tab_add"):
+            if tab_add_style:
+                css_ta_fg = bashmenu_ui.parse_css_color(tab_add_style.color.name) if tab_add_style.color and tab_add_style.color.name else None
+                css_ta_bg = (
+                    bashmenu_ui.parse_css_color(tab_add_style.bgcolor.name)
+                    if (tab_add_style.bgcolor and tab_add_style.bgcolor.name)
+                    else css_tb_bg
+                )
+                with contextlib.suppress(Exception):
+                    for ta in self.query(".editor_tab_add"):
+                        if css_ta_fg:
                             ta.styles.color = css_ta_fg
+                        if css_ta_bg:
+                            ta.styles.background = css_ta_bg
 
     def refresh_tab_bar(self) -> None:
         try:
@@ -2003,13 +2028,16 @@ class BashEditScreen(Screen):
                 bashmenu_ui.apply_theme_to_textual_borders(t_name)
             ed_styles = self.theme_styles.get("editor") if isinstance(self.theme_styles.get("editor"), dict) else {}
             bg_style = ed_styles.get("background") or self.theme_styles.get("background")
-            if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
-                css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
-                if css_bg:
-                    with contextlib.suppress(Exception):
-                        self.styles.background = css_bg
-                    with contextlib.suppress(Exception):
-                        self.query_one("#editor_widget", EditorWidget).styles.background = css_bg
+            css_bg = (
+                bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                if (bg_style and bg_style.bgcolor and bg_style.bgcolor.name)
+                else None
+            )
+            if css_bg:
+                with contextlib.suppress(Exception):
+                    self.styles.background = css_bg
+                with contextlib.suppress(Exception):
+                    self.query_one("#editor_widget", EditorWidget).styles.background = css_bg
 
             text_style = ed_styles.get("text") or self.theme_styles.get("text")
             if text_style and text_style.color and text_style.color.name:
@@ -2020,11 +2048,14 @@ class BashEditScreen(Screen):
 
             hdr_style = ed_styles.get("header") or self.theme_styles.get("header") or self.theme_styles.get("title")
             if hdr_style:
-                if hdr_style.bgcolor and hdr_style.bgcolor.name:
-                    css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
-                    if css_hdr_bg:
-                        with contextlib.suppress(Exception):
-                            self.query_one("#editor_header_bar").styles.background = css_hdr_bg
+                css_hdr_bg = (
+                    bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
+                    if (hdr_style.bgcolor and hdr_style.bgcolor.name)
+                    else css_bg
+                )
+                if css_hdr_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_header_bar").styles.background = css_hdr_bg
                 if hdr_style.color and hdr_style.color.name:
                     css_hdr_fg = bashmenu_ui.parse_css_color(hdr_style.color.name)
                     if css_hdr_fg:
@@ -2053,20 +2084,26 @@ class BashEditScreen(Screen):
             with contextlib.suppress(Exception):
                 self.query_one("#editor_divider", Label).update(div_char * 500)
 
-            divider_style = self.theme_styles.get("divider") or self.theme_styles.get("border") or self.theme_styles.get("accent")
+            divider_style = ed_styles.get("border") or self.theme_styles.get("divider") or self.theme_styles.get("border") or self.theme_styles.get("accent")
             if divider_style and divider_style.color and divider_style.color.name:
                 css_div = bashmenu_ui.parse_css_color(divider_style.color.name)
                 if css_div:
                     with contextlib.suppress(Exception):
                         self.query_one("#editor_divider", Label).styles.color = css_div
+            if css_bg:
+                with contextlib.suppress(Exception):
+                    self.query_one("#editor_divider", Label).styles.background = css_bg
 
             status_style = ed_styles.get("status") or self.theme_styles.get("status") or self.theme_styles.get("footer") or self.theme_styles.get("header")
             if status_style:
-                if status_style.bgcolor and status_style.bgcolor.name:
-                    css_st_bg = bashmenu_ui.parse_css_color(status_style.bgcolor.name)
-                    if css_st_bg:
-                        with contextlib.suppress(Exception):
-                            self.query_one("#editor_status", Label).styles.background = css_st_bg
+                css_st_bg = (
+                    bashmenu_ui.parse_css_color(status_style.bgcolor.name)
+                    if (status_style.bgcolor and status_style.bgcolor.name)
+                    else css_bg
+                )
+                if css_st_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#editor_status", Label).styles.background = css_st_bg
                 if status_style.color and status_style.color.name:
                     css_st_fg = bashmenu_ui.parse_css_color(status_style.color.name)
                     if css_st_fg:
@@ -2074,21 +2111,29 @@ class BashEditScreen(Screen):
                             self.query_one("#editor_status", Label).styles.color = css_st_fg
 
             footer_style = ed_styles.get("footer") or self.theme_styles.get("footer") or self.theme_styles.get("background")
-            if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
-                css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
-                if css_ftr_bg:
-                    with contextlib.suppress(Exception):
-                        self.query_one("#editor_legend").styles.background = css_ftr_bg
+            css_ftr_bg = (
+                bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
+                if (footer_style and footer_style.bgcolor and footer_style.bgcolor.name)
+                else css_bg
+            )
+            if css_ftr_bg:
+                with contextlib.suppress(Exception):
+                    self.query_one("#editor_legend").styles.background = css_ftr_bg
 
             accent_style = self.theme_styles.get("accent") or self.theme_styles.get("help_text")
-            if accent_style and accent_style.color and accent_style.color.name:
-                css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
-                if css_accent:
+            ftr_fg_style = (
+                footer_style
+                if (footer_style and footer_style.color and footer_style.color.name)
+                else accent_style
+            )
+            if ftr_fg_style and ftr_fg_style.color and ftr_fg_style.color.name:
+                css_ftr_fg = bashmenu_ui.parse_css_color(ftr_fg_style.color.name)
+                if css_ftr_fg:
                     with contextlib.suppress(Exception):
                         for item in self.query(".footer_item"):
-                            item.styles.color = css_accent
+                            item.styles.color = css_ftr_fg
 
-            sep_style = self.theme_styles.get("border") or self.theme_styles.get("divider") or self.theme_styles.get("footer")
+            sep_style = ed_styles.get("border") or self.theme_styles.get("border") or self.theme_styles.get("divider") or footer_style
             if sep_style and sep_style.color and sep_style.color.name:
                 css_sep = bashmenu_ui.parse_css_color(sep_style.color.name)
                 if css_sep:

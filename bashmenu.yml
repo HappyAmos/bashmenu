@@ -53,5 +53,5 @@ settings:
   inactivity_timeout:
     milliseconds: 300000
     command: cmatrix -s
-  refresh_interval: 5
+  refresh_interval: 10
   pager_editor: vim

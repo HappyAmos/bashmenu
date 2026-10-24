@@ -64,7 +64,8 @@ notebook:
           \ with RadioSet/RadioButton, eliminated 'choice' completely across the codebase,\
           \ integrated 'radio' type with full options configuration into menuedit.py,\
           \ added schema validation in ymlcheck.py, and documented in man page and SKILL.md.\n\
-          - [x] BUG: Marquee not working when hovering over overflowing menu items (e.g. 'Configure Status Gutter'). Fixed screen stack depth check in _tick_marquee and MarqueeLabel._on_tick.\n"
+          - [x] BUG: Marquee not working when hovering over overflowing menu items (e.g. 'Configure Status Gutter'). Fixed screen stack depth check in _tick_marquee and MarqueeLabel._on_tick.\n\
+          - [x] BUG: Synchronize Menu Editor, Text Editor, and Modals theme colors with Theme Editor mock previews (eliminated orange $accent header bar and $panel status/footer background leak when token bgcolor is -1, and inherited section backgrounds in mock previews).\n"
     - 'TODO (no agent):':
         type: note
         format: markdown

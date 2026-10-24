@@ -1984,20 +1984,28 @@ class MenuEditScreen(Screen):
                 bashmenu_ui.apply_theme_to_textual_borders(t_name)
             me_styles = self.theme_styles.get("menu_editor", {}) if isinstance(self.theme_styles.get("menu_editor"), dict) else {}
             bg_style = me_styles.get("background") or self.theme_styles.get("background")
-            if bg_style and bg_style.bgcolor and bg_style.bgcolor.name:
-                css_bg = bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
-                if css_bg:
-                    for wid in ["#workspace", "#tree_panel", "#inspector_panel", "#tree", "#inspector_content"]:
-                        with contextlib.suppress(Exception):
-                            self.query_one(wid).styles.background = css_bg
+            css_bg = (
+                bashmenu_ui.parse_css_color(bg_style.bgcolor.name)
+                if (bg_style and bg_style.bgcolor and bg_style.bgcolor.name)
+                else None
+            )
+            if css_bg:
+                with contextlib.suppress(Exception):
+                    self.styles.background = css_bg
+                for wid in ["#workspace", "#tree_panel", "#inspector_panel", "#tree", "#inspector_content"]:
+                    with contextlib.suppress(Exception):
+                        self.query_one(wid).styles.background = css_bg
 
             hdr_style = me_styles.get("header") or self.theme_styles.get("header") or self.theme_styles.get("title")
             if hdr_style:
-                if hdr_style.bgcolor and hdr_style.bgcolor.name:
-                    css_hdr_bg = bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
-                    if css_hdr_bg:
-                        with contextlib.suppress(Exception):
-                            self.query_one("#header").styles.background = css_hdr_bg
+                css_hdr_bg = (
+                    bashmenu_ui.parse_css_color(hdr_style.bgcolor.name)
+                    if (hdr_style.bgcolor and hdr_style.bgcolor.name)
+                    else css_bg
+                )
+                if css_hdr_bg:
+                    with contextlib.suppress(Exception):
+                        self.query_one("#header").styles.background = css_hdr_bg
                 if hdr_style.color and hdr_style.color.name:
                     css_hdr_fg = bashmenu_ui.parse_css_color(hdr_style.color.name)
                     if css_hdr_fg:
@@ -2023,7 +2031,7 @@ class MenuEditScreen(Screen):
                         with contextlib.suppress(Exception):
                             self.query_one(pid).styles.border = ("solid", css_border)
 
-            title_style = self.theme_styles.get("title") or self.theme_styles.get("accent")
+            title_style = me_styles.get("header") or self.theme_styles.get("title") or self.theme_styles.get("accent")
             if title_style and title_style.color and title_style.color.name:
                 css_title = bashmenu_ui.parse_css_color(title_style.color.name)
                 if css_title:
@@ -2039,21 +2047,29 @@ class MenuEditScreen(Screen):
                             self.query_one(wid).styles.color = css_text
 
             footer_style = me_styles.get("footer") or self.theme_styles.get("footer") or self.theme_styles.get("background")
-            if footer_style and footer_style.bgcolor and footer_style.bgcolor.name:
-                css_ftr_bg = bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
-                if css_ftr_bg:
-                    with contextlib.suppress(Exception):
-                        self.query_one("#footer").styles.background = css_ftr_bg
+            css_ftr_bg = (
+                bashmenu_ui.parse_css_color(footer_style.bgcolor.name)
+                if (footer_style and footer_style.bgcolor and footer_style.bgcolor.name)
+                else css_bg
+            )
+            if css_ftr_bg:
+                with contextlib.suppress(Exception):
+                    self.query_one("#footer").styles.background = css_ftr_bg
 
             accent_style = self.theme_styles.get("accent") or self.theme_styles.get("help_text")
-            if accent_style and accent_style.color and accent_style.color.name:
-                css_accent = bashmenu_ui.parse_css_color(accent_style.color.name)
-                if css_accent:
+            ftr_fg_style = (
+                footer_style
+                if (footer_style and footer_style.color and footer_style.color.name)
+                else accent_style
+            )
+            if ftr_fg_style and ftr_fg_style.color and ftr_fg_style.color.name:
+                css_ftr_fg = bashmenu_ui.parse_css_color(ftr_fg_style.color.name)
+                if css_ftr_fg:
                     with contextlib.suppress(Exception):
                         for item in self.query(".footer_item"):
-                            item.styles.color = css_accent
+                            item.styles.color = css_ftr_fg
 
-            sep_style = self.theme_styles.get("border") or self.theme_styles.get("divider") or self.theme_styles.get("footer")
+            sep_style = me_styles.get("border") or self.theme_styles.get("border") or self.theme_styles.get("divider") or footer_style
             if sep_style and sep_style.color and sep_style.color.name:
                 css_sep = bashmenu_ui.parse_css_color(sep_style.color.name)
                 if css_sep:
