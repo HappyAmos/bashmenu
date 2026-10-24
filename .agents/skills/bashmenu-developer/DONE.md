@@ -392,4 +392,12 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
   5. *Documentation*: Documented `radio` in `bashmenu.1` man page and `SKILL.md`.
 - **Tests:** Added `test_radio_modal_preselects_current_value`, `test_radio_modal_number_shortcut_and_submit`, `test_radio_modal_cancel_returns_none`, `test_radio_badge_and_type_detection`, `test_radio_options_parsing_in_save`, `test_choice_is_invalid`, `test_radio_is_valid_type`, and `test_radio_missing_options_or_key_reports_error` in `.tests/test_radio_and_placeholders.py`. Updated `test_radio_modal_screen_dispatch` in `.tests/test_pager.py`.
 
+---
+
+### 33. Fix Menu Marquee Ticking on Overflowing Options
+- **Item:** `- [x] BUG: Marquee not working when hovering over overflowing menu items (e.g., "Configure Status Gutter"). Initiate marquee for overflowing right-aligned text when selection indicator pauses.`
+- **Root Cause:** In `MainMenuView._tick_marquee` (`bashmenu.py`) and `MarqueeLabel._on_tick` (`bashmenu_ui.py`), an overlay screen check had `len(getattr(app, "screen_stack", [])) > 1`. In Textual applications, `app.screen_stack` always contains root `_default` at index 0, and `BashMenuApp.on_mount()` pushes `BashMenuScreen` on top, making `len(screen_stack) == 2` under normal idle operation. Because `2 > 1` was always True, `_tick_marquee` and `_on_tick` exited on every tick, permanently freezing the marquee tracker at offset 0 and 4 pause ticks.
+- **Fix:** Replaced the faulty `len(screen_stack) > 1` check in `bashmenu.py` and `bashmenu_ui.py` with proper screen visibility checks: verify `scr._is_covered()` if implemented, and verify whether `app.screen is not scr` or `scr` is not the top screen on `screen_stack` (`screen_stack[-1] is not scr`).
+- **Tests:** Added `test_marquee_ticks_in_bashmenu_app_and_modal_pause` in `.tests/test_improvements.py` verifying marquee ticks under `BashMenuApp` with 2 screens, advances offset after 4 pause ticks, pauses when a modal screen is pushed, resumes when popped, and renders scrolled right-bracket text.
+
 

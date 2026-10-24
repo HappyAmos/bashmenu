@@ -63,7 +63,8 @@ notebook:
           \ menu item type completely with 'radio'. Implemented true radio-button interface\
           \ with RadioSet/RadioButton, eliminated 'choice' completely across the codebase,\
           \ integrated 'radio' type with full options configuration into menuedit.py,\
-          \ added schema validation in ymlcheck.py, and documented in man page and SKILL.md.\n"
+          \ added schema validation in ymlcheck.py, and documented in man page and SKILL.md.\n\
+          - [x] BUG: Marquee not working when hovering over overflowing menu items (e.g. 'Configure Status Gutter'). Fixed screen stack depth check in _tick_marquee and MarqueeLabel._on_tick.\n"
     - 'TODO (no agent):':
         type: note
         format: markdown

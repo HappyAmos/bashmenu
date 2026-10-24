@@ -7,7 +7,7 @@ items:
       submenu:
         title: New submenu
         items:
-          - Convert Image To BM Wallpaper:
+          - Convert Image To BM Wallpaper [80x48]:
               type: command
               icon: '{nf::#f11e7}'
               command: convert "{file_picker:path:{bashmenu_dir}/assets/wallpapers}"
@@ -577,6 +577,8 @@ items:
                           value: default
                         - label: Built-in Editor (BashEdit)
                           value: builtin
+                        - label: Vim
+                          value: vim
                       icon: '{nf::#f044}'
                       action: settings.pager_editor
                       interactive: true

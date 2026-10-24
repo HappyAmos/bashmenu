@@ -1433,8 +1433,14 @@ class MarqueeLabel(Label):
         with contextlib.suppress(Exception):
             app = getattr(self, "app", None)
             scr = getattr(self, "screen", None)
-            if app and (len(getattr(app, "screen_stack", [])) > 1 or (scr and getattr(app, "screen", None) is not scr)):
+            if scr and hasattr(scr, "_is_covered") and scr._is_covered():
                 return
+            if app:
+                if scr and getattr(app, "screen", None) is not scr:
+                    return
+                screen_stack = getattr(app, "screen_stack", None)
+                if screen_stack and scr in screen_stack and screen_stack[-1] is not scr:
+                    return
         if self.tracker.tick():
             self.refresh()
 

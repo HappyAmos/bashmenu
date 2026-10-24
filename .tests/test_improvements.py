@@ -4165,6 +4165,63 @@ G
             'ls "/var/log"',
         )
 
+    def test_marquee_ticks_in_bashmenu_app_and_modal_pause(self):
+        """Verify marquee ticks properly in BashMenuApp (len(screen_stack) == 2),
+        scrolls overflowing option text, and pauses when a modal screen covers it.
+        """
+        import asyncio
+
+        from textual.screen import ModalScreen
+        from textual.widgets import Label
+
+        class DummyModal(ModalScreen):
+            def compose(self):
+                yield Label("modal")
+
+        async def run_marquee_test():
+            app = bashmenu.BashMenuApp()
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                mv = app.screen.query_one(bashmenu.MainMenuView)
+                if mv._marquee_timer:
+                    mv._marquee_timer.stop()
+                mv._marquee_tracker.reset()
+
+                # In BashMenuApp, screen_stack has [_default, BashMenuScreen]
+                self.assertEqual(len(app.screen_stack), 2)
+                self.assertEqual(mv._marquee_tracker.offset, 0)
+                self.assertEqual(mv._marquee_tracker.ticks_remaining, 4)
+
+                # 4 pause ticks
+                for _ in range(4):
+                    mv._tick_marquee()
+                    self.assertEqual(mv._marquee_tracker.offset, 0)
+
+                # 5th tick advances offset
+                mv._tick_marquee()
+                self.assertEqual(mv._marquee_tracker.offset, 1)
+
+                # Push modal screen over BashMenuScreen
+                app.push_screen(DummyModal())
+                await pilot.pause()
+                self.assertEqual(len(app.screen_stack), 3)
+
+                # While modal is open, marquee should not tick
+                curr_offset = mv._marquee_tracker.offset
+                mv._tick_marquee()
+                self.assertEqual(mv._marquee_tracker.offset, curr_offset)
+
+                # Dismiss modal
+                app.pop_screen()
+                await pilot.pause()
+                self.assertEqual(len(app.screen_stack), 2)
+
+                # Ticking resumes
+                mv._tick_marquee()
+                self.assertEqual(mv._marquee_tracker.offset, curr_offset + 1)
+
+        asyncio.run(run_marquee_test())
+
 
 if __name__ == "__main__":
     unittest.main()
