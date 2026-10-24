@@ -2320,6 +2320,48 @@ class TestThemeEditor(unittest.TestCase):
 
         asyncio.run(run_checks())
 
+    def test_preview_panel_displays_gutter_in_viewport_for_all_modes(self):
+        """Verify Mock Menu, Menu Editor, and Text Editor previews display their help/status gutters within visible viewport rows."""
+        async def run_checks():
+            app = themeedit.ThemeEditApp(theme_name="dracula")
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                screen = app.screen
+                prev = screen.query_one("#live_preview", themeedit.ThemePreviewWidget)
+                tabs = screen.query_one("#preview_tabs", themeedit.Tabs)
+
+                # 1. Mock Menu mode
+                self.assertEqual(prev.preview_mode, "menu")
+                menu_lines = prev.render().plain.splitlines()
+                self.assertEqual(len(menu_lines), prev.size.height)
+                visible_menu = "\n".join(prev.render_line(y).text for y in range(prev.size.height))
+                self.assertIn("[F1] Help", visible_menu)
+                self.assertIn("12:45", visible_menu)
+
+                # 2. Menu Editor mode
+                tabs.active = "tab_menu_editor"
+                await pilot.pause()
+                self.assertEqual(prev.preview_mode, "menu_editor")
+                me_lines = prev.render().plain.splitlines()
+                self.assertEqual(len(me_lines), prev.size.height)
+                visible_me = "\n".join(prev.render_line(y).text for y in range(prev.size.height))
+                self.assertIn("[F1] Help", visible_me)
+                self.assertIn("[F3] Add", visible_me)
+
+                # 3. Text Editor mode
+                tabs.active = "tab_text_editor"
+                await pilot.pause()
+                self.assertEqual(prev.preview_mode, "text_editor")
+                te_lines = prev.render().plain.splitlines()
+                self.assertEqual(len(te_lines), prev.size.height)
+                visible_te = "\n".join(prev.render_line(y).text for y in range(prev.size.height))
+                self.assertIn("[ Read 18 lines ]", visible_te)
+                self.assertIn("Line: 3  Col: 15", visible_te)
+                self.assertIn("^G Help", visible_te)
+                self.assertIn("^O Save", visible_te)
+
+        asyncio.run(run_checks())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2850,7 +2850,7 @@ class ThemePreviewWidget(Static):
         split_x = max(18, min(24, w // 2 - 2))
         right_w = max(8, w - split_x - 4)
 
-        body_rows = max(5, num_rows - 3)
+        body_rows = max(4, num_rows - 5)
         editor_items = [
             ("▼ ", "Main Menu", "Title: ", "[ My Menu    ]"),
             ("  ├─▶ ", "Apps", "Icon:  ", "[ 📁         ]"),
@@ -2934,17 +2934,33 @@ class ThemePreviewWidget(Static):
             set_hit_range(y_curr, w - 1, w, "color_menu_editor__border", "prop_border_vertical")
             set_hit_range(y_curr, w, w + 2, "color_shadow", "prop_shadow_char")
 
+        # Gutter top border
+        y_gt = 1 + body_rows
+        gt_line = Text()
+        gt_line.append("├" + b_h_bot * split_x + "┴" + b_h_bot * max(0, w - 3 - split_x) + "┤", style=b_style)
+        gt_line.append(shadow_ch * 2, style=shadow_style)
+        lines.append(gt_line)
+
+        set_hit_range(y_gt, 0, w, "color_menu_editor__border", "gutter_border")
+        set_hit_range(y_gt, w, w + 2, "color_shadow", "prop_shadow_char")
+
         # Bottom gutter / shortcut line
-        y_g = 1 + body_rows
+        y_g = y_gt + 1
         g_line = Text()
-        g_line.append("├", style=b_style)
-        g_text = "[F1] Help | [F3] Add | [Del] Delete | [ESC] Back"
+        g_line.append(b_v_left, style=b_style)
+        all_me_items = ["[F1] Help", "[F3] Add", "[Del] Delete", "[ESC] Back"]
+        chosen_me = ["[F1] Help", "[F3] Add"]
+        for cand in all_me_items[2:]:
+            if len(" " + " | ".join([*chosen_me, cand]) + " ") <= w - 2:
+                chosen_me.append(cand)
+        g_text = " | ".join(chosen_me)
         g_part = Text(f" {g_text} ", style=help_style)
         if g_part.cell_len > w - 2:
             g_part.truncate(w - 2)
         g_pad = max(0, w - 2 - g_part.cell_len)
+        g_part.append(" " * g_pad, style=help_style)
         g_line.append_text(g_part)
-        g_line.append(b_h_bot * g_pad + "┤", style=b_style)
+        g_line.append(b_v_right, style=b_style)
         g_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(g_line)
 
@@ -3184,14 +3200,20 @@ class ThemePreviewWidget(Static):
         # Footer shortcut legend
         y_ft = y_st + 1
         ft_line = Text()
-        ft_line.append("├", style=ed_b_style)
-        legend_txt = " ^G Help | ^O Save | ^R Open | ^W Find | ^K Cut | ^X Exit "
+        ft_line.append(b_v_left, style=ed_b_style)
+        all_leg_items = ["^G Help", "^O Save", "^R Open", "^W Find", "^K Cut", "^X Exit"]
+        chosen_leg = ["^G Help", "^O Save"]
+        for cand in all_leg_items[2:]:
+            if len(" " + " | ".join([*chosen_leg, cand]) + " ") <= w - 2:
+                chosen_leg.append(cand)
+        legend_txt = " " + " | ".join(chosen_leg) + " "
         leg_part = Text(legend_txt, style=ed_footer_style)
         if leg_part.cell_len > w - 2:
             leg_part.truncate(w - 2)
         leg_pad = max(0, w - 2 - leg_part.cell_len)
+        leg_part.append(" " * leg_pad, style=ed_footer_style)
         ft_line.append_text(leg_part)
-        ft_line.append(b_h_bot * leg_pad + "┤", style=ed_b_style)
+        ft_line.append(b_v_right, style=ed_b_style)
         ft_line.append(shadow_ch * 2, style=shadow_style)
         lines.append(ft_line)
         set_hit_range(y_ft, 0, 1, "color_border")
@@ -3599,17 +3621,36 @@ class ThemePreviewWidget(Static):
 
         return _finish(out)
 
-    def render(self) -> Text:
-        """Render complete simulated BashMenu frame with active borders and styles."""
+    def _get_target_dimensions(self) -> tuple[int, int]:
+        """Compute target preview width and row count based on widget and parent dimensions."""
+        self_size = getattr(self, "size", None)
         parent = getattr(self, "parent", None)
-        if parent and getattr(parent, "size", None) and parent.size.width > 20 and parent.size.height > 10:
-            inner_pw = max(40, parent.size.width - 3)
-            inner_ph = max(12, parent.size.height - 2)
+        parent_size = getattr(parent, "size", None) if parent else None
+
+        if self_size and self_size.width > 20 and self_size.height >= 10:
+            inner_pw = max(40, self_size.width - 3)
+            w = max(38, inner_pw - 2)
+            num_rows = max(12, self_size.height)
+            return w, num_rows
+
+        if parent_size and parent_size.width > 20 and parent_size.height > 10:
+            inner_pw = max(40, parent_size.width - 3)
+            inner_ph = max(12, parent_size.height - 5)
             w = max(38, inner_pw - 2)
             num_rows = inner_ph
-        else:
-            w = 56
-            num_rows = 12
+            return w, num_rows
+
+        return 56, 12
+
+    def on_resize(self, event: events.Resize) -> None:
+        """Invalidate cached preview lines when widget dimensions change."""
+        self._cached_base_lines = None
+        self._cached_strips = None
+        self.refresh()
+
+    def render(self) -> Text:
+        """Render complete simulated BashMenu frame with active borders and styles."""
+        w, num_rows = self._get_target_dimensions()
 
         if w != getattr(self, "_last_w", None) or num_rows != getattr(self, "_last_h", None):
             self._cached_base_lines = None
@@ -4108,7 +4149,12 @@ class ThemePreviewWidget(Static):
 
     def render_line(self, y: int) -> Strip:
         """Render a single line of simulated preview directly as a Strip, bypassing Textual Rich-to-Content overhead."""
-        if self._cached_strips is None:
+        w, num_rows = self._get_target_dimensions()
+        if (
+            self._cached_strips is None
+            or w != getattr(self, "_last_w", None)
+            or num_rows != getattr(self, "_last_h", None)
+        ):
             self.render()
 
         if getattr(self, "_flash_range", None):
