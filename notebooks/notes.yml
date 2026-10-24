@@ -66,7 +66,7 @@ notebook:
           \ added schema validation in ymlcheck.py, and documented in man page and SKILL.md.\n\
           - [x] BUG: Marquee not working when hovering over overflowing menu items (e.g. 'Configure Status Gutter'). Fixed screen stack depth check in _tick_marquee and MarqueeLabel._on_tick.\n\
           - [x] BUG: Synchronize Menu Editor, Text Editor, and Modals theme colors with Theme Editor mock previews (eliminated orange $accent header bar and $panel status/footer background leak when token bgcolor is -1, and inherited section backgrounds in mock previews).\n\
-          - [x] FEATURE/UI: Theme editor dropper status bar: display only 256-color codes (no hex/ANSI names) and add live '[Top: Dropper]' and '[Bot: Dropper]' swatches styled with the clicked character cell's foreground and background colors.\n"
+          - [x] FEATURE/UI: Theme editor dropper status bar: display only 256-color codes (no hex/ANSI names), add live '[Top: ▓▓▓]' and '[Bot: ▓▓▓]' foreground-only swatches, and expand #preview_status_bar to 2 rows with evenly distributed badges.\n"
     - 'TODO (no agent):':
         type: note
         format: markdown

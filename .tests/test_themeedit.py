@@ -2281,7 +2281,7 @@ class TestThemeEditor(unittest.TestCase):
         self.assertEqual(themeedit.color_val_to_256_code(-1), -1)
 
     def test_preview_status_bar_dropper_updates_on_click(self):
-        """Verify clicking preview pane updates 2-line preview_status_bar with 256-color codes and [Top: Dropper] / [Bot: Dropper] swatches."""
+        """Verify clicking preview pane updates 2-line preview_status_bar with 256-color codes and [Top: ▓▓▓] / [Bot: ▓▓▓] swatches."""
         async def run_checks():
             app = themeedit.ThemeEditApp(theme_name="lighthouse")
             async with app.run_test(size=(120, 40)) as pilot:
@@ -2300,11 +2300,13 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertIn("FG: 255", opt_lines[0])
                 self.assertIn("BG: -1", opt_lines[0])
                 self.assertNotIn("#", rendered_opt)
-                self.assertIn("[Top: Dropper]", opt_lines[1])
-                self.assertIn("[Bot: Dropper]", opt_lines[1])
-                # Verify styled spans exist on the Rich Text status bar for "Dropper"
+                self.assertIn("[Top: ▓▓▓]", opt_lines[1])
+                self.assertIn("[Bot: ▓▓▓]", opt_lines[1])
+                # Verify styled spans exist on the status bar for "▓▓▓" with foreground only (no background color)
                 if hasattr(bar_renderable, "spans"):
                     self.assertGreaterEqual(len(bar_renderable.spans), 2)
+                    for span in bar_renderable.spans:
+                        self.assertIsNone(getattr(span.style, "bgcolor", getattr(span.style, "background", None)))
 
                 # Click on background in preview
                 await pilot.click("#live_preview", offset=(45, 10))
@@ -2313,8 +2315,8 @@ class TestThemeEditor(unittest.TestCase):
                 self.assertEqual(len(bg_lines), 2)
                 self.assertIn("💧 [background]", bg_lines[0])
                 self.assertNotIn("#", rendered_bg)
-                self.assertIn("[Top: Dropper]", rendered_bg)
-                self.assertIn("[Bot: Dropper]", rendered_bg)
+                self.assertIn("[Top: ▓▓▓]", rendered_bg)
+                self.assertIn("[Bot: ▓▓▓]", rendered_bg)
 
         asyncio.run(run_checks())
 

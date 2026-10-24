@@ -418,12 +418,12 @@ This log documents completed items from `TODO.md`, detailing root causes, implem
 
 ---
 
-### 35. Theme Editor Dropper Status Bar: 2-Line Layout, 256-Color-Only Codes & Live `[Top: Dropper]` / `[Bot: Dropper]` Swatches
-- **Item:** `- [x] FEATURE/UI: Theme editor dropper status bar: display only 256-color codes (no hex/ANSI names), add live "[Top: Dropper]" and "[Bot: Dropper]" swatches styled with the clicked character cell's foreground and background colors, and expand #preview_status_bar to 2 rows with evenly distributed badges.`
+### 35. Theme Editor Dropper Status Bar: 2-Line Layout, 256-Color-Only Codes & Live `[Top: ▓▓▓]` / `[Bot: ▓▓▓]` Swatches
+- **Item:** `- [x] FEATURE/UI: Theme editor dropper status bar: display only 256-color codes (no hex/ANSI names), add live "[Top: ▓▓▓]" and "[Bot: ▓▓▓]" swatches styled with foreground-only colors from the clicked character cell, and expand #preview_status_bar to 2 rows with evenly distributed badges.`
 - **Implementation:**
   1. Added `color_val_to_256_code` in `themeedit.py` to normalize any token color value (integer, numeric string, or named ANSI constant like `COLOR_BLACK`) to its 256-color integer code (`0–255` or `-1`).
   2. Enhanced `ThemePreviewWidget.sample_color_at` (`themeedit.py`) to extract the clicked character cell's rendered `cell_fg` and `cell_bg` colors via `line.get_style_at_offset(console, cx)` on `_cached_base_lines[cy]`, falling back to the active section/theme background and text colors when `None`.
-  3. Expanded `#preview_status_bar` height to `2` in `ThemeEditScreen.DEFAULT_CSS` and updated `ThemeEditScreen.update_dropper_status` (`themeedit.py`) to split all dropper badges (`💧 [token]`, `FG: ...`, `BG: ...`, `WP Top: ...`, `WP Bot: ...`, `[Top: Dropper]`, `[Bot: Dropper]`, `(cx,cy)`) equally across 2 rows and distribute spacing evenly across the available width of each row.
+  3. Expanded `#preview_status_bar` height to `2` in `ThemeEditScreen.DEFAULT_CSS` and updated `ThemeEditScreen.update_dropper_status` (`themeedit.py`) to split all dropper badges (`💧 [token]`, `FG: ...`, `BG: ...`, `WP Top: ...`, `WP Bot: ...`, `[Top: ▓▓▓]`, `[Bot: ▓▓▓]`, `(cx,cy)`) equally across 2 rows (with `"▓▓▓"` styled using foreground-only `Style(color=cell_fg)` and `Style(color=cell_bg)`) and distribute spacing evenly across the available width of each row.
 - **Tests:** Updated `test_theme_preview_sample_color_at` and `test_preview_status_bar_dropper_updates_on_click` in `.tests/test_themeedit.py`.
 
 

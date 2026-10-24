@@ -5021,17 +5021,17 @@ class ThemeEditScreen(Screen):
                 avg_ansi = wp_avg["ansi"]
                 badges.append(Text(f"WP Cell: {avg_ansi}"))
 
-        # Live [Top: Dropper] and [Bot: Dropper] color swatches
-        top_swatch_style = Style(color=cell_fg, bgcolor=cell_bg) if (cell_fg or cell_bg) else Style()
-        bot_swatch_style = Style(color=cell_bg, bgcolor=cell_fg) if (cell_fg or cell_bg) else Style()
+        # Live [Top: ▓▓▓] and [Bot: ▓▓▓] color swatches (foreground color only)
+        top_swatch_style = Style(color=cell_fg) if cell_fg else Style()
+        bot_swatch_style = Style(color=cell_bg) if cell_bg else Style()
 
         top_badge = Text("[Top: ")
-        top_badge.append("Dropper", style=top_swatch_style)
+        top_badge.append("▓▓▓", style=top_swatch_style)
         top_badge.append("]")
         badges.append(top_badge)
 
         bot_badge = Text("[Bot: ")
-        bot_badge.append("Dropper", style=bot_swatch_style)
+        bot_badge.append("▓▓▓", style=bot_swatch_style)
         bot_badge.append("]")
         badges.append(bot_badge)
 

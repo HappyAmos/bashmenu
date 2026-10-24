@@ -5345,7 +5345,7 @@ lighthouse:
       background: COLOR_BLACK
       header:
       - 152
-      - -1
+      - 67
       tab_active:
       - 16
       - 152
@@ -5380,7 +5380,7 @@ lighthouse:
       - -1
       title:
       - 152
-      - -1
+      - 67
       text:
       - 255
       - -1
