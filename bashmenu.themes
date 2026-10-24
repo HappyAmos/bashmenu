@@ -3956,7 +3956,7 @@ nightscape:
     - 177
     - -1
     window_close_button:
-    - 203
+    - 15
     - -1
     scrollbar:
     - 189
@@ -3966,8 +3966,14 @@ nightscape:
     - -1
     menu_editor:
       background: 133
+      footer:
+      - 54
+      - -1
     editor:
       background: 133
+      footer:
+      - 54
+      - -1
   16:
     background: COLOR_BLACK
     title:
