@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "saved_at": "2026-10-25 23:23:34 EDT",
+  "pilot_name": "Captain Alex Kamal",
+  "ship_name": "Rocinante",
+  "specialization": "Belter Prospector",
+  "credits": 21250,
+  "cartel_debt": 0,
+  "has_scam_insurance": false,
+  "cargo": {
+    "water_ice": 250
+  },
+  "base_cargo_capacity": 10000,
+  "engine_tier": 1,
+  "fuel_tank_tier": 1,
+  "rcs_tank_tier": 1,
+  "installed_modules": [
+    "mod_cargo_bay_1"
+  ],
+  "position": [
+    317506.87185264606,
+    -79665.58469611658,
+    -810498.4284804799
+  ],
+  "velocity": [
+    585.1204711139595,
+    -175.83176627037713,
+    -1598.6107203940421
+  ],
+  "orientation": [
+    -0.25656724180458323,
+    -0.244342332656968,
+    -0.5006669128438362,
+    0.7898118239732567
+  ],
+  "dry_mass": 24000,
+  "fuel": 35983.71834635276,
+  "max_fuel": 36000,
+  "rcs_gas": 428.7686328903672,
+  "max_rcs_gas": 450,
+  "hull_hp": 1000,
+  "max_hull_hp": 1000,
+  "armor_rating": 500,
+  "max_armor": 500,
+  "pdc_ammo": 2500,
+  "max_pdc_ammo": 2500,
+  "torpedo_count": 6,
+  "max_torpedoes": 6,
+  "has_anti_g_suit": true,
+  "juice_doses": 9,
+  "max_juice_doses": 10,
+  "torch_g": 15,
+  "is_docked": false,
+  "docked_station": "",
+  "target_name": "Mining Outpost Vesta-9",
+  "time_scale": 1
+}

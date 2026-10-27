@@ -1089,12 +1089,20 @@ pacman:
     bottom_tee: '{ascii:219}'
     title_left_cap: '{ascii:219}'
     title_right_cap: '{ascii:219}'
-    gutter_border: '{ascii:220}'
-    gutter_separator: '{ascii:221}'
+    gutter_border: '{ascii:223}'
+    gutter_separator: '{ascii:219}'
     gutter_left_tee: '{ascii:219}'
     gutter_right_tee: '{ascii:219}'
     gutter_top_tee: '{ascii:219}'
     gutter_bottom_tee: '{ascii:219}'
+    border_horizontal: '{ascii:223}'
+    border_vertical: '{ascii:221}'
+    border_tee_left: '{ascii:219}'
+    border_tee_right: '{ascii:219}'
+    border_tee_top: '{ascii:219}'
+    border_tee_bottom: '{ascii:219}'
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
     background: COLOR_BLACK
     title:
@@ -2160,8 +2168,14 @@ amber_crt:
     gutter_right_tee: "\u2524"
     gutter_top_tee: "\u252C"
     gutter_bottom_tee: "\u2534"
+    border_tee_left: "\u251C"
+    border_tee_right: "\u2524"
+    border_tee_top: "\u252C"
+    border_tee_bottom: "\u2534"
+    border_cross: "\u253C"
+    shadow_char: "\u2591"
   256:
-    background: COLOR_BLACK
+    background: -1
     title:
     - 214
     - -1
@@ -3680,7 +3694,7 @@ mountain:
     border_cross: "\u253C"
     shadow_char: "\u2591"
   256:
-    background: COLOR_BLACK
+    background: -1
     title:
     - 255
     - -1
@@ -3741,6 +3755,12 @@ mountain:
     whitespace:
     - 239
     - -1
+    menu_editor:
+      background: 236
+    editor:
+      background: 236
+    modals:
+      background: 236
   16:
     background: COLOR_BLACK
     title:
