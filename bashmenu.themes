@@ -6851,8 +6851,8 @@ alaska-mountain:
     - COLOR_BLACK
     - -1
   background:
-    image: assets/wallpapers/alaska-mountain.pixel.png
-    opacity: 0.5
+    image: assets/wallpapers/alaska-mountain.png
+    opacity: 0.85
     scaling: stretch
     mode: quarterblock
   divider:
