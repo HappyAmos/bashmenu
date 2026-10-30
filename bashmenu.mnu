@@ -376,6 +376,22 @@ items:
         title: Internet Options
         items:
           - '{divider}':
+          - Bookmarks:
+              type: submenu
+              submenu:
+                title: New submenu
+                items:
+                  - Rust Book:
+                      type: command
+                      icon: '{nf::#f02d}'
+                      command: '{scripts_dir}/webopen.sh https://doc.rust-lang.org/rust-by-example/hello/print.html'
+                      interactive: true
+                      quiet: false
+                      alt_buffer: true
+              icon: '{nf::#f461}'
+              interactive: true
+              quiet: false
+              alt_buffer: true
           - Github.com:
               type: command
               command: '{scripts_dir}/webopen.sh https://github.com'
